@@ -7,11 +7,10 @@ import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Optional, Tuple
 from get_gtin import lookup_gtin
-from api import make_session_with_cookies, try_single_post, create_order_multistep, load_cookies
+from api import make_session_with_cookies, try_single_post, load_cookies
 
 
 # Константы (фиксированные для всех заказов)
-WAREHOUSE_ID = "59739360-7d62-434b-ad13-4617c87a6d13"
 PRODUCT_GROUP = "wheelChairs"
 RELEASE_METHOD_TYPE = "production"
 CIS_TYPE = "unit"
@@ -153,47 +152,40 @@ def safe_perform(it) -> Tuple[bool, str]:
         # cookies → session
         cookies = load_cookies()
         if not cookies:
-            # try import get_cookies from get_cookies
             try:
                 from cookies import get_cookies as external_collect  # type: ignore
-                print("Calling get_cookiesesin cookies...")
+                print("Calling get_cookies in cookies...")
                 cookies = external_collect()
             except Exception as e:
                 print("Cannot import/call get_cookies module:", e)
-                print("Either run get_cookies.py manually or fix import.")
-                return
+                return False, f"Cannot get cookies: {e}"
 
         if not cookies:
             print("Cookies not obtained; aborting.")
-            return
+            return False, "Cookies not obtained"
+
         session = make_session_with_cookies(cookies)
 
         # --- пробуем быстрый POST ---
         resp = try_single_post(
             session,
-            WAREHOUSE_ID,
             document_number,
             PRODUCT_GROUP,
             RELEASE_METHOD_TYPE,
             positions,
-            cis_type=CIS_TYPE,
             filling_method=FILLING_METHOD,
+            thumbprint="08f40b694898598b3922b69277b79fd2c84d9c85"
         )
-        if resp is not None and resp.status_code in (200, 201):
-            return True, f"Успех: {resp.text}"
 
-        # --- fallback: многошаговый сценарий ---
-        res = create_order_multistep(
-            session,
-            WAREHOUSE_ID,
-            document_number,
-            PRODUCT_GROUP,
-            RELEASE_METHOD_TYPE,
-            positions,
-            cis_type=CIS_TYPE,
-            filling_method=FILLING_METHOD,
-        )
-        return True, f"Многошаговый успех: {res}"
+        if not resp:
+            return False, "No response from API"
+
+        # проверка дублирования: если documentId уже есть, не создаём новую заявку
+        document_id = resp.get("documentId") or resp.get("id")  # зависит от API
+        status = resp.get("status") or "unknown"
+
+        print("[OK] ФИНАЛЬНЫЙ СТАТУС ДОКУМЕНТА:", status)
+        return True, f"Document {document_number} processed, status: {status}, id: {document_id}"
 
     except Exception as e:
         logging.exception("Ошибка при API-вызове вместо Selenium")
