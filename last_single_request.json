@@ -1,7 +1,7 @@
 {
   "url": "https://mk.kontur.ru/api/v1/codes-order?warehouseId=59739360-7d62-434b-ad13-4617c87a6d13",
   "body": {
-    "documentNumber": "ТЕСТ",
+    "documentNumber": "ТЕСТ 2",
     "comment": "",
     "productGroup": "wheelChairs",
     "releaseMethodType": "production",
@@ -9,10 +9,10 @@
     "cisType": "unit",
     "positions": [
       {
-        "gtin": "04660537612754",
-        "name": "Перчатки Sterä диагностические из натурального латекса, р-р M",
+        "gtin": "4640473514534",
+        "name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р S",
         "tnvedCode": "4015120009",
-        "quantity": 90
+        "quantity": 12
       }
     ]
   }

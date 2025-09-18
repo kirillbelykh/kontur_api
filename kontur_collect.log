@@ -1,5 +1,0 @@
-2025-09-18 13:53:59,508 - WARNING - Retrying (Retry(total=2, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ConnectionResetError(10054, 'Удаленный хост принудительно разорвал существующее подключение', None, 10054, None)': /session/2aab65bca099953fa1438349ad5d98b7
-2025-09-18 13:55:29,934 - INFO - Clicked cookie accept
-2025-09-18 13:55:31,006 - INFO - Clicked profile (best-effort)
-2025-09-18 13:55:32,752 - INFO - Clicked warehouse (fallback selector)
-2025-09-18 13:55:33,760 - INFO - Saved cookies to kontur_cookies.json
