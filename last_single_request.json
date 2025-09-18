@@ -1,0 +1,19 @@
+{
+  "url": "https://mk.kontur.ru/api/v1/codes-order?warehouseId=59739360-7d62-434b-ad13-4617c87a6d13",
+  "body": {
+    "documentNumber": "ТЕСТ",
+    "comment": "",
+    "productGroup": "wheelChairs",
+    "releaseMethodType": "production",
+    "fillingMethod": "productsCatalog",
+    "cisType": "unit",
+    "positions": [
+      {
+        "gtin": "04660537612754",
+        "name": "Перчатки Sterä диагностические из натурального латекса, р-р M",
+        "tnvedCode": "4015120009",
+        "quantity": 90
+      }
+    ]
+  }
+}
