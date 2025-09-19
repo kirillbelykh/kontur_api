@@ -29,6 +29,7 @@ class OrderItem:
     gtin: str = ""          # найдём перед запуском воркеров
     full_name: str = ""     # опционально: полное наименование из справочника
     tnved_code: str = ""
+    cisType: str = ""
 
 # helper prints only for prompts / summary
 def ui_print(msg: str):
@@ -145,8 +146,9 @@ def safe_perform(it) -> Tuple[bool, str]:
         positions = [{
             "gtin": payload.get("gtin"),
             "name": payload.get("full_name") or payload.get("simpl_name") or "",
-            "tnvedCode": payload.get("tnved_code", ""),
+            "tnvedCode": payload.get("tnved_code"),
             "quantity": payload.get("codes_count", 1),
+            "cisType": payload.get("cisType")
         }]
 
         # cookies → session
@@ -237,7 +239,8 @@ def main():
                 codes_count=codes_count,
                 gtin=gtin_input,
                 full_name="",
-                tnved_code=tnved_code
+                tnved_code=tnved_code,
+                cisType=CIS_TYPE
             )
             setattr(it, "_uid", uuid.uuid4().hex)
             collected.append(it)
@@ -286,7 +289,8 @@ def main():
                 codes_count=codes_count,
                 gtin=gtin,
                 full_name=full_name or "",
-                tnved_code=tnved_code
+                tnved_code=tnved_code,
+                cisType=CIS_TYPE
             )
             setattr(it, "_uid", uuid.uuid4().hex)
             collected.append(it)

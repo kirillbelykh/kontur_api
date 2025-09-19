@@ -1,0 +1,25 @@
+2025-09-19 20:37:33,225 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-19 20:37:33,227 - ERROR - Îרטבךא ןנט API-גûחמגו גלוסעמ Selenium
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\main.py", line 159, in safe_perform
+    resp = try_single_post(
+        session,
+    ...<6 lines>...
+        thumbprint="08f40b694898598b3922b69277b79fd2c84d9c85"
+    )
+TypeError: try_single_post() got an unexpected keyword argument 'cis_type'
+2025-09-19 20:39:51,680 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-19 20:39:51,682 - ERROR - Îרטבךא ןנט API-גûחמגו גלוסעמ Selenium
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\main.py", line 160, in safe_perform
+    resp = try_single_post(
+        session,
+    ...<5 lines>...
+        thumbprint="08f40b694898598b3922b69277b79fd2c84d9c85"
+    )
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 140, in try_single_post
+    "gtin": p["gtin"],
+            ~^^^^^^^^
+TypeError: 'OrderItem' object is not subscriptable
+2025-09-19 20:42:59,958 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-19 20:43:43,372 - INFO - Saved last_snapshot.json (snapshot of to_process).
