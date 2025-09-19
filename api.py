@@ -34,18 +34,6 @@ def load_cookies() -> Optional[Dict[str,str]]:
             pass
     return None
 
-def make_session_with_cookies(cookies: Dict[str, str]) -> requests.Session:
-    s = requests.Session()
-    s.headers.update({
-        "User-Agent": "Mozilla/5.0",
-        "Accept": "application/json, text/plain, */*",
-        "Content-Type": "application/json; charset=utf-8",
-    })
-    
-    for k, v in cookies.items():
-        s.cookies.set(k, v, domain="mk.kontur.ru", path="/")
-    
-    return s
 
 
 # ---------------- API flows ----------------
