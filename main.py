@@ -8,7 +8,10 @@ from dataclasses import dataclass, asdict
 from typing import List, Optional, Tuple
 from get_gtin import lookup_gtin
 from api import make_session_with_cookies, try_single_post, load_cookies
-
+import customtkinter as ctk
+import tkinter as tk
+from tkinter import ttk
+import sys
 
 # Константы (фиксированные для всех заказов)
 PRODUCT_GROUP = "wheelChairs"
@@ -30,14 +33,6 @@ class OrderItem:
     full_name: str = ""     # опционально: полное наименование из справочника
     tnved_code: str = ""
     cisType: str = ""
-
-# helper prints only for prompts / summary
-def ui_print(msg: str):
-    print(msg)
-
-    
-# Настройка логгирования (можешь убрать / настроить путь)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # ==== Опции выбора ====
 simplified_options = [
@@ -72,63 +67,8 @@ size_options = [
 
 units_options = [1,2,3,4,5,6,7,8,9,10,20,25,30,40,50,60,70,80,90,100,110,120,125,250,500]
 
-def choose_option(options: List, prompt: str):
-    print(f"\n{prompt}:")
-    for i, option in enumerate(options, start=1):
-        print(f"{i}. {option}")
-    while True:
-        choice = input("Введите номер: ").strip()
-        if choice.isdigit() and 1 <= int(choice) <= len(options):
-            return options[int(choice)-1]
-        print("Неверный выбор. Попробуйте снова.")
-
-
-def print_collected(collected: List[OrderItem]):
-    if not collected:
-        print("\n--- Накопленные позиции: пусто ---\n")
-        return
-    print("\n--- Накопленные позиции ---")
-    for idx, it in enumerate(collected, start=1):
-        uid = getattr(it, "_uid", "no-uid")
-        print(f"{idx}. uid={uid} | {it.simpl_name} | {it.size} | {it.units_per_pack} уп. | GTIN {it.gtin} | к-во: {it.codes_count} | заявка: '{it.order_name}'")
-    print("---------------------------\n")
-
-
-def choose_delete_index(collected: List[OrderItem]) -> Optional[int]:
-    """
-    Пользователь может ввести индекс позиции (1-based) или 'uid:<id>'.
-    Если пустая строка — отменяем удаление.
-    """
-    if not collected:
-        ui_print("Нет позиций для удаления.")
-        return None
-
-    print_collected(collected)
-    inp = input("Введите номер позиции для удаления или 'uid:<id>' (пусто = отмена): ").strip()
-    
-    if inp == "":
-        ui_print("Удаление отменено.")
-        return None
-
-    if inp.lower().startswith("uid:"):
-        uid_to_remove = inp.split("uid:", 1)[1].strip()
-        for i, it in enumerate(collected):
-            if getattr(it, "_uid", None) == uid_to_remove:
-                return i
-        ui_print("UID не найден.")
-        return None
-
-    if not inp.isdigit():
-        ui_print("Неверный ввод.")
-        return None
-
-    idx = int(inp) - 1
-    if idx < 0 or idx >= len(collected):
-        ui_print("Индекс вне диапазона.")
-        return None
-
-    return idx
-
+# Настройка логгирования (можешь убрать / настроить путь)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def safe_perform(it) -> Tuple[bool, str]:
     """
@@ -193,44 +133,144 @@ def safe_perform(it) -> Tuple[bool, str]:
         logging.exception("Ошибка при API-вызове вместо Selenium")
         return False, f"Exception: {e}"
 
-    
+class App(ctk.CTk):
+    def __init__(self, df):
+        super().__init__()
+        self.title("Kontur Automation")
+        self.geometry("800x800")
+        self.df = df
+        self.collected: List[OrderItem] = []
 
-def main():
-    NOMENCLATURE_XLSX = "data/nomenclature.xlsx"
-    if not os.path.exists(NOMENCLATURE_XLSX):
-        ui_print(f"ERROR: файл {NOMENCLATURE_XLSX} не найден.")
-        return
+        # Input frame
+        input_frame = ctk.CTkFrame(self)
+        input_frame.pack(pady=10, padx=10, fill="x")
 
-    df = pd.read_excel(NOMENCLATURE_XLSX)
-    df.columns = df.columns.str.strip()
+        ctk.CTkLabel(input_frame, text="Заявка (текст для 'Заказ кодов №'):").grid(row=0, column=0, pady=5, padx=5, sticky="w")
+        self.order_entry = ctk.CTkEntry(input_frame, width=400)
+        self.order_entry.grid(row=0, column=1, pady=5, padx=5)
 
-    ui_print("=== Kontur Automation — ввод позиций ===")
-    collected: List[OrderItem] = []
+        self.gtin_var = ctk.StringVar(value="No")
+        ctk.CTkRadioButton(input_frame, text="Поиск по GTIN", variable=self.gtin_var, value="Yes", command=self.toggle_mode).grid(row=1, column=0, pady=5, padx=5)
+        ctk.CTkRadioButton(input_frame, text="Выбор опций", variable=self.gtin_var, value="No", command=self.toggle_mode).grid(row=1, column=1, pady=5, padx=5)
 
-    while True:
-        print("\nПоиск по GTIN?")
-        print("1. Да")
-        print("2. Нет")
-        gtin_choice = input("Выбор (1/2): ").strip()
+        # GTIN frame
+        self.gtin_frame = ctk.CTkFrame(input_frame)
+        ctk.CTkLabel(self.gtin_frame, text="GTIN:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
+        self.gtin_entry = ctk.CTkEntry(self.gtin_frame, width=400)
+        self.gtin_entry.grid(row=0, column=1, pady=5, padx=5)
 
-        if gtin_choice == "1":
-            order_name = input("Заявка (текст, будет вставлен в 'Заказ кодов №'): ").strip()
-            if not order_name:
-                ui_print("Нужно ввести заявку.")
-                continue
-            gtin_input = input("Введите GTIN: ").strip()
+        # Select frame
+        self.select_frame = ctk.CTkFrame(input_frame)
+        ctk.CTkLabel(self.select_frame, text="Вид товара:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
+        self.simpl_combo = ctk.CTkComboBox(self.select_frame, values=simplified_options, command=self.update_options, width=400)
+        self.simpl_combo.grid(row=0, column=1, pady=5, padx=5)
+
+        self.color_label = ctk.CTkLabel(self.select_frame, text="Цвет:")
+        self.color_combo = ctk.CTkComboBox(self.select_frame, values=color_options, width=400)
+
+        self.venchik_label = ctk.CTkLabel(self.select_frame, text="С венчиком/без венчика?")
+        self.venchik_combo = ctk.CTkComboBox(self.select_frame, values=venchik_options, width=400)
+
+        ctk.CTkLabel(self.select_frame, text="Размер:").grid(row=3, column=0, pady=5, padx=5, sticky="w")
+        self.size_combo = ctk.CTkComboBox(self.select_frame, values=size_options, width=400)
+        self.size_combo.grid(row=3, column=1, pady=5, padx=5)
+
+        ctk.CTkLabel(self.select_frame, text="Количество единиц в упаковке:").grid(row=4, column=0, pady=5, padx=5, sticky="w")
+        self.units_combo = ctk.CTkComboBox(self.select_frame, values=[str(u) for u in units_options], width=400)
+        self.units_combo.grid(row=4, column=1, pady=5, padx=5)
+
+        # Codes count (common)
+        ctk.CTkLabel(input_frame, text="Количество кодов:").grid(row=2, column=0, pady=5, padx=5, sticky="w")
+        self.codes_entry = ctk.CTkEntry(input_frame, width=400)
+        self.codes_entry.grid(row=2, column=1, pady=5, padx=5)
+
+        # Add button
+        add_btn = ctk.CTkButton(input_frame, text="Добавить позицию", command=self.add_item)
+        add_btn.grid(row=5, column=0, columnspan=2, pady=10)
+
+        # Initial mode
+        self.toggle_mode()
+
+        # Treeview
+        columns = ("idx", "uid", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name")
+        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=10)
+        self.tree.heading("idx", text="#")
+        self.tree.heading("uid", text="UID")
+        self.tree.heading("simpl_name", text="Упрощенно")
+        self.tree.heading("size", text="Размер")
+        self.tree.heading("units_per_pack", text="Упаковка")
+        self.tree.heading("gtin", text="GTIN")
+        self.tree.heading("codes_count", text="Кодов")
+        self.tree.heading("order_name", text="Заявка")
+        self.tree.pack(pady=10, padx=10, fill="both", expand=True)
+
+        # Buttons frame
+        btn_frame = ctk.CTkFrame(self)
+        btn_frame.pack(pady=10, fill="x")
+
+        delete_btn = ctk.CTkButton(btn_frame, text="Удалить позицию", command=self.delete_item)
+        delete_btn.pack(side="left", padx=10)
+
+        execute_btn = ctk.CTkButton(btn_frame, text="Выполнить все", command=self.execute_all)
+        execute_btn.pack(side="left", padx=10)
+
+        exit_btn = ctk.CTkButton(btn_frame, text="Выйти", command=self.quit)
+        exit_btn.pack(side="left", padx=10)
+
+        # Log textbox
+        self.log_text = ctk.CTkTextbox(self, height=150)
+        self.log_text.pack(pady=10, padx=10, fill="x")
+
+        # Style Treeview for dark mode
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Treeview", background="#2b2b2b", fieldbackground="#2b2b2b", foreground="white")
+        style.configure("Treeview.Heading", background="#3a3a3a", foreground="white")
+        style.map("Treeview", background=[("selected", "#1f6aa5")])
+
+    def toggle_mode(self):
+        if self.gtin_var.get() == "Yes":
+            self.select_frame.grid_forget()
+            self.gtin_frame.grid(row=3, column=0, columnspan=2, pady=5, padx=5)
+        else:
+            self.gtin_frame.grid_forget()
+            self.select_frame.grid(row=3, column=0, columnspan=2, pady=5, padx=5)
+            self.update_options()
+
+    def update_options(self, value=None):
+        simpl = self.simpl_combo.get().lower()
+        if simpl in [c.lower() for c in color_required]:
+            self.color_label.grid(row=1, column=0, pady=5, padx=5, sticky="w")
+            self.color_combo.grid(row=1, column=1, pady=5, padx=5)
+        else:
+            self.color_label.grid_forget()
+            self.color_combo.grid_forget()
+
+        if simpl in [c.lower() for c in venchik_required]:
+            self.venchik_label.grid(row=2, column=0, pady=5, padx=5, sticky="w")
+            self.venchik_combo.grid(row=2, column=1, pady=5, padx=5)
+        else:
+            self.venchik_label.grid_forget()
+            self.venchik_combo.grid_forget()
+
+    def add_item(self):
+        order_name = self.order_entry.get().strip()
+        if not order_name:
+            self.log_insert("Нужно ввести заявку.")
+            return
+
+        try:
+            codes_count = int(self.codes_entry.get().strip())
+        except ValueError:
+            self.log_insert("Неверно введено количество кодов. Попробуй ещё раз.")
+            return
+
+        if self.gtin_var.get() == "Yes":
+            gtin_input = self.gtin_entry.get().strip()
             if not gtin_input:
-                ui_print("GTIN пустой — отмена.")
-                continue
-            try:
-                codes_count = int(input("Количество кодов (целое): ").strip())
-            except:
-                ui_print("Неверно введено количество кодов. Попробуй ещё раз.")
-                continue
-            
-            # tnved для ручного ввода по GTIN — берём "по умолчанию"
+                self.log_insert("GTIN пустой — отмена.")
+                return
             tnved_code = "4015120009"
-
             it = OrderItem(
                 order_name=order_name,
                 simpl_name="по GTIN",
@@ -242,39 +282,23 @@ def main():
                 tnved_code=tnved_code,
                 cisType=CIS_TYPE
             )
-            setattr(it, "_uid", uuid.uuid4().hex)
-            collected.append(it)
-            ui_print(f"Добавлено по GTIN: {gtin_input} — {codes_count} кодов — заявка '{order_name}'")
-            print_collected(collected)
-        
-        elif gtin_choice == "2":
-            order_name = input("\nЗаявка (текст, будет вставлен в 'Заказ кодов №'): ").strip()
-            if not order_name:
-                ui_print("Нужно ввести заявку.")
-                continue
+            self.log_insert(f"Добавлено по GTIN: {gtin_input} — {codes_count} кодов — заявка '{order_name}'")
+        else:
+            simpl = self.simpl_combo.get()
+            color = self.color_combo.get() if self.color_combo.winfo_viewable() else None
+            venchik = self.venchik_combo.get() if self.venchik_combo.winfo_viewable() else None
+            size = self.size_combo.get()
+            units = self.units_combo.get()
 
-            simpl = choose_option(simplified_options, "Выберите вид товара")
-            color = None
-            if simpl.lower() in [c.lower() for c in color_required]:
-                color = choose_option(color_options, "Выберите цвет")
-            venchik = None
-            if simpl.lower() in [c.lower() for c in venchik_required]:
-                venchik = choose_option(venchik_options, "С венчиком/без венчика?")
-            size = choose_option(size_options, "Выберите размер")
-            units = choose_option(units_options, "Выберите количество единиц в упаковке")
+            if not all([simpl, size, units]):
+                self.log_insert("Заполните все обязательные поля.")
+                return
 
-            try:
-                codes_count = int(input("Количество кодов (целое): ").strip())
-            except:
-                ui_print("Неверно введено количество кодов. Попробуй ещё раз.")
-                continue
-
-            gtin, full_name = lookup_gtin(df, simpl, size, units, color, venchik)
+            gtin, full_name = lookup_gtin(self.df, simpl, size, units, color, venchik)
             if not gtin:
-                ui_print(f"GTIN не найден для ({simpl}, {size}, {units}, {color}, {venchik}) — позиция не добавлена.")
-                continue
+                self.log_insert(f"GTIN не найден для ({simpl}, {size}, {units}, {color}, {venchik}) — позиция не добавлена.")
+                return
 
-            # Определяем ТНВЭД по упрощённому названию
             simpl_lower = simpl.lower()
             if any(word in simpl_lower for word in ["хир", "микро", "ультра", "гинек", "дв пара"]):
                 tnved_code = "4015120001"
@@ -292,112 +316,95 @@ def main():
                 tnved_code=tnved_code,
                 cisType=CIS_TYPE
             )
-            setattr(it, "_uid", uuid.uuid4().hex)
-            collected.append(it)
-            ui_print(
+            self.log_insert(
                 f"Добавлено: {simpl} ({size}, {units} уп., {color or 'без цвета'}) — "
                 f"GTIN {gtin} — {codes_count} кодов — ТНВЭД {tnved_code} — заявка '{order_name}'"
             )
-            print_collected(collected)
 
-        else:
-            ui_print("Неверный выбор — попробуйте снова.")
-            continue
+        setattr(it, "_uid", uuid.uuid4().hex)
+        self.collected.append(it)
+        self.update_tree()
 
+    def update_tree(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        for idx, it in enumerate(self.collected, start=1):
+            self.tree.insert("", "end", values=(
+                idx, getattr(it, "_uid", "no-uid"), it.simpl_name, it.size, it.units_per_pack,
+                it.gtin, it.codes_count, it.order_name
+            ))
 
-        # меню действий
-        while True:
-            print("\nДействия:")
-            print("1 - Ввести ещё позицию")
-            print("2 - Удалить позицию (по индексу или uid:... )")
-            print("3 - Показать накопленные позиции")
-            print("4 - Выполнить все накопленные позиции")
-            print("0 - Выйти без выполнения")
-            action = input("Выбор (0/1/2/3/4): ").strip()
-            if action == "1":
-                break
-            elif action == "2":
-                idx = choose_delete_index(collected)
-                if idx is None:
-                    continue
-                removed = collected.pop(idx)
-                ui_print(f"Удалена позиция #{idx+1}: uid={getattr(removed,'_uid',None)} | {removed.simpl_name} — GTIN {removed.gtin}")
-                print_collected(collected)
-            elif action == "3":
-                print_collected(collected)
-            elif action == "4":
-                # подтверждение + snapshot
-                print_collected(collected)
-                confirm = input(f"Подтвердите выполнение {len(collected)} задач(и)? (y/n): ").strip().lower()
-                if confirm != "y":
-                    ui_print("Выполнение отменено пользователем.")
-                    continue
+    def delete_item(self):
+        selected = self.tree.selection()
+        if not selected:
+            self.log_insert("Нет выбранной позиции для удаления.")
+            return
+        idx = self.tree.index(selected[0])
+        removed = self.collected.pop(idx)
+        self.log_insert(f"Удалена позиция: uid={getattr(removed, '_uid', None)} | {removed.simpl_name} — GTIN {removed.gtin}")
+        self.update_tree()
 
-                # делаем жёсткую глубокую копию коллекции (snapshot)
-                to_process = copy.deepcopy(collected)
+    def execute_all(self):
+        if not self.collected:
+            self.log_insert("Нет накопленных позиций.")
+            return
 
-                # сохраняем snapshot на диск для дебага (включаем _uid в дамп)
-                try:
-                    snapshot = []
-                    for x in to_process:
-                        d = asdict(x)
-                        d["_uid"] = getattr(x, "_uid", None)
-                        snapshot.append(d)
-                    with open("last_snapshot.json", "w", encoding="utf-8") as f:
-                        json.dump(snapshot, f, ensure_ascii=False, indent=2)
-                    logging.info("Saved last_snapshot.json (snapshot of to_process).")
-                except Exception:
-                    logging.exception("Не удалось сохранить last_snapshot.json")
+        confirm = tk.messagebox.askyesno("Подтверждение", f"Подтвердите выполнение {len(self.collected)} задач(и)?")
+        if not confirm:
+            self.log_insert("Выполнение отменено пользователем.")
+            return
 
-                # контроль того, что snapshot действительно сформирован
-                if not to_process:
-                    ui_print("Нет накопленных позиций — выходим.")
-                    return
+        to_process = copy.deepcopy(self.collected)
 
-                # перед запуском проверим, что в snapshot нет позиций, которые были удалены (защитный лог)
-                current_uids = {getattr(x, "_uid", None) for x in collected}
-                snapshot_uids = [getattr(x, "_uid", None) for x in to_process]
-                # если какие-то UID отсутствуют — логируем (но всё равно запускаем snapshot)
-                missing = [u for u in snapshot_uids if u not in current_uids]
-                if missing:
-                    logging.warning(f"В snapshot есть UID'ы, которых нет в текущем collected: {missing}")
-                    # это маловероятно при deepcopy, но логируем для диагностики
+        try:
+            snapshot = []
+            for x in to_process:
+                d = asdict(x)
+                d["_uid"] = getattr(x, "_uid", None)
+                snapshot.append(d)
+            with open("last_snapshot.json", "w", encoding="utf-8") as f:
+                json.dump(snapshot, f, ensure_ascii=False, indent=2)
+            logging.info("Saved last_snapshot.json (snapshot of to_process).")
+        except Exception:
+            logging.exception("Не удалось сохранить last_snapshot.json")
 
-                ui_print(f"\nБудет выполнено {len(to_process)} задач(и) ПОСЛЕДОВАТЕЛЬНО.")
-                ui_print("Запуск...")
-                results = []
-                success_count = 0
-                fail_count = 0
-                for it in to_process:
-                    uid = getattr(it, "_uid", None)
-                    ui_print(f"Запуск позиции uid={uid}: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
-                    ok, msg = safe_perform(it)
-                    results.append((ok, msg, it))
-                    if ok:
-                        success_count += 1
-                    else:
-                        fail_count += 1
-                    ui_print(f"[{'OK' if ok else 'ERR'}] uid={uid} {it.simpl_name} — {msg}")
-                
-                ui_print("\n=== Выполнение завершено ===")
-                ui_print(f"Успешно: {success_count}, Ошибок: {fail_count}.")
-
-                # подробный отчёт
-                if any(not r[0] for r in results):
-                    print("\nНеудачные позиции:")
-                    for ok, msg, it in results:
-                        if not ok:
-                            print(f" - uid={getattr(it,'_uid',None)} | {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}' => {msg}")
-
-
-                # Оставляем collected как есть (так безопаснее); при желании можно удалить успешно выполненные позиции
-                return
-            elif action == "0":
-                ui_print("Выход без выполнения.")
-                return
+        self.log_insert(f"\nБудет выполнено {len(to_process)} задач(и) ПОСЛЕДОВАТЕЛЬНО.")
+        self.log_insert("Запуск...")
+        results = []
+        success_count = 0
+        fail_count = 0
+        for it in to_process:
+            uid = getattr(it, "_uid", None)
+            self.log_insert(f"Запуск позиции uid={uid}: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
+            ok, msg = safe_perform(it)
+            results.append((ok, msg, it))
+            if ok:
+                success_count += 1
             else:
-                ui_print("Неверный выбор. Попробуйте снова.")
+                fail_count += 1
+            self.log_insert(f"[{'OK' if ok else 'ERR'}] uid={uid} {it.simpl_name} — {msg}")
 
+        self.log_insert("\n=== Выполнение завершено ===")
+        self.log_insert(f"Успешно: {success_count}, Ошибок: {fail_count}.")
+
+        if any(not r[0] for r in results):
+            self.log_insert("\nНеудачные позиции:")
+            for ok, msg, it in results:
+                if not ok:
+                    self.log_insert(f" - uid={getattr(it,'_uid',None)} | {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}' => {msg}")
+
+    def log_insert(self, msg: str):
+        self.log_text.insert("end", f"{msg}\n")
+        self.log_text.see("end")
 
 if __name__ == "__main__":
-    main()
+    NOMENCLATURE_XLSX = "data/nomenclature.xlsx"
+    if not os.path.exists(NOMENCLATURE_XLSX):
+        print(f"ERROR: файл {NOMENCLATURE_XLSX} не найден.")
+    else:
+        df = pd.read_excel(NOMENCLATURE_XLSX)
+        df.columns = df.columns.str.strip()
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("dark-blue")
+        app = App(df)
+        app.mainloop()

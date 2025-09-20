@@ -1,0 +1,183 @@
+2025-09-20 16:55:27,959 - INFO - Nomenclature loaded from C:/Users/sklad/Desktop/kontur_automation/data/nomenclature.xlsx
+2025-09-20 16:55:29,637 - INFO - Добавлена позиция uid=d79e9b43d4364635b43eb353551a1e68: стер лат | GTIN 4650118043312 | 1 шт.
+2025-09-20 16:55:48,564 - INFO - Cookies saved to kontur_cookies.json
+2025-09-20 16:59:23,011 - INFO - Номенклатура загружена из data/nomenclature.xlsx (строк: 3715)
+2025-09-20 16:59:23,018 - INFO - Cookies загружены автоматически (load_cookies).
+2025-09-20 16:59:41,192 - INFO - Добавлена: uid=41ae2c0a58c5478587e933c744f5254d | стер лат | GTIN 4650118043312 | 1 шт.
+2025-09-20 16:59:46,017 - INFO - Сохранён snapshot для запуска.
+2025-09-20 16:59:46,018 - INFO - Запуск: uid=41ae2c0a58c5478587e933c744f5254d | GTIN 4650118043312 | заявка 'тест новейший'
+2025-09-20 16:59:48,726 - ERROR - Ошибка: uid=41ae2c0a58c5478587e933c744f5254d — No response from API
+2025-09-20 16:59:48,728 - INFO - === Завершено. Успешно: 0, Ошибок: 1 ===
+2025-09-20 17:01:45,915 - INFO - Номенклатура загружена из data/nomenclature.xlsx (строк: 3715)
+2025-09-20 17:01:45,920 - ERROR - load_cookies() вернул пусто — cookies не загружены.
+2025-09-20 17:02:12,099 - INFO - Добавлена: uid=f347b3f183364c509bb0edef070e4bb5 | стер лат | GTIN 4650118043312 | 1 шт.
+2025-09-20 17:02:16,646 - INFO - Сохранён snapshot для запуска.
+2025-09-20 17:02:16,647 - INFO - Запуск: uid=f347b3f183364c509bb0edef070e4bb5 | GTIN 4650118043312 | заявка 'тест новейший'
+2025-09-20 17:02:16,648 - ERROR - Cookies not obtained (load_cookies returned nothing)
+2025-09-20 17:02:16,650 - ERROR - Ошибка: uid=f347b3f183364c509bb0edef070e4bb5 — Cookies not obtained
+2025-09-20 17:02:16,651 - INFO - === Завершено. Успешно: 0, Ошибок: 1 ===
+2025-09-20 17:02:27,661 - ERROR - load_cookies() вернул пусто.
+2025-09-20 17:02:59,547 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 17:03:06,004 - INFO - Clicked cookie accept
+2025-09-20 17:03:07,085 - INFO - Clicked profile (best-effort)
+2025-09-20 17:03:08,826 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 17:03:09,836 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 17:06:00,135 - INFO - Добавлена позиция: стер лат (M, 120 уп., без цвета) — GTIN 4650118043312 — 1 кодов
+2025-09-20 17:06:03,725 - INFO - Snapshot сохранён: last_snapshot.json
+2025-09-20 17:06:03,726 - INFO - Запуск выполнения 1 задач...
+2025-09-20 17:06:03,744 - INFO - Обработка uid=3ed5158d41d94df3ae16730dc386196d | GTIN 4650118043312 | заявка 'тест ласт'
+2025-09-20 17:06:06,701 - ERROR - [ERR] uid=3ed5158d41d94df3ae16730dc386196d — No response from API
+2025-09-20 17:06:06,703 - INFO - === Выполнение завершено: успешно=0, ошибок=1 ===
+2025-09-20 17:14:30,659 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 17:25:55,426 - WARNING - Config: Older configuration version detected (0 instead of 27)
+2025-09-20 17:25:55,426 - WARNING - Config: Upgrading configuration in progress.
+2025-09-20 17:25:55,427 - DEBUG - Config: Upgrading from 0 to 1
+2025-09-20 17:25:55,430 - INFO - deps: Successfully imported "kivy_deps.angle" 0.4.0
+2025-09-20 17:25:55,431 - INFO - Logger: Record log in C:\Users\sklad\.kivy\logs\kivy_25-09-20_0.txt
+2025-09-20 17:25:55,432 - INFO - deps: Successfully imported "kivy_deps.glew" 0.3.1
+2025-09-20 17:25:55,432 - INFO - deps: Successfully imported "kivy_deps.sdl2" 0.8.0
+2025-09-20 17:25:55,432 - INFO - Kivy: v2.3.1
+2025-09-20 17:25:55,432 - INFO - Kivy: Installed at "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\__init__.py"
+2025-09-20 17:25:55,432 - INFO - Python: v3.13.7 (tags/v3.13.7:bcee1c3, Aug 14 2025, 14:15:11) [MSC v.1944 64 bit (AMD64)]
+2025-09-20 17:25:55,433 - INFO - Python: Interpreter at "C:\Users\sklad\Desktop\crypto\venv\Scripts\python.exe"
+2025-09-20 17:25:55,433 - INFO - Logger: Purge log fired. Processing...
+2025-09-20 17:25:55,433 - INFO - Logger: Purge finished!
+2025-09-20 17:25:56,575 - INFO - Factory: 195 symbols loaded
+2025-09-20 17:25:57,444 - INFO - Image: Providers: img_tex, img_dds, img_sdl2 (img_pil, img_ffpyplayer ignored)
+2025-09-20 17:25:58,271 - INFO - Text: Provider: sdl2
+2025-09-20 17:25:58,436 - INFO - Window: Provider: sdl2
+2025-09-20 17:25:59,699 - INFO - GL: Using the "OpenGL" graphics system
+2025-09-20 17:25:59,713 - INFO - GL: GLEW initialization succeeded
+2025-09-20 17:25:59,713 - INFO - GL: Backend used <glew>
+2025-09-20 17:25:59,714 - INFO - GL: OpenGL version <b'4.6.0 Compatibility Profile Context 25.6.1.250522'>
+2025-09-20 17:25:59,715 - INFO - GL: OpenGL vendor <b'ATI Technologies Inc.'>
+2025-09-20 17:25:59,715 - INFO - GL: OpenGL renderer <b'AMD Radeon(TM) Graphics'>
+2025-09-20 17:25:59,716 - INFO - GL: OpenGL parsed version: 4, 6
+2025-09-20 17:25:59,716 - INFO - GL: Shading version <b'4.60'>
+2025-09-20 17:25:59,717 - INFO - GL: Texture max size <16384>
+2025-09-20 17:25:59,717 - INFO - GL: Texture max units <32>
+2025-09-20 17:25:59,832 - INFO - Window: auto add sdl2 input provider
+2025-09-20 17:25:59,848 - INFO - Window: virtual keyboard not allowed, single mode, not docked
+2025-09-20 17:26:00,563 - INFO - Base: Start application main loop
+2025-09-20 17:26:00,577 - INFO - GL: NPOT texture support is available
+2025-09-20 17:26:06,717 - INFO - Base: Leaving application in progress...
+2025-09-20 17:26:06,721 - WARNING - stderr: Traceback (most recent call last):
+2025-09-20 17:26:06,721 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\main.py", line 550, in <module>
+2025-09-20 17:26:06,722 - WARNING - stderr:     KonturApp().run()
+2025-09-20 17:26:06,722 - WARNING - stderr:     ~~~~~~~~~~~~~~~^^
+2025-09-20 17:26:06,722 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\app.py", line 956, in run
+2025-09-20 17:26:06,722 - WARNING - stderr:     runTouchApp()
+2025-09-20 17:26:06,723 - WARNING - stderr:     ~~~~~~~~~~~^^
+2025-09-20 17:26:06,723 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 574, in runTouchApp
+2025-09-20 17:26:06,723 - WARNING - stderr:     EventLoop.mainloop()
+2025-09-20 17:26:06,723 - WARNING - stderr:     ~~~~~~~~~~~~~~~~~~^^
+2025-09-20 17:26:06,723 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 339, in mainloop
+2025-09-20 17:26:06,723 - WARNING - stderr:     self.idle()
+2025-09-20 17:26:06,724 - WARNING - stderr:     ~~~~~~~~~^^
+2025-09-20 17:26:06,724 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 387, in idle
+2025-09-20 17:26:06,724 - WARNING - stderr:     Builder.sync()
+2025-09-20 17:26:06,724 - WARNING - stderr:     ~~~~~~~~~~~~^^
+2025-09-20 17:26:06,725 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\lang\builder.py", line 797, in sync
+2025-09-20 17:26:06,725 - WARNING - stderr:     call_fn(next_args[:-1], None, None)
+2025-09-20 17:26:06,725 - WARNING - stderr:     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-09-20 17:26:06,725 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\lang\builder.py", line 72, in call_fn
+2025-09-20 17:26:06,725 - WARNING - stderr:     setattr(element, key, e_value)
+2025-09-20 17:26:06,726 - WARNING - stderr:     ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+2025-09-20 17:26:06,726 - WARNING - stderr:   File "kivy\\graphics\\context_instructions.pyx", line 275, in kivy.graphics.context_instructions.Color.rgba.__set__
+2025-09-20 17:26:06,726 - WARNING - stderr: TypeError: float() argument must be a string or a real number, not 'tuple'
+2025-09-20 17:30:13,134 - INFO - deps: Successfully imported "kivy_deps.angle" 0.4.0
+2025-09-20 17:30:13,135 - INFO - Logger: Record log in C:\Users\sklad\.kivy\logs\kivy_25-09-20_1.txt
+2025-09-20 17:30:13,136 - INFO - deps: Successfully imported "kivy_deps.glew" 0.3.1
+2025-09-20 17:30:13,136 - INFO - deps: Successfully imported "kivy_deps.sdl2" 0.8.0
+2025-09-20 17:30:13,137 - INFO - Kivy: v2.3.1
+2025-09-20 17:30:13,137 - INFO - Kivy: Installed at "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\__init__.py"
+2025-09-20 17:30:13,137 - INFO - Python: v3.13.7 (tags/v3.13.7:bcee1c3, Aug 14 2025, 14:15:11) [MSC v.1944 64 bit (AMD64)]
+2025-09-20 17:30:13,137 - INFO - Python: Interpreter at "C:\Users\sklad\Desktop\crypto\venv\Scripts\python.exe"
+2025-09-20 17:30:13,138 - INFO - Logger: Purge log fired. Processing...
+2025-09-20 17:30:13,139 - INFO - Logger: Purge finished!
+2025-09-20 17:30:13,228 - INFO - Factory: 195 symbols loaded
+2025-09-20 17:30:13,339 - INFO - Image: Providers: img_tex, img_dds, img_sdl2 (img_pil, img_ffpyplayer ignored)
+2025-09-20 17:30:13,385 - INFO - Text: Provider: sdl2
+2025-09-20 17:30:13,415 - INFO - Window: Provider: sdl2
+2025-09-20 17:30:13,620 - INFO - GL: Using the "OpenGL" graphics system
+2025-09-20 17:30:13,632 - INFO - GL: GLEW initialization succeeded
+2025-09-20 17:30:13,632 - INFO - GL: Backend used <glew>
+2025-09-20 17:30:13,632 - INFO - GL: OpenGL version <b'4.6.0 Compatibility Profile Context 25.6.1.250522'>
+2025-09-20 17:30:13,633 - INFO - GL: OpenGL vendor <b'ATI Technologies Inc.'>
+2025-09-20 17:30:13,633 - INFO - GL: OpenGL renderer <b'AMD Radeon(TM) Graphics'>
+2025-09-20 17:30:13,633 - INFO - GL: OpenGL parsed version: 4, 6
+2025-09-20 17:30:13,633 - INFO - GL: Shading version <b'4.60'>
+2025-09-20 17:30:13,633 - INFO - GL: Texture max size <16384>
+2025-09-20 17:30:13,634 - INFO - GL: Texture max units <32>
+2025-09-20 17:30:13,691 - INFO - Window: auto add sdl2 input provider
+2025-09-20 17:30:13,693 - INFO - Window: virtual keyboard not allowed, single mode, not docked
+2025-09-20 17:30:13,703 - INFO - GL: NPOT texture support is available
+2025-09-20 17:30:14,212 - INFO - Base: Start application main loop
+2025-09-20 17:30:20,647 - INFO - Base: Leaving application in progress...
+2025-09-20 17:45:49,090 - INFO - deps: Successfully imported "kivy_deps.angle" 0.4.0
+2025-09-20 17:45:49,108 - INFO - Logger: Record log in C:\Users\sklad\.kivy\logs\kivy_25-09-20_2.txt
+2025-09-20 17:45:49,109 - INFO - deps: Successfully imported "kivy_deps.glew" 0.3.1
+2025-09-20 17:45:49,109 - INFO - deps: Successfully imported "kivy_deps.sdl2" 0.8.0
+2025-09-20 17:45:49,109 - INFO - Kivy: v2.3.1
+2025-09-20 17:45:49,110 - INFO - Kivy: Installed at "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\__init__.py"
+2025-09-20 17:45:49,110 - INFO - Python: v3.13.7 (tags/v3.13.7:bcee1c3, Aug 14 2025, 14:15:11) [MSC v.1944 64 bit (AMD64)]
+2025-09-20 17:45:49,110 - INFO - Python: Interpreter at "C:\Users\sklad\Desktop\crypto\venv\Scripts\python.exe"
+2025-09-20 17:45:49,111 - INFO - Logger: Purge log fired. Processing...
+2025-09-20 17:45:49,111 - INFO - Logger: Purge finished!
+2025-09-20 17:45:49,177 - INFO - Factory: 195 symbols loaded
+2025-09-20 17:45:49,279 - INFO - Image: Providers: img_tex, img_dds, img_sdl2 (img_pil, img_ffpyplayer ignored)
+2025-09-20 17:45:49,304 - INFO - Text: Provider: sdl2
+2025-09-20 17:45:49,349 - INFO - Window: Provider: sdl2
+2025-09-20 17:45:49,635 - INFO - GL: Using the "OpenGL" graphics system
+2025-09-20 17:45:49,647 - INFO - GL: GLEW initialization succeeded
+2025-09-20 17:45:49,647 - INFO - GL: Backend used <glew>
+2025-09-20 17:45:49,648 - INFO - GL: OpenGL version <b'4.6.0 Compatibility Profile Context 25.6.1.250522'>
+2025-09-20 17:45:49,648 - INFO - GL: OpenGL vendor <b'ATI Technologies Inc.'>
+2025-09-20 17:45:49,648 - INFO - GL: OpenGL renderer <b'AMD Radeon(TM) Graphics'>
+2025-09-20 17:45:49,648 - INFO - GL: OpenGL parsed version: 4, 6
+2025-09-20 17:45:49,649 - INFO - GL: Shading version <b'4.60'>
+2025-09-20 17:45:49,649 - INFO - GL: Texture max size <16384>
+2025-09-20 17:45:49,650 - INFO - GL: Texture max units <32>
+2025-09-20 17:45:49,706 - INFO - Window: auto add sdl2 input provider
+2025-09-20 17:45:49,708 - INFO - Window: virtual keyboard not allowed, single mode, not docked
+2025-09-20 17:45:50,173 - INFO - Base: Start application main loop
+2025-09-20 17:45:50,175 - INFO - GL: NPOT texture support is available
+2025-09-20 17:45:51,886 - INFO - Base: Leaving application in progress...
+2025-09-20 17:45:51,889 - WARNING - stderr: Traceback (most recent call last):
+2025-09-20 17:45:51,891 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\main.py", line 556, in <module>
+2025-09-20 17:45:51,891 - WARNING - stderr:     KonturApp().run()
+2025-09-20 17:45:51,891 - WARNING - stderr:     ~~~~~~~~~~~~~~~^^
+2025-09-20 17:45:51,891 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\app.py", line 956, in run
+2025-09-20 17:45:51,892 - WARNING - stderr:     runTouchApp()
+2025-09-20 17:45:51,892 - WARNING - stderr:     ~~~~~~~~~~~^^
+2025-09-20 17:45:51,893 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 574, in runTouchApp
+2025-09-20 17:45:51,893 - WARNING - stderr:     EventLoop.mainloop()
+2025-09-20 17:45:51,894 - WARNING - stderr:     ~~~~~~~~~~~~~~~~~~^^
+2025-09-20 17:45:51,894 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 339, in mainloop
+2025-09-20 17:45:51,894 - WARNING - stderr:     self.idle()
+2025-09-20 17:45:51,894 - WARNING - stderr:     ~~~~~~~~~^^
+2025-09-20 17:45:51,894 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 383, in idle
+2025-09-20 17:45:51,895 - WARNING - stderr:     self.dispatch_input()
+2025-09-20 17:45:51,895 - WARNING - stderr:     ~~~~~~~~~~~~~~~~~~~^^
+2025-09-20 17:45:51,895 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 334, in dispatch_input
+2025-09-20 17:45:51,895 - WARNING - stderr:     post_dispatch_input(*pop(0))
+2025-09-20 17:45:51,895 - WARNING - stderr:     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+2025-09-20 17:45:51,896 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\base.py", line 302, in post_dispatch_input
+2025-09-20 17:45:51,896 - WARNING - stderr:     wid.dispatch('on_touch_up', me)
+2025-09-20 17:45:51,896 - WARNING - stderr:     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+2025-09-20 17:45:51,896 - WARNING - stderr:   File "kivy\\_event.pyx", line 731, in kivy._event.EventDispatcher.dispatch
+2025-09-20 17:45:51,897 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\uix\behaviors\button.py", line 179, in on_touch_up
+2025-09-20 17:45:51,897 - WARNING - stderr:     self.dispatch('on_release')
+2025-09-20 17:45:51,897 - WARNING - stderr:     ~~~~~~~~~~~~~^^^^^^^^^^^^^^
+2025-09-20 17:45:51,898 - WARNING - stderr:   File "kivy\\_event.pyx", line 727, in kivy._event.EventDispatcher.dispatch
+2025-09-20 17:45:51,898 - WARNING - stderr:   File "kivy\\_event.pyx", line 1307, in kivy._event.EventObservers.dispatch
+2025-09-20 17:45:51,899 - WARNING - stderr:   File "kivy\\_event.pyx", line 1191, in kivy._event.EventObservers._dispatch
+2025-09-20 17:45:51,899 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\venv\Lib\site-packages\kivy\lang\builder.py", line 60, in custom_callback
+2025-09-20 17:45:51,899 - WARNING - stderr:     exec(__kvlang__.co_value, idmap)
+2025-09-20 17:45:51,900 - WARNING - stderr:     ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-09-20 17:45:51,900 - WARNING - stderr:   File "<string>", line 119, in <module>
+2025-09-20 17:45:51,900 - WARNING - stderr:   File "C:\Users\sklad\Desktop\crypto\main.py", line 337, in add_by_selection
+2025-09-20 17:45:51,900 - WARNING - stderr:     order_name = ModernTextInput(hint_text="Заявка")
+2025-09-20 17:45:51,900 - WARNING - stderr:                  ^^^^^^^^^^^^^^^
+2025-09-20 17:45:51,901 - WARNING - stderr: NameError: name 'ModernTextInput' is not defined
+2025-09-20 19:03:15,766 - INFO - Saved last_snapshot.json (snapshot of to_process).
