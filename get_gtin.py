@@ -19,8 +19,8 @@ def lookup_gtin(
     simpl_name: str,
     size: str,
     units_per_pack: str,
-    color: str = None,
-    venchik: str = None
+    color: str | None = None,
+    venchik: str | None = None
 ) -> tuple[str | None, str | None]:
     """
     Поиск GTIN и полного наименования по заданным полям.
@@ -92,4 +92,31 @@ def lookup_gtin(
         logging.exception("Ошибка в lookup_gtin")
 
     # если ничего не нашли
+    return None, None
+
+
+# -----------------------------
+# Lookup by GTIN
+# -----------------------------
+def lookup_by_gtin(df: pd.DataFrame, gtin: str) -> tuple[str | None, str | None]:
+    """
+    Поиск товара по GTIN.
+    Возвращает кортеж (Полное наименование, Упрощенное имя) или (None, None), если не найдено.
+    """
+    try:
+        gtin_str = str(gtin).strip()
+        if 'GTIN' not in df.columns:
+            logging.warning("В DataFrame нет колонки 'GTIN'")
+            return None, None
+
+        match = df[df['GTIN'].astype(str).str.strip() == gtin_str]
+        if not match.empty:
+            row = match.iloc[0]
+            full_name = str(row.get('Полное наименование товара', '')).strip()
+            simpl_name = str(row.get('Упрощенно', '')).strip()
+            return full_name, simpl_name
+
+    except Exception as e:
+        logging.exception(f"Ошибка в lookup_by_gtin для GTIN={gtin}")
+
     return None, None

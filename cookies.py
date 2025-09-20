@@ -3,6 +3,7 @@ import logging
 import time
 from pathlib import Path
 from typing import Dict, Optional
+from logger import logger
 
 LOG_FILE = "kontur_collect.log"
 logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
@@ -44,16 +45,16 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         from selenium.webdriver.support import expected_conditions as EC
     except Exception as e:
         logging.exception("Selenium import failed")
-        print("Selenium не установлен или недоступен:", e)
+        logger.error("Selenium не установлен или недоступен:", e)
         return None
 
     if not driver_path.exists():
         logging.error(f"Driver not found: {driver_path}")
-        print("Driver not found:", driver_path)
+        logger.error("Driver not found:", driver_path)
         return None
     if not browser_path.exists():
         logging.error(f"Browser binary not found: {browser_path}")
-        print("Browser binary not found:", browser_path)
+        logger.error("Browser binary not found:", browser_path)
         return None
 
     opts = Options()
@@ -117,12 +118,12 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         except Exception:
             logging.exception("Failed to save cookies")
 
-        print("Collected cookies keys:", list(cookies.keys()))
+        logger.info("Collected cookies keys:", list(cookies.keys()))
         return cookies
 
     except Exception as e:
         logging.exception("get_cookies failed")
-        print("get_cookies failed:", e)
+        logger.error("get_cookies failed:", e)
         return None
     finally:
         try:
@@ -133,6 +134,6 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
 if __name__ == "__main__":
     c = get_cookies()
     if c:
-        print("Cookies saved to kontur_cookies.json")
+        logger.info("Cookies saved to kontur_cookies.json")
     else:
-        print("Failed to collect cookies.")
+        logger.error("Failed to collect cookies.")

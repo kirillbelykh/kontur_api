@@ -1,23 +1,33 @@
 import os
-import logging
 import json
 import copy
 import uuid
+from logger import logger
+from pathlib import Path
 import pandas as pd
 from dataclasses import dataclass, asdict
-from typing import List, Optional, Tuple
-from get_gtin import lookup_gtin
-from api import make_session_with_cookies, try_single_post, load_cookies
+from typing import List, Tuple
+from get_gtin import lookup_gtin, lookup_by_gtin
+from api import try_single_post
+from utils import load_cookies, make_session_with_cookies, get_tnved_code
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk
-import sys
+from dotenv import load_dotenv
+from options import (
+    simplified_options, color_required, venchik_required,
+    color_options, venchik_options, size_options, units_options
+)   
 
-# Константы (фиксированные для всех заказов)
-PRODUCT_GROUP = "wheelChairs"
-RELEASE_METHOD_TYPE = "production"
-CIS_TYPE = "unit"
-FILLING_METHOD = "productsCatalog"
+load_dotenv()
+
+# Константы 
+PRODUCT_GROUP = os.getenv("PRODUCT_GROUP")
+RELEASE_METHOD_TYPE = os.getenv("RELEASE_METHOD_TYPE")
+CIS_TYPE = os.getenv("CIS_TYPE")  
+FILLING_METHOD = os.getenv("FILLING_METHOD")  
+THUMBPRINT = os.getenv("THUMBPRINT")
+NOMENCLATURE_XLSX = "data/nomenclature.xlsx"
 
 # -----------------------------
 # Data container
@@ -31,49 +41,12 @@ class OrderItem:
     codes_count: int        # Количество кодов для заказа
     gtin: str = ""          # найдём перед запуском воркеров
     full_name: str = ""     # опционально: полное наименование из справочника
-    tnved_code: str = ""
-    cisType: str = ""
+    tnved_code: str = ""    # Тнвэд-код
+    cisType: str = ""       # тип кода (CIS_TYPE из .env)
 
-# ==== Опции выбора ====
-simplified_options = [
-    "стер лат 1-хлор", "стер лат", "стер лат 2-хлор", "стер нитрил",
-    "хир", "хир 1-хлор", "хир с полимерным", "хир 2-хлор", "хир изопрен",
-    "хир нитрил", "ультра", "гинекология", "двойная пара", "микрохирургия",
-    "ортопедия", "латекс диаг гладкие", "латекс диаг", "латекс 2-хлор",
-    "латекс с полимерным", "латекс удлиненный", "латекс анатомической",
-    "латекс hr", "латекс 1-хлор", "нитрил диаг", "нитрил диаг hr короткий",
-    "нитрил диаг hr удлиненный"
-]
-
-color_required = [
-    "латекс 1-хлор", "латекс 2-хлор", "латекс HR", "латекс анатомической",
-    "латекс диаг", "латекс диаг гладкие", "латекс с полимерным",
-    "латекс удлиненный", "нитрил диаг", "нитрил диаг HR короткий",
-    "нитрил диаг HR удлиненный", "стер лат 1-хлор", "стер лат 2-хлор",
-    "ультра"
-]
-
-venchik_required = [
-    "гинекология", "микрохирургия", "ортопедия"
-]
-
-color_options = ["белый", "зеленый", "натуральный", "розовый", "синий", "фиолетовый", "черный"]
-venchik_options = ["с венчиком", "без венчика"]
-
-size_options = [
-    "XS", "S", "M", "L", "XL", "5,0", "5,5", "6,0", "6,5",
-    "7,0", "7,5", "8,0", "8,5", "9,0", "9,5", "10,0"
-]
-
-units_options = [1,2,3,4,5,6,7,8,9,10,20,25,30,40,50,60,70,80,90,100,110,120,125,250,500]
-
-# Настройка логгирования (можешь убрать / настроить путь)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-def safe_perform(it) -> Tuple[bool, str]:
+def make_order_to_kontur(it) -> Tuple[bool, str]:
     """
     API-обёртка для OrderItem.
-    Берёт order_name от пользователя и подставляет как номер заявки.
     """
     try:
         payload = asdict(it)
@@ -96,14 +69,14 @@ def safe_perform(it) -> Tuple[bool, str]:
         if not cookies:
             try:
                 from cookies import get_cookies as external_collect  # type: ignore
-                print("Calling get_cookies in cookies...")
+                logger.info("Calling get_cookies in cookies...")
                 cookies = external_collect()
             except Exception as e:
-                print("Cannot import/call get_cookies module:", e)
+                logger.error("Cannot import/call get_cookies module:", e)
                 return False, f"Cannot get cookies: {e}"
 
         if not cookies:
-            print("Cookies not obtained; aborting.")
+            logger.info("Cookies not obtained; aborting.")
             return False, "Cookies not obtained"
 
         session = make_session_with_cookies(cookies)
@@ -111,12 +84,12 @@ def safe_perform(it) -> Tuple[bool, str]:
         # --- пробуем быстрый POST ---
         resp = try_single_post(
             session,
-            document_number,
-            PRODUCT_GROUP,
-            RELEASE_METHOD_TYPE,
+            str(document_number),
+            str(PRODUCT_GROUP),
+            str(RELEASE_METHOD_TYPE),
             positions,
-            filling_method=FILLING_METHOD,
-            thumbprint="08f40b694898598b3922b69277b79fd2c84d9c85"
+            filling_method=str(FILLING_METHOD),
+            thumbprint=str(THUMBPRINT)
         )
 
         if not resp:
@@ -126,17 +99,16 @@ def safe_perform(it) -> Tuple[bool, str]:
         document_id = resp.get("documentId") or resp.get("id")  # зависит от API
         status = resp.get("status") or "unknown"
 
-        print("[OK] ФИНАЛЬНЫЙ СТАТУС ДОКУМЕНТА:", status)
+        logger.info("ФИНАЛЬНЫЙ СТАТУС ДОКУМЕНТА:", status)
         return True, f"Document {document_number} processed, status: {status}, id: {document_id}"
 
     except Exception as e:
-        logging.exception("Ошибка при API-вызове вместо Selenium")
         return False, f"Exception: {e}"
 
 class App(ctk.CTk):
     def __init__(self, df):
         super().__init__()
-        self.title("Kontur Automation")
+        self.title("Kontur Marking")
         self.geometry("800x800")
         self.df = df
         self.collected: List[OrderItem] = []
@@ -270,7 +242,11 @@ class App(ctk.CTk):
             if not gtin_input:
                 self.log_insert("GTIN пустой — отмена.")
                 return
-            tnved_code = "4015120009"
+            full_name, simpl = lookup_by_gtin(self.df, gtin_input)
+            tnved_code = get_tnved_code(simpl or "")
+            if not simpl:
+                self.log_insert(f"GTIN {gtin_input} не найден в справочнике — позиция не добавлена.")
+                return
             it = OrderItem(
                 order_name=order_name,
                 simpl_name="по GTIN",
@@ -278,9 +254,9 @@ class App(ctk.CTk):
                 units_per_pack="не указано",
                 codes_count=codes_count,
                 gtin=gtin_input,
-                full_name="",
+                full_name=full_name or "",
                 tnved_code=tnved_code,
-                cisType=CIS_TYPE
+                cisType=str(CIS_TYPE)
             )
             self.log_insert(f"Добавлено по GTIN: {gtin_input} — {codes_count} кодов — заявка '{order_name}'")
         else:
@@ -299,11 +275,7 @@ class App(ctk.CTk):
                 self.log_insert(f"GTIN не найден для ({simpl}, {size}, {units}, {color}, {venchik}) — позиция не добавлена.")
                 return
 
-            simpl_lower = simpl.lower()
-            if any(word in simpl_lower for word in ["хир", "микро", "ультра", "гинек", "дв пара"]):
-                tnved_code = "4015120001"
-            else:
-                tnved_code = "4015120009"
+            tnved_code = get_tnved_code(simpl)
 
             it = OrderItem(
                 order_name=order_name,
@@ -314,7 +286,7 @@ class App(ctk.CTk):
                 gtin=gtin,
                 full_name=full_name or "",
                 tnved_code=tnved_code,
-                cisType=CIS_TYPE
+                cisType=str(CIS_TYPE)
             )
             self.log_insert(
                 f"Добавлено: {simpl} ({size}, {units} уп., {color or 'без цвета'}) — "
@@ -364,11 +336,10 @@ class App(ctk.CTk):
                 snapshot.append(d)
             with open("last_snapshot.json", "w", encoding="utf-8") as f:
                 json.dump(snapshot, f, ensure_ascii=False, indent=2)
-            logging.info("Saved last_snapshot.json (snapshot of to_process).")
-        except Exception:
-            logging.exception("Не удалось сохранить last_snapshot.json")
+        except Exception as e:
+            self.log_insert(f"Не удалось сохранить снимок: {e}")
 
-        self.log_insert(f"\nБудет выполнено {len(to_process)} задач(и) ПОСЛЕДОВАТЕЛЬНО.")
+        self.log_insert(f"\nБудет выполнено {len(to_process)} заказов.")
         self.log_insert("Запуск...")
         results = []
         success_count = 0
@@ -376,7 +347,7 @@ class App(ctk.CTk):
         for it in to_process:
             uid = getattr(it, "_uid", None)
             self.log_insert(f"Запуск позиции uid={uid}: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
-            ok, msg = safe_perform(it)
+            ok, msg = make_order_to_kontur(it)
             results.append((ok, msg, it))
             if ok:
                 success_count += 1
@@ -398,9 +369,8 @@ class App(ctk.CTk):
         self.log_text.see("end")
 
 if __name__ == "__main__":
-    NOMENCLATURE_XLSX = "data/nomenclature.xlsx"
     if not os.path.exists(NOMENCLATURE_XLSX):
-        print(f"ERROR: файл {NOMENCLATURE_XLSX} не найден.")
+        logger.error(f"файл {NOMENCLATURE_XLSX} не найден.")
     else:
         df = pd.read_excel(NOMENCLATURE_XLSX)
         df.columns = df.columns.str.strip()

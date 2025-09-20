@@ -1,5 +1,7 @@
 requests>=2.31.0
-pywin32>=305
+pywin32
 selenium
 openpyxl
-base64
+pandas
+customtkinter
+tkinter
