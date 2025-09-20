@@ -10,16 +10,19 @@ import pythoncom
 
 # ---------------- config ----------------
 COOKIES_FILE = Path("kontur_cookies.json")
-BASE = "https://mk.kontur.ru"
+CONFIG__DATA_FILE = Path("config.json")
+with CONFIG__DATA_FILE.open(encoding="utf-8") as f:
+    config = json.load(f)
 
-# Проверь/измени при необходимости:
-ORGANIZATION_ID = "5cda50fa-523f-4bb5-85b6-66d7241b23cd"  # Восстановленный ID организации для Kontur API
-OMS_ID = "d953894c-250a-4408-a2ef-bb26170c59b5"  # OMS ID как отдельная сущность (для возможных расширений CRPT)
-WAREHOUSE_ID = "59739360-7d62-434b-ad13-4617c87a6d13"
-PRODUCT_GROUP = "wheelChairs"
-RELEASE_METHOD_TYPE = "production"
-CIS_TYPE = "unit"
-FILLING_METHOD = "productsCatalog"
+BASE = config["base_url"]
+ORGANIZATION_ID = config["organization_id"]
+OMS_ID = config["oms_id"]
+WAREHOUSE_ID = config["warehouse_id"]
+PRODUCT_GROUP = config["product_group"]
+RELEASE_METHOD_TYPE = config["release_method_type"]
+CIS_TYPE = config["cis_type"]
+FILLING_METHOD = config["filling_method"]
+
 
 # debug files
 LAST_SINGLE_REQ = Path("last_single_request.json")
