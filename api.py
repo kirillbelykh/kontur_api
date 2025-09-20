@@ -6,17 +6,17 @@ import base64
 import datetime
 import win32com.client
 from win32com.client import Dispatch
-import json
-
+import pythoncom
 
 # ---------------- config ----------------
 COOKIES_FILE = Path("kontur_cookies.json")
 BASE = "https://mk.kontur.ru"
 
 # Проверь/измени при необходимости:
-ORGANIZATION_ID = "5cda50fa-523f-4bb5-85b6-66d7241b23cd"
+ORGANIZATION_ID = "5cda50fa-523f-4bb5-85b6-66d7241b23cd"  # Восстановленный ID организации для Kontur API
+OMS_ID = "d953894c-250a-4408-a2ef-bb26170c59b5"  # OMS ID как отдельная сущность (для возможных расширений CRPT)
 WAREHOUSE_ID = "59739360-7d62-434b-ad13-4617c87a6d13"
-PRODUCT_GROUP = "wheelChairs"   # как в devtools у тебя
+PRODUCT_GROUP = "wheelChairs"
 RELEASE_METHOD_TYPE = "production"
 CIS_TYPE = "unit"
 FILLING_METHOD = "productsCatalog"
@@ -28,6 +28,7 @@ LAST_MULTI_LOG = Path("last_multistep_log.json")
 
 # CAdES / CAPICOM constants
 CADES_BES = 1
+CADESCOM_BASE64_TO_BINARY = 1
 CAPICOM_ENCODE_BASE64 = 0
 CAPICOM_AUTHENTICATED_ATTRIBUTE_SIGNING_TIME = 0
 CAPICOM_CURRENT_USER_STORE = 2
@@ -35,7 +36,7 @@ CAPICOM_MY_STORE = "My"
 CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
 
 # ---------------- helpers ----------------
-def load_cookies() -> Optional[Dict[str,str]]:
+def load_cookies() -> Optional[Dict[str, str]]:
     if COOKIES_FILE.exists():
         try:
             data = json.loads(COOKIES_FILE.read_text(encoding="utf-8"))
@@ -59,6 +60,7 @@ def make_session_with_cookies(cookies: Optional[Dict[str, str]]) -> requests.Ses
 
 # ---------- certificate utilities (pywin32 / CAdES) ----------
 def find_certificate_by_thumbprint(thumbprint: Optional[str] = None):
+    pythoncom.CoInitialize()
     store = win32com.client.Dispatch("CAdESCOM.Store")
     store.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
     found = None
@@ -70,54 +72,117 @@ def find_certificate_by_thumbprint(thumbprint: Optional[str] = None):
                         found = cert
                         break
                 else:
-                    # если thumbprint не указан — берем первый сертификат с закрытым ключом (попробуем)
-                    # Простейшая эвристика: берем первый попавшийся
                     found = cert
                     break
             except Exception:
                 continue
     finally:
         store.Close()
+    pythoncom.CoUninitialize()
     return found
 
-def sign_base64_content_with_cades(cert, base64_content: str) -> str:
+def sign_data(cert, base64_content: str, b_detached: bool = False) -> str:
     """
-    Подписывает base64-строку откреплённой (detached) CAdES-BES подписью.
+    Подписывает данные из base64-строки CAdES-BES подписью.
+    base64_content - base64-строка данных для подписи.
+    b_detached - True для отсоединенной (detached), False для присоединенной (attached).
     Возвращает подпись в base64 (ASCII).
     """
-    # сервер ждёт, что мы подпишем строку base64 (а не её декодированные байты)
-    content_bytes = base64_content.encode("utf-8")
-    double_b64 = base64.b64encode(content_bytes).decode("ascii")
-
-    signer = win32com.client.Dispatch("CAdESCOM.CPSigner")
+    pythoncom.CoInitialize()
+    signer = Dispatch("CAdESCOM.CPSigner")
     signer.Certificate = cert
 
-    # атрибут времени подписи (по возможности)
-    try:
-        attr = win32com.client.Dispatch("CAdESCOM.CPAttribute")
-        attr.Name = CAPICOM_AUTHENTICATED_ATTRIBUTE_SIGNING_TIME
-        attr.Value = datetime.datetime.now()
-        signer.AuthenticatedAttributes2.Add(attr)
-    except Exception:
-        pass
+    oSigningTimeAttr = Dispatch("CAdESCOM.CPAttribute")
+    oSigningTimeAttr.Name = CAPICOM_AUTHENTICATED_ATTRIBUTE_SIGNING_TIME
+    oSigningTimeAttr.Value = datetime.datetime.now()
+    signer.AuthenticatedAttributes2.Add(oSigningTimeAttr)
 
-    signed = win32com.client.Dispatch("CAdESCOM.CadesSignedData")
-    try:
-        signed.ContentEncodingType = CAPICOM_ENCODE_BASE64
-    except Exception:
-        pass
-    signed.Content = double_b64
-
-    # detached = True => откреплённая подпись
-    signature = signed.SignCades(signer, CADES_BES, True, CAPICOM_ENCODE_BASE64)
+    signed_data = Dispatch("CAdESCOM.CadesSignedData")
+    signed_data.ContentEncoding = CADESCOM_BASE64_TO_BINARY
+    signed_data.Content = base64_content
+    signature = signed_data.SignCades(signer, CADES_BES, b_detached, CAPICOM_ENCODE_BASE64)
 
     if isinstance(signature, bytes):
         signature = signature.decode("ascii", errors="ignore")
+    pythoncom.CoUninitialize()
     return signature.replace("\r", "").replace("\n", "")
 
+def post_with_winhttp(url, payload, headers=None):
+    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
+    win_http.Open("POST", url, False)
+    win_http.SetRequestHeader("User-Agent", "Mozilla/5.0")
+    win_http.SetRequestHeader("Accept", "application/json, text/plain, */*")
+    win_http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
+    if headers:
+        for k, v in headers.items():
+            win_http.SetRequestHeader(k, v)
+    win_http.Send(json.dumps(payload))
+    win_http.WaitForResponse()
+    status = win_http.Status
+    response_text = win_http.ResponseText
+    all_headers = win_http.GetAllResponseHeaders()
+    if status != 200:
+        raise Exception(f"WinHTTP POST failed: Status {status} - {response_text}")
+    return status, response_text, all_headers
 
 
-# ---------------- API flows ----------------
+# ---------------- Refresh OMS token ----------------
+def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> bool:
+    print("[INFO] Обновление токена OMS...")
+    url_auth = f"{BASE}/api/v1/crpt/auth?organizationId={organization_id}"
+
+    try:
+        resp_get = session.get(url_auth, timeout=15)
+        resp_get.raise_for_status()
+        challenges = resp_get.json()
+        print(f"[DEBUG] Ответ /crpt/auth GET: {json.dumps(challenges, indent=2)}")
+        if not isinstance(challenges, list):
+            print(f"[ERR] Некорректный формат challenges: {challenges}")
+            return False
+    except Exception as e:
+        print(f"[ERR] GET challenges для OMS: {e}")
+        return False
+
+    payload = []
+    for ch in challenges:
+        if ch['productGroup'] in ['oms', 'trueApi']:
+            try:
+                sig = sign_data(cert, ch["base64Data"], b_detached=False)  # attached для auth
+                payload.append({
+                    "uuid": ch["uuid"],
+                    "productGroup": ch["productGroup"],
+                    "base64Data": sig  # trueApi/oms используют одно поле
+                })
+            except Exception as e:
+                print(f"[ERR] Подпись challenge для {ch['productGroup']} (uuid={ch['uuid']}): {e}")
+                return False
+
+
+    if not payload:
+        print("[ERR] Нет challenge для OMS в ответе")
+        return False
+
+    try:
+        cookies_dict = session.cookies.get_dict()
+        cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
+        custom_headers = {"Cookie": cookie_str} if cookie_str else None
+        status, resp_text, all_headers = post_with_winhttp(url_auth, payload, headers=custom_headers)
+
+        # Обновление cookies в session из Set-Cookie
+        set_cookie_lines = [line.strip()[len("Set-Cookie:"):].strip() for line in all_headers.splitlines() if line.strip().startswith("Set-Cookie:")]
+        if set_cookie_lines:
+            temp_resp = requests.Response()
+            temp_resp.headers['Set-Cookie'] = set_cookie_lines
+            temp_resp.status_code = status
+            temp_resp.url = url_auth
+            session.cookies.update(temp_resp.cookies)
+
+        print(f"[OK] Токен OMS обновлён успешно. Ответ: {resp_text}")
+        return True
+    except Exception as e:
+        print(f"[ERR] POST signed challenges для OMS: {e}")
+        return False
+
 # ---------------- API flows ----------------
 def try_single_post(session: requests.Session, document_number: str,
                     product_group: str, release_method_type: str,
@@ -182,6 +247,12 @@ def try_single_post(session: requests.Session, document_number: str,
             print(f"[ERR] Проверка сертификата: {e}")
             return None
 
+    # обновление токена OMS
+    cert = find_certificate_by_thumbprint(thumbprint)
+    if not cert:
+        print(f"[ERR] Сертификат для подписи не найден (thumbprint={thumbprint})")
+        return None
+
     # получение orders-for-sign
     try:
         resp = session.get(f"{BASE}/api/v1/codes-order/{document_id}/orders-for-sign", timeout=15)
@@ -194,28 +265,13 @@ def try_single_post(session: requests.Session, document_number: str,
         print(f"[ERR] Получение данных для подписи: {e}")
         return None
 
-    # находим сертификат
-    cert = find_certificate_by_thumbprint(thumbprint)
-    if not cert:
-        print(f"[ERR] Сертификат для подписи не найден (thumbprint={thumbprint})")
-        return None
-
-    # функция detached-подписи
-    def sign_detached(b64_content: str) -> str:
-        signer = Dispatch("CAdESCOM.CPSigner")
-        signer.Certificate = cert
-        signed_data = Dispatch("CAdESCOM.CadesSignedData")
-        signed_data.Content = b64_content
-        signature = signed_data.SignCades(signer, 1)  # CADESCOM_CADES_BES = detached
-        return signature
-
     # подпись каждого order
     for o in orders_to_sign:
         oid = o["id"]
         b64content = o["base64Content"]
         print(f"[INFO] Подписываем order id={oid} (base64Content length={len(b64content)})")
         try:
-            signature_b64 = sign_detached(b64content)
+            signature_b64 = sign_data(cert, b64content, b_detached=True)  # detached для orders
             signed_orders_payload.append({"id": oid, "base64Content": signature_b64})
         except Exception as e:
             print(f"[ERR] Ошибка подписи order {oid}: {e}")
@@ -223,6 +279,10 @@ def try_single_post(session: requests.Session, document_number: str,
 
     # отправка документа
     try:
+        if not refresh_oms_token(session, cert, ORGANIZATION_ID):
+            print("[ERR] Не удалось обновить токен OMS")
+            return None
+
         send_url = f"{BASE}/api/v1/codes-order/{document_id}/send"
         payload = {"signedOrders": signed_orders_payload}
         r_send = session.post(send_url, json=payload, timeout=30)

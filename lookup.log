@@ -1,25 +1,87 @@
-2025-09-19 20:37:33,225 - INFO - Saved last_snapshot.json (snapshot of to_process).
-2025-09-19 20:37:33,227 - ERROR - Ошибка при API-вызове вместо Selenium
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\main.py", line 159, in safe_perform
-    resp = try_single_post(
-        session,
-    ...<6 lines>...
-        thumbprint="08f40b694898598b3922b69277b79fd2c84d9c85"
-    )
-TypeError: try_single_post() got an unexpected keyword argument 'cis_type'
-2025-09-19 20:39:51,680 - INFO - Saved last_snapshot.json (snapshot of to_process).
-2025-09-19 20:39:51,682 - ERROR - Ошибка при API-вызове вместо Selenium
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\main.py", line 160, in safe_perform
-    resp = try_single_post(
-        session,
-    ...<5 lines>...
-        thumbprint="08f40b694898598b3922b69277b79fd2c84d9c85"
-    )
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 140, in try_single_post
-    "gtin": p["gtin"],
-            ~^^^^^^^^
-TypeError: 'OrderItem' object is not subscriptable
-2025-09-19 20:42:59,958 - INFO - Saved last_snapshot.json (snapshot of to_process).
-2025-09-19 20:43:43,372 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 09:53:12,127 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 09:53:17,569 - INFO - Clicked cookie accept
+2025-09-20 09:53:18,649 - INFO - Clicked profile (best-effort)
+2025-09-20 09:53:19,872 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 09:53:20,882 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 09:54:45,887 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 10:55:57,860 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 11:05:21,256 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 11:05:26,453 - INFO - Clicked cookie accept
+2025-09-20 11:05:27,547 - INFO - Clicked profile (best-effort)
+2025-09-20 11:05:29,307 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 11:05:30,315 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 11:05:32,867 - INFO - Создание документа: ТЕСТ новый 1
+2025-09-20 11:05:33,570 - INFO - Документ создан: 6131eec1-b8ba-4100-8dca-5ae9c9a40162
+2025-09-20 11:05:34,289 - INFO - Статус доступности документа: available
+2025-09-20 11:05:34,881 - INFO - Подписываем order id=cecd63d2-8436-4b34-acd0-8d21da1aa794 productGroup=None (content_len=476)
+2025-09-20 11:05:34,989 - INFO - Signed id=cecd63d2-8436-4b34-acd0-8d21da1aa794 sig_len=7792
+2025-09-20 11:05:34,990 - INFO - Отправляем подписанный payload (preview): {"signedOrders": [{"id": "cecd63d2-8436-4b34-acd0-8d21da1aa794", "sig_len": 7792}]}
+2025-09-20 11:05:35,287 - INFO - Отправка прошла успешно (detached/cryptcp signature)
+2025-09-20 11:05:35,430 - INFO - Финальный статус документа: sendForRelease
+2025-09-20 12:17:53,167 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 12:17:59,233 - INFO - Clicked cookie accept
+2025-09-20 12:18:00,312 - INFO - Clicked profile (best-effort)
+2025-09-20 12:18:02,067 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 12:18:03,076 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 12:18:05,682 - INFO - Создание документа: ТЕСТ новый 1
+2025-09-20 12:18:06,372 - INFO - Документ создан: b3d15276-974b-4333-b78c-e534cfa21297
+2025-09-20 12:18:07,174 - INFO - Статус доступности документа: available
+2025-09-20 12:18:07,784 - INFO - Подписываем order id=0c81d6be-66fe-46a0-9cdd-4b41d09290e2 productGroup=None content_len=476
+2025-09-20 12:18:07,882 - INFO - Подписано id=0c81d6be-66fe-46a0-9cdd-4b41d09290e2 sig_len=7792
+2025-09-20 12:18:07,883 - INFO - Отправляем payload preview: {"signedOrders": [{"id": "0c81d6be-66fe-46a0-9cdd-4b41d09290e2", "sig_len": 7792}]}
+2025-09-20 12:18:08,293 - INFO - Отправка подписей успешна
+2025-09-20 12:18:08,504 - INFO - Финальный статус документа: sendForRelease
+2025-09-20 12:20:50,928 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 13:50:19,378 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 13:50:25,577 - INFO - Clicked cookie accept
+2025-09-20 13:50:26,659 - INFO - Clicked profile (best-effort)
+2025-09-20 13:50:28,657 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 13:50:29,666 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 13:52:39,616 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 13:52:44,755 - INFO - Clicked cookie accept
+2025-09-20 13:52:45,833 - INFO - Clicked profile (best-effort)
+2025-09-20 13:52:47,624 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 13:52:48,632 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 13:54:22,488 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 13:56:46,238 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 13:57:58,214 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 13:59:33,199 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:00:34,992 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:03:25,467 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:05:20,094 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:07:30,977 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:07:53,721 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:07:58,302 - INFO - Clicked cookie accept
+2025-09-20 14:07:59,379 - INFO - Clicked profile (best-effort)
+2025-09-20 14:08:01,127 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 14:08:02,136 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 14:20:05,731 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:20:33,076 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:22:05,360 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:24:10,067 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:28:19,238 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:28:47,527 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 14:31:17,013 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 15:03:05,082 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 15:09:12,675 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 15:09:17,889 - INFO - Clicked cookie accept
+2025-09-20 15:09:18,975 - INFO - Clicked profile (best-effort)
+2025-09-20 15:09:20,791 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 15:09:21,801 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 15:22:59,523 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 15:23:04,676 - INFO - Clicked cookie accept
+2025-09-20 15:23:05,756 - INFO - Clicked profile (best-effort)
+2025-09-20 15:23:07,505 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 15:23:08,514 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 15:25:31,464 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 15:30:02,454 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 15:30:07,589 - INFO - Clicked cookie accept
+2025-09-20 15:30:08,669 - INFO - Clicked profile (best-effort)
+2025-09-20 15:30:10,406 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 15:30:11,415 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 16:00:41,585 - INFO - Saved last_snapshot.json (snapshot of to_process).
+2025-09-20 16:00:46,834 - INFO - Clicked cookie accept
+2025-09-20 16:00:47,945 - INFO - Clicked profile (best-effort)
+2025-09-20 16:00:50,146 - INFO - Clicked warehouse (fallback selector)
+2025-09-20 16:00:51,154 - INFO - Saved cookies to kontur_cookies.json
+2025-09-20 16:04:21,900 - INFO - Saved last_snapshot.json (snapshot of to_process).
