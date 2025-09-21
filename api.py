@@ -310,7 +310,12 @@ def get_with_winhttp(url: str, headers: dict | None = None):
     return status, body, all_headers
 
 
-def download_codes_pdf(session: requests.Session, document_id: str) -> Optional[str]:
+
+def download_codes_pdf_and_convert(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[str, Optional[str]]]:
+    """
+    Скачивает PDF для заказа document_id, сохраняет его как <order_name>.pdf на рабочем столе.
+    Конвертацию в CSV убрал — функция возвращает (pdf_path, None).
+    """
     logger.info(f"Начало скачивания PDF для заказа {document_id}")
 
     # Параметры polling статуса заказа
@@ -401,7 +406,7 @@ def download_codes_pdf(session: requests.Session, document_id: str) -> Optional[
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         target_dir = os.path.join(desktop, "pdf-коды км")
         os.makedirs(target_dir, exist_ok=True)
-        pdf_filename = f"codes_{document_id}.pdf"
+        pdf_filename = f"{order_name}.pdf"
         pdf_path = os.path.join(target_dir, pdf_filename)
     except Exception as e:
         logger.error(f"Ошибка при подготовке пути сохранения: {e}", exc_info=True)
@@ -419,6 +424,7 @@ def download_codes_pdf(session: requests.Session, document_id: str) -> Optional[
         headers["Cookie"] = cookie_str
 
     # Попытка 1: requests с ручным Cookie header (обычно работает)
+    pdf_bytes = None
     try:
         logger.debug("Пробуем скачать PDF через requests с явным Cookie header")
         resp_pdf = session.get(file_url, timeout=30, headers=headers, stream=True, allow_redirects=True)
@@ -426,42 +432,40 @@ def download_codes_pdf(session: requests.Session, document_id: str) -> Optional[
             logger.warning(f"requests GET вернул 401 для {file_url}; попробуем WinHTTP fallback. Response headers: {resp_pdf.headers}")
             raise requests.HTTPError(f"401 for {file_url}")
         resp_pdf.raise_for_status()
+        # Собираем байты в память — пригодится для возможных дальнейших обращений
+        pdf_bytes = resp_pdf.content
         with open(pdf_path, 'wb') as f:
-            for chunk in resp_pdf.iter_content(chunk_size=8192):
-                if chunk:
-                    f.write(chunk)
+            f.write(pdf_bytes)
         logger.info(f"PDF скачан: {pdf_path}")
-        return pdf_path
     except Exception as e_req:
         logger.warning(f"Не удалось скачать через requests: {e_req}", exc_info=True)
 
-    # Попытка 2: WinHTTP GET (fallback) — иногда API требует WinHTTP-клиента/корректных сетевых заголовков
-    try:
-        logger.debug("Пробуем скачать PDF через WinHTTP (COM) fallback")
-        status, body, all_headers = get_with_winhttp(file_url, headers=headers)
-        logger.debug(f"WinHTTP status={status}; headers: {all_headers}")
-        if status != 200:
-            logger.error(f"WinHTTP GET failed: status={status}; headers={all_headers}")
-            return None
-        # body может быть None или байтовой последовательностью
-        if body is None:
-            logger.error("WinHTTP вернул пустое тело ответа")
-            return None
+    # Попытка 2: WinHTTP GET (fallback)
+    if pdf_bytes is None:
+        try:
+            logger.debug("Пробуем скачать PDF через WinHTTP (COM) fallback")
+            status, body, all_headers = get_with_winhttp(file_url, headers=headers)
+            logger.debug(f"WinHTTP status={status}; headers: {all_headers}")
+            if status != 200:
+                logger.error(f"WinHTTP GET failed: status={status}; headers={all_headers}")
+                return None
+            if body is None:
+                logger.error("WinHTTP вернул пустое тело ответа")
+                return None
 
-        # Сохраняем бинарное содержимое
-        # ResponseBody в COM может быть типом поддерживаемым записью как bytes/bytearray
-        with open(pdf_path, 'wb') as f:
-            # Иногда body — объект SafeArray; лучше пытаться привести к bytes
+            # Попытаться привести тело к байтам
             try:
-                f.write(bytes(body))
+                pdf_bytes = bytes(body)
             except Exception:
-                # если bytes() не работает, попробуем записать напрямую
-                f.write(body)
-        logger.info(f"PDF скачан (WinHTTP): {pdf_path}")
-        return pdf_path
+                pdf_bytes = body
 
-    except Exception as e_win:
-        logger.error(f"Ошибка скачивания PDF (WinHTTP fallback): {e_win}", exc_info=True)
-        # логируем заголовки/куки для диагностики
-        logger.debug(f"Cookie used: {cookie_str}")
-        return None
+            with open(pdf_path, 'wb') as f:
+                f.write(pdf_bytes)
+            logger.info(f"PDF скачан (WinHTTP): {pdf_path}")
+        except Exception as e_win:
+            logger.error(f"Ошибка скачивания PDF (WinHTTP fallback): {e_win}", exc_info=True)
+            logger.debug(f"Cookie used: {cookie_str}")
+            return None
+
+    # Конвертация в CSV удалена — возвращаем путь к PDF и None для CSV (чтобы было обратимо)
+    return pdf_path, None

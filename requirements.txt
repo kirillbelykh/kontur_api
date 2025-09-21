@@ -5,3 +5,4 @@ openpyxl
 pandas
 customtkinter
 python-dotenv
+pdfplumber 

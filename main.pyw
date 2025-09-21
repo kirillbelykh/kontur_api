@@ -7,7 +7,7 @@ import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Tuple
 from get_gtin import lookup_gtin, lookup_by_gtin
-from api import try_single_post, download_codes_pdf
+from api import try_single_post, download_codes_pdf_and_convert
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code
 import customtkinter as ctk
@@ -434,7 +434,7 @@ class App(ctk.CTk):
                 continue  # Пропустить уже скачанные или с ошибкой
 
             self.download_log_insert(f"Скачивание для заказа {item['document_id']} ({item['order_name']})...")
-            filename = download_codes_pdf(session, item['document_id'])
+            filename = download_codes_pdf_and_convert(session, item['document_id'], item['order_name'])
             if filename:
                 item['status'] = 'Скачан'
                 item['filename'] = filename
