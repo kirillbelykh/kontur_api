@@ -7,7 +7,7 @@ import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Tuple
 from get_gtin import lookup_gtin, lookup_by_gtin
-from api import try_single_post
+from api import try_single_post, download_codes_pdf
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code
 import customtkinter as ctk
@@ -34,7 +34,7 @@ NOMENCLATURE_XLSX = "data/nomenclature.xlsx"
 # -----------------------------
 @dataclass
 class OrderItem:
-    order_name: str         # Заявка № или текст для "Заказ кодов №"
+    order_name: str         # Заявка № или текст для "Заказ кодов"
     simpl_name: str         # Упрощенно
     size: str               # Размер
     units_per_pack: str     # Количество единиц в упаковке (строка, для поиска)
@@ -110,12 +110,20 @@ class App(ctk.CTk):
         self.geometry("800x800")
         self.df = df
         self.collected: List[OrderItem] = []
+        self.download_list: List[dict] = []  # [{'document_id': str, 'status': str, 'filename': str or None, 'order_name': str}]
+
+        # Tabview for sections
+        self.tabview = ctk.CTkTabview(self)
+        self.tabview.pack(pady=10, padx=10, fill="both", expand=True)
+
+        # Tab 1: Создание заказов
+        tab_create = self.tabview.add("Создание заказов")
 
         # Input frame
-        input_frame = ctk.CTkFrame(self)
+        input_frame = ctk.CTkFrame(tab_create)
         input_frame.pack(pady=10, padx=10, fill="x")
 
-        ctk.CTkLabel(input_frame, text="Заявка (текст для 'Заказ кодов №'):").grid(row=0, column=0, pady=5, padx=5, sticky="w")
+        ctk.CTkLabel(input_frame, text="Заявка (текст для 'Заказ кодов'):").grid(row=0, column=0, pady=5, padx=5, sticky="w")
         self.order_entry = ctk.CTkEntry(input_frame, width=400)
         self.order_entry.grid(row=0, column=1, pady=5, padx=5)
 
@@ -161,9 +169,9 @@ class App(ctk.CTk):
         # Initial mode
         self.toggle_mode()
 
-        # Treeview
+        # Treeview for orders
         columns = ("idx", "uid", "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name")
-        self.tree = ttk.Treeview(self, columns=columns, show="headings", height=10)
+        self.tree = ttk.Treeview(tab_create, columns=columns, show="headings", height=10)
         self.tree.heading("idx", text="#")
         self.tree.heading("uid", text="UID")
         self.tree.heading("full_name", text="Наименование")
@@ -175,8 +183,8 @@ class App(ctk.CTk):
         self.tree.heading("order_name", text="Заявка")
         self.tree.pack(pady=10, padx=10, fill="both", expand=True)
 
-        # Buttons frame
-        btn_frame = ctk.CTkFrame(self)
+        # Buttons frame for create tab
+        btn_frame = ctk.CTkFrame(tab_create)
         btn_frame.pack(pady=10, fill="x")
 
         delete_btn = ctk.CTkButton(btn_frame, text="Удалить позицию", command=self.delete_item)
@@ -185,11 +193,8 @@ class App(ctk.CTk):
         execute_btn = ctk.CTkButton(btn_frame, text="Выполнить все", command=self.execute_all)
         execute_btn.pack(side="left", padx=10)
 
-        exit_btn = ctk.CTkButton(btn_frame, text="Выйти", command=self.quit)
-        exit_btn.pack(side="left", padx=10)
-
-        # Log textbox
-        self.log_text = ctk.CTkTextbox(self, height=150)
+        # Log textbox for create tab
+        self.log_text = ctk.CTkTextbox(tab_create, height=150)
         self.log_text.pack(pady=10, padx=10, fill="x")
 
         # Style Treeview for dark mode
@@ -198,6 +203,35 @@ class App(ctk.CTk):
         style.configure("Treeview", background="#2b2b2b", fieldbackground="#2b2b2b", foreground="white")
         style.configure("Treeview.Heading", background="#3a3a3a", foreground="white")
         style.map("Treeview", background=[("selected", "#1f6aa5")])
+
+        # Tab 2: Скачивание кодов
+        tab_download = self.tabview.add("Скачивание кодов")
+
+        # Treeview for downloads
+        download_columns = ("order_name", "document_id", "status", "filename")
+        self.download_tree = ttk.Treeview(tab_download, columns=download_columns, show="headings", height=10)
+        self.download_tree.heading("order_name", text="Заявка")
+        self.download_tree.heading("document_id", text="ID заказа")
+        self.download_tree.heading("status", text="Статус")
+        self.download_tree.heading("filename", text="Файл")
+        self.download_tree.pack(pady=10, padx=10, fill="both", expand=True)
+
+        # Buttons for download tab
+        download_btn_frame = ctk.CTkFrame(tab_download)
+        download_btn_frame.pack(pady=10, fill="x")
+
+        download_btn = ctk.CTkButton(download_btn_frame, text="Скачать все", command=self.download_all)
+        download_btn.pack(side="left", padx=10)
+
+        refresh_btn = ctk.CTkButton(download_btn_frame, text="Обновить статусы", command=self.refresh_download_statuses)
+        refresh_btn.pack(side="left", padx=10)
+
+        # Log textbox for download tab
+        self.download_log_text = ctk.CTkTextbox(tab_download, height=150)
+        self.download_log_text.pack(pady=10, padx=10, fill="x")
+
+        # Initial update
+        self.update_download_tree()
 
     def toggle_mode(self):
         if self.gtin_var.get() == "Yes":
@@ -345,11 +379,23 @@ class App(ctk.CTk):
         fail_count = 0
         for it in to_process:
             uid = getattr(it, "_uid", None)
-            self.log_insert(f"Запуск позиции uid={uid}: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
+            self.log_insert(f"Запуск позиции: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
             ok, msg = make_order_to_kontur(it)
             results.append((ok, msg, it))
             if ok:
                 success_count += 1
+                # Parse document_id from msg (assuming format "Document ... id: {id}")
+                try:
+                    document_id = msg.split("id: ")[1].strip()
+                    self.download_list.append({
+                        'order_name': it.order_name,
+                        'document_id': document_id,
+                        'status': 'Ожидает',
+                        'filename': None
+                    })
+                    self.update_download_tree()
+                except:
+                    self.log_insert(f"Не удалось извлечь document_id из: {msg}")
             else:
                 fail_count += 1
             self.log_insert(f"[{'OK' if ok else 'ERR'}] uid={uid} {it.simpl_name} — {msg}")
@@ -363,9 +409,61 @@ class App(ctk.CTk):
                 if not ok:
                     self.log_insert(f" - uid={getattr(it,'_uid',None)} | {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}' => {msg}")
 
+    def download_all(self):
+        if not self.download_list:
+            self.download_log_insert("Нет заказов для скачивания.")
+            return
+
+        # cookies → session
+        cookies = None
+        try:
+            logger.info("Получаем cookies для скачивания...")
+            cookies = get_valid_cookies()
+        except Exception as e:
+            self.download_log_insert(f"Ошибка при получении cookies: {e}")
+            return
+
+        if not cookies:
+            self.download_log_insert("Cookies не получены; прерываем скачивание.")
+            return
+
+        session = make_session_with_cookies(cookies)
+
+        for item in self.download_list:
+            if item['status'] != 'Ожидает':
+                continue  # Пропустить уже скачанные или с ошибкой
+
+            self.download_log_insert(f"Скачивание для заказа {item['document_id']} ({item['order_name']})...")
+            filename = download_codes_pdf(session, item['document_id'])
+            if filename:
+                item['status'] = 'Скачан'
+                item['filename'] = filename
+                self.download_log_insert(f"Успешно скачано: {filename}")
+            else:
+                item['status'] = 'Ошибка'
+                self.download_log_insert("Ошибка скачивания")
+            self.update_download_tree()
+
+    def refresh_download_statuses(self):
+        # Здесь можно добавить логику обновления статусов без скачивания, если нужно
+        self.update_download_tree()
+        self.download_log_insert("Статусы обновлены.")
+
+    def update_download_tree(self):
+        for item in self.download_tree.get_children():
+            self.download_tree.delete(item)
+        for it in self.download_list:
+            self.download_tree.insert("", "end", values=(
+                it['order_name'], it['document_id'], it['status'], it['filename'] or "-"
+            ))
+
     def log_insert(self, msg: str):
         self.log_text.insert("end", f"{msg}\n")
         self.log_text.see("end")
+
+    def download_log_insert(self, msg: str):
+        self.download_log_text.insert("end", f"{msg}\n")
+        self.download_log_text.see("end")
 
 if __name__ == "__main__":
     if not os.path.exists(NOMENCLATURE_XLSX):
@@ -373,7 +471,7 @@ if __name__ == "__main__":
     else:
         df = pd.read_excel(NOMENCLATURE_XLSX)
         df.columns = df.columns.str.strip()
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("dark-blue")
         app = App(df)
         app.mainloop()

@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 import requests
 import datetime
 from logger import logger
@@ -9,6 +9,7 @@ import win32com.client
 from win32com.client import Dispatch
 import pythoncom
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
@@ -280,4 +281,187 @@ def try_single_post(session: requests.Session, document_number: str,
         return doc
     except Exception as e:
         logger.error(f"Получение финального статуса: {e}")
+        return None
+
+# ---------------- Download PDF ----------------
+def get_with_winhttp(url: str, headers: dict | None = None):
+    """
+    Выполнить GET через WinHTTP и вернуть (status, response_bytes, all_headers)
+    """
+    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
+    win_http.Open("GET", url, False)
+    # стандартные заголовки
+    win_http.SetRequestHeader("User-Agent", "Mozilla/5.0")
+    if headers:
+        for k, v in headers.items():
+            # не пересоздаём User-Agent
+            if k.lower() == "user-agent":
+                continue
+            win_http.SetRequestHeader(k, v)
+    win_http.Send()
+    win_http.WaitForResponse()
+    status = int(win_http.Status)
+    # ResponseBody в COM возвращает бинарные данные
+    try:
+        body = win_http.ResponseBody  # binary
+    except Exception:
+        body = None
+    all_headers = win_http.GetAllResponseHeaders()
+    return status, body, all_headers
+
+
+def download_codes_pdf(session: requests.Session, document_id: str) -> Optional[str]:
+    logger.info(f"Начало скачивания PDF для заказа {document_id}")
+
+    # Параметры polling статуса заказа
+    max_attempts = 10  # 5 мин / 30 сек = 10
+    attempt = 0
+    status = None
+    while attempt < max_attempts:
+        try:
+            resp_status = session.get(f"{BASE}/api/v1/codes-order/{document_id}", timeout=15)
+            resp_status.raise_for_status()
+            doc = resp_status.json()
+            status = doc.get("status")
+            logger.info(f"Статус заказа: {status}")
+            if status == "released":
+                break
+            time.sleep(30)
+            attempt += 1
+        except Exception as e:
+            logger.error(f"Ошибка проверки статуса: {e}", exc_info=True)
+            return None
+
+    if status != "released":
+        logger.error(f"Заказ не перешел в 'released' за {max_attempts * 30} сек")
+        return None
+
+    # Получить шаблоны печати
+    try:
+        resp_templates = session.get(f"{BASE}/api/v1/print-templates?organizationId={ORGANIZATION_ID}&formTypes=codesOrder", timeout=15)
+        resp_templates.raise_for_status()
+        templates = resp_templates.json()
+        logger.debug(f"Шаблоны: {json.dumps(templates, indent=2, ensure_ascii=False)}")
+    except Exception as e:
+        logger.error(f"Ошибка получения шаблонов: {e}", exc_info=True)
+        return None
+
+    # Найти шаблон с size "30x20"
+    template_id = None
+    for t in templates:
+        if t.get("size") == "30x20":
+            template_id = t.get("id")
+            break
+    if not template_id:
+        logger.error("Шаблон '30x20' не найден")
+        return None
+
+    # POST для экспорта PDF
+    try:
+        export_url = f"{BASE}/api/v1/codes-order/{document_id}/export/pdf?splitByGtins=false&templateId={template_id}"
+        resp_export = session.post(export_url, timeout=30)
+        resp_export.raise_for_status()
+        export_data = resp_export.json()
+        result_id = export_data.get("resultId")
+        logger.info(f"Экспорт начат, resultId: {result_id}")
+    except Exception as e:
+        logger.error(f"Ошибка экспорта PDF: {e}", exc_info=True)
+        return None
+
+    # Поллинг статуса экспорта (макс 2 мин, каждые 10 сек)
+    max_attempts_export = 12  # 2 мин / 10 сек = 12
+    attempt_export = 0
+    file_url = None
+    while attempt_export < max_attempts_export:
+        try:
+            resp_result = session.get(f"{BASE}/api/v1/codes-order/{document_id}/export/pdf/{result_id}", timeout=15)
+            resp_result.raise_for_status()
+            result_data = resp_result.json()
+            result_status = result_data.get("status")
+            logger.info(f"Статус экспорта: {result_status}")
+            if result_status == "success":
+                file_infos = result_data.get("fileInfos", [])
+                if file_infos:
+                    file_url = file_infos[0].get("fileUrl")
+                break
+            time.sleep(10)
+            attempt_export += 1
+        except Exception as e:
+            logger.error(f"Ошибка проверки статуса экспорта: {e}", exc_info=True)
+            return None
+
+    if not file_url:
+        logger.error("Экспорт не завершился успехом или файл не найден")
+        return None
+
+    logger.debug(f"fileUrl: {file_url}")
+
+    # Подготавливаем целевую папку на Desktop
+    try:
+        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        target_dir = os.path.join(desktop, "pdf-коды км")
+        os.makedirs(target_dir, exist_ok=True)
+        pdf_filename = f"codes_{document_id}.pdf"
+        pdf_path = os.path.join(target_dir, pdf_filename)
+    except Exception as e:
+        logger.error(f"Ошибка при подготовке пути сохранения: {e}", exc_info=True)
+        return None
+
+    # Подготовим заголовки с куками вручную (cookie_str)
+    cookies_dict = session.cookies.get_dict()
+    cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
+
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Referer": BASE,
+    }
+    if cookie_str:
+        headers["Cookie"] = cookie_str
+
+    # Попытка 1: requests с ручным Cookie header (обычно работает)
+    try:
+        logger.debug("Пробуем скачать PDF через requests с явным Cookie header")
+        resp_pdf = session.get(file_url, timeout=30, headers=headers, stream=True, allow_redirects=True)
+        if resp_pdf.status_code == 401:
+            logger.warning(f"requests GET вернул 401 для {file_url}; попробуем WinHTTP fallback. Response headers: {resp_pdf.headers}")
+            raise requests.HTTPError(f"401 for {file_url}")
+        resp_pdf.raise_for_status()
+        with open(pdf_path, 'wb') as f:
+            for chunk in resp_pdf.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+        logger.info(f"PDF скачан: {pdf_path}")
+        return pdf_path
+    except Exception as e_req:
+        logger.warning(f"Не удалось скачать через requests: {e_req}", exc_info=True)
+
+    # Попытка 2: WinHTTP GET (fallback) — иногда API требует WinHTTP-клиента/корректных сетевых заголовков
+    try:
+        logger.debug("Пробуем скачать PDF через WinHTTP (COM) fallback")
+        status, body, all_headers = get_with_winhttp(file_url, headers=headers)
+        logger.debug(f"WinHTTP status={status}; headers: {all_headers}")
+        if status != 200:
+            logger.error(f"WinHTTP GET failed: status={status}; headers={all_headers}")
+            return None
+        # body может быть None или байтовой последовательностью
+        if body is None:
+            logger.error("WinHTTP вернул пустое тело ответа")
+            return None
+
+        # Сохраняем бинарное содержимое
+        # ResponseBody в COM может быть типом поддерживаемым записью как bytes/bytearray
+        with open(pdf_path, 'wb') as f:
+            # Иногда body — объект SafeArray; лучше пытаться привести к bytes
+            try:
+                f.write(bytes(body))
+            except Exception:
+                # если bytes() не работает, попробуем записать напрямую
+                f.write(body)
+        logger.info(f"PDF скачан (WinHTTP): {pdf_path}")
+        return pdf_path
+
+    except Exception as e_win:
+        logger.error(f"Ошибка скачивания PDF (WinHTTP fallback): {e_win}", exc_info=True)
+        # логируем заголовки/куки для диагностики
+        logger.debug(f"Cookie used: {cookie_str}")
         return None
