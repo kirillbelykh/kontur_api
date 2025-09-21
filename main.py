@@ -3,14 +3,13 @@ import json
 import copy
 import uuid
 from logger import logger
-from pathlib import Path
 import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Tuple
 from get_gtin import lookup_gtin, lookup_by_gtin
 from api import try_single_post
 from cookies import get_valid_cookies
-from utils import load_cookies, make_session_with_cookies, get_tnved_code
+from utils import make_session_with_cookies, get_tnved_code
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk

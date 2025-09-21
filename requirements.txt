@@ -3,6 +3,5 @@ selenium
 pywin32
 openpyxl
 pandas
-tkinter
 customtkinter
 python-dotenv

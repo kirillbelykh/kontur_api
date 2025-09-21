@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+REM === Текущая папка, где запущен скрипт ===
+set PROJECT_DIR=%CD%\kontur_api
+
 REM === Проверка наличия winget ===
 where winget >nul 2>nul
 if %errorlevel% neq 0 (
@@ -27,14 +30,14 @@ if %errorlevel% neq 0 (
 )
 
 REM === Клонирование проекта ===
-if not exist kontur_api (
-    echo ⬇️ Клонирую проект...
-    git clone https://github.com/kirillbelykh/kontur_api
+if not exist "%PROJECT_DIR%" (
+    echo ⬇️ Клонирую проект в %PROJECT_DIR%...
+    git clone https://github.com/kirillbelykh/kontur_api "%PROJECT_DIR%"
 ) else (
-    echo ✅ Папка kontur_api уже существует
+    echo ✅ Папка проекта уже существует: %PROJECT_DIR%
 )
 
-cd kontur_api
+cd "%PROJECT_DIR%"
 
 REM === Создание виртуального окружения ===
 if not exist venv (
@@ -52,7 +55,7 @@ pip install -r requirements.txt
 REM === Создание ярлыка на рабочем столе ===
 set DESKTOP=%USERPROFILE%\Desktop
 set TARGET=%CD%\main.pyw
-set SHORTCUT=%DESKTOP%\Kontur_API.lnk
+set SHORTCUT=%DESKTOP%\Заказ кодов Контур.lnk
 set ICON=%CD%\icon.ico
 
 echo ⬇️ Создаю ярлык на рабочем столе с иконкой...
@@ -64,5 +67,5 @@ powershell -Command ^
   $s.IconLocation='%ICON%'; ^
   $s.Save()
 
-echo ✅ Установка завершена!
+echo ✅ Установка завершена! Проект установлен в %PROJECT_DIR%
 pause
