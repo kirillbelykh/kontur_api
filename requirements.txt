@@ -1,7 +1,8 @@
 requests
-pywin32
 selenium
+pywin32
 openpyxl
 pandas
+tkinter
 customtkinter
-dotenv
+python-dotenv
