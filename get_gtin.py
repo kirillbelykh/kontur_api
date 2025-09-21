@@ -1,15 +1,6 @@
-import logging
+from logger import logger
 import pandas as pd
 
-# -----------------------------
-# logging (минимальные сообщения в терминал, подробности в файл)
-# -----------------------------
-LOG_FILE = "lookup.log"
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s"
-)
 
 # -----------------------------
 # Lookup GTIN in nomenclature.xlsx
@@ -89,7 +80,7 @@ def lookup_gtin(
             )
 
     except Exception as e:
-        logging.exception("Ошибка в lookup_gtin")
+        logger.exception("Ошибка в lookup_gtin")
 
     # если ничего не нашли
     return None, None
@@ -106,7 +97,7 @@ def lookup_by_gtin(df: pd.DataFrame, gtin: str) -> tuple[str | None, str | None]
     try:
         gtin_str = str(gtin).strip()
         if 'GTIN' not in df.columns:
-            logging.warning("В DataFrame нет колонки 'GTIN'")
+            logger.warning("В DataFrame нет колонки 'GTIN'")
             return None, None
 
         match = df[df['GTIN'].astype(str).str.strip() == gtin_str]
@@ -117,6 +108,6 @@ def lookup_by_gtin(df: pd.DataFrame, gtin: str) -> tuple[str | None, str | None]
             return full_name, simpl_name
 
     except Exception as e:
-        logging.exception(f"Ошибка в lookup_by_gtin для GTIN={gtin}")
+        logger.exception(f"Ошибка в lookup_by_gtin для GTIN={gtin}")
 
     return None, None

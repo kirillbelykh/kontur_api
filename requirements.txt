@@ -1,7 +1,7 @@
-requests>=2.31.0
+requests
 pywin32
 selenium
 openpyxl
 pandas
 customtkinter
-tkinter
+dotenv
