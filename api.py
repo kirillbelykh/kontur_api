@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Tuple, Optional
 import requests
 import datetime
 from logger import logger
