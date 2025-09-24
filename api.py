@@ -164,7 +164,7 @@ def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> 
         return False
 
 # ---------------- API flows ----------------
-def try_single_post(session: requests.Session, document_number: str,
+def try_fast_post(session: requests.Session, document_number: str,
                     product_group: str, release_method_type: str,
                     positions: list[dict],
                     filling_method: str = "productsCatalog", thumbprint: str | None = None) -> dict | None:
