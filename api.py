@@ -215,7 +215,7 @@ def try_fast_post(session: requests.Session, document_number: str,
         logger.error(f"Проверка доступности документа {document_number}: {e}")
         return None
 
-    # проверка сертификата
+    # проверка сертификата (надо подумать, нужен ли этот блок)
     if thumbprint:
         try:
             resp = session.get(f"{BASE}/api/v1/organizations/{ORGANIZATION_ID}/employees/has-certificate?thumbprint={thumbprint}", timeout=15)
@@ -227,7 +227,7 @@ def try_fast_post(session: requests.Session, document_number: str,
             logger.error(f"Проверка сертификата: {e}")
             return None
 
-    # обновление токена OMS
+    # находим сертификат 
     cert = find_certificate_by_thumbprint(thumbprint)
     if not cert:
         logger.error(f"Сертификат для подписи не найден (thumbprint={thumbprint})")
