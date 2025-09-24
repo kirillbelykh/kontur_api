@@ -464,7 +464,7 @@ class App(ctk.CTk):
             return
         idx = self.tree.index(selected[0])
         removed = self.collected.pop(idx)
-        self.log_insert(f"Удалена позиция: uid={getattr(removed, '_uid', None)} | {removed.simpl_name} — GTIN {removed.gtin}")
+        self.log_insert(f"Удалена позиция: {removed.simpl_name} — GTIN {removed.gtin}")
         self.update_tree()
 
     def execute_all(self):
@@ -589,7 +589,7 @@ if __name__ == "__main__":
     else:
         df = pd.read_excel(NOMENCLATURE_XLSX)
         df.columns = df.columns.str.strip()
-        ctk.set_appearance_mode("light")
+        ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
         app = App(df)
         app.mainloop()
