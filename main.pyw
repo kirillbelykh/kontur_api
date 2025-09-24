@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from options import (
     simplified_options, color_required, venchik_required,
     color_options, venchik_options, size_options, units_options
-)   
+)
 
 load_dotenv()
 
@@ -137,6 +137,9 @@ class App(ctk.CTk):
         self.gtin_entry = ctk.CTkEntry(self.gtin_frame, width=400)
         self.gtin_entry.grid(row=0, column=1, pady=5, padx=5)
 
+        # Добавляем поддержку вставки/копирования через правый клик, сочетания клавиш и русскую раскладку
+        self._add_entry_context_menu(self.gtin_entry)
+
         # Select frame
         self.select_frame = ctk.CTkFrame(input_frame)
         ctk.CTkLabel(self.select_frame, text="Вид товара:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
@@ -232,6 +235,121 @@ class App(ctk.CTk):
 
         # Initial update
         self.update_download_tree()
+
+    def _add_entry_context_menu(self, entry: ctk.CTkEntry):
+        """Добавляет контекстное меню (правый клик) и обработку вставки через клавиши для поля entry.
+
+        Исправляет проблему, когда в русской раскладке Ctrl+C/Ctrl+V не срабатывают — обрабатываем
+        комбинации по символам как в латинской, так и в кириллической раскладках, а также альтернативные
+        сочетания (Shift-Insert, Ctrl-Insert, Shift-Delete).
+        """
+        menu = tk.Menu(self, tearoff=0)
+
+        def _paste(event=None):
+            try:
+                clip = self.clipboard_get()
+            except Exception:
+                return "break"
+            try:
+                # Если что-то выделено — заменяем
+                try:
+                    sel_first = entry.index("sel.first")
+                    sel_last = entry.index("sel.last")
+                    entry.delete(sel_first, sel_last)
+                except Exception:
+                    pass
+                entry.insert("insert", clip)
+            except Exception:
+                pass
+            return "break"
+
+        def _copy(event=None):
+            try:
+                sel = entry.selection_get()
+                self.clipboard_clear()
+                self.clipboard_append(sel)
+            except Exception:
+                pass
+            return "break"
+
+        def _cut(event=None):
+            try:
+                sel_first = entry.index("sel.first")
+                sel_last = entry.index("sel.last")
+                sel = entry.get()[sel_first:sel_last]
+                self.clipboard_clear()
+                self.clipboard_append(sel)
+                entry.delete(sel_first, sel_last)
+            except Exception:
+                pass
+            return "break"
+
+        def _select_all(event=None):
+            try:
+                entry.select_range(0, 'end')
+                entry.icursor('end')
+            except Exception:
+                pass
+            return "break"
+
+        menu.add_command(label="Вставить", command=_paste)
+        menu.add_command(label="Копировать", command=_copy)
+        menu.add_command(label="Вырезать", command=_cut)
+        menu.add_separator()
+        menu.add_command(label="Выделить всё", command=_select_all)
+
+        # Правый клик (Button-3) для большинства ОС
+        def _show_menu(event):
+            try:
+                menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                menu.grab_release()
+            return "break"
+
+        entry.bind('<Button-3>', _show_menu)
+        # Поддержка для macOS (Control-Button-1) и некоторых окружений
+        entry.bind('<Control-Button-1>', _show_menu)
+
+        # Обработка комбинаций клавиш: учитываем как латинские, так и кириллические буквы
+        # mapping: c -> с, v -> м, x -> ч, a -> ф (русская раскладка)
+        paste_keys = {'v', 'м'}
+        copy_keys = {'c', 'с'}
+        cut_keys = {'x', 'ч'}
+        select_keys = {'a', 'ф'}
+
+        def _on_ctrl_key(event):
+            key = ''
+            try:
+                key = (event.keysym or '').lower()
+            except Exception:
+                pass
+            # event.char иногда содержит символ, попробуем и его
+            if not key:
+                try:
+                    key = (event.char or '').lower()
+                except Exception:
+                    key = ''
+
+            if key in paste_keys:
+                return _paste(event)
+            if key in copy_keys:
+                return _copy(event)
+            if key in cut_keys:
+                return _cut(event)
+            if key in select_keys:
+                return _select_all(event)
+            # не обработали — вернуть None, чтобы прочие сочетания работали как обычно
+            return None
+
+        # Привязываем унифицированный обработчик для Ctrl+Key и Command+Key (mac)
+        entry.bind('<Control-Key>', _on_ctrl_key)
+        entry.bind('<Control-KeyRelease>', lambda e: 'break')
+        entry.bind('<Command-Key>', _on_ctrl_key)
+
+        # Альтернативные сочетания
+        entry.bind('<Shift-Insert>', _paste)
+        entry.bind('<Control-Insert>', _copy)
+        entry.bind('<Shift-Delete>', _cut)
 
     def toggle_mode(self):
         if self.gtin_var.get() == "Yes":
@@ -379,7 +497,7 @@ class App(ctk.CTk):
         fail_count = 0
         for it in to_process:
             uid = getattr(it, "_uid", None)
-            self.log_insert(f"Запуск позиции: {it.simpl_name} | GTIN {it.gtin} | заявка № '{it.order_name}'")
+            self.log_insert(f"Запуск позиции: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
             ok, msg = make_order_to_kontur(it)
             results.append((ok, msg, it))
             if ok:
@@ -398,7 +516,7 @@ class App(ctk.CTk):
                     self.log_insert(f"Не удалось извлечь document_id из: {msg}")
             else:
                 fail_count += 1
-            self.log_insert(f"[{'Заказ успешно создан' if ok else 'Ошибка создания заказа'}] {it.simpl_name} — {msg}")
+            self.log_insert(f"[{'OK' if ok else 'ERR'}] uid={uid} {it.simpl_name} — {msg}")
 
         self.log_insert("\n=== Выполнение завершено ===")
         self.log_insert(f"Успешно: {success_count}, Ошибок: {fail_count}.")
@@ -471,7 +589,7 @@ if __name__ == "__main__":
     else:
         df = pd.read_excel(NOMENCLATURE_XLSX)
         df.columns = df.columns.str.strip()
-        ctk.set_appearance_mode("dark")
+        ctk.set_appearance_mode("light")
         ctk.set_default_color_theme("dark-blue")
         app = App(df)
         app.mainloop()
