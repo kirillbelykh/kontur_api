@@ -1017,7 +1017,8 @@ class App(ctk.CTk):
                     "batchNumber": batch_num,
                     "productionType": "ownProduction",
                     "documentNumber": order_name,
-                    "cisType": "unit"
+                    "cisType": "unit", 
+                    "productsHasSameDates": "true"
                 }
                 
                 fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint)
