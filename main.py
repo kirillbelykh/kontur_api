@@ -123,7 +123,7 @@ class App(ctk.CTk):
         input_frame = ctk.CTkFrame(tab_create)
         input_frame.pack(pady=10, padx=10, fill="x")
 
-        ctk.CTkLabel(input_frame, text="Заявка (текст для 'Заказ кодов'):").grid(row=0, column=0, pady=5, padx=5, sticky="w")
+        ctk.CTkLabel(input_frame, text="Заявка №:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
         self.order_entry = ctk.CTkEntry(input_frame, width=400)
         self.order_entry.grid(row=0, column=1, pady=5, padx=5)
 
@@ -173,10 +173,9 @@ class App(ctk.CTk):
         self.toggle_mode()
 
         # Treeview for orders
-        columns = ("idx", "uid", "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name")
+        columns = ("idx",  "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name", "uid")
         self.tree = ttk.Treeview(tab_create, columns=columns, show="headings", height=10)
         self.tree.heading("idx", text="Порядковый номер")
-        self.tree.heading("uid", text="UID")
         self.tree.heading("full_name", text="Наименование")
         self.tree.heading("simpl_name", text="Упрощенно")
         self.tree.heading("size", text="Размер")
@@ -184,6 +183,7 @@ class App(ctk.CTk):
         self.tree.heading("gtin", text="GTIN")
         self.tree.heading("codes_count", text="Кодов")
         self.tree.heading("order_name", text="Заявка")
+        self.tree.heading("uid", text="UID")
         self.tree.pack(pady=10, padx=10, fill="both", expand=True)
 
         # Buttons frame for create tab
@@ -195,6 +195,9 @@ class App(ctk.CTk):
 
         execute_btn = ctk.CTkButton(btn_frame, text="Выполнить все", command=self.execute_all)
         execute_btn.pack(side="left", padx=10)
+        
+        clear_btn = ctk.CTkButton(btn_frame, text="Очистить", command=self.clear_all)
+        clear_btn.pack(side="left", padx=10)
 
         # Log textbox for create tab
         self.log_text = ctk.CTkTextbox(tab_create, height=150)
@@ -451,7 +454,7 @@ class App(ctk.CTk):
             )
             self.log_insert(
                 f"✅Добавлено: {simpl} ({size}, {units} уп., {color or 'без цвета'}) — "
-                f"GTIN {gtin} — {codes_count} кодов — ТНВЭД {tnved_code} — заявка '{order_name}'"
+                f"GTIN {gtin} — {codes_count} кодов — ТНВЭД {tnved_code} — заявка № {order_name}"
             )
 
         setattr(it, "_uid", uuid.uuid4().hex)
@@ -476,6 +479,55 @@ class App(ctk.CTk):
         removed = self.collected.pop(idx)
         self.log_insert(f"Удалена позиция: {removed.simpl_name} — GTIN {removed.gtin}")
         self.update_tree()
+
+    def clear_all(self):
+        """Очищает все данные: список заказов, дерево и поля ввода"""
+        try:
+            # Очищаем список собранных позиций
+            self.collected.clear()
+            
+            # Очищаем дерево заказов
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+            
+            # Очищаем поле ввода заявки
+            self.order_entry.delete(0, "end")
+            
+            # Очищаем поле ввода GTIN (если активно)
+            if hasattr(self, 'gtin_entry'):
+                self.gtin_entry.delete(0, "end")
+            
+            # Сбрасываем комбо-боксы к значениям по умолчанию
+            if hasattr(self, 'simpl_combo'):
+                self.simpl_combo.set("")
+            
+            if hasattr(self, 'color_combo'):
+                self.color_combo.set("")
+            
+            if hasattr(self, 'venchik_combo'):
+                self.venchik_combo.set("")
+            
+            if hasattr(self, 'size_combo'):
+                self.size_combo.set("")
+            
+            if hasattr(self, 'units_combo'):
+                self.units_combo.set("")
+            
+            # Очищаем поле количества кодов
+            if hasattr(self, 'codes_entry'):
+                self.codes_entry.delete(0, "end")
+            
+            # Очищаем лог (опционально)
+            self.log_text.configure(state="normal")
+            self.log_text.delete("1.0", "end")
+            self.log_text.configure(state="disabled")
+            
+            # Выводим сообщение об успешной очистке
+            self.log_insert("Все данные успешно очищены")
+            
+        except Exception as e:
+            self.log_insert(f"Ошибка при очистке данных: {e}")
+
 
     def execute_all(self):
         if not self.collected:
@@ -528,6 +580,44 @@ class App(ctk.CTk):
             for ok, msg, it in results:
                 if not ok:
                     self.log_insert(f" - uid={getattr(it,'_uid',None)} | {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}' => {msg}")
+
+        self._clear_after_execution()
+    def _clear_after_execution(self):
+        """Очищает данные после выполнения заказов"""
+        try:
+            # Очищаем основной список заказов
+            self.collected.clear()
+            
+            # Очищаем дерево заказов
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+            
+            # Очищаем поле количества кодов (опционально)
+            if hasattr(self, 'codes_entry'):
+                self.codes_entry.delete(0, "end")
+            
+            # Сбрасываем комбо-боксы к значениям по умолчанию (опционально)
+            self._reset_input_fields()
+            
+            self.log_insert("Память очищена. Можно создавать новые заказы.")
+            
+        except Exception as e:
+            self.log_insert(f"Ошибка при очистке памяти: {e}")
+
+    def _reset_input_fields(self):
+        """Сбрасывает поля ввода к значениям по умолчанию"""
+        try:
+            # Сбрасываем комбо-боксы
+            comboboxes = ['simpl_combo', 'color_combo', 'venchik_combo', 'size_combo', 'units_combo']
+            for combo_name in comboboxes:
+                if hasattr(self, combo_name):
+                    getattr(self, combo_name).set("")
+            
+            # Можно также очистить поле заявки, если нужно
+            # self.order_entry.delete(0, "end")
+            
+        except Exception as e:
+            print(f"Ошибка при сбросе полей ввода: {e}")
 
     def download_all(self):
         if not self.download_list:

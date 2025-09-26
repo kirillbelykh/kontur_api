@@ -1,0 +1,11 @@
+2025-09-26 14:46:48,641 - INFO - История заказа сохранена в файл 'История заказов.txt'
+2025-09-26 14:46:48,646 - INFO - Получаем cookies...
+2025-09-26 14:46:53,926 - INFO - Clicked cookie accept
+2025-09-26 14:46:55,034 - INFO - Clicked profile (best-effort)
+2025-09-26 14:46:56,335 - INFO - Clicked warehouse (fallback selector)
+2025-09-26 14:46:57,345 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-26 14:47:00,129 - INFO - Создание документа: тест 1
+2025-09-26 14:47:00,131 - ERROR - Создание документа тест 1: Invalid URL 'None/api/v1/codes-order?warehouseId=None': No scheme supplied. Perhaps you meant https://None/api/v1/codes-order?warehouseId=None?
+2025-09-26 14:47:00,151 - INFO - Получаем cookies...
+2025-09-26 14:47:00,171 - INFO - Создание документа: тест 2
+2025-09-26 14:47:00,172 - ERROR - Создание документа тест 2: Invalid URL 'None/api/v1/codes-order?warehouseId=None': No scheme supplied. Perhaps you meant https://None/api/v1/codes-order?warehouseId=None?
