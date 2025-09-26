@@ -9,7 +9,7 @@ from typing import List, Tuple
 from get_gtin import lookup_gtin, lookup_by_gtin
 from api import try_single_post, download_codes_pdf_and_convert
 from cookies import get_valid_cookies
-from utils import make_session_with_cookies, get_tnved_code
+from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk
@@ -175,7 +175,7 @@ class App(ctk.CTk):
         # Treeview for orders
         columns = ("idx", "uid", "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name")
         self.tree = ttk.Treeview(tab_create, columns=columns, show="headings", height=10)
-        self.tree.heading("idx", text="#")
+        self.tree.heading("idx", text="Порядковый номер")
         self.tree.heading("uid", text="UID")
         self.tree.heading("full_name", text="Наименование")
         self.tree.heading("simpl_name", text="Упрощенно")
@@ -419,7 +419,7 @@ class App(ctk.CTk):
                 tnved_code=tnved_code,
                 cisType=str(CIS_TYPE)
             )
-            self.log_insert(f"Добавлено по GTIN: {gtin_input} — {codes_count} кодов — заявка '{order_name}'")
+            self.log_insert(f"✅Добавлено по GTIN: {gtin_input} — {codes_count} кодов — заявка '{order_name}'")
         else:
             simpl = self.simpl_combo.get()
             color = self.color_combo.get() if self.color_combo.winfo_viewable() else None
@@ -450,7 +450,7 @@ class App(ctk.CTk):
                 cisType=str(CIS_TYPE)
             )
             self.log_insert(
-                f"Добавлено: {simpl} ({size}, {units} уп., {color or 'без цвета'}) — "
+                f"✅Добавлено: {simpl} ({size}, {units} уп., {color or 'без цвета'}) — "
                 f"GTIN {gtin} — {codes_count} кодов — ТНВЭД {tnved_code} — заявка '{order_name}'"
             )
 
@@ -489,17 +489,9 @@ class App(ctk.CTk):
 
         to_process = copy.deepcopy(self.collected)
 
-        try:
-            snapshot = []
-            for x in to_process:
-                d = asdict(x)
-                d["_uid"] = getattr(x, "_uid", None)
-                snapshot.append(d)
-            with open("last_snapshot.json", "w", encoding="utf-8") as f:
-                json.dump(snapshot, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            self.log_insert(f"Не удалось сохранить снимок: {e}")
-
+        save_snapshot(to_process)
+        save_order_history(to_process)
+        
         self.log_insert(f"\nБудет выполнено {len(to_process)} заказов.")
         self.log_insert("Запуск...")
         results = []

@@ -9,7 +9,7 @@ from typing import List, Tuple
 from get_gtin import lookup_gtin, lookup_by_gtin
 from api import try_single_post, download_codes_pdf_and_convert
 from cookies import get_valid_cookies
-from utils import make_session_with_cookies, get_tnved_code
+from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
 import tkinter as tk
 from tkinter import ttk
@@ -160,14 +160,14 @@ class App(ctk.CTk):
         self.units_combo = ctk.CTkComboBox(self.select_frame, values=[str(u) for u in units_options], width=400)
         self.units_combo.grid(row=4, column=1, pady=5, padx=5)
 
-        # Codes count (common)
-        ctk.CTkLabel(input_frame, text="Количество кодов:").grid(row=2, column=0, pady=5, padx=5, sticky="w")
+        # Codes count (common) - перемещено вниз
+        ctk.CTkLabel(input_frame, text="Количество кодов:").grid(row=5, column=0, pady=5, padx=5, sticky="w")
         self.codes_entry = ctk.CTkEntry(input_frame, width=400)
-        self.codes_entry.grid(row=2, column=1, pady=5, padx=5)
+        self.codes_entry.grid(row=5, column=1, pady=5, padx=5)
 
-        # Add button
+        # Add button - теперь под полем "Количество кодов"
         add_btn = ctk.CTkButton(input_frame, text="Добавить позицию", command=self.add_item)
-        add_btn.grid(row=5, column=0, columnspan=2, pady=10)
+        add_btn.grid(row=6, column=0, columnspan=2, pady=10)
 
         # Initial mode
         self.toggle_mode()
@@ -200,6 +200,16 @@ class App(ctk.CTk):
         self.log_text = ctk.CTkTextbox(tab_create, height=150)
         self.log_text.pack(pady=10, padx=10, fill="x")
 
+        # Ограничение доступа только для чтения/копирования
+        self.log_text.configure(state="disabled")  # Блокирует редактирование
+
+        # Добавляем контекстное меню для копирования
+        self.log_text.bind("<Button-3>", self._show_log_context_menu)  # Правая кнопка мыши
+
+        # Разрешаем стандартные сочетания клавиш для копирования
+        self.log_text.bind("<Control-c>", lambda e: self._copy_log_text())
+        self.log_text.bind("<Control-C>", lambda e: self._copy_log_text())
+    
         # Style Treeview for dark mode
         style = ttk.Style()
         style.theme_use("clam")
@@ -479,17 +489,9 @@ class App(ctk.CTk):
 
         to_process = copy.deepcopy(self.collected)
 
-        try:
-            snapshot = []
-            for x in to_process:
-                d = asdict(x)
-                d["_uid"] = getattr(x, "_uid", None)
-                snapshot.append(d)
-            with open("last_snapshot.json", "w", encoding="utf-8") as f:
-                json.dump(snapshot, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            self.log_insert(f"Не удалось сохранить снимок: {e}")
-
+        save_snapshot(to_process)
+        save_order_history(to_process)
+        
         self.log_insert(f"\nБудет выполнено {len(to_process)} заказов.")
         self.log_insert("Запуск...")
         results = []
@@ -576,8 +578,60 @@ class App(ctk.CTk):
             ))
 
     def log_insert(self, msg: str):
-        self.log_text.insert("end", f"{msg}\n")
-        self.log_text.see("end")
+        """Выводит сообщение в лог (с ограничением доступа только для чтения)"""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.insert("end", f"{msg}\n")
+            self.log_text.see("end")  # Автопрокрутка к новому сообщению
+            self.log_text.configure(state="disabled")
+        except Exception as e:
+            print(f"Ошибка при записи в лог: {e}")
+
+    def _show_log_context_menu(self, event):
+        """Показывает контекстное меню для текстового поля лога"""
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Копировать", command=self._copy_log_text)
+        menu.add_command(label="Выделить все", command=self._select_all_log_text)
+        menu.add_separator()
+        menu.add_command(label="Очистить лог", command=self._clear_log_text)
+        
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _copy_log_text(self):
+        """Копирует выделенный текст из лога в буфер обмена"""
+        try:
+            # Временно включаем редактирование для копирования
+            self.log_text.configure(state="normal")
+            
+            # Копируем выделенный текст
+            selected_text = self.log_text.get("sel.first", "sel.last")
+            if selected_text:
+                self.clipboard_clear()
+                self.clipboard_append(selected_text)
+        except tk.TclError:
+            # Если ничего не выделено
+            pass
+        finally:
+            # Возвращаем в режим только для чтения
+            self.log_text.configure(state="disabled")
+
+    def _select_all_log_text(self):
+        """Выделяет весь текст в логе"""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.tag_add("sel", "1.0", "end")
+            self.log_text.configure(state="disabled")
+        except:
+            pass
+
+    def _clear_log_text(self):
+        """Очищает содержимое лога"""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.delete("1.0", "end")
+            self.log_text.configure(state="disabled")
+        except:
+            pass
 
     def download_log_insert(self, msg: str):
         self.download_log_text.insert("end", f"{msg}\n")
