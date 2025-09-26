@@ -310,7 +310,20 @@ def get_with_winhttp(url: str, headers: dict | None = None):
     return status, body, all_headers
 
 
-
+def check_order_status(session: requests.Session, document_id: str) -> str:
+    """
+    Быстрая проверка статуса заказа без ожидания
+    """
+    try:
+        resp_status = session.get(f"{BASE}/api/v1/codes-order/{document_id}", timeout=15)
+        resp_status.raise_for_status()
+        doc = resp_status.json()
+        return doc.get("status", "unknown")
+    except Exception as e:
+        logger.error(f"Ошибка проверки статуса заказа {document_id}: {e}")
+        return "error"
+    
+    
 def download_codes_pdf_and_convert(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[str, Optional[str]]]:
     """
     Скачивает PDF для заказа document_id, сохраняет его как <order_name>.pdf на рабочем столе.
@@ -439,33 +452,6 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
         logger.info(f"PDF скачан: {pdf_path}")
     except Exception as e_req:
         logger.warning(f"Не удалось скачать через requests: {e_req}", exc_info=True)
-
-    # Попытка 2: WinHTTP GET (fallback)
-    if pdf_bytes is None:
-        try:
-            logger.debug("Пробуем скачать PDF через WinHTTP (COM) fallback")
-            status, body, all_headers = get_with_winhttp(file_url, headers=headers)
-            logger.debug(f"WinHTTP status={status}; headers: {all_headers}")
-            if status != 200:
-                logger.error(f"WinHTTP GET failed: status={status}; headers={all_headers}")
-                return None
-            if body is None:
-                logger.error("WinHTTP вернул пустое тело ответа")
-                return None
-
-            # Попытаться привести тело к байтам
-            try:
-                pdf_bytes = bytes(body)
-            except Exception:
-                pdf_bytes = body
-
-            with open(pdf_path, 'wb') as f:
-                f.write(pdf_bytes)
-            logger.info(f"PDF скачан (WinHTTP): {pdf_path}")
-        except Exception as e_win:
-            logger.error(f"Ошибка скачивания PDF (WinHTTP fallback): {e_win}", exc_info=True)
-            logger.debug(f"Cookie used: {cookie_str}")
-            return None
 
     # Конвертация в CSV удалена — возвращаем путь к PDF и None для CSV (чтобы было обратимо)
     return pdf_path, None

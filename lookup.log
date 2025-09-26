@@ -9,3 +9,299 @@
 2025-09-26 14:47:00,151 - INFO - Получаем cookies...
 2025-09-26 14:47:00,171 - INFO - Создание документа: тест 2
 2025-09-26 14:47:00,172 - ERROR - Создание документа тест 2: Invalid URL 'None/api/v1/codes-order?warehouseId=None': No scheme supplied. Perhaps you meant https://None/api/v1/codes-order?warehouseId=None?
+2025-09-26 15:32:51,528 - INFO - История заказа сохранена в файл 'История заказов.txt'
+2025-09-26 15:32:51,531 - INFO - Получаем cookies...
+2025-09-26 15:32:51,532 - INFO - Cookies устарели (2754 сек). Нужно обновить.
+2025-09-26 15:32:55,309 - INFO - Clicked cookie accept
+2025-09-26 15:32:56,420 - INFO - Clicked profile (best-effort)
+2025-09-26 15:32:57,664 - INFO - Clicked warehouse (fallback selector)
+2025-09-26 15:32:58,674 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-26 15:33:01,318 - INFO - Создание документа: тест 1
+2025-09-26 15:33:01,320 - ERROR - Создание документа тест 1: Invalid URL 'None/api/v1/codes-order?warehouseId=None': No scheme supplied. Perhaps you meant https://None/api/v1/codes-order?warehouseId=None?
+2025-09-26 15:40:08,239 - INFO - История заказа сохранена в файл 'История заказов.txt'
+2025-09-26 15:40:08,242 - INFO - Получаем cookies...
+2025-09-26 15:40:08,270 - INFO - Создание документа: тест 1
+2025-09-26 15:40:09,787 - INFO - Документ создан: 64161fa4-de2e-472b-a82f-ea79af19aa1b
+2025-09-26 15:40:11,129 - INFO - Подписываем order id=7f984163-e2c9-4196-9ac6-0d4f9a513845 (base64Content length=460)
+2025-09-26 15:40:11,259 - INFO - Обновление токена OMS...
+2025-09-26 15:40:13,022 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 15:40:13,316 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 15:40:13,443 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 15:40:13,456 - INFO - Получаем cookies...
+2025-09-26 15:40:13,457 - INFO - Создание документа: тест 2
+2025-09-26 15:40:14,099 - INFO - Документ создан: 49c0c8af-a5c7-489c-ae13-dfff3d43d837
+2025-09-26 15:40:14,701 - INFO - Подписываем order id=1cc23264-274d-4af2-a00d-011703b516ab (base64Content length=460)
+2025-09-26 15:40:14,707 - INFO - Обновление токена OMS...
+2025-09-26 15:40:15,509 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 15:40:15,767 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 15:40:16,640 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 15:46:55,085 - INFO - История заказа сохранена в файл 'История заказов.txt'
+2025-09-26 15:46:55,089 - INFO - Получаем cookies...
+2025-09-26 15:46:55,091 - INFO - Создание документа: тест 1
+2025-09-26 15:46:56,037 - INFO - Документ создан: 40d67d97-6e93-4c4a-a622-6b0ad63d91bf
+2025-09-26 15:46:58,040 - INFO - Подписываем order id=d3d0f072-5020-45cb-83fc-96f2a02ddbd7 (base64Content length=460)
+2025-09-26 15:46:58,131 - INFO - Обновление токена OMS...
+2025-09-26 15:46:59,334 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 15:46:59,940 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 15:47:00,331 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 15:47:00,344 - INFO - Получаем cookies...
+2025-09-26 15:47:00,345 - INFO - Создание документа: тест 2
+2025-09-26 15:47:01,669 - INFO - Документ создан: 0500fe57-aa5d-422e-96ec-4ea8bd3094c5
+2025-09-26 15:47:02,974 - INFO - Подписываем order id=a286577e-554c-4122-b7f9-270176b31aff (base64Content length=460)
+2025-09-26 15:47:02,980 - INFO - Обновление токена OMS...
+2025-09-26 15:47:03,925 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 15:47:04,369 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 15:47:04,551 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 15:48:09,295 - INFO - Cookies устарели (911 сек). Нужно обновить.
+2025-09-26 15:48:15,327 - INFO - Clicked cookie accept
+2025-09-26 15:48:16,429 - INFO - Clicked profile (best-effort)
+2025-09-26 15:48:18,259 - INFO - Clicked warehouse (fallback selector)
+2025-09-26 15:48:19,270 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-26 15:50:26,970 - INFO - Начало скачивания PDF для заказа 40d67d97-6e93-4c4a-a622-6b0ad63d91bf
+2025-09-26 15:50:27,109 - INFO - Начало скачивания PDF для заказа 0500fe57-aa5d-422e-96ec-4ea8bd3094c5
+2025-09-26 15:50:27,731 - INFO - Статус заказа: released
+2025-09-26 15:50:27,828 - INFO - Статус заказа: released
+2025-09-26 15:50:28,535 - INFO - Экспорт начат, resultId: 8863b80a-f772-4079-9b14-a56814b6be2d
+2025-09-26 15:50:28,535 - INFO - Экспорт начат, resultId: 31ec3965-bc6f-44e9-9138-fb596bea33ff
+2025-09-26 15:50:28,770 - INFO - Статус экспорта: inProgress
+2025-09-26 15:50:28,771 - INFO - Статус экспорта: inProgress
+2025-09-26 15:50:38,877 - INFO - Статус экспорта: inProgress
+2025-09-26 15:50:38,918 - INFO - Статус экспорта: inProgress
+2025-09-26 15:50:49,072 - INFO - Статус экспорта: success
+2025-09-26 15:50:49,117 - INFO - Статус экспорта: success
+2025-09-26 15:51:00,142 - WARNING - Не удалось скачать через requests: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1e563fb64ec5bda164 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\util\connection.py", line 60, in create_connection
+    for res in socket.getaddrinfo(host, port, family, socket.SOCK_STREAM):
+               ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\socket.py", line 977, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 488, in _make_request
+    raise new_e
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 464, in _make_request
+    self._validate_conn(conn)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 1093, in _validate_conn
+    conn.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 753, in connect
+    self.sock = sock = self._new_conn()
+                       ~~~~~~~~~~~~~~^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 205, in _new_conn
+    raise NameResolutionError(self.host, self, e) from e
+urllib3.exceptions.NameResolutionError: <urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1e563fb64ec5bda164 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 443, in download_codes_pdf_and_convert
+    resp_pdf = session.get(file_url, timeout=30, headers=headers, stream=True, allow_redirects=True)
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1e563fb64ec5bda164 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+2025-09-26 15:51:00,143 - WARNING - Не удалось скачать через requests: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1fd23a54f495b6d2e2 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+        (self._dns_host, self.port),
+    ...<2 lines>...
+        socket_options=self.socket_options,
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\util\connection.py", line 60, in create_connection
+    for res in socket.getaddrinfo(host, port, family, socket.SOCK_STREAM):
+               ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\socket.py", line 977, in getaddrinfo
+    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
+               ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+socket.gaierror: [Errno 11001] getaddrinfo failed
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+        conn,
+    ...<10 lines>...
+        **response_kw,
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 488, in _make_request
+    raise new_e
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 464, in _make_request
+    self._validate_conn(conn)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 1093, in _validate_conn
+    conn.connect()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 753, in connect
+    self.sock = sock = self._new_conn()
+                       ~~~~~~~~~~~~~~^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 205, in _new_conn
+    raise NameResolutionError(self.host, self, e) from e
+urllib3.exceptions.NameResolutionError: <urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\adapters.py", line 644, in send
+    resp = conn.urlopen(
+        method=request.method,
+    ...<9 lines>...
+        chunked=chunked,
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
+    )
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\util\retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1fd23a54f495b6d2e2 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 443, in download_codes_pdf_and_convert
+    resp_pdf = session.get(file_url, timeout=30, headers=headers, stream=True, allow_redirects=True)
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 602, in get
+    return self.request("GET", url, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1fd23a54f495b6d2e2 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+2025-09-26 15:51:00,351 - ERROR - Ошибка скачивания PDF (WinHTTP fallback): (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 81, in _GetGoodDispatch
+    IDispatch = pythoncom.connect(IDispatch)
+pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 460, in download_codes_pdf_and_convert
+    status, body, all_headers = get_with_winhttp(file_url, headers=headers)
+                                ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 291, in get_with_winhttp
+    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\__init__.py", line 116, in Dispatch
+    dispatch, userName = dynamic._GetGoodDispatchAndUserName(dispatch, userName, clsctx)
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 101, in _GetGoodDispatchAndUserName
+    return (_GetGoodDispatch(IDispatch, clsctx), userName)
+            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 83, in _GetGoodDispatch
+    IDispatch = pythoncom.CoCreateInstance(
+        IDispatch, None, clsctx, pythoncom.IID_IDispatch
+    )
+pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
+2025-09-26 15:51:00,357 - ERROR - Ошибка скачивания PDF (WinHTTP fallback): (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
+Traceback (most recent call last):
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 81, in _GetGoodDispatch
+    IDispatch = pythoncom.connect(IDispatch)
+pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 460, in download_codes_pdf_and_convert
+    status, body, all_headers = get_with_winhttp(file_url, headers=headers)
+                                ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 291, in get_with_winhttp
+    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\__init__.py", line 116, in Dispatch
+    dispatch, userName = dynamic._GetGoodDispatchAndUserName(dispatch, userName, clsctx)
+                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 101, in _GetGoodDispatchAndUserName
+    return (_GetGoodDispatch(IDispatch, clsctx), userName)
+            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 83, in _GetGoodDispatch
+    IDispatch = pythoncom.CoCreateInstance(
+        IDispatch, None, clsctx, pythoncom.IID_IDispatch
+    )
+pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
+2025-09-26 16:03:27,152 - INFO - Cookies устарели (908 сек). Нужно обновить.
+2025-09-26 16:03:31,761 - INFO - Clicked cookie accept
+2025-09-26 16:03:32,853 - INFO - Clicked profile (best-effort)
+2025-09-26 16:03:34,691 - INFO - Clicked warehouse (fallback selector)
+2025-09-26 16:03:35,701 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-26 16:04:16,456 - INFO - История заказа сохранена в файл 'История заказов.txt'
+2025-09-26 16:04:16,459 - INFO - Получаем cookies...
+2025-09-26 16:04:16,473 - INFO - Создание документа: тест 1
+2025-09-26 16:04:17,274 - INFO - Документ создан: d408b238-931a-49cd-bda6-d95fc1fd2236
+2025-09-26 16:04:18,912 - INFO - Подписываем order id=933be863-f204-4de6-b7de-fe1ec3cad78e (base64Content length=460)
+2025-09-26 16:04:19,027 - INFO - Обновление токена OMS...
+2025-09-26 16:04:20,002 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 16:04:20,323 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 16:04:20,527 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 16:04:20,532 - INFO - Получаем cookies...
+2025-09-26 16:04:20,532 - INFO - Создание документа: тест 2
+2025-09-26 16:04:21,264 - INFO - Документ создан: e7994b67-b628-42eb-a30e-1956a05fece2
+2025-09-26 16:04:22,555 - INFO - Подписываем order id=c2b1af31-af02-48b3-9c4e-67477e6ebbb5 (base64Content length=460)
+2025-09-26 16:04:22,561 - INFO - Обновление токена OMS...
+2025-09-26 16:04:23,326 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 16:04:23,627 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 16:04:23,785 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 16:07:36,131 - INFO - Начало скачивания PDF для заказа d408b238-931a-49cd-bda6-d95fc1fd2236
+2025-09-26 16:07:36,318 - INFO - Начало скачивания PDF для заказа e7994b67-b628-42eb-a30e-1956a05fece2
+2025-09-26 16:07:36,725 - INFO - Статус заказа: released
+2025-09-26 16:07:36,925 - INFO - Статус заказа: released
+2025-09-26 16:07:37,126 - INFO - Экспорт начат, resultId: 57675f12-c3a7-4fa2-8438-850e5c2da7a6
+2025-09-26 16:07:37,270 - INFO - Статус экспорта: inProgress
+2025-09-26 16:07:37,382 - INFO - Экспорт начат, resultId: ac168b6f-a3b1-4075-8116-64f91b1bc97e
+2025-09-26 16:07:37,543 - INFO - Статус экспорта: inProgress
+2025-09-26 16:07:47,601 - INFO - Статус экспорта: inProgress
+2025-09-26 16:07:47,759 - INFO - Статус экспорта: inProgress
+2025-09-26 16:07:57,742 - INFO - Статус экспорта: inProgress
+2025-09-26 16:07:57,931 - INFO - Статус экспорта: inProgress
+2025-09-26 16:08:07,898 - INFO - Статус экспорта: inProgress
+2025-09-26 16:08:08,110 - INFO - Статус экспорта: inProgress
+2025-09-26 16:08:18,293 - INFO - Статус экспорта: success
+2025-09-26 16:08:18,295 - INFO - Статус экспорта: success
+2025-09-26 16:08:18,928 - INFO - PDF скачан: C:\Users\sklad\Desktop\pdf-коды км\тест 2.pdf
+2025-09-26 16:08:18,958 - INFO - PDF скачан: C:\Users\sklad\Desktop\pdf-коды км\тест 1.pdf

@@ -1,11 +1,13 @@
 import os
-import json
 import copy
 import uuid
+import threading
+import queue
+import time
 from logger import logger
 import pandas as pd
 from dataclasses import dataclass, asdict
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from get_gtin import lookup_gtin, lookup_by_gtin
 from api import try_single_post, download_codes_pdf_and_convert
 from cookies import get_valid_cookies
@@ -22,6 +24,7 @@ from options import (
 load_dotenv()
 
 # Константы 
+BASE = os.getenv("BASE_URL")
 PRODUCT_GROUP = os.getenv("PRODUCT_GROUP")
 RELEASE_METHOD_TYPE = os.getenv("RELEASE_METHOD_TYPE")
 CIS_TYPE = os.getenv("CIS_TYPE")  
@@ -111,7 +114,16 @@ class App(ctk.CTk):
         self.df = df
         self.collected: List[OrderItem] = []
         self.download_list: List[dict] = []  # [{'document_id': str, 'status': str, 'filename': str or None, 'order_name': str}]
+        
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+        #THREADING
+        self.auto_download_queue = queue.Queue()
+        self.auto_download_thread = None
+        self.stop_auto_download = False
+        self.download_workers = []
+        self.max_workers = 3  # Максимальное количество одновременных скачиваний
+        
         # Tabview for sections
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(pady=10, padx=10, fill="both", expand=True)
@@ -236,11 +248,6 @@ class App(ctk.CTk):
         download_btn_frame = ctk.CTkFrame(tab_download)
         download_btn_frame.pack(pady=10, fill="x")
 
-        download_btn = ctk.CTkButton(download_btn_frame, text="Скачать все", command=self.download_all)
-        download_btn.pack(side="left", padx=10)
-
-        refresh_btn = ctk.CTkButton(download_btn_frame, text="Обновить статусы", command=self.refresh_download_statuses)
-        refresh_btn.pack(side="left", padx=10)
 
         # Log textbox for download tab
         self.download_log_text = ctk.CTkTextbox(tab_download, height=150)
@@ -248,6 +255,8 @@ class App(ctk.CTk):
 
         # Initial update
         self.update_download_tree()
+        # Запускаем автоматическое скачивание при старте
+        self.start_auto_download()
 
     def _add_entry_context_menu(self, entry: ctk.CTkEntry):
         """Добавляет контекстное меню (правый клик) и обработку вставки через клавиши для поля entry.
@@ -572,6 +581,8 @@ class App(ctk.CTk):
                 fail_count += 1
             self.log_insert(f"[{'OK' if ok else 'ERR'}] uid={uid} {it.simpl_name} — {msg}")
 
+        self._start_auto_download_for_new_orders()
+
         self.log_insert("\n=== Выполнение завершено ===")
         self.log_insert(f"Успешно: {success_count}, Ошибок: {fail_count}.")
 
@@ -599,8 +610,6 @@ class App(ctk.CTk):
             # Сбрасываем комбо-боксы к значениям по умолчанию (опционально)
             self._reset_input_fields()
             
-            self.log_insert("Память очищена. Можно создавать новые заказы.")
-            
         except Exception as e:
             self.log_insert(f"Ошибка при очистке памяти: {e}")
 
@@ -619,45 +628,135 @@ class App(ctk.CTk):
         except Exception as e:
             print(f"Ошибка при сбросе полей ввода: {e}")
 
-    def download_all(self):
-        if not self.download_list:
-            self.download_log_insert("Нет заказов для скачивания.")
-            return
-
-        # cookies → session
-        cookies = None
-        try:
-            logger.info("Получаем cookies для скачивания...")
-            cookies = get_valid_cookies()
-        except Exception as e:
-            self.download_log_insert(f"Ошибка при получении cookies: {e}")
-            return
-
-        if not cookies:
-            self.download_log_insert("Cookies не получены; прерываем скачивание.")
-            return
-
-        session = make_session_with_cookies(cookies)
-
+    def _start_auto_download_for_new_orders(self):
+        """Добавляет новые заказы в систему автоматического скачивания"""
         for item in self.download_list:
-            if item['status'] != 'Ожидает':
-                continue  # Пропустить уже скачанные или с ошибкой
+            if item['status'] == 'Ожидает':
+                # Можно сразу проверить статус или подождать следующей итерации worker'а
+                pass
 
-            self.download_log_insert(f"Скачивание для заказа {item['document_id']} ({item['order_name']})...")
-            filename = download_codes_pdf_and_convert(session, item['document_id'], item['order_name'])
-            if filename:
-                item['status'] = 'Скачан'
-                item['filename'] = filename
-                self.download_log_insert(f"Успешно скачано: {filename}")
-            else:
-                item['status'] = 'Ошибка'
-                self.download_log_insert("Ошибка скачивания")
-            self.update_download_tree()
 
-    def refresh_download_statuses(self):
-        # Здесь можно добавить логику обновления статусов без скачивания, если нужно
+    def start_auto_download(self):
+        """Запускает систему автоматического скачивания"""
+        self.stop_auto_download = False
+        
+        # Поток для обработки очереди заказов
+        self.auto_download_thread = threading.Thread(target=self._auto_download_worker, daemon=True)
+        self.auto_download_thread.start()
+        
+        # Потоки-воркеры для скачивания
+        for i in range(self.max_workers):
+            worker = threading.Thread(target=self._download_worker, daemon=True, args=(i,))
+            worker.start()
+            self.download_workers.append(worker)
+        
+        self.download_log_insert("Автоматическое скачивание запущено")
+
+    def stop_auto_download_system(self):
+        """Останавливает систему автоматического скачивания"""
+        self.stop_auto_download = True
+        self.download_log_insert("Автоматическое скачивание остановлено")
+
+    def _auto_download_worker(self):
+        """Фоновый worker для проверки статусов заказов"""
+        while not self.stop_auto_download:
+            try:
+                # Проверяем заказы каждые 30 секунд
+                time.sleep(30)
+                
+                if not self.download_list:
+                    continue
+                    
+                # Получаем cookies для сессии
+                try:
+                    cookies = get_valid_cookies()
+                    if not cookies:
+                        continue
+                    session = make_session_with_cookies(cookies)
+                except Exception as e:
+                    self.after(0, lambda: self.download_log_insert(f"Ошибка получения cookies: {e}"))
+                    continue
+                
+                # Проверяем статусы заказов
+                for item in self.download_list:
+                    if self.stop_auto_download:
+                        break
+                        
+                    if item['status'] == 'Ожидает':
+                        document_id = item['document_id']
+                        
+                        # Проверяем статус заказа
+                        try:
+                            status = self._check_order_status(session, document_id)
+                            if status == 'released':
+                                # Добавляем в очередь на скачивание
+                                self.auto_download_queue.put(item)
+                                # Обновляем статус в GUI
+                                self.after(0, lambda i=item: self._update_item_status(i, 'В очереди на скачивание'))
+                        except Exception as e:
+                            self.after(0, lambda e=e: self.download_log_insert(f"Ошибка проверки статуса: {e}"))
+                            
+            except Exception as e:
+                self.after(0, lambda e=e: self.download_log_insert(f"Ошибка в auto_download_worker: {e}"))
+
+    def _download_worker(self, worker_id):
+        """Worker для скачивания PDF"""
+        while not self.stop_auto_download:
+            try:
+                # Берем задание из очереди (с таймаутом для graceful shutdown)
+                try:
+                    item = self.auto_download_queue.get(timeout=5)
+                except queue.Empty:
+                    continue
+                    
+                self.after(0, lambda i=item: self._update_item_status(i, 'Скачивается'))
+                
+                # Скачиваем PDF
+                try:
+                    cookies = get_valid_cookies()
+                    if not cookies:
+                        self.after(0, lambda i=item: self._update_item_status(i, 'Ошибка: нет cookies'))
+                        continue
+                        
+                    session = make_session_with_cookies(cookies)
+                    filename = download_codes_pdf_and_convert(session, item['document_id'], item['order_name'])
+                    
+                    if filename:
+                        self.after(0, lambda i=item, f=filename: self._finish_download(i, f, 'Скачан'))
+                    else:
+                        self.after(0, lambda i=item: self._update_item_status(i, 'Ошибка скачивания'))
+                        
+                except Exception as e:
+                    self.after(0, lambda i=item, e=e: self._update_item_status(i, f'Ошибка: {str(e)}'))
+                    
+                finally:
+                    self.auto_download_queue.task_done()
+                    
+            except Exception as e:
+                self.after(0, lambda e=e: self.download_log_insert(f"Ошибка в download_worker {worker_id}: {e}"))
+
+    def _check_order_status(self, session, document_id):
+        """Проверяет статус заказа (укороченная версия без ожидания)"""
+        try:
+            resp_status = session.get(f"{BASE}/api/v1/codes-order/{document_id}", timeout=15)
+            resp_status.raise_for_status()
+            doc = resp_status.json()
+            return doc.get("status", "unknown")
+        except Exception as e:
+            raise Exception(f"Ошибка проверки статуса {document_id}: {e}")
+
+    def _update_item_status(self, item, new_status):
+        """Обновляет статус элемента в основном потоке"""
+        item['status'] = new_status
         self.update_download_tree()
-        self.download_log_insert("Статусы обновлены.")
+        self.download_log_insert(f"Заказ {item['document_id']}: {new_status}")
+
+    def _finish_download(self, item, filename, status):
+        """Завершает скачивание и обsновляет интерфейс"""
+        item['status'] = status
+        item['filename'] = filename
+        self.update_download_tree()
+        self.download_log_insert(f"Успешно скачан: {filename}")
 
     def update_download_tree(self):
         for item in self.download_tree.get_children():
@@ -726,6 +825,11 @@ class App(ctk.CTk):
     def download_log_insert(self, msg: str):
         self.download_log_text.insert("end", f"{msg}\n")
         self.download_log_text.see("end")
+
+    def on_closing(self):
+        """Вызывается при закрытии приложения"""
+        self.stop_auto_download_system()
+        self.destroy()
 
 if __name__ == "__main__":
     if not os.path.exists(NOMENCLATURE_XLSX):
