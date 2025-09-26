@@ -372,3 +372,49 @@ pywintypes.com_error: (-2147221008, 'Не был произведен вызов
 2025-09-26 16:37:51,097 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\codesOrder_2025-09-26_1.csv
 2025-09-26 16:43:57,640 - INFO - Cookies устарели (912 сек). Нужно обновить.
 2025-09-26 16:44:08,127 - INFO - Cookie accept not found/ignored
+2025-09-26 16:44:41,711 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-26_16-44-41.txt
+2025-09-26 16:44:41,719 - INFO - Получаем cookies...
+2025-09-26 16:44:41,720 - INFO - Cookies устарели (956 сек). Нужно обновить.
+2025-09-26 16:44:47,755 - INFO - Clicked cookie accept
+2025-09-26 16:44:48,834 - INFO - Clicked profile (best-effort)
+2025-09-26 16:44:50,539 - INFO - Clicked warehouse (fallback selector)
+2025-09-26 16:44:51,549 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-26 16:44:53,974 - INFO - Создание документа: тест 1
+2025-09-26 16:44:55,085 - INFO - Документ создан: bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2
+2025-09-26 16:44:56,686 - INFO - Подписываем order id=c4a1f3cc-8b62-40ad-8a7d-4fd68800ffec (base64Content length=460)
+2025-09-26 16:44:56,773 - INFO - Обновление токена OMS...
+2025-09-26 16:44:58,235 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 16:44:58,546 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 16:44:58,709 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 16:44:58,716 - INFO - Получаем cookies...
+2025-09-26 16:44:58,717 - INFO - Создание документа: тест 2
+2025-09-26 16:44:59,563 - INFO - Документ создан: aebcc979-8cdf-4deb-b385-faa2cc5a9a4c
+2025-09-26 16:45:00,344 - INFO - Подписываем order id=4527f58a-d755-4274-85c5-e62bc0580d0b (base64Content length=460)
+2025-09-26 16:45:00,350 - INFO - Обновление токена OMS...
+2025-09-26 16:45:01,166 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-26 16:45:01,442 - INFO - Отправка прошла успешно (detached signature)
+2025-09-26 16:45:01,618 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 16:48:31,986 - INFO - Начало скачивания PDF/CSV/XLS для заказа bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2 ('тест 1')
+2025-09-26 16:48:32,187 - INFO - Начало скачивания PDF/CSV/XLS для заказа aebcc979-8cdf-4deb-b385-faa2cc5a9a4c ('тест 2')
+2025-09-26 16:48:32,612 - INFO - Статус заказа bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: released
+2025-09-26 16:48:32,771 - INFO - Статус заказа aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: released
+2025-09-26 16:48:33,159 - INFO - PDF export started for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2, resultId: ecd26e99-a9d2-4108-a0d1-db37417f0b1b
+2025-09-26 16:48:33,430 - INFO - PDF export started for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c, resultId: 53f9ff16-0027-4d62-b006-7709d09c6d63
+2025-09-26 16:48:54,309 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-26 16:48:54,554 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\тест 2.pdf
+2025-09-26 16:48:54,556 - INFO - CSV export started for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2, resultId: f8332986-d10a-4bcd-928f-d8ab969b00e5
+2025-09-26 16:48:54,704 - INFO - CSV export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: inProgress
+2025-09-26 16:48:54,918 - INFO - CSV export started for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c, resultId: c7fe2ff9-c669-425c-9c30-63b029ce82b1
+2025-09-26 16:48:55,075 - INFO - CSV export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: inProgress
+2025-09-26 16:49:04,849 - INFO - CSV export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: success
+2025-09-26 16:49:05,002 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\codesOrder_2025-09-26_1.csv
+2025-09-26 16:49:05,258 - INFO - CSV export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: success
+2025-09-26 16:49:05,284 - INFO - XLS export started for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2, resultId: b6629fd0-761e-4b26-91d9-068e637a4007
+2025-09-26 16:49:05,419 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\codesOrder_2025-09-26_1.csv
+2025-09-26 16:49:05,459 - INFO - XLS export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: inProgress
+2025-09-26 16:49:05,681 - INFO - XLS export started for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c, resultId: 0ca01927-13ba-423a-96d4-b096455225ca
+2025-09-26 16:49:05,846 - INFO - XLS export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: inProgress
+2025-09-26 16:49:15,606 - INFO - XLS export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: success
+2025-09-26 16:49:15,773 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\codesOrder_2025-09-26_1.xls
+2025-09-26 16:49:15,993 - INFO - XLS export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: success
+2025-09-26 16:49:16,198 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\codesOrder_2025-09-26_1.xls
