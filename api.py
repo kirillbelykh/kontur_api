@@ -164,7 +164,7 @@ def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> 
         return False
 
 # ---------------- API flows ----------------
-def try_fast_post(session: requests.Session, document_number: str,
+def try_single_post(session: requests.Session, document_number: str,
                     product_group: str, release_method_type: str,
                     positions: list[dict],
                     filling_method: str = "productsCatalog", thumbprint: str | None = None) -> dict | None:
@@ -215,7 +215,7 @@ def try_fast_post(session: requests.Session, document_number: str,
         logger.error(f"Проверка доступности документа {document_number}: {e}")
         return None
 
-    # проверка сертификата (надо подумать, нужен ли этот блок)
+    # проверка сертификата
     if thumbprint:
         try:
             resp = session.get(f"{BASE}/api/v1/organizations/{ORGANIZATION_ID}/employees/has-certificate?thumbprint={thumbprint}", timeout=15)
@@ -227,7 +227,7 @@ def try_fast_post(session: requests.Session, document_number: str,
             logger.error(f"Проверка сертификата: {e}")
             return None
 
-    # находим сертификат 
+    # обновление токена OMS
     cert = find_certificate_by_thumbprint(thumbprint)
     if not cert:
         logger.error(f"Сертификат для подписи не найден (thumbprint={thumbprint})")

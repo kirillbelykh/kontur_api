@@ -7,7 +7,7 @@ import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Tuple
 from get_gtin import lookup_gtin, lookup_by_gtin
-from api import try_fast_post, download_codes_pdf_and_convert
+from api import try_single_post, download_codes_pdf_and_convert
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code
 import customtkinter as ctk
@@ -21,7 +21,7 @@ from options import (
 
 load_dotenv()
 
-# Constants 
+# Константы 
 PRODUCT_GROUP = os.getenv("PRODUCT_GROUP")
 RELEASE_METHOD_TYPE = os.getenv("RELEASE_METHOD_TYPE")
 CIS_TYPE = os.getenv("CIS_TYPE")  
@@ -40,7 +40,7 @@ class OrderItem:
     units_per_pack: str     # Количество единиц в упаковке (строка, для поиска)
     codes_count: int        # Количество кодов для заказа
     gtin: str = ""          # найдём перед запуском воркеров
-    full_name: str = ""     # полное наименование из справочника
+    full_name: str = ""     # опционально: полное наименование из справочника
     tnved_code: str = ""    # Тнвэд-код
     cisType: str = ""       # тип кода (CIS_TYPE из .env)
 
@@ -60,8 +60,8 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
             "gtin": payload.get("gtin"),
             "name": payload.get("full_name") or payload.get("simpl_name") or "",
             "tnvedCode": payload.get("tnved_code"),
-            "quantity": payload.get("codes_count"),
-            "cisType": payload.get("cisType", "unit")
+            "quantity": payload.get("codes_count", 1),
+            "cisType": payload.get("cisType")
         }]
 
         # cookies → session
@@ -70,18 +70,17 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
             logger.info("Получаем cookies...")
             cookies = get_valid_cookies()
         except Exception as e:
-            logger.error("Ошибка cookies:", e)
+            logger.error("Ошибка при получении cookies:", e)
             return False, f"Cannot get cookies: {e}"
 
         if not cookies:
             logger.info("Cookies не получены; прерываем выполнение.")
             return False, "Cookies not obtained"
 
-        #create and fill session with cookies
         session = make_session_with_cookies(cookies)
 
-        # --- try fast POST ---
-        resp = try_fast_post(
+        # --- пробуем быстрый POST ---
+        resp = try_single_post(
             session,
             str(document_number),
             str(PRODUCT_GROUP),
@@ -161,14 +160,14 @@ class App(ctk.CTk):
         self.units_combo = ctk.CTkComboBox(self.select_frame, values=[str(u) for u in units_options], width=400)
         self.units_combo.grid(row=4, column=1, pady=5, padx=5)
 
-        # Codes count (common)
-        ctk.CTkLabel(input_frame, text="Количество кодов:").grid(row=2, column=0, pady=5, padx=5, sticky="w")
+        # Codes count (common) - перемещено вниз
+        ctk.CTkLabel(input_frame, text="Количество кодов:").grid(row=5, column=0, pady=5, padx=5, sticky="w")
         self.codes_entry = ctk.CTkEntry(input_frame, width=400)
-        self.codes_entry.grid(row=2, column=1, pady=5, padx=5)
+        self.codes_entry.grid(row=5, column=1, pady=5, padx=5)
 
-        # Add button
+        # Add button - теперь под полем "Количество кодов"
         add_btn = ctk.CTkButton(input_frame, text="Добавить позицию", command=self.add_item)
-        add_btn.grid(row=5, column=0, columnspan=2, pady=10)
+        add_btn.grid(row=6, column=0, columnspan=2, pady=10)
 
         # Initial mode
         self.toggle_mode()
@@ -201,6 +200,16 @@ class App(ctk.CTk):
         self.log_text = ctk.CTkTextbox(tab_create, height=150)
         self.log_text.pack(pady=10, padx=10, fill="x")
 
+        # Ограничение доступа только для чтения/копирования
+        self.log_text.configure(state="disabled")  # Блокирует редактирование
+
+        # Добавляем контекстное меню для копирования
+        self.log_text.bind("<Button-3>", self._show_log_context_menu)  # Правая кнопка мыши
+
+        # Разрешаем стандартные сочетания клавиш для копирования
+        self.log_text.bind("<Control-c>", lambda e: self._copy_log_text())
+        self.log_text.bind("<Control-C>", lambda e: self._copy_log_text())
+    
         # Style Treeview for dark mode
         style = ttk.Style()
         style.theme_use("clam")
@@ -577,8 +586,60 @@ class App(ctk.CTk):
             ))
 
     def log_insert(self, msg: str):
-        self.log_text.insert("end", f"{msg}\n")
-        self.log_text.see("end")
+        """Выводит сообщение в лог (с ограничением доступа только для чтения)"""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.insert("end", f"{msg}\n")
+            self.log_text.see("end")  # Автопрокрутка к новому сообщению
+            self.log_text.configure(state="disabled")
+        except Exception as e:
+            print(f"Ошибка при записи в лог: {e}")
+
+    def _show_log_context_menu(self, event):
+        """Показывает контекстное меню для текстового поля лога"""
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Копировать", command=self._copy_log_text)
+        menu.add_command(label="Выделить все", command=self._select_all_log_text)
+        menu.add_separator()
+        menu.add_command(label="Очистить лог", command=self._clear_log_text)
+        
+        menu.tk_popup(event.x_root, event.y_root)
+
+    def _copy_log_text(self):
+        """Копирует выделенный текст из лога в буфер обмена"""
+        try:
+            # Временно включаем редактирование для копирования
+            self.log_text.configure(state="normal")
+            
+            # Копируем выделенный текст
+            selected_text = self.log_text.get("sel.first", "sel.last")
+            if selected_text:
+                self.clipboard_clear()
+                self.clipboard_append(selected_text)
+        except tk.TclError:
+            # Если ничего не выделено
+            pass
+        finally:
+            # Возвращаем в режим только для чтения
+            self.log_text.configure(state="disabled")
+
+    def _select_all_log_text(self):
+        """Выделяет весь текст в логе"""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.tag_add("sel", "1.0", "end")
+            self.log_text.configure(state="disabled")
+        except:
+            pass
+
+    def _clear_log_text(self):
+        """Очищает содержимое лога"""
+        try:
+            self.log_text.configure(state="normal")
+            self.log_text.delete("1.0", "end")
+            self.log_text.configure(state="disabled")
+        except:
+            pass
 
     def download_log_insert(self, msg: str):
         self.download_log_text.insert("end", f"{msg}\n")

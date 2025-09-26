@@ -3,8 +3,6 @@ from logger import logger
 import time
 from pathlib import Path
 from typing import Dict, Optional
-from logger import logger
-
 
 
 # Настройки — поправь пути под систему
