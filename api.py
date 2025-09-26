@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from typing import Tuple, Optional
+from typing import Dict, Any, List, Optional, Tuple
 import requests
 import datetime
 from logger import logger
@@ -480,7 +480,7 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
             file_id = finfo.get("fileId")
             download_csv_url = f"{BASE}/api/v1/codes-order/{document_id}/export/csv/{csv_result_id}/download/{file_id}"
             # защитить имя файла
-            safe_csv_name = order_name
+            safe_csv_name = order_name + "_csv"
             if any(ch in safe_csv_name for ch in ("/", "\\", ":", "*", "?", "\"", "<", ">", "|")):
                 safe_csv_name = f"{safe_base}.csv"
             csv_path = os.path.join(target_dir, safe_csv_name)
@@ -555,3 +555,236 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
     # Вернуть кортеж путей (возможно некоторые элементы None)
     return pdf_path, csv_path, xls_path
 
+
+
+
+def perform_introduction_from_order(
+    session: requests.Session,
+    codes_order_id: str,
+    organization_id: str = ORGANIZATION_ID,
+    thumbprint: Optional[str] = None,
+    # опциональные поля для PATCH /production (если нужно обновить метаданные)
+    production_patch: Optional[Dict[str, Any]] = None,
+    # автоперезапросы / таймауты
+    check_poll_interval: int = 5,      # сек для /codes-checking polling (короткий интервал)
+    check_poll_attempts: int = 24,     # сколько попыток (24*5=120s default)
+    gen_poll_interval: int = 2,        # сек для ожидания generate/send результатов
+    gen_poll_attempts: int = 30        # сколько попыток для generate (примерно 60s)
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Выполняет ввод в оборот (codes introduction) для указанного codes_order_id.
+    Возвращает (ok: bool, result: dict) где result содержит поля:
+      - introduction_id
+      - created_introduction (ответ GET после создания)
+      - check_status (последний ответ /codes-checking)
+      - production (последний GET /production)
+      - generate_items (raw items from generate-multiple)
+      - send_response (ответ от send-multiple)
+      - final_introduction, final_check (последние GET ответы)
+      - errors (список сообщений об ошибках)
+    """
+    result: Dict[str, Any] = {"errors": []}
+    try:
+        # 1) create-from-codes-order
+        url_create = f"{BASE}/api/v1/codes-introduction/create-from-codes-order/{codes_order_id}?isImportFts=false&isAccompanyingDocumentNeeds=false"
+        logger.info("Создаём ввод в оборот из заказа %s ...", codes_order_id)
+        r = session.post(url_create, timeout=30)
+        r.raise_for_status()
+        intro_id = r.text.strip().strip('"')
+        result["introduction_id"] = intro_id
+        logger.info("Создана заявка ввода в оборот: %s", intro_id)
+
+        # 2) initial GET introduction
+        r_intro = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}", timeout=15)
+        r_intro.raise_for_status()
+        result["created_introduction"] = r_intro.json()
+
+        # 3) poll codes-checking until status indicates no errors
+        check_ok = False
+        attempts = 0
+        last_check = None
+        while attempts < check_poll_attempts:
+            r_check = session.get(f"{BASE}/api/v1/codes-checking/{intro_id}", timeout=15)
+            if r_check.status_code == 200:
+                last_check = r_check.json()
+                result["check_status_latest"] = last_check
+                status = last_check.get("status")
+                logger.info("codes-checking status for %s: %s", intro_id, status)
+                if status in ("doesNotHaveErrors", "created", "checked", "noErrors"):  # возможные статусы
+                    check_ok = True
+                    break
+            else:
+                logger.debug("codes-checking returned non-200: %s", r_check.status_code)
+            attempts += 1
+            time.sleep(check_poll_interval)
+
+        if not check_ok:
+            msg = f"codes-checking для {intro_id} не перешёл в OK-статус после {check_poll_attempts} попыток"
+            logger.warning(msg)
+            result["errors"].append(msg)
+            # продолжим, возможно всё равно можно отправить (но лучше вернуть ошибку)
+            # return False, result
+
+        # 4) GET production (получаем структуру production)
+        try:
+            r_prod = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}/production", timeout=15)
+            r_prod.raise_for_status()
+            result["production"] = r_prod.json()
+        except Exception as e:
+            logger.warning("Не удалось получить /production: %s", e)
+            result["errors"].append(f"production GET error: {e}")
+
+        # 5) Если переданы поля для PATCH /production — применим
+        if production_patch:
+            try:
+                patch_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/production"
+                logger.info("PATCH production %s", patch_url)
+                r_patch = session.patch(patch_url, json=production_patch, timeout=30)
+                r_patch.raise_for_status()
+                result["production_patch_response"] = r_patch.json() if r_patch.content else {"status": "ok"}
+                # обновим production
+                r_prod2 = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}/production", timeout=15)
+                r_prod2.raise_for_status()
+                result["production_after_patch"] = r_prod2.json()
+            except Exception as e:
+                logger.exception("Ошибка PATCH production: %s", e)
+                result["errors"].append(f"production PATCH error: {e}")
+
+        # 6) попытка автозаполнения позиций (autocomplete) — не обязателен, но делаем если нужно
+        try:
+            auto_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/positions/autocomplete"
+            logger.info("POST positions/autocomplete ...")
+            r_auto = session.post(auto_url, timeout=30)
+            # многие реализации возвращают 204/200/empty; не обязательно требовать body
+            if r_auto.status_code not in (200, 204):
+                logger.debug("autocomplete returned status %s", r_auto.status_code)
+            result["autocomplete_status"] = r_auto.status_code
+        except Exception as e:
+            logger.warning("autocomplete failed: %s", e)
+            result["errors"].append(f"autocomplete error: {e}")
+
+        # 7) проверить наличие сертификата у сотрудника в организации
+        try:
+            if thumbprint:
+                r_cert_check = session.get(f"{BASE}/api/v1/organizations/{organization_id}/employees/has-certificate?thumbprint={thumbprint}", timeout=15)
+                r_cert_check.raise_for_status()
+                has_cert = bool(r_cert_check.json())
+                result["has_certificate"] = has_cert
+                if not has_cert:
+                    msg = "Сертификат с указанным thumbprint не зарегистрирован в организации"
+                    logger.error(msg)
+                    result["errors"].append(msg)
+                    return False, result
+        except Exception as e:
+            logger.exception("Ошибка проверки сертификата: %s", e)
+            result["errors"].append(f"cert check error: {e}")
+            return False, result
+
+        # 8) GET generate-multiple -> получим массив объектов base64Content
+        try:
+            gen_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/generate-multiple"
+            r_gen = session.get(gen_url, timeout=30)
+            r_gen.raise_for_status()
+            gen_items = r_gen.json()
+            result["generate_items_raw"] = gen_items
+            if not isinstance(gen_items, list) or not gen_items:
+                msg = "generate-multiple вернул пустой список"
+                logger.error(msg)
+                result["errors"].append(msg)
+                return False, result
+        except Exception as e:
+            logger.exception("Ошибка generate-multiple: %s", e)
+            result["errors"].append(f"generate-multiple error: {e}")
+            return False, result
+
+        # 9) подпись каждого base64Content
+        cert = find_certificate_by_thumbprint(thumbprint)
+        if not cert:
+            msg = f"Сертификат для подписи не найден (thumbprint={thumbprint})"
+            logger.error(msg)
+            result["errors"].append(msg)
+            return False, result
+
+        signed_payloads: List[Dict[str, str]] = []
+        for item in gen_items:
+            docid = item.get("documentId") or item.get("documentId")
+            b64 = item.get("base64Content")
+            if not b64:
+                result["errors"].append(f"item {docid} missing base64Content")
+                continue
+            # попробуем сначала attached (b_detached=False), если ошибка — detached True
+            sig = None
+            try:
+                sig = sign_data(cert, b64, b_detached=False)
+                # sign_data в твоей реализации возвращает строку (или кортеж?), убедимся что строка:
+                if isinstance(sig, tuple):
+                    sig = sig[0]
+            except Exception as e:
+                logger.warning("Attached sign failed for %s: %s — попробуем detached", docid, e)
+                try:
+                    sig = sign_data(cert, b64, b_detached=True)
+                    if isinstance(sig, tuple):
+                        sig = sig[0]
+                except Exception as e2:
+                    logger.exception("Не удалось подписать %s ни attached ни detached: %s", docid, e2)
+                    result["errors"].append(f"sign failed for {docid}: {e2}")
+                    continue
+            if not sig:
+                result["errors"].append(f"signature empty for {docid}")
+                continue
+            signed_payloads.append({"documentId": docid, "signedContent": sig})
+
+        if not signed_payloads:
+            msg = "Нет подписанных документов для отправки"
+            logger.error(msg)
+            result["errors"].append(msg)
+            return False, result
+
+        result["signed_payloads_preview"] = [{"documentId": p["documentId"], "signed_len": len(p["signedContent"])} for p in signed_payloads]
+
+        # 10) обновить OMS token (важно)
+        try:
+            if not refresh_oms_token(session, cert, organization_id):
+                logger.warning("refresh_oms_token вернул False — попробуем отправить всё равно")
+        except Exception as e:
+            logger.warning("refresh_oms_token exception: %s", e)
+
+        # 11) отправка send-multiple
+        try:
+            send_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/send-multiple"
+            logger.info("Отправка send-multiple ...")
+            r_send = session.post(send_url, json=signed_payloads, timeout=30)
+            r_send.raise_for_status()
+            # API возвращает массив / подтверждение — сохраним
+            try:
+                result["send_response"] = r_send.json()
+            except Exception:
+                result["send_response"] = r_send.text
+        except Exception as e:
+            logger.exception("Ошибка send-multiple: %s", e)
+            result["errors"].append(f"send-multiple error: {e}")
+            return False, result
+
+        # 12) финальные GET'ы
+        try:
+            r_final_intro = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}", timeout=15)
+            r_final_intro.raise_for_status()
+            result["final_introduction"] = r_final_intro.json()
+        except Exception as e:
+            logger.warning("final introduction GET failed: %s", e)
+
+        try:
+            r_final_check = session.get(f"{BASE}/api/v1/codes-checking/{intro_id}", timeout=15)
+            r_final_check.raise_for_status()
+            result["final_check"] = r_final_check.json()
+        except Exception as e:
+            logger.warning("final checking GET failed: %s", e)
+
+        # Всё успешно
+        ok = not bool(result["errors"])
+        return ok, result
+
+    except Exception as e:
+        logger.exception("Unhandled exception in perform_introduction_from_order: %s", e)
+        result["errors"].append(f"unhandled exception: {e}")
+        return False, result
