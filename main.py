@@ -579,7 +579,6 @@ class App(ctk.CTk):
                     self.log_insert(f"Не удалось извлечь document_id из: {msg}")
             else:
                 fail_count += 1
-            self.log_insert(f"[{'OK' if ok else 'ERR'}] uid={uid} {it.simpl_name} — {msg}")
 
         self._start_auto_download_for_new_orders()
 

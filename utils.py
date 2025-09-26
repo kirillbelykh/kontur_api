@@ -5,6 +5,7 @@ from typing import Dict, Optional
 from dataclasses import asdict
 from datetime import datetime
 from logger import logger
+from pathlib import Path
 
 COOKIES_FILE = Path("cookies.json")
 # ---------------- helpers ----------------
@@ -38,14 +39,26 @@ def get_tnved_code(simpl: str):
         return "4015120009"
     
 def save_order_history(order_items):
-    """Сохраняет информацию о заказах в текстовый файл 'История заказов.txt'"""
+    """Сохраняет информацию о заказах в папке 'История заказов КМ' на рабочем столе"""
     try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Получаем путь к рабочему столу
+        desktop_path = Path.home() / "Desktop"
+        history_folder = desktop_path / "История заказов КМ"
         
-        with open("История заказов.txt", "a", encoding="utf-8") as f:
-            f.write(f"\n{'='*80}\n")
-            f.write(f"Заказ от: {timestamp}\n")
+        # Создаем папку, если она не существует
+        history_folder.mkdir(exist_ok=True)
+        
+        # Создаем имя файла с датой
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        filename = f"Заказ_{timestamp}.txt"
+        file_path = history_folder / filename
+        
+        timestamp_display = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        with open(file_path, "w", encoding="utf-8") as f:
             f.write(f"{'='*80}\n")
+            f.write(f"Заказ от: {timestamp_display}\n")
+            f.write(f"{'='*80}\n\n")
             
             for i, item in enumerate(order_items, 1):
                 f.write(f"Позиция #{i}:\n")
@@ -61,14 +74,17 @@ def save_order_history(order_items):
                 f.write(f"  UID: {getattr(item, '_uid', 'Не указан')}\n")
                 f.write("-" * 50 + "\n")
             
-            f.write(f"Итого позиций: {len(order_items)}\n")
+            f.write(f"\nИтого позиций: {len(order_items)}\n")
             total_codes = sum(int(getattr(item, 'codes_count', 0)) for item in order_items)
             f.write(f"Общее количество кодов: {total_codes}\n")
         
-        logger.info(f"История заказа сохранена в файл 'История заказов.txt'")
+        logger.info(f"История заказа сохранена в файл: {file_path}")
+        
+        return str(file_path)
         
     except Exception as e:
         logger.error(f"Не удалось сохранить историю заказа: {e}")
+        return None
     
 def save_snapshot(to_process) -> bool:
     try:

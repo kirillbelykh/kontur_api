@@ -2,6 +2,9 @@
 /venv
 __pycache__
 *.pyc
+kontur_cookies.json
+last_snapshot.json
+История заказов.txt
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md

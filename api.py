@@ -326,13 +326,26 @@ def check_order_status(session: requests.Session, document_id: str) -> str:
     
 def download_codes_pdf_and_convert(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[str, Optional[str]]]:
     """
-    Скачивает PDF для заказа document_id, сохраняет его как <order_name>.pdf на рабочем столе.
-    Конвертацию в CSV убрал — функция возвращает (pdf_path, None).
+    Скачивает PDF и CSV для заказа document_id и сохраняет их в папку:
+      Desktop / "pdf-коды км" / <safe_order_name>/
+    Файлы сохраняются с общей базой имени, производной от order_name.
+    Возвращает кортеж (pdf_path, csv_path). Если файл не скачан — соответствующий элемент = None.
+    WinHTTP / COM fallback удалён — только requests.
     """
-    logger.info(f"Начало скачивания PDF для заказа {document_id}")
+    logger.info(f"Начало скачивания PDF+CSV для заказа {document_id} ({order_name!r})")
 
-    # Параметры polling статуса заказа
-    max_attempts = 10  # 5 мин / 30 сек = 10
+    # helper: сделать абсолютный URL (если fileUrl относительный)
+    from urllib.parse import urljoin
+
+    def make_full_url(url: str) -> str:
+        if not url:
+            return ""
+        if url.startswith("http://") or url.startswith("https://"):
+            return url
+        return urljoin(BASE, url)
+
+    # 1) дождаться статуса released (polling)
+    max_attempts = 10  # 5 минут (10 * 30s)
     attempt = 0
     status = None
     while attempt < max_attempts:
@@ -341,117 +354,158 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
             resp_status.raise_for_status()
             doc = resp_status.json()
             status = doc.get("status")
-            logger.info(f"Статус заказа: {status}")
+            logger.info(f"Статус заказа {document_id}: {status}")
             if status == "released":
                 break
             time.sleep(30)
             attempt += 1
         except Exception as e:
-            logger.error(f"Ошибка проверки статуса: {e}", exc_info=True)
+            logger.error(f"Ошибка проверки статуса заказа {document_id}: {e}", exc_info=True)
             return None
 
     if status != "released":
-        logger.error(f"Заказ не перешел в 'released' за {max_attempts * 30} сек")
+        logger.error(f"Заказ {document_id} не перешёл в 'released' за {max_attempts * 30} сек")
         return None
 
-    # Получить шаблоны печати
-    try:
-        resp_templates = session.get(f"{BASE}/api/v1/print-templates?organizationId={ORGANIZATION_ID}&formTypes=codesOrder", timeout=15)
-        resp_templates.raise_for_status()
-        templates = resp_templates.json()
-        logger.debug(f"Шаблоны: {json.dumps(templates, indent=2, ensure_ascii=False)}")
-    except Exception as e:
-        logger.error(f"Ошибка получения шаблонов: {e}", exc_info=True)
-        return None
-
-    # Найти шаблон с size "30x20"
-    template_id = None
-    for t in templates:
-        if t.get("size") == "30x20":
-            template_id = t.get("id")
-            break
-    if not template_id:
-        logger.error("Шаблон '30x20' не найден")
-        return None
-
-    # POST для экспорта PDF
-    try:
-        export_url = f"{BASE}/api/v1/codes-order/{document_id}/export/pdf?splitByGtins=false&templateId={template_id}"
-        resp_export = session.post(export_url, timeout=30)
-        resp_export.raise_for_status()
-        export_data = resp_export.json()
-        result_id = export_data.get("resultId")
-        logger.info(f"Экспорт начат, resultId: {result_id}")
-    except Exception as e:
-        logger.error(f"Ошибка экспорта PDF: {e}", exc_info=True)
-        return None
-
-    # Поллинг статуса экспорта (макс 2 мин, каждые 10 сек)
-    max_attempts_export = 12  # 2 мин / 10 сек = 12
-    attempt_export = 0
-    file_url = None
-    while attempt_export < max_attempts_export:
-        try:
-            resp_result = session.get(f"{BASE}/api/v1/codes-order/{document_id}/export/pdf/{result_id}", timeout=15)
-            resp_result.raise_for_status()
-            result_data = resp_result.json()
-            result_status = result_data.get("status")
-            logger.info(f"Статус экспорта: {result_status}")
-            if result_status == "success":
-                file_infos = result_data.get("fileInfos", [])
-                if file_infos:
-                    file_url = file_infos[0].get("fileUrl")
-                break
-            time.sleep(10)
-            attempt_export += 1
-        except Exception as e:
-            logger.error(f"Ошибка проверки статуса экспорта: {e}", exc_info=True)
-            return None
-
-    if not file_url:
-        logger.error("Экспорт не завершился успехом или файл не найден")
-        return None
-
-    logger.debug(f"fileUrl: {file_url}")
-
-    # Подготавливаем целевую папку на Desktop
+    # Подготовка каталога для сохранения: Desktop / "pdf-коды км" / <safe_order_name>
     try:
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-        target_dir = os.path.join(desktop, "pdf-коды км")
+        parent_dir = os.path.join(desktop, "pdf-коды км")
+        # безопасное имя папки
+        safe_order_name = "".join(c for c in (order_name or document_id) if c.isalnum() or c in " -_").strip()
+        if not safe_order_name:
+            safe_order_name = document_id
+        # Ограничим длину имени папки
+        safe_order_name = safe_order_name[:120]
+        target_dir = os.path.join(parent_dir, safe_order_name)
         os.makedirs(target_dir, exist_ok=True)
-        pdf_filename = f"{order_name}.pdf"
-        pdf_path = os.path.join(target_dir, pdf_filename)
+        # базовое имя файла
+        safe_base = safe_order_name[:100]
     except Exception as e:
         logger.error(f"Ошибка при подготовке пути сохранения: {e}", exc_info=True)
         return None
 
-    # Подготовим заголовки с куками вручную (cookie_str)
+    # Заголовки (включая куки из session)
     cookies_dict = session.cookies.get_dict()
     cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
-
-    headers = {
-        "User-Agent": "Mozilla/5.0",
-        "Referer": BASE,
-    }
+    headers = {"User-Agent": "Mozilla/5.0", "Referer": BASE}
     if cookie_str:
         headers["Cookie"] = cookie_str
 
-    # Попытка 1: requests с ручным Cookie header (обычно работает)
-    pdf_bytes = None
-    try:
-        logger.debug("Пробуем скачать PDF через requests с явным Cookie header")
-        resp_pdf = session.get(file_url, timeout=30, headers=headers, stream=True, allow_redirects=True)
-        if resp_pdf.status_code == 401:
-            logger.warning(f"requests GET вернул 401 для {file_url}; попробуем WinHTTP fallback. Response headers: {resp_pdf.headers}")
-            raise requests.HTTPError(f"401 for {file_url}")
-        resp_pdf.raise_for_status()
-        # Собираем байты в память — пригодится для возможных дальнейших обращений
-        pdf_bytes = resp_pdf.content
-        with open(pdf_path, 'wb') as f:
-            f.write(pdf_bytes)
-        logger.info(f"PDF скачан: {pdf_path}")
-    except Exception as e_req:
-        logger.warning(f"Не удалось скачать через requests: {e_req}", exc_info=True)
+    pdf_path = None
+    csv_path = None
 
-    # Конвертация в CSV удалена — возвращаем путь к PDF и None для CSV (чтобы было обратимо)
-    return pdf_path, None
+    # ---------------- PDF export ----------------
+    try:
+        # получить templateId для size "30x20"
+        resp_templates = session.get(f"{BASE}/api/v1/print-templates?organizationId={ORGANIZATION_ID}&formTypes=codesOrder", timeout=15)
+        resp_templates.raise_for_status()
+        templates = resp_templates.json()
+        template_id = None
+        for t in templates:
+            if t.get("size") == "30x20":
+                template_id = t.get("id")
+                break
+        if template_id:
+            export_url = f"{BASE}/api/v1/codes-order/{document_id}/export/pdf?splitByGtins=false&templateId={template_id}"
+            resp_export = session.post(export_url, timeout=30)
+            resp_export.raise_for_status()
+            export_data = resp_export.json()
+            result_id = export_data.get("resultId")
+            logger.info(f"PDF export started for {document_id}, resultId: {result_id}")
+
+            # polling результата
+            file_url = None
+            attempts_pdf = 0
+            while attempts_pdf < 12:  # ~2 минуты
+                resp_result = session.get(f"{BASE}/api/v1/codes-order/{document_id}/export/pdf/{result_id}", timeout=15)
+                resp_result.raise_for_status()
+                result_data = resp_result.json()
+                if result_data.get("status") == "success":
+                    file_infos = result_data.get("fileInfos", [])
+                    if file_infos:
+                        # в fileInfos может быть fileUrl (абсолютный/относительный)
+                        file_url = file_infos[0].get("fileUrl") or file_infos[0].get("fileUrlAbsolute") or None
+                    break
+                time.sleep(10)
+                attempts_pdf += 1
+
+            if file_url:
+                full_file_url = make_full_url(file_url)
+                safe_pdf_name = f"{safe_base}.pdf"
+                pdf_path = os.path.join(target_dir, safe_pdf_name)
+                try:
+                    logger.debug(f"Downloading PDF from {full_file_url}")
+                    r = session.get(full_file_url, timeout=60, headers=headers, stream=True, allow_redirects=True)
+                    r.raise_for_status()
+                    with open(pdf_path, "wb") as fh:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                fh.write(chunk)
+                    logger.info(f"PDF сохранён: {pdf_path}")
+                except Exception as e:
+                    logger.error(f"Ошибка скачивания PDF (requests) {full_file_url}: {e}", exc_info=True)
+                    pdf_path = None
+            else:
+                logger.warning(f"PDF export для {document_id} завершился без fileUrl")
+        else:
+            logger.warning("Шаблон '30x20' для PDF не найден — пропускаем PDF экспорт")
+    except Exception as e:
+        logger.exception(f"Ошибка в PDF-части для {document_id}: {e}")
+        pdf_path = None
+
+    # ---------------- CSV export ----------------
+    try:
+        export_csv_url = f"{BASE}/api/v1/codes-order/{document_id}/export/csv?splitByGtins=false"
+        resp_csv_export = session.post(export_csv_url, timeout=30)
+        resp_csv_export.raise_for_status()
+        csv_export_data = resp_csv_export.json()
+        csv_result_id = csv_export_data.get("resultId")
+        logger.info(f"CSV export started for {document_id}, resultId: {csv_result_id}")
+
+        # polling CSV result
+        file_infos = None
+        attempts_csv = 0
+        while attempts_csv < 30:  # до ~5 минут (30 * 10s)
+            resp_csv_status = session.get(f"{BASE}/api/v1/codes-order/{document_id}/export/csv/{csv_result_id}", timeout=15)
+            resp_csv_status.raise_for_status()
+            csv_status_data = resp_csv_status.json()
+            status_csv = csv_status_data.get("status")
+            logger.info(f"CSV export status for {document_id}: {status_csv}")
+            if status_csv == "success":
+                file_infos = csv_status_data.get("fileInfos", [])
+                break
+            time.sleep(10)
+            attempts_csv += 1
+
+        if file_infos:
+            finfo = file_infos[0]
+            file_id = finfo.get("fileId")
+            file_name = finfo.get("fileName") or f"{safe_base}.csv"
+            # скачать через endpoint /export/csv/{resultId}/download/{fileId}
+            download_csv_url = f"{BASE}/api/v1/codes-order/{document_id}/export/csv/{csv_result_id}/download/{file_id}"
+            safe_csv_name = order_name
+            # защитить имя файла
+            if any(ch in safe_csv_name for ch in ("/", "\\", ":", "*", "?", "\"", "<", ">", "|")):
+                safe_csv_name = f"{safe_base}.csv"
+            csv_path = os.path.join(target_dir, safe_csv_name)
+            try:
+                logger.debug(f"Downloading CSV from {download_csv_url}")
+                r = session.get(download_csv_url, timeout=60, headers=headers, stream=True, allow_redirects=True)
+                r.raise_for_status()
+                with open(csv_path, "wb") as fh:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            fh.write(chunk)
+                logger.info(f"CSV сохранён: {csv_path}")
+            except Exception as e:
+                logger.error(f"Ошибка скачивания CSV (requests) {download_csv_url}: {e}", exc_info=True)
+                csv_path = None
+        else:
+            logger.warning(f"CSV export для {document_id} не вернул fileInfos в пределах таймаута")
+    except Exception as e:
+        logger.exception(f"Ошибка в CSV-части для {document_id}: {e}")
+        csv_path = None
+
+    # Вернуть кортеж путей (возможно один из них None)
+    return pdf_path, csv_path
