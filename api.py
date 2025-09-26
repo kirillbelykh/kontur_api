@@ -324,17 +324,15 @@ def check_order_status(session: requests.Session, document_id: str) -> str:
         return "error"
     
     
-def download_codes_pdf_and_convert(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[str, Optional[str]]]:
+def download_codes_pdf_and_convert(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[Optional[str], Optional[str], Optional[str]]]:
     """
-    Скачивает PDF и CSV для заказа document_id и сохраняет их в папку:
+    Скачивает PDF, CSV и XLS (если доступны) для заказа document_id и сохраняет их в папку:
       Desktop / "pdf-коды км" / <safe_order_name>/
     Файлы сохраняются с общей базой имени, производной от order_name.
-    Возвращает кортеж (pdf_path, csv_path). Если файл не скачан — соответствующий элемент = None.
-    WinHTTP / COM fallback удалён — только requests.
+    Возвращает кортеж (pdf_path, csv_path, xls_path). Если файл не скачан — соответствующий элемент = None.
     """
-    logger.info(f"Начало скачивания PDF+CSV для заказа {document_id} ({order_name!r})")
+    logger.info(f"Начало скачивания PDF/CSV/XLS для заказа {document_id} ({order_name!r})")
 
-    # helper: сделать абсолютный URL (если fileUrl относительный)
     from urllib.parse import urljoin
 
     def make_full_url(url: str) -> str:
@@ -375,11 +373,10 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
         safe_order_name = "".join(c for c in (order_name or document_id) if c.isalnum() or c in " -_").strip()
         if not safe_order_name:
             safe_order_name = document_id
-        # Ограничим длину имени папки
         safe_order_name = safe_order_name[:120]
         target_dir = os.path.join(parent_dir, safe_order_name)
         os.makedirs(target_dir, exist_ok=True)
-        # базовое имя файла
+        # базовое безопасное имя файла
         safe_base = safe_order_name[:100]
     except Exception as e:
         logger.error(f"Ошибка при подготовке пути сохранения: {e}", exc_info=True)
@@ -394,6 +391,7 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
 
     pdf_path = None
     csv_path = None
+    xls_path = None
 
     # ---------------- PDF export ----------------
     try:
@@ -424,7 +422,6 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
                 if result_data.get("status") == "success":
                     file_infos = result_data.get("fileInfos", [])
                     if file_infos:
-                        # в fileInfos может быть fileUrl (абсолютный/относительный)
                         file_url = file_infos[0].get("fileUrl") or file_infos[0].get("fileUrlAbsolute") or None
                     break
                 time.sleep(10)
@@ -482,10 +479,9 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
             finfo = file_infos[0]
             file_id = finfo.get("fileId")
             file_name = finfo.get("fileName") or f"{safe_base}.csv"
-            # скачать через endpoint /export/csv/{resultId}/download/{fileId}
             download_csv_url = f"{BASE}/api/v1/codes-order/{document_id}/export/csv/{csv_result_id}/download/{file_id}"
-            safe_csv_name = order_name
             # защитить имя файла
+            safe_csv_name = order_name
             if any(ch in safe_csv_name for ch in ("/", "\\", ":", "*", "?", "\"", "<", ">", "|")):
                 safe_csv_name = f"{safe_base}.csv"
             csv_path = os.path.join(target_dir, safe_csv_name)
@@ -507,5 +503,57 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
         logger.exception(f"Ошибка в CSV-части для {document_id}: {e}")
         csv_path = None
 
-    # Вернуть кортеж путей (возможно один из них None)
-    return pdf_path, csv_path
+    # ---------------- XLS export ----------------
+    try:
+        export_xls_url = f"{BASE}/api/v1/codes-order/{document_id}/export/xls?splitByGtins=false"
+        resp_xls_export = session.post(export_xls_url, timeout=30)
+        resp_xls_export.raise_for_status()
+        xls_export_data = resp_xls_export.json()
+        xls_result_id = xls_export_data.get("resultId")
+        logger.info(f"XLS export started for {document_id}, resultId: {xls_result_id}")
+
+        # polling XLS result
+        file_infos = None
+        attempts_xls = 0
+        while attempts_xls < 30:  # до ~5 минут
+            resp_xls_status = session.get(f"{BASE}/api/v1/codes-order/{document_id}/export/xls/{xls_result_id}", timeout=15)
+            resp_xls_status.raise_for_status()
+            xls_status_data = resp_xls_status.json()
+            status_xls = xls_status_data.get("status")
+            logger.info(f"XLS export status for {document_id}: {status_xls}")
+            if status_xls == "success":
+                file_infos = xls_status_data.get("fileInfos", [])
+                break
+            time.sleep(10)
+            attempts_xls += 1
+
+        if file_infos:
+            finfo = file_infos[0]
+            file_id = finfo.get("fileId")
+            file_name = finfo.get("fileName") or f"{safe_base}.xls"
+            download_xls_url = f"{BASE}/api/v1/codes-order/{document_id}/export/xls/{xls_result_id}/download/{file_id}"
+            safe_xls_name = order_name
+            if any(ch in safe_xls_name for ch in ("/", "\\", ":", "*", "?", "\"", "<", ">", "|")):
+                safe_xls_name = f"{safe_base}.xls"
+            xls_path = os.path.join(target_dir, safe_xls_name)
+            try:
+                logger.debug(f"Downloading XLS from {download_xls_url}")
+                r = session.get(download_xls_url, timeout=60, headers=headers, stream=True, allow_redirects=True)
+                r.raise_for_status()
+                with open(xls_path, "wb") as fh:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            fh.write(chunk)
+                logger.info(f"XLS сохранён: {xls_path}")
+            except Exception as e:
+                logger.error(f"Ошибка скачивания XLS (requests) {download_xls_url}: {e}", exc_info=True)
+                xls_path = None
+        else:
+            logger.warning(f"XLS export для {document_id} не вернул fileInfos в пределах таймаута")
+    except Exception as e:
+        logger.exception(f"Ошибка в XLS-части для {document_id}: {e}")
+        xls_path = None
+
+    # Вернуть кортеж путей (возможно некоторые элементы None)
+    return pdf_path, csv_path, xls_path
+

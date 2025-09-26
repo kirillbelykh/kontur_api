@@ -356,3 +356,19 @@ pywintypes.com_error: (-2147221008, 'Не был произведен вызов
 2025-09-26 16:34:44,583 - INFO - Токен OMS обновлён успешно. Ответ: 
 2025-09-26 16:34:44,931 - INFO - Отправка прошла успешно (detached signature)
 2025-09-26 16:34:45,112 - INFO - Финальный статус документа: sendForRelease
+2025-09-26 16:37:27,404 - INFO - Начало скачивания PDF+CSV для заказа 4b78f5b4-4aae-4791-bead-7781b7c09083 ('тест 1')
+2025-09-26 16:37:27,620 - INFO - Начало скачивания PDF+CSV для заказа 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2 ('тест 2')
+2025-09-26 16:37:28,055 - INFO - Статус заказа 4b78f5b4-4aae-4791-bead-7781b7c09083: released
+2025-09-26 16:37:28,225 - INFO - Статус заказа 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2: released
+2025-09-26 16:37:28,520 - INFO - PDF export started for 4b78f5b4-4aae-4791-bead-7781b7c09083, resultId: 0ee02f1f-5a96-4085-aa6b-3c9a36b87448
+2025-09-26 16:37:28,750 - INFO - PDF export started for 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2, resultId: c83646be-4f54-4c8b-81b9-446daa713981
+2025-09-26 16:37:49,851 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-26 16:37:49,927 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\тест 2.pdf
+2025-09-26 16:37:50,178 - INFO - CSV export started for 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2, resultId: 09580be9-f10b-4793-be78-9b2e32de3687
+2025-09-26 16:37:50,331 - INFO - CSV export status for 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2: success
+2025-09-26 16:37:50,521 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\codesOrder_2025-09-26_1.csv
+2025-09-26 16:37:50,753 - INFO - CSV export started for 4b78f5b4-4aae-4791-bead-7781b7c09083, resultId: 0464ca86-d266-429d-965b-36d63dc5e2a5
+2025-09-26 16:37:50,934 - INFO - CSV export status for 4b78f5b4-4aae-4791-bead-7781b7c09083: success
+2025-09-26 16:37:51,097 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\codesOrder_2025-09-26_1.csv
+2025-09-26 16:43:57,640 - INFO - Cookies устарели (912 сек). Нужно обновить.
+2025-09-26 16:44:08,127 - INFO - Cookie accept not found/ignored
