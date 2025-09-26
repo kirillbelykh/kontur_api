@@ -1,13 +1,11 @@
 import json
-import logging
+from logger import logger
 import time
 from pathlib import Path
 from typing import Dict, Optional
 from logger import logger
 
-LOG_FILE = "kontur_collect.log"
-logging.basicConfig(filename=LOG_FILE, level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
+
 
 # Настройки — поправь пути под систему
 YANDEX_DRIVER_PATH = Path(r"driver\yandexdriver.exe")
@@ -33,11 +31,11 @@ def load_cookies_from_file() -> Optional[Dict[str, str]]:
         ts = data.get("timestamp", 0)
         age = time.time() - ts
         if age > COOKIE_TTL:
-            logging.info(f"Cookies устарели ({age:.0f} сек). Нужно обновить.")
+            logger.info(f"Cookies устарели ({age:.0f} сек). Нужно обновить.")
             return None
         return cookies
     except Exception as e:
-        logging.exception("Ошибка при чтении cookies из файла")
+        logger.exception("Ошибка при чтении cookies из файла")
         logger.error("Ошибка при чтении cookies из файла:", e)
         return None
 
@@ -50,9 +48,9 @@ def save_cookies_to_file(cookies: Dict[str, str]) -> None:
             "cookies": cookies
         }
         COOKIES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        logging.info(f"Cookies сохранены в {COOKIES_FILE}")
+        logger.info(f"Cookies сохранены в {COOKIES_FILE}")
     except Exception:
-        logging.exception("Ошибка при сохранении cookies")
+        logger.exception("Ошибка при сохранении cookies")
 
 
 def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
@@ -72,16 +70,16 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
     except Exception as e:
-        logging.exception("Selenium import failed")
+        logger.exception("Selenium import failed")
         logger.error("Selenium не установлен или недоступен:", e)
         return None
 
     if not driver_path.exists():
-        logging.error(f"Driver not found: {driver_path}")
+        logger.error(f"Driver not found: {driver_path}")
         logger.error("Driver not found:", driver_path)
         return None
     if not browser_path.exists():
-        logging.error(f"Browser binary not found: {browser_path}")
+        logger.error(f"Browser binary not found: {browser_path}")
         logger.error("Browser binary not found:", browser_path)
         return None
 
@@ -109,29 +107,29 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                 (By.XPATH, '//*[@id="root"]/div/div/div[1]/div[1]/span/button/div[2]/span')
             ))
             cookie_btn.click()
-            logging.info("Clicked cookie accept")
+            logger.info("Clicked cookie accept")
             time.sleep(SLEEP)
         except Exception:
-            logging.info("Cookie accept not found/ignored")
+            logger.info("Cookie accept not found/ignored")
 
         try:
             profile_xpath = '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div/div[1]/div/div/div/div[1]/div/div'
             profile_el = wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath)))
             profile_el.click()
-            logging.info("Clicked profile (best-effort)")
+            logger.info("Clicked profile (best-effort)")
             time.sleep(SLEEP)
         except Exception:
-            logging.info("Profile select not found/ignored")
+            logger.info("Profile select not found/ignored")
 
         try:
             warehouse_el = wait.until(EC.element_to_be_clickable(
                 (By.XPATH, '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]')
             ))
             warehouse_el.click()
-            logging.info("Clicked warehouse (fallback selector)")
+            logger.info("Clicked warehouse (fallback selector)")
             time.sleep(SLEEP)
         except Exception:
-            logging.info("Warehouse select not found/ignored")
+            logger.info("Warehouse select not found/ignored")
 
         raw = driver.get_cookies()
         cookies = {c["name"]: c["value"] for c in raw}
@@ -141,7 +139,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         return cookies
 
     except Exception as e:
-        logging.exception("get_cookies failed")
+        logger.exception("get_cookies failed")
         logger.error("get_cookies failed:", e)
         return None
     finally:
