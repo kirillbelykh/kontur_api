@@ -478,7 +478,6 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
         if file_infos:
             finfo = file_infos[0]
             file_id = finfo.get("fileId")
-            file_name = finfo.get("fileName") or f"{safe_base}.csv"
             download_csv_url = f"{BASE}/api/v1/codes-order/{document_id}/export/csv/{csv_result_id}/download/{file_id}"
             # защитить имя файла
             safe_csv_name = order_name
@@ -530,7 +529,6 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
         if file_infos:
             finfo = file_infos[0]
             file_id = finfo.get("fileId")
-            file_name = finfo.get("fileName") or f"{safe_base}.xls"
             download_xls_url = f"{BASE}/api/v1/codes-order/{document_id}/export/xls/{xls_result_id}/download/{file_id}"
             safe_xls_name = order_name
             if any(ch in safe_xls_name for ch in ("/", "\\", ":", "*", "?", "\"", "<", ">", "|")):
