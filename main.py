@@ -7,7 +7,7 @@ import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Tuple
 from get_gtin import lookup_gtin, lookup_by_gtin
-from api import try_single_post, download_codes_pdf_and_convert
+from api import try_fast_post, download_codes_pdf_and_convert
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code
 import customtkinter as ctk
@@ -21,7 +21,7 @@ from options import (
 
 load_dotenv()
 
-# Константы 
+# Constants 
 PRODUCT_GROUP = os.getenv("PRODUCT_GROUP")
 RELEASE_METHOD_TYPE = os.getenv("RELEASE_METHOD_TYPE")
 CIS_TYPE = os.getenv("CIS_TYPE")  
@@ -40,7 +40,7 @@ class OrderItem:
     units_per_pack: str     # Количество единиц в упаковке (строка, для поиска)
     codes_count: int        # Количество кодов для заказа
     gtin: str = ""          # найдём перед запуском воркеров
-    full_name: str = ""     # опционально: полное наименование из справочника
+    full_name: str = ""     # полное наименование из справочника
     tnved_code: str = ""    # Тнвэд-код
     cisType: str = ""       # тип кода (CIS_TYPE из .env)
 
@@ -60,8 +60,8 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
             "gtin": payload.get("gtin"),
             "name": payload.get("full_name") or payload.get("simpl_name") or "",
             "tnvedCode": payload.get("tnved_code"),
-            "quantity": payload.get("codes_count", 1),
-            "cisType": payload.get("cisType")
+            "quantity": payload.get("codes_count"),
+            "cisType": payload.get("cisType", "unit")
         }]
 
         # cookies → session
@@ -70,17 +70,18 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
             logger.info("Получаем cookies...")
             cookies = get_valid_cookies()
         except Exception as e:
-            logger.error("Ошибка при получении cookies:", e)
+            logger.error("Ошибка cookies:", e)
             return False, f"Cannot get cookies: {e}"
 
         if not cookies:
             logger.info("Cookies не получены; прерываем выполнение.")
             return False, "Cookies not obtained"
 
+        #create and fill session with cookies
         session = make_session_with_cookies(cookies)
 
-        # --- пробуем быстрый POST ---
-        resp = try_single_post(
+        # --- try fast POST ---
+        resp = try_fast_post(
             session,
             str(document_number),
             str(PRODUCT_GROUP),
