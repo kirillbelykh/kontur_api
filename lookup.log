@@ -192,3 +192,169 @@ requests.exceptions.HTTPError: 500 Server Error: Internal Server Error for url: 
 2025-09-28 15:22:11,067 - INFO - Clicked profile (best-effort)
 2025-09-28 15:22:12,775 - INFO - Clicked warehouse (fallback selector)
 2025-09-28 15:22:13,784 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 15:28:53,916 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_15-28-53.txt
+2025-09-28 15:28:53,921 - INFO - Получаем cookies...
+2025-09-28 15:28:53,923 - INFO - Создание документа: тест 1
+2025-09-28 15:28:54,721 - INFO - Документ создан: 373cc1f7-a92a-4ce8-8582-8a49a761637e
+2025-09-28 15:28:56,552 - INFO - Подписываем order id=fa50a07b-930a-4f3d-97e9-9d7ebc78430a (base64Content length=460)
+2025-09-28 15:28:56,642 - INFO - Обновление токена OMS...
+2025-09-28 15:28:57,465 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 15:28:57,800 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 15:28:57,951 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 15:32:47,478 - INFO - Начало скачивания PDF/CSV/XLS для заказа 373cc1f7-a92a-4ce8-8582-8a49a761637e ('тест 1')
+2025-09-28 15:32:48,070 - INFO - Статус заказа 373cc1f7-a92a-4ce8-8582-8a49a761637e: released
+2025-09-28 15:32:48,483 - INFO - PDF export started for 373cc1f7-a92a-4ce8-8582-8a49a761637e, resultId: f93a6cbd-1c7d-48a6-9a88-68858602ed7b
+2025-09-28 15:33:09,622 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-28 15:33:09,931 - INFO - CSV export started for 373cc1f7-a92a-4ce8-8582-8a49a761637e, resultId: f0e4b180-43ef-4c0f-868d-0a597f0f6e8e
+2025-09-28 15:33:10,103 - INFO - CSV export status for 373cc1f7-a92a-4ce8-8582-8a49a761637e: inProgress
+2025-09-28 15:33:20,254 - INFO - CSV export status for 373cc1f7-a92a-4ce8-8582-8a49a761637e: success
+2025-09-28 15:33:20,371 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv.csv
+2025-09-28 15:33:20,581 - INFO - XLS export started for 373cc1f7-a92a-4ce8-8582-8a49a761637e, resultId: 9207c4ca-ecbd-4fbb-af0f-79b363a346ec
+2025-09-28 15:33:20,705 - INFO - XLS export status for 373cc1f7-a92a-4ce8-8582-8a49a761637e: inProgress
+2025-09-28 15:33:30,839 - INFO - XLS export status for 373cc1f7-a92a-4ce8-8582-8a49a761637e: success
+2025-09-28 15:33:30,981 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.xls
+2025-09-28 15:33:53,225 - INFO - DNS успешно разрешён: [(<AddressFamily.AF_INET: 2>, 0, 0, '', ('46.17.200.242', 443))]
+2025-09-28 15:33:54,305 - INFO - Ответ сервера: "f3cb3d73-dce8-4aab-9236-63ef8cb7af16"
+2025-09-28 15:33:54,305 - INFO - Создана заявка ввода в оборот: f3cb3d73-dce8-4aab-9236-63ef8cb7af16
+2025-09-28 15:33:54,598 - INFO - codes-checking status for f3cb3d73-dce8-4aab-9236-63ef8cb7af16: inProgress
+2025-09-28 15:33:54,786 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/f3cb3d73-dce8-4aab-9236-63ef8cb7af16/production
+2025-09-28 15:33:55,140 - INFO - POST positions/autocomplete ...
+2025-09-28 15:33:55,777 - INFO - Ответ сервера при вводе в оборот: [{'documentId': 'f3cb3d73-dce8-4aab-9236-63ef8cb7af16', 'base64Content': 'eyJkb2NfdHlwZSI6IlByb21vdGlvbl9JbmZvcm1fU2VsZm1hZGUiLCJwYXJ0aWNpcGFudF9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl9kYXRlIjoiMjAyNS0wOS0yOCIsInByb2R1Y2VyX2lubiI6Ijc4NDMzMTY3OTQiLCJvd25lcl9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl90eXBlIjoiT1dOX1BST0RVQ1RJT04iLCJwcm9kdWN0cyI6W3sidWl0X2NvZGUiOiIwMTA0NjQwNDczNTE0NDgwMjE1YklwPndhQmE1TWtNIiwidG52ZWRfY29kZSI6IjQwMTUxMjAwMDkifV19'}, {'documentId': 'de4ed5b2-78b5-44c7-9753-00d11abb435c', 'base64Content': 'eyJzbnRpbnMiOlsiMDEwNDY0MDQ3MzUxNDQ4MDIxNWJJcD53YUJhNU1rTVx1MDAxZDkxRUUxMVx1MDAxZDkyTzJjaVhHVTlPRVFCY2I3RTJPRHhlM0FMUWJNMXFjTVd5cVZ1SjB2R2N6WT0iXSwicHJvZHVjdEdyb3VwIjoid2hlZWxjaGFpcnMiLCJhdHRyaWJ1dGVzIjp7InByb2R1Y3Rpb25EYXRlIjoiMjAyNS0wOS0yOCIsImV4cGlyYXRpb25EYXRlIjoiMjAyNy0wOS0yOCIsImJhdGNoTnVtYmVyIjoiMjgwOTI1In19'}]
+2025-09-28 15:33:55,805 - INFO - Обновление токена OMS...
+2025-09-28 15:33:56,027 - ERROR - POST signed challenges для OMS: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
+2025-09-28 15:33:56,027 - WARNING - refresh_oms_token вернул False — попробуем отправить всё равно
+2025-09-28 15:33:56,027 - INFO - Отправка send-multiple ...
+2025-09-28 15:37:17,489 - INFO - Cookies устарели (904 сек). Нужно обновить.
+2025-09-28 15:37:21,124 - INFO - Clicked cookie accept
+2025-09-28 15:37:22,215 - INFO - Clicked profile (best-effort)
+2025-09-28 15:37:23,447 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 15:37:24,457 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 15:41:28,386 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_15-41-28.txt
+2025-09-28 15:41:28,391 - INFO - Получаем cookies...
+2025-09-28 15:41:28,392 - INFO - Создание документа: тест 1
+2025-09-28 15:41:29,116 - INFO - Документ создан: 58644ae1-973a-40e2-a8d9-e75028d3275b
+2025-09-28 15:41:30,795 - INFO - Подписываем order id=ef0d32b7-c215-4b8b-a4a4-803ad8454e08 (base64Content length=460)
+2025-09-28 15:41:30,897 - INFO - Обновление токена OMS...
+2025-09-28 15:41:31,680 - ERROR - POST signed challenges для OMS: WinHTTP POST failed: Status 417 - {"type":"internalCrptError","message":"Error code: [crpt:transport:Forbidden]. TraceId: [56be19c9b352505d7f72b015e464970f]. Message: {\"error_message\":\"Подпись невалидна. Код ошибки: 2\"}.  CrptErrorType: InternalCrptError"}
+2025-09-28 15:41:31,681 - ERROR - Не удалось обновить токен OMS
+2025-09-28 15:46:53,016 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_15-46-53.txt
+2025-09-28 15:46:53,022 - INFO - Получаем cookies...
+2025-09-28 15:46:53,023 - INFO - Создание документа: тест 1
+2025-09-28 15:46:53,803 - INFO - Документ создан: c4319213-b511-410b-a883-6f12493aa0fb
+2025-09-28 15:46:55,463 - INFO - Подписываем order id=6e1adc23-350a-40cf-9ad8-e1339f9bbe4e (base64Content length=460)
+2025-09-28 15:46:55,552 - INFO - Обновление токена OMS...
+2025-09-28 15:46:56,492 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 15:46:57,024 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 15:46:57,169 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 15:50:48,087 - INFO - Начало скачивания PDF/CSV/XLS для заказа c4319213-b511-410b-a883-6f12493aa0fb ('тест 1')
+2025-09-28 15:50:48,643 - INFO - Статус заказа c4319213-b511-410b-a883-6f12493aa0fb: released
+2025-09-28 15:50:49,085 - INFO - PDF export started for c4319213-b511-410b-a883-6f12493aa0fb, resultId: e61f89b3-369f-4ceb-876b-c0767983e24c
+2025-09-28 15:51:10,170 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-28 15:51:10,452 - INFO - CSV export started for c4319213-b511-410b-a883-6f12493aa0fb, resultId: 4dc35d4c-0ae1-49f7-9173-85a9791e759d
+2025-09-28 15:51:10,630 - INFO - CSV export status for c4319213-b511-410b-a883-6f12493aa0fb: inProgress
+2025-09-28 15:51:20,800 - INFO - CSV export status for c4319213-b511-410b-a883-6f12493aa0fb: success
+2025-09-28 15:51:20,935 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv.csv
+2025-09-28 15:51:21,150 - INFO - XLS export started for c4319213-b511-410b-a883-6f12493aa0fb, resultId: 64f94085-a428-41e9-bedc-114d80b10d6e
+2025-09-28 15:51:21,290 - INFO - XLS export status for c4319213-b511-410b-a883-6f12493aa0fb: inProgress
+2025-09-28 15:51:31,404 - INFO - XLS export status for c4319213-b511-410b-a883-6f12493aa0fb: success
+2025-09-28 15:51:31,559 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.xls
+2025-09-28 15:51:52,717 - INFO - DNS успешно разрешён: [(<AddressFamily.AF_INET: 2>, 0, 0, '', ('46.17.200.242', 443))]
+2025-09-28 15:51:53,831 - INFO - Ответ сервера: "e531645d-be12-4c6c-a7db-d59ff64fbd0e"
+2025-09-28 15:51:53,831 - INFO - Создана заявка ввода в оборот: e531645d-be12-4c6c-a7db-d59ff64fbd0e
+2025-09-28 15:51:54,061 - INFO - codes-checking status for e531645d-be12-4c6c-a7db-d59ff64fbd0e: inProgress
+2025-09-28 15:51:54,223 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/e531645d-be12-4c6c-a7db-d59ff64fbd0e/production
+2025-09-28 15:51:54,621 - INFO - POST positions/autocomplete ...
+2025-09-28 15:51:55,474 - INFO - Ответ сервера при вводе в оборот: [{'documentId': 'e531645d-be12-4c6c-a7db-d59ff64fbd0e', 'base64Content': 'eyJkb2NfdHlwZSI6IlByb21vdGlvbl9JbmZvcm1fU2VsZm1hZGUiLCJwYXJ0aWNpcGFudF9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl9kYXRlIjoiMjAyNS0wOS0yOCIsInByb2R1Y2VyX2lubiI6Ijc4NDMzMTY3OTQiLCJvd25lcl9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl90eXBlIjoiT1dOX1BST0RVQ1RJT04iLCJwcm9kdWN0cyI6W3sidWl0X2NvZGUiOiIwMTA0NjQwNDczNTE0NDczMjE1blZKSy1TeklPUndsIiwidG52ZWRfY29kZSI6IjQwMTUxMjAwMDkifV19'}, {'documentId': '15489e71-3ee8-4b3b-ab20-ec5397aaf4fd', 'base64Content': 'eyJzbnRpbnMiOlsiMDEwNDY0MDQ3MzUxNDQ3MzIxNW5WSkstU3pJT1J3bFx1MDAxZDkxRUUxMVx1MDAxZDkyZUpxSFRzRk1SRzZPUEdBZDI0RTI1THpjQlhDaEMrY25yRHdMZnlJNitacz0iXSwicHJvZHVjdEdyb3VwIjoid2hlZWxjaGFpcnMiLCJhdHRyaWJ1dGVzIjp7InByb2R1Y3Rpb25EYXRlIjoiMjAyNS0wOS0yOCIsImV4cGlyYXRpb25EYXRlIjoiMjAyNy0wOS0yOCIsImJhdGNoTnVtYmVyIjoiMjgwOTI1In19'}]
+2025-09-28 15:51:55,509 - INFO - Отправка send-multiple ...
+2025-09-28 15:52:48,094 - INFO - Cookies устарели (924 сек). Нужно обновить.
+2025-09-28 15:52:51,847 - INFO - Clicked cookie accept
+2025-09-28 15:52:52,929 - INFO - Clicked profile (best-effort)
+2025-09-28 15:52:55,765 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 15:52:56,774 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 16:05:21,039 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_16-05-21.txt
+2025-09-28 16:05:21,041 - INFO - Получаем cookies...
+2025-09-28 16:05:21,043 - INFO - Создание документа: тест 1
+2025-09-28 16:05:21,620 - INFO - Документ создан: 2487a5ab-fe0d-417b-804f-4a8a8ecde9a8
+2025-09-28 16:05:23,041 - INFO - Подписываем order id=c752be43-42d8-47da-9174-04de9cec3731 (base64Content length=460)
+2025-09-28 16:05:23,128 - INFO - Обновление токена OMS...
+2025-09-28 16:05:23,792 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 16:05:24,066 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 16:05:24,159 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 16:08:07,107 - INFO - Cookies устарели (910 сек). Нужно обновить.
+2025-09-28 16:08:31,736 - INFO - Cookie accept not found/ignored
+2025-09-28 16:08:50,234 - INFO - Profile select not found/ignored
+2025-09-28 16:08:50,236 - INFO - Warehouse select not found/ignored
+2025-09-28 16:08:50,237 - ERROR - get_cookies failed
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\cookies.py", line 132, in get_cookies
+    raw = driver.get_cookies()
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 743, in get_cookies
+    return self.execute(Command.GET_ALL_COOKIES)["value"]
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.InvalidSessionIdException: Message: invalid session id; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#invalidsessionidexception
+Stacktrace:
+	GetHandleVerifier [0x0x7ff663d87c15+24469]
+	(No symbol) [0x0x7ff663ccf920]
+	(No symbol) [0x0x7ff663b1afcc]
+	(No symbol) [0x0x7ff663b61460]
+	(No symbol) [0x0x7ff663b9c192]
+	(No symbol) [0x0x7ff663b98429]
+	(No symbol) [0x0x7ff663b974f9]
+	(No symbol) [0x0x7ff663adf275]
+	GetHandleVerifier [0x0x7ff664100cfd+3666045]
+	GetHandleVerifier [0x0x7ff664134332+3876530]
+	GetHandleVerifier [0x0x7ff664129f13+3834515]
+	GetHandleVerifier [0x0x7ff663e7486e+994286]
+	(No symbol) [0x0x7ff663cd904d]
+	(No symbol) [0x0x7ff663ade147]
+	GetHandleVerifier [0x0x7ff6641a62c8+4343368]
+	BaseThreadInitThunk [0x0x7ffae382e8d7+23]
+	RtlUserThreadStart [0x0x7ffae4d88d9c+44]
+
+2025-09-28 16:09:35,951 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_16-09-35.txt
+2025-09-28 16:09:35,958 - INFO - Получаем cookies...
+2025-09-28 16:09:35,958 - INFO - Cookies устарели (999 сек). Нужно обновить.
+2025-09-28 16:09:39,932 - INFO - Clicked cookie accept
+2025-09-28 16:09:41,009 - INFO - Clicked profile (best-effort)
+2025-09-28 16:09:42,242 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 16:09:43,252 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 16:09:45,699 - INFO - Создание документа: тест 1
+2025-09-28 16:09:46,480 - INFO - Документ создан: bf7cb7e2-d0fb-41c6-823d-76ba0db8ce50
+2025-09-28 16:09:49,516 - INFO - Подписываем order id=a34c8f47-bd8a-464a-9d06-90c8e7c2c03c (base64Content length=460)
+2025-09-28 16:09:49,589 - INFO - Обновление токена OMS...
+2025-09-28 16:09:50,266 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 16:09:50,497 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 16:09:50,599 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 16:13:27,044 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_16-13-27.txt
+2025-09-28 16:13:27,048 - INFO - Получаем cookies...
+2025-09-28 16:13:27,049 - INFO - Создание документа: тест 1
+2025-09-28 16:13:27,797 - INFO - Документ создан: 62071b5f-9bec-4932-a912-59979a5be00f
+2025-09-28 16:13:29,318 - INFO - Подписываем order id=c78b725f-7ca6-4365-bb8d-d86b2666fa9a (base64Content length=460)
+2025-09-28 16:13:29,405 - INFO - Обновление токена OMS...
+2025-09-28 16:13:30,841 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 16:13:31,237 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 16:13:31,397 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 16:16:24,572 - INFO - Начало скачивания PDF/CSV/XLS для заказа 62071b5f-9bec-4932-a912-59979a5be00f ('тест 1')
+2025-09-28 16:16:25,121 - INFO - Статус заказа 62071b5f-9bec-4932-a912-59979a5be00f: released
+2025-09-28 16:16:25,470 - INFO - PDF export started for 62071b5f-9bec-4932-a912-59979a5be00f, resultId: 6c540b26-654c-426c-beda-56ee99db046b
+2025-09-28 16:16:46,611 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-28 16:16:46,818 - INFO - CSV export started for 62071b5f-9bec-4932-a912-59979a5be00f, resultId: d3ed1b64-f107-45b2-801e-f01c5be0c5b7
+2025-09-28 16:16:47,134 - INFO - CSV export status for 62071b5f-9bec-4932-a912-59979a5be00f: inProgress
+2025-09-28 16:16:57,445 - INFO - CSV export status for 62071b5f-9bec-4932-a912-59979a5be00f: success
+2025-09-28 16:16:57,582 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv.csv
+2025-09-28 16:16:57,826 - INFO - XLS export started for 62071b5f-9bec-4932-a912-59979a5be00f, resultId: 319e540a-bce2-4838-a289-d1af937061a9
+2025-09-28 16:16:57,956 - INFO - XLS export status for 62071b5f-9bec-4932-a912-59979a5be00f: success
+2025-09-28 16:16:58,120 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.xls
+2025-09-28 16:17:19,026 - INFO - DNS успешно разрешён: [(<AddressFamily.AF_INET: 2>, 0, 0, '', ('46.17.200.242', 443))]
+2025-09-28 16:17:20,059 - INFO - Ответ сервера: "1a8853b4-52cb-4bb9-bd75-0c4ca428db33"
+2025-09-28 16:17:20,060 - INFO - Создана заявка ввода в оборот: 1a8853b4-52cb-4bb9-bd75-0c4ca428db33
+2025-09-28 16:17:20,665 - INFO - codes-checking status for 1a8853b4-52cb-4bb9-bd75-0c4ca428db33: inProgress
+2025-09-28 16:17:20,893 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/1a8853b4-52cb-4bb9-bd75-0c4ca428db33/production
+2025-09-28 16:17:21,417 - INFO - POST positions/autocomplete ...
+2025-09-28 16:17:22,342 - INFO - Ответ сервера при вводе в оборот: [{'documentId': '1a8853b4-52cb-4bb9-bd75-0c4ca428db33', 'base64Content': 'eyJkb2NfdHlwZSI6IlByb21vdGlvbl9JbmZvcm1fU2VsZm1hZGUiLCJwYXJ0aWNpcGFudF9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl9kYXRlIjoiMjAyNS0wOS0yOCIsInByb2R1Y2VyX2lubiI6Ijc4NDMzMTY3OTQiLCJvd25lcl9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl90eXBlIjoiT1dOX1BST0RVQ1RJT04iLCJwcm9kdWN0cyI6W3sidWl0X2NvZGUiOiIwMTA0NjUwMTE4MDQzMjk5MjE1czBJKWR4IWpcIjBrUyIsInRudmVkX2NvZGUiOiI0MDE1MTIwMDA5In1dfQ=='}, {'documentId': 'a0ddc9d6-b058-47e2-ac25-24e2b9f84a53', 'base64Content': 'eyJzbnRpbnMiOlsiMDEwNDY1MDExODA0MzI5OTIxNXMwSSlkeCFqXCIwa1NcdTAwMWQ5MUVFMTFcdTAwMWQ5MmJWQUhXUTQ1S0gwRFc2V0Q0RU5jdzNWTkdHR1Z1U0EybVF5YkhNT3dzQWc9Il0sInByb2R1Y3RHcm91cCI6IndoZWVsY2hhaXJzIiwiYXR0cmlidXRlcyI6eyJwcm9kdWN0aW9uRGF0ZSI6IjIwMjUtMDktMjgiLCJleHBpcmF0aW9uRGF0ZSI6IjIwMjctMDktMjgiLCJiYXRjaE51bWJlciI6IjI4MDkyNSJ9fQ=='}]
+2025-09-28 16:17:22,355 - INFO - Отправка send-multiple ...

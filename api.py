@@ -105,6 +105,7 @@ def post_with_winhttp(url, payload, headers=None):
     all_headers = win_http.GetAllResponseHeaders()
     if status != 200:
         raise Exception(f"WinHTTP POST failed: Status {status} - {response_text}")
+    pythoncom.CoUninitialize()
     return status, response_text, all_headers
 
 
@@ -732,7 +733,7 @@ def perform_introduction_from_order(
             # попробуем сначала attached (b_detached=False), если ошибка — detached True
             sig = None
             try:
-                sig = sign_data(cert, b64, b_detached=False)
+                sig = sign_data(cert, b64, b_detached=True)
                 # sign_data в твоей реализации возвращает строку (или кортеж?), убедимся что строка:
                 if isinstance(sig, tuple):
                     sig = sig[0]
@@ -759,12 +760,6 @@ def perform_introduction_from_order(
 
         result["signed_payloads_preview"] = [{"documentId": p["documentId"], "signed_len": len(p["signedContent"])} for p in signed_payloads]
 
-        # 10) обновить OMS token (важно)
-        try:
-            if not refresh_oms_token(session, cert, organization_id):
-                logger.warning("refresh_oms_token вернул False — попробуем отправить всё равно")
-        except Exception as e:
-            logger.warning("refresh_oms_token exception: %s", e)
 
         # 11) отправка send-multiple
         try:

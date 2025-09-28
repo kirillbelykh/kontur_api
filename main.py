@@ -1105,7 +1105,7 @@ class App(ctk.CTk):
             order_name = item.get("order_name", "Unknown")
             
             if ok:
-                self.intro_log_insert(f"✅ УСПЕХ: {order_name} (ID: {docid}) - {msg}")
+                self.intro_log_insert(f"✅ Заявка на ввод в оборот отправлена!")
                 item["status"] = "Введен в оборот"
                 # Можно также изменить цвет строки или добавить пометку
             else:
