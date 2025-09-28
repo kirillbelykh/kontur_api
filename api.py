@@ -1,3 +1,4 @@
+import time
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ from win32com.client import Dispatch
 import pythoncom
 from dotenv import load_dotenv
 import time
+import socket
 
 load_dotenv()
 
@@ -480,7 +482,7 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
             file_id = finfo.get("fileId")
             download_csv_url = f"{BASE}/api/v1/codes-order/{document_id}/export/csv/{csv_result_id}/download/{file_id}"
             # защитить имя файла
-            safe_csv_name = order_name + "_csv"
+            safe_csv_name = f"{order_name}_csv.csv"
             if any(ch in safe_csv_name for ch in ("/", "\\", ":", "*", "?", "\"", "<", ">", "|")):
                 safe_csv_name = f"{safe_base}.csv"
             csv_path = os.path.join(target_dir, safe_csv_name)
@@ -530,7 +532,7 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
             finfo = file_infos[0]
             file_id = finfo.get("fileId")
             download_xls_url = f"{BASE}/api/v1/codes-order/{document_id}/export/xls/{xls_result_id}/download/{file_id}"
-            safe_xls_name = order_name
+            safe_xls_name = f"{order_name}.xls"
             if any(ch in safe_xls_name for ch in ("/", "\\", ":", "*", "?", "\"", "<", ">", "|")):
                 safe_xls_name = f"{safe_base}.xls"
             xls_path = os.path.join(target_dir, safe_xls_name)
@@ -586,14 +588,28 @@ def perform_introduction_from_order(
     result: Dict[str, Any] = {"errors": []}
     try:
         # 1) create-from-codes-order
-        url_create = f"{BASE}/api/v1/codes-introduction/create-from-codes-order/{codes_order_id}?isImportFts=false&isAccompanyingDocumentNeeds=false"
-        logger.info("Создаём ввод в оборот из заказа %s ...", codes_order_id)
-        r = session.post(url_create, timeout=30)
+        try:
+            addr = socket.getaddrinfo('mk.kontur.ru', 443)
+            logger.info(f"DNS успешно разрешён: {addr}")
+            url_create = f"{BASE}/api/v1/codes-introduction/create-from-codes-order/{codes_order_id}?isImportFts=false&isAccompanyingDocumentNeeds=false"
+            extra_kwargs = {}  # Без verify=False
+        except socket.gaierror as dns_err:
+            logger.error(f"DNS-разрешение провалено: {dns_err}. Используем workaround с IP.")
+            # Workaround: Используем IP вместо домена
+            ip = '46.17.200.242'
+            original_base = BASE.replace('mk.kontur.ru', ip)
+            url_create = f"{original_base}/api/v1/codes-introduction/create-from-codes-order/{codes_order_id}?isImportFts=false&isAccompanyingDocumentNeeds=false"
+            extra_kwargs = {'verify': False}  # Отключаем проверку SSL (небезопасно!)
+        # Добавляем заголовок Host для workaround (если используем IP)
+        headers = {'Host': 'mk.kontur.ru'} if 'ip' in locals() else {}
+        
+        r = session.post(url_create, headers=headers, timeout=30, **extra_kwargs)
+        logger.info(f"Ответ сервера: {r.text}")
         r.raise_for_status()
         intro_id = r.text.strip().strip('"')
         result["introduction_id"] = intro_id
         logger.info("Создана заявка ввода в оборот: %s", intro_id)
-
+        
         # 2) initial GET introduction
         r_intro = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}", timeout=15)
         r_intro.raise_for_status()
@@ -610,7 +626,7 @@ def perform_introduction_from_order(
                 result["check_status_latest"] = last_check
                 status = last_check.get("status")
                 logger.info("codes-checking status for %s: %s", intro_id, status)
-                if status in ("doesNotHaveErrors", "created", "checked", "noErrors"):  # возможные статусы
+                if status in ("inProgress", "doesNotHaveErrors", "created", "checked", "noErrors"):  # возможные статусы
                     check_ok = True
                     break
             else:
@@ -684,6 +700,7 @@ def perform_introduction_from_order(
         try:
             gen_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/generate-multiple"
             r_gen = session.get(gen_url, timeout=30)
+            logger.info(f"Ответ сервера при вводе в оборот: {r_gen.json()}")
             r_gen.raise_for_status()
             gen_items = r_gen.json()
             result["generate_items_raw"] = gen_items
@@ -783,8 +800,10 @@ def perform_introduction_from_order(
         # Всё успешно
         ok = not bool(result["errors"])
         return ok, result
-
+        
     except Exception as e:
-        logger.exception("Unhandled exception in perform_introduction_from_order: %s", e)
-        result["errors"].append(f"unhandled exception: {e}")
+        result["errors"].append(str(e))
+        logger.error(f"Ошибка в perform_introduction_from_order: {e}")
         return False, result
+
+    

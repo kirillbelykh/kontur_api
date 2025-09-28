@@ -577,7 +577,8 @@ class App(ctk.CTk):
                         'order_name': it.order_name,
                         'document_id': document_id,
                         'status': 'Ожидает',
-                        'filename': None
+                        'filename': None,
+                        'simpl': it.simpl_name
                     })
                     self.update_download_tree()
                 except:
@@ -1008,17 +1009,27 @@ class App(ctk.CTk):
             for it in selected_items:
                 docid = it["document_id"]
                 order_name = it.get("order_name", "Unknown")
+                simpl_name = it.get("simpl")
                 self.intro_log_insert(f"⏳ Добавлен в очередь: {order_name} (ID: {docid})")
-
+                tnved_code = get_tnved_code(simpl_name)
                 # Формируем production_patch
                 production_patch = {
+                    "comment": "",
+                    "documentNumber": order_name,
+                    "productionType": "ownProduction",
+                    "warehouseId": "59739364-7d62-434b-ad13-4617c87a6d13",
+                    "expirationType": "milkMoreThan72",
+                    "containsUtilisationReport": "true",
+                    "usageType": "verified",
+                    "cisType": "unit",
+                    "fillingMethod": "file",
+                    "isAutocompletePositionsDataNeeded": "true",
+                    "productsHasSameDates": "true",
+                    "isForKegs": "true",
                     "productionDate": prod_date,
                     "expirationDate": exp_date,
                     "batchNumber": batch_num,
-                    "productionType": "ownProduction",
-                    "documentNumber": order_name,
-                    "cisType": "unit", 
-                    "productsHasSameDates": "true"
+                    "TnvedCode": tnved_code
                 }
                 
                 fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint)
@@ -1051,7 +1062,6 @@ class App(ctk.CTk):
         Возвращает (ok, message).
         """
         document_id = item["document_id"]
-        order_name = item.get("order_name", "Unknown")
         
         try:
             # Получаем cookies/session
@@ -1069,7 +1079,8 @@ class App(ctk.CTk):
                 session=session,
                 codes_order_id=document_id,
                 production_patch=production_patch,
-                thumbprint=thumbprint,
+                organization_id=os.getenv("ORGANIZATION_ID"),
+                thumbprint=THUMBPRINT,
                 check_poll_interval=10,      # Увеличим интервалы для стабильности
                 check_poll_attempts=30,      # Больше попыток
                 gen_poll_interval=5,
@@ -1086,6 +1097,7 @@ class App(ctk.CTk):
                 
         except Exception as e:
             return False, f"Исключение: {str(e)}"
+        
     def _on_intro_finished(self, item: dict, ok: bool, msg: str):
         """Обновление GUI после завершения одного задания (в главном потоке)."""
         try:

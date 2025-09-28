@@ -1,75 +1,31 @@
-2025-09-26 14:46:48,641 - INFO - История заказа сохранена в файл 'История заказов.txt'
-2025-09-26 14:46:48,646 - INFO - Получаем cookies...
-2025-09-26 14:46:53,926 - INFO - Clicked cookie accept
-2025-09-26 14:46:55,034 - INFO - Clicked profile (best-effort)
-2025-09-26 14:46:56,335 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 14:46:57,345 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 14:47:00,129 - INFO - Создание документа: тест 1
-2025-09-26 14:47:00,131 - ERROR - Создание документа тест 1: Invalid URL 'None/api/v1/codes-order?warehouseId=None': No scheme supplied. Perhaps you meant https://None/api/v1/codes-order?warehouseId=None?
-2025-09-26 14:47:00,151 - INFO - Получаем cookies...
-2025-09-26 14:47:00,171 - INFO - Создание документа: тест 2
-2025-09-26 14:47:00,172 - ERROR - Создание документа тест 2: Invalid URL 'None/api/v1/codes-order?warehouseId=None': No scheme supplied. Perhaps you meant https://None/api/v1/codes-order?warehouseId=None?
-2025-09-26 15:32:51,528 - INFO - История заказа сохранена в файл 'История заказов.txt'
-2025-09-26 15:32:51,531 - INFO - Получаем cookies...
-2025-09-26 15:32:51,532 - INFO - Cookies устарели (2754 сек). Нужно обновить.
-2025-09-26 15:32:55,309 - INFO - Clicked cookie accept
-2025-09-26 15:32:56,420 - INFO - Clicked profile (best-effort)
-2025-09-26 15:32:57,664 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 15:32:58,674 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 15:33:01,318 - INFO - Создание документа: тест 1
-2025-09-26 15:33:01,320 - ERROR - Создание документа тест 1: Invalid URL 'None/api/v1/codes-order?warehouseId=None': No scheme supplied. Perhaps you meant https://None/api/v1/codes-order?warehouseId=None?
-2025-09-26 15:40:08,239 - INFO - История заказа сохранена в файл 'История заказов.txt'
-2025-09-26 15:40:08,242 - INFO - Получаем cookies...
-2025-09-26 15:40:08,270 - INFO - Создание документа: тест 1
-2025-09-26 15:40:09,787 - INFO - Документ создан: 64161fa4-de2e-472b-a82f-ea79af19aa1b
-2025-09-26 15:40:11,129 - INFO - Подписываем order id=7f984163-e2c9-4196-9ac6-0d4f9a513845 (base64Content length=460)
-2025-09-26 15:40:11,259 - INFO - Обновление токена OMS...
-2025-09-26 15:40:13,022 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 15:40:13,316 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 15:40:13,443 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 15:40:13,456 - INFO - Получаем cookies...
-2025-09-26 15:40:13,457 - INFO - Создание документа: тест 2
-2025-09-26 15:40:14,099 - INFO - Документ создан: 49c0c8af-a5c7-489c-ae13-dfff3d43d837
-2025-09-26 15:40:14,701 - INFO - Подписываем order id=1cc23264-274d-4af2-a00d-011703b516ab (base64Content length=460)
-2025-09-26 15:40:14,707 - INFO - Обновление токена OMS...
-2025-09-26 15:40:15,509 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 15:40:15,767 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 15:40:16,640 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 15:46:55,085 - INFO - История заказа сохранена в файл 'История заказов.txt'
-2025-09-26 15:46:55,089 - INFO - Получаем cookies...
-2025-09-26 15:46:55,091 - INFO - Создание документа: тест 1
-2025-09-26 15:46:56,037 - INFO - Документ создан: 40d67d97-6e93-4c4a-a622-6b0ad63d91bf
-2025-09-26 15:46:58,040 - INFO - Подписываем order id=d3d0f072-5020-45cb-83fc-96f2a02ddbd7 (base64Content length=460)
-2025-09-26 15:46:58,131 - INFO - Обновление токена OMS...
-2025-09-26 15:46:59,334 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 15:46:59,940 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 15:47:00,331 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 15:47:00,344 - INFO - Получаем cookies...
-2025-09-26 15:47:00,345 - INFO - Создание документа: тест 2
-2025-09-26 15:47:01,669 - INFO - Документ создан: 0500fe57-aa5d-422e-96ec-4ea8bd3094c5
-2025-09-26 15:47:02,974 - INFO - Подписываем order id=a286577e-554c-4122-b7f9-270176b31aff (base64Content length=460)
-2025-09-26 15:47:02,980 - INFO - Обновление токена OMS...
-2025-09-26 15:47:03,925 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 15:47:04,369 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 15:47:04,551 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 15:48:09,295 - INFO - Cookies устарели (911 сек). Нужно обновить.
-2025-09-26 15:48:15,327 - INFO - Clicked cookie accept
-2025-09-26 15:48:16,429 - INFO - Clicked profile (best-effort)
-2025-09-26 15:48:18,259 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 15:48:19,270 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 15:50:26,970 - INFO - Начало скачивания PDF для заказа 40d67d97-6e93-4c4a-a622-6b0ad63d91bf
-2025-09-26 15:50:27,109 - INFO - Начало скачивания PDF для заказа 0500fe57-aa5d-422e-96ec-4ea8bd3094c5
-2025-09-26 15:50:27,731 - INFO - Статус заказа: released
-2025-09-26 15:50:27,828 - INFO - Статус заказа: released
-2025-09-26 15:50:28,535 - INFO - Экспорт начат, resultId: 8863b80a-f772-4079-9b14-a56814b6be2d
-2025-09-26 15:50:28,535 - INFO - Экспорт начат, resultId: 31ec3965-bc6f-44e9-9138-fb596bea33ff
-2025-09-26 15:50:28,770 - INFO - Статус экспорта: inProgress
-2025-09-26 15:50:28,771 - INFO - Статус экспорта: inProgress
-2025-09-26 15:50:38,877 - INFO - Статус экспорта: inProgress
-2025-09-26 15:50:38,918 - INFO - Статус экспорта: inProgress
-2025-09-26 15:50:49,072 - INFO - Статус экспорта: success
-2025-09-26 15:50:49,117 - INFO - Статус экспорта: success
-2025-09-26 15:51:00,142 - WARNING - Не удалось скачать через requests: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1e563fb64ec5bda164 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+2025-09-28 14:01:48,098 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_14-01-48.txt
+2025-09-28 14:01:48,104 - INFO - Получаем cookies...
+2025-09-28 14:01:48,106 - INFO - Создание документа: тест 1
+2025-09-28 14:01:48,734 - INFO - Документ создан: 8e06d93c-5dad-4c25-9f77-1450855ff936
+2025-09-28 14:01:50,346 - INFO - Подписываем order id=be100993-53cf-40e7-a8c1-6a9e5f426d18 (base64Content length=460)
+2025-09-28 14:01:50,441 - INFO - Обновление токена OMS...
+2025-09-28 14:01:51,073 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 14:01:51,306 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 14:01:51,449 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 14:02:38,013 - INFO - Cookies устарели (903 сек). Нужно обновить.
+2025-09-28 14:02:54,295 - INFO - Clicked cookie accept
+2025-09-28 14:02:55,416 - INFO - Clicked profile (best-effort)
+2025-09-28 14:02:56,657 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 14:02:57,665 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 14:04:31,770 - INFO - Начало скачивания PDF/CSV/XLS для заказа 8e06d93c-5dad-4c25-9f77-1450855ff936 ('тест 1')
+2025-09-28 14:04:32,184 - INFO - Статус заказа 8e06d93c-5dad-4c25-9f77-1450855ff936: released
+2025-09-28 14:04:32,532 - INFO - PDF export started for 8e06d93c-5dad-4c25-9f77-1450855ff936, resultId: 6f47aaa5-8407-4dab-8cb4-aafe5e1c82af
+2025-09-28 14:04:53,963 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-28 14:04:54,142 - INFO - CSV export started for 8e06d93c-5dad-4c25-9f77-1450855ff936, resultId: c4baab90-1b59-40ff-bcc4-87209af3dd1c
+2025-09-28 14:04:54,224 - INFO - CSV export status for 8e06d93c-5dad-4c25-9f77-1450855ff936: inProgress
+2025-09-28 14:05:04,333 - INFO - CSV export status for 8e06d93c-5dad-4c25-9f77-1450855ff936: success
+2025-09-28 14:05:04,445 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv.csv
+2025-09-28 14:05:04,648 - INFO - XLS export started for 8e06d93c-5dad-4c25-9f77-1450855ff936, resultId: 24d4e457-a7d4-4792-bbe3-c141f322301c
+2025-09-28 14:05:04,744 - INFO - XLS export status for 8e06d93c-5dad-4c25-9f77-1450855ff936: inProgress
+2025-09-28 14:05:14,846 - INFO - XLS export status for 8e06d93c-5dad-4c25-9f77-1450855ff936: success
+2025-09-28 14:05:14,919 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.xls
+2025-09-28 14:09:55,112 - INFO - Создаём ввод в оборот из заказа 8e06d93c-5dad-4c25-9f77-1450855ff936 ...
+2025-09-28 14:10:06,174 - ERROR - Unhandled exception in perform_introduction_from_order: HTTPSConnectionPool(host='mk.kontur.ru', port=443): Max retries exceeded with url: /api/v1/codes-introduction/create-from-codes-order/8e06d93c-5dad-4c25-9f77-1450855ff936?isImportFts=false&isAccompanyingDocumentNeeds=false (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022942C18410>: Failed to resolve 'mk.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
 Traceback (most recent call last):
   File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 198, in _new_conn
     sock = connection.create_connection(
@@ -107,7 +63,7 @@ Traceback (most recent call last):
                        ~~~~~~~~~~~~~~^^
   File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 205, in _new_conn
     raise NameResolutionError(self.host, self, e) from e
-urllib3.exceptions.NameResolutionError: <urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)
+urllib3.exceptions.NameResolutionError: <urllib3.connection.HTTPSConnection object at 0x0000022942C18410>: Failed to resolve 'mk.kontur.ru' ([Errno 11001] getaddrinfo failed)
 
 The above exception was the direct cause of the following exception:
 
@@ -125,500 +81,114 @@ Traceback (most recent call last):
   File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\util\retry.py", line 519, in increment
     raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1e563fb64ec5bda164 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='mk.kontur.ru', port=443): Max retries exceeded with url: /api/v1/codes-introduction/create-from-codes-order/8e06d93c-5dad-4c25-9f77-1450855ff936?isImportFts=false&isAccompanyingDocumentNeeds=false (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022942C18410>: Failed to resolve 'mk.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
 
 During handling of the above exception, another exception occurred:
 
 Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 443, in download_codes_pdf_and_convert
-    resp_pdf = session.get(file_url, timeout=30, headers=headers, stream=True, allow_redirects=True)
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 602, in get
-    return self.request("GET", url, **kwargs)
-           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 591, in perform_introduction_from_order
+    r = session.post(url_create, timeout=30)
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 637, in post
+    return self.request("POST", url, data=data, json=json, **kwargs)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 589, in request
     resp = self.send(prep, **send_kwargs)
   File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 703, in send
     r = adapter.send(request, **kwargs)
   File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\adapters.py", line 677, in send
     raise ConnectionError(e, request=request)
-requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1e563fb64ec5bda164 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E20D0>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
-2025-09-26 15:51:00,143 - WARNING - Не удалось скачать через requests: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1fd23a54f495b6d2e2 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+requests.exceptions.ConnectionError: HTTPSConnectionPool(host='mk.kontur.ru', port=443): Max retries exceeded with url: /api/v1/codes-introduction/create-from-codes-order/8e06d93c-5dad-4c25-9f77-1450855ff936?isImportFts=false&isAccompanyingDocumentNeeds=false (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022942C18410>: Failed to resolve 'mk.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
+2025-09-28 14:18:01,768 - INFO - Cookies устарели (904 сек). Нужно обновить.
+2025-09-28 14:18:26,414 - INFO - Clicked cookie accept
+2025-09-28 14:18:27,505 - INFO - Clicked profile (best-effort)
+2025-09-28 14:18:28,722 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 14:18:29,733 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 14:33:32,207 - INFO - Cookies устарели (902 сек). Нужно обновить.
+2025-09-28 14:34:07,591 - INFO - Clicked cookie accept
+2025-09-28 14:34:08,678 - INFO - Clicked profile (best-effort)
+2025-09-28 14:34:09,865 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 14:34:10,873 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 14:51:35,452 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_14-51-35.txt
+2025-09-28 14:51:35,455 - INFO - Получаем cookies...
+2025-09-28 14:51:35,455 - INFO - Cookies устарели (1045 сек). Нужно обновить.
+2025-09-28 14:51:42,315 - INFO - Clicked cookie accept
+2025-09-28 14:51:43,396 - INFO - Clicked profile (best-effort)
+2025-09-28 14:51:46,143 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 14:51:47,155 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 14:51:49,587 - INFO - Создание документа: тест 1
+2025-09-28 14:51:50,442 - INFO - Документ создан: 0487266e-369a-43c5-a01a-73eeeeb64f06
+2025-09-28 14:51:52,424 - INFO - Подписываем order id=bf383123-60b0-4fbb-8c2a-02043bc77719 (base64Content length=460)
+2025-09-28 14:51:52,511 - INFO - Обновление токена OMS...
+2025-09-28 14:51:53,877 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 14:51:54,292 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 14:51:54,523 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 15:02:29,364 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_15-02-29.txt
+2025-09-28 15:02:29,368 - INFO - Получаем cookies...
+2025-09-28 15:02:29,369 - INFO - Создание документа: тест 1
+2025-09-28 15:02:30,197 - INFO - Документ создан: 211e0188-3b3f-4964-a0ae-2e780979d5db
+2025-09-28 15:02:32,086 - INFO - Подписываем order id=0aa2f89e-34fd-41b4-86ce-6f479266eed6 (base64Content length=460)
+2025-09-28 15:02:32,174 - INFO - Обновление токена OMS...
+2025-09-28 15:02:33,083 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 15:02:33,389 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 15:02:33,605 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 15:05:22,166 - INFO - Начало скачивания PDF/CSV/XLS для заказа 211e0188-3b3f-4964-a0ae-2e780979d5db ('тест 1')
+2025-09-28 15:05:22,686 - INFO - Статус заказа 211e0188-3b3f-4964-a0ae-2e780979d5db: released
+2025-09-28 15:05:23,040 - INFO - PDF export started for 211e0188-3b3f-4964-a0ae-2e780979d5db, resultId: a999234d-8b17-468e-8992-689f47d4c1aa
+2025-09-28 15:05:44,861 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-28 15:05:45,397 - INFO - CSV export started for 211e0188-3b3f-4964-a0ae-2e780979d5db, resultId: c1da61bf-86aa-47f4-8e56-7d82cf7dc87b
+2025-09-28 15:05:45,846 - INFO - CSV export status for 211e0188-3b3f-4964-a0ae-2e780979d5db: inProgress
+2025-09-28 15:05:56,005 - INFO - CSV export status for 211e0188-3b3f-4964-a0ae-2e780979d5db: success
+2025-09-28 15:05:56,112 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv.csv
+2025-09-28 15:05:56,328 - INFO - XLS export started for 211e0188-3b3f-4964-a0ae-2e780979d5db, resultId: 681c638c-9d59-4180-82ed-f4217c5a3e06
+2025-09-28 15:05:56,463 - INFO - XLS export status for 211e0188-3b3f-4964-a0ae-2e780979d5db: inProgress
+2025-09-28 15:06:06,635 - INFO - XLS export status for 211e0188-3b3f-4964-a0ae-2e780979d5db: success
+2025-09-28 15:06:06,807 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.xls
+2025-09-28 15:06:42,926 - INFO - DNS успешно разрешён: [(<AddressFamily.AF_INET: 2>, 0, 0, '', ('46.17.200.242', 443))]
+2025-09-28 15:06:44,043 - INFO - Ответ сервера: "becf3c51-10c2-4d56-b831-978775f647d9"
+2025-09-28 15:06:44,043 - INFO - Создана заявка ввода в оборот: becf3c51-10c2-4d56-b831-978775f647d9
+2025-09-28 15:06:52,170 - INFO - Cookies устарели (905 сек). Нужно обновить.
+2025-09-28 15:06:55,760 - INFO - Clicked cookie accept
+2025-09-28 15:06:56,838 - INFO - Clicked profile (best-effort)
+2025-09-28 15:06:58,591 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 15:06:59,599 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 15:10:15,216 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_15-10-15.txt
+2025-09-28 15:10:15,218 - INFO - Получаем cookies...
+2025-09-28 15:10:15,219 - INFO - Создание документа: тест 1
+2025-09-28 15:10:15,900 - INFO - Документ создан: fc8a901d-6739-463b-8f94-d03d334df28e
+2025-09-28 15:10:17,541 - INFO - Подписываем order id=36888667-8360-4c4b-8eed-8478f7cd84cf (base64Content length=460)
+2025-09-28 15:10:17,658 - INFO - Обновление токена OMS...
+2025-09-28 15:10:18,704 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-28 15:10:18,983 - INFO - Отправка прошла успешно (detached signature)
+2025-09-28 15:10:19,149 - INFO - Финальный статус документа: sendForRelease
+2025-09-28 15:13:36,464 - INFO - Начало скачивания PDF/CSV/XLS для заказа fc8a901d-6739-463b-8f94-d03d334df28e ('тест 1')
+2025-09-28 15:13:36,985 - INFO - Статус заказа fc8a901d-6739-463b-8f94-d03d334df28e: released
+2025-09-28 15:13:37,437 - INFO - PDF export started for fc8a901d-6739-463b-8f94-d03d334df28e, resultId: 78a91bf1-fa20-48aa-8dc5-62f8789297f0
+2025-09-28 15:13:58,666 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
+2025-09-28 15:13:58,913 - INFO - CSV export started for fc8a901d-6739-463b-8f94-d03d334df28e, resultId: 6787a858-f5d5-47b8-a01d-9205cfeda1f6
+2025-09-28 15:13:59,053 - INFO - CSV export status for fc8a901d-6739-463b-8f94-d03d334df28e: inProgress
+2025-09-28 15:14:09,285 - INFO - CSV export status for fc8a901d-6739-463b-8f94-d03d334df28e: success
+2025-09-28 15:14:09,451 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv.csv
+2025-09-28 15:14:09,742 - INFO - XLS export started for fc8a901d-6739-463b-8f94-d03d334df28e, resultId: 20cafd34-9a76-46b2-9b04-da5dcad162e0
+2025-09-28 15:14:09,893 - INFO - XLS export status for fc8a901d-6739-463b-8f94-d03d334df28e: inProgress
+2025-09-28 15:14:20,067 - INFO - XLS export status for fc8a901d-6739-463b-8f94-d03d334df28e: success
+2025-09-28 15:14:20,213 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.xls
+2025-09-28 15:14:42,650 - INFO - DNS успешно разрешён: [(<AddressFamily.AF_INET: 2>, 0, 0, '', ('46.17.200.242', 443))]
+2025-09-28 15:14:43,885 - INFO - Ответ сервера: "a1963fa5-43c6-4b5d-9062-9bd443665dbd"
+2025-09-28 15:14:43,885 - INFO - Создана заявка ввода в оборот: a1963fa5-43c6-4b5d-9062-9bd443665dbd
+2025-09-28 15:14:44,155 - INFO - codes-checking status for a1963fa5-43c6-4b5d-9062-9bd443665dbd: inProgress
+2025-09-28 15:14:44,500 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/a1963fa5-43c6-4b5d-9062-9bd443665dbd/production
+2025-09-28 15:14:44,847 - INFO - POST positions/autocomplete ...
+2025-09-28 15:14:45,402 - INFO - Ответ сервера при вводе в оборот: {'type': 'unknownError', 'message': 'Error code: [bad-request]. TraceId: [65477cde3cd17c1e7dc5a30de80b6040]. Message: Bad request. Значение поля TnvedCode должно быть заполнено если Children пуст . '}
+2025-09-28 15:14:45,403 - ERROR - Ошибка generate-multiple: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/a1963fa5-43c6-4b5d-9062-9bd443665dbd/generate-multiple
 Traceback (most recent call last):
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 198, in _new_conn
-    sock = connection.create_connection(
-        (self._dns_host, self.port),
-    ...<2 lines>...
-        socket_options=self.socket_options,
-    )
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\util\connection.py", line 60, in create_connection
-    for res in socket.getaddrinfo(host, port, family, socket.SOCK_STREAM):
-               ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\socket.py", line 977, in getaddrinfo
-    for res in _socket.getaddrinfo(host, port, family, type, proto, flags):
-               ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-socket.gaierror: [Errno 11001] getaddrinfo failed
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 787, in urlopen
-    response = self._make_request(
-        conn,
-    ...<10 lines>...
-        **response_kw,
-    )
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 488, in _make_request
-    raise new_e
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 464, in _make_request
-    self._validate_conn(conn)
-    ~~~~~~~~~~~~~~~~~~~^^^^^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 1093, in _validate_conn
-    conn.connect()
-    ~~~~~~~~~~~~^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 753, in connect
-    self.sock = sock = self._new_conn()
-                       ~~~~~~~~~~~~~~^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connection.py", line 205, in _new_conn
-    raise NameResolutionError(self.host, self, e) from e
-urllib3.exceptions.NameResolutionError: <urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\adapters.py", line 644, in send
-    resp = conn.urlopen(
-        method=request.method,
-    ...<9 lines>...
-        chunked=chunked,
-    )
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\connectionpool.py", line 841, in urlopen
-    retries = retries.increment(
-        method, url, error=new_e, _pool=self, _stacktrace=sys.exc_info()[2]
-    )
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\urllib3\util\retry.py", line 519, in increment
-    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1fd23a54f495b6d2e2 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 443, in download_codes_pdf_and_convert
-    resp_pdf = session.get(file_url, timeout=30, headers=headers, stream=True, allow_redirects=True)
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 602, in get
-    return self.request("GET", url, **kwargs)
-           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 589, in request
-    resp = self.send(prep, **send_kwargs)
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\sessions.py", line 703, in send
-    r = adapter.send(request, **kwargs)
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\adapters.py", line 677, in send
-    raise ConnectionError(e, request=request)
-requests.exceptions.ConnectionError: HTTPSConnectionPool(host='api.kontur.ru', port=443): Max retries exceeded with url: /drive/v1/contents/srv/evrikaprinter/uid/1e825db9-466c-4581-996c-e00dc250c204/68d68c1fd23a54f495b6d2e2 (Caused by NameResolutionError("<urllib3.connection.HTTPSConnection object at 0x0000022FDA3E2350>: Failed to resolve 'api.kontur.ru' ([Errno 11001] getaddrinfo failed)"))
-2025-09-26 15:51:00,351 - ERROR - Ошибка скачивания PDF (WinHTTP fallback): (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
-Traceback (most recent call last):
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 81, in _GetGoodDispatch
-    IDispatch = pythoncom.connect(IDispatch)
-pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 460, in download_codes_pdf_and_convert
-    status, body, all_headers = get_with_winhttp(file_url, headers=headers)
-                                ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 291, in get_with_winhttp
-    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\__init__.py", line 116, in Dispatch
-    dispatch, userName = dynamic._GetGoodDispatchAndUserName(dispatch, userName, clsctx)
-                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 101, in _GetGoodDispatchAndUserName
-    return (_GetGoodDispatch(IDispatch, clsctx), userName)
-            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 83, in _GetGoodDispatch
-    IDispatch = pythoncom.CoCreateInstance(
-        IDispatch, None, clsctx, pythoncom.IID_IDispatch
-    )
-pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
-2025-09-26 15:51:00,357 - ERROR - Ошибка скачивания PDF (WinHTTP fallback): (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
-Traceback (most recent call last):
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 81, in _GetGoodDispatch
-    IDispatch = pythoncom.connect(IDispatch)
-pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
-
-During handling of the above exception, another exception occurred:
-
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 460, in download_codes_pdf_and_convert
-    status, body, all_headers = get_with_winhttp(file_url, headers=headers)
-                                ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 291, in get_with_winhttp
-    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\__init__.py", line 116, in Dispatch
-    dispatch, userName = dynamic._GetGoodDispatchAndUserName(dispatch, userName, clsctx)
-                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 101, in _GetGoodDispatchAndUserName
-    return (_GetGoodDispatch(IDispatch, clsctx), userName)
-            ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\win32com\client\dynamic.py", line 83, in _GetGoodDispatch
-    IDispatch = pythoncom.CoCreateInstance(
-        IDispatch, None, clsctx, pythoncom.IID_IDispatch
-    )
-pywintypes.com_error: (-2147221008, 'Не был произведен вызов CoInitialize.', None, None)
-2025-09-26 16:03:27,152 - INFO - Cookies устарели (908 сек). Нужно обновить.
-2025-09-26 16:03:31,761 - INFO - Clicked cookie accept
-2025-09-26 16:03:32,853 - INFO - Clicked profile (best-effort)
-2025-09-26 16:03:34,691 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 16:03:35,701 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 16:04:16,456 - INFO - История заказа сохранена в файл 'История заказов.txt'
-2025-09-26 16:04:16,459 - INFO - Получаем cookies...
-2025-09-26 16:04:16,473 - INFO - Создание документа: тест 1
-2025-09-26 16:04:17,274 - INFO - Документ создан: d408b238-931a-49cd-bda6-d95fc1fd2236
-2025-09-26 16:04:18,912 - INFO - Подписываем order id=933be863-f204-4de6-b7de-fe1ec3cad78e (base64Content length=460)
-2025-09-26 16:04:19,027 - INFO - Обновление токена OMS...
-2025-09-26 16:04:20,002 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:04:20,323 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:04:20,527 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:04:20,532 - INFO - Получаем cookies...
-2025-09-26 16:04:20,532 - INFO - Создание документа: тест 2
-2025-09-26 16:04:21,264 - INFO - Документ создан: e7994b67-b628-42eb-a30e-1956a05fece2
-2025-09-26 16:04:22,555 - INFO - Подписываем order id=c2b1af31-af02-48b3-9c4e-67477e6ebbb5 (base64Content length=460)
-2025-09-26 16:04:22,561 - INFO - Обновление токена OMS...
-2025-09-26 16:04:23,326 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:04:23,627 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:04:23,785 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:07:36,131 - INFO - Начало скачивания PDF для заказа d408b238-931a-49cd-bda6-d95fc1fd2236
-2025-09-26 16:07:36,318 - INFO - Начало скачивания PDF для заказа e7994b67-b628-42eb-a30e-1956a05fece2
-2025-09-26 16:07:36,725 - INFO - Статус заказа: released
-2025-09-26 16:07:36,925 - INFO - Статус заказа: released
-2025-09-26 16:07:37,126 - INFO - Экспорт начат, resultId: 57675f12-c3a7-4fa2-8438-850e5c2da7a6
-2025-09-26 16:07:37,270 - INFO - Статус экспорта: inProgress
-2025-09-26 16:07:37,382 - INFO - Экспорт начат, resultId: ac168b6f-a3b1-4075-8116-64f91b1bc97e
-2025-09-26 16:07:37,543 - INFO - Статус экспорта: inProgress
-2025-09-26 16:07:47,601 - INFO - Статус экспорта: inProgress
-2025-09-26 16:07:47,759 - INFO - Статус экспорта: inProgress
-2025-09-26 16:07:57,742 - INFO - Статус экспорта: inProgress
-2025-09-26 16:07:57,931 - INFO - Статус экспорта: inProgress
-2025-09-26 16:08:07,898 - INFO - Статус экспорта: inProgress
-2025-09-26 16:08:08,110 - INFO - Статус экспорта: inProgress
-2025-09-26 16:08:18,293 - INFO - Статус экспорта: success
-2025-09-26 16:08:18,295 - INFO - Статус экспорта: success
-2025-09-26 16:08:18,928 - INFO - PDF скачан: C:\Users\sklad\Desktop\pdf-коды км\тест 2.pdf
-2025-09-26 16:08:18,958 - INFO - PDF скачан: C:\Users\sklad\Desktop\pdf-коды км\тест 1.pdf
-2025-09-26 16:28:36,706 - INFO - История заказа сохранена в файл 'История заказов.txt'
-2025-09-26 16:28:36,709 - INFO - Получаем cookies...
-2025-09-26 16:28:36,710 - INFO - Cookies устарели (1501 сек). Нужно обновить.
-2025-09-26 16:28:41,472 - INFO - Clicked cookie accept
-2025-09-26 16:28:42,549 - INFO - Clicked profile (best-effort)
-2025-09-26 16:28:44,317 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 16:28:45,325 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 16:28:47,762 - INFO - Создание документа: тест 1
-2025-09-26 16:28:48,550 - INFO - Документ создан: 24dd40a8-48ca-4752-b3da-d3dea6b7a8b5
-2025-09-26 16:28:50,255 - INFO - Подписываем order id=70568124-3301-4e87-9dd7-ba5cea0bf020 (base64Content length=460)
-2025-09-26 16:28:50,354 - INFO - Обновление токена OMS...
-2025-09-26 16:28:51,363 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:28:51,713 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:28:51,891 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:28:51,895 - INFO - Получаем cookies...
-2025-09-26 16:28:51,896 - INFO - Создание документа: тест 2
-2025-09-26 16:28:53,483 - INFO - Документ создан: 0ab41ae9-9615-4741-910a-ebcf11cd3d8e
-2025-09-26 16:28:54,288 - INFO - Подписываем order id=1a38f280-8c5d-4d3a-8882-693e9189e6fa (base64Content length=460)
-2025-09-26 16:28:54,294 - INFO - Обновление токена OMS...
-2025-09-26 16:28:55,066 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:28:56,200 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:28:56,376 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:31:24,906 - INFO - Начало скачивания PDF и CSV для заказа 24dd40a8-48ca-4752-b3da-d3dea6b7a8b5
-2025-09-26 16:31:25,123 - INFO - Начало скачивания PDF и CSV для заказа 0ab41ae9-9615-4741-910a-ebcf11cd3d8e
-2025-09-26 16:31:25,656 - INFO - Статус заказа: released
-2025-09-26 16:31:25,815 - INFO - Статус заказа: released
-2025-09-26 16:31:55,865 - INFO - Статус заказа: released
-2025-09-26 16:31:56,037 - INFO - Статус заказа: released
-2025-09-26 16:32:26,098 - INFO - Статус заказа: released
-2025-09-26 16:32:26,272 - INFO - Статус заказа: released
-2025-09-26 16:32:56,292 - INFO - Статус заказа: released
-2025-09-26 16:32:56,542 - INFO - Статус заказа: released
-2025-09-26 16:33:26,520 - INFO - Статус заказа: released
-2025-09-26 16:33:26,753 - INFO - Статус заказа: released
-2025-09-26 16:34:37,413 - INFO - История заказа сохранена в файл 'История заказов.txt'
-2025-09-26 16:34:37,416 - INFO - Получаем cookies...
-2025-09-26 16:34:37,418 - INFO - Создание документа: тест 1
-2025-09-26 16:34:38,151 - INFO - Документ создан: 4b78f5b4-4aae-4791-bead-7781b7c09083
-2025-09-26 16:34:39,855 - INFO - Подписываем order id=40788be2-d5c0-4072-b96e-c0e4ce37a985 (base64Content length=460)
-2025-09-26 16:34:39,973 - INFO - Обновление токена OMS...
-2025-09-26 16:34:41,069 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:34:41,354 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:34:41,510 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:34:41,513 - INFO - Получаем cookies...
-2025-09-26 16:34:41,514 - INFO - Создание документа: тест 2
-2025-09-26 16:34:42,343 - INFO - Документ создан: 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2
-2025-09-26 16:34:43,588 - INFO - Подписываем order id=c4c488f2-756e-4235-9034-d13f049ece58 (base64Content length=460)
-2025-09-26 16:34:43,594 - INFO - Обновление токена OMS...
-2025-09-26 16:34:44,583 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:34:44,931 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:34:45,112 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:37:27,404 - INFO - Начало скачивания PDF+CSV для заказа 4b78f5b4-4aae-4791-bead-7781b7c09083 ('тест 1')
-2025-09-26 16:37:27,620 - INFO - Начало скачивания PDF+CSV для заказа 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2 ('тест 2')
-2025-09-26 16:37:28,055 - INFO - Статус заказа 4b78f5b4-4aae-4791-bead-7781b7c09083: released
-2025-09-26 16:37:28,225 - INFO - Статус заказа 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2: released
-2025-09-26 16:37:28,520 - INFO - PDF export started for 4b78f5b4-4aae-4791-bead-7781b7c09083, resultId: 0ee02f1f-5a96-4085-aa6b-3c9a36b87448
-2025-09-26 16:37:28,750 - INFO - PDF export started for 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2, resultId: c83646be-4f54-4c8b-81b9-446daa713981
-2025-09-26 16:37:49,851 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
-2025-09-26 16:37:49,927 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\тест 2.pdf
-2025-09-26 16:37:50,178 - INFO - CSV export started for 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2, resultId: 09580be9-f10b-4793-be78-9b2e32de3687
-2025-09-26 16:37:50,331 - INFO - CSV export status for 244fb26c-eb6e-41f8-ad36-81a0dab9bbd2: success
-2025-09-26 16:37:50,521 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\codesOrder_2025-09-26_1.csv
-2025-09-26 16:37:50,753 - INFO - CSV export started for 4b78f5b4-4aae-4791-bead-7781b7c09083, resultId: 0464ca86-d266-429d-965b-36d63dc5e2a5
-2025-09-26 16:37:50,934 - INFO - CSV export status for 4b78f5b4-4aae-4791-bead-7781b7c09083: success
-2025-09-26 16:37:51,097 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\codesOrder_2025-09-26_1.csv
-2025-09-26 16:43:57,640 - INFO - Cookies устарели (912 сек). Нужно обновить.
-2025-09-26 16:44:08,127 - INFO - Cookie accept not found/ignored
-2025-09-26 16:44:41,711 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-26_16-44-41.txt
-2025-09-26 16:44:41,719 - INFO - Получаем cookies...
-2025-09-26 16:44:41,720 - INFO - Cookies устарели (956 сек). Нужно обновить.
-2025-09-26 16:44:47,755 - INFO - Clicked cookie accept
-2025-09-26 16:44:48,834 - INFO - Clicked profile (best-effort)
-2025-09-26 16:44:50,539 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 16:44:51,549 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 16:44:53,974 - INFO - Создание документа: тест 1
-2025-09-26 16:44:55,085 - INFO - Документ создан: bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2
-2025-09-26 16:44:56,686 - INFO - Подписываем order id=c4a1f3cc-8b62-40ad-8a7d-4fd68800ffec (base64Content length=460)
-2025-09-26 16:44:56,773 - INFO - Обновление токена OMS...
-2025-09-26 16:44:58,235 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:44:58,546 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:44:58,709 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:44:58,716 - INFO - Получаем cookies...
-2025-09-26 16:44:58,717 - INFO - Создание документа: тест 2
-2025-09-26 16:44:59,563 - INFO - Документ создан: aebcc979-8cdf-4deb-b385-faa2cc5a9a4c
-2025-09-26 16:45:00,344 - INFO - Подписываем order id=4527f58a-d755-4274-85c5-e62bc0580d0b (base64Content length=460)
-2025-09-26 16:45:00,350 - INFO - Обновление токена OMS...
-2025-09-26 16:45:01,166 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 16:45:01,442 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 16:45:01,618 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 16:48:31,986 - INFO - Начало скачивания PDF/CSV/XLS для заказа bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2 ('тест 1')
-2025-09-26 16:48:32,187 - INFO - Начало скачивания PDF/CSV/XLS для заказа aebcc979-8cdf-4deb-b385-faa2cc5a9a4c ('тест 2')
-2025-09-26 16:48:32,612 - INFO - Статус заказа bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: released
-2025-09-26 16:48:32,771 - INFO - Статус заказа aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: released
-2025-09-26 16:48:33,159 - INFO - PDF export started for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2, resultId: ecd26e99-a9d2-4108-a0d1-db37417f0b1b
-2025-09-26 16:48:33,430 - INFO - PDF export started for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c, resultId: 53f9ff16-0027-4d62-b006-7709d09c6d63
-2025-09-26 16:48:54,309 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
-2025-09-26 16:48:54,554 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\тест 2.pdf
-2025-09-26 16:48:54,556 - INFO - CSV export started for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2, resultId: f8332986-d10a-4bcd-928f-d8ab969b00e5
-2025-09-26 16:48:54,704 - INFO - CSV export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: inProgress
-2025-09-26 16:48:54,918 - INFO - CSV export started for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c, resultId: c7fe2ff9-c669-425c-9c30-63b029ce82b1
-2025-09-26 16:48:55,075 - INFO - CSV export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: inProgress
-2025-09-26 16:49:04,849 - INFO - CSV export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: success
-2025-09-26 16:49:05,002 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\codesOrder_2025-09-26_1.csv
-2025-09-26 16:49:05,258 - INFO - CSV export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: success
-2025-09-26 16:49:05,284 - INFO - XLS export started for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2, resultId: b6629fd0-761e-4b26-91d9-068e637a4007
-2025-09-26 16:49:05,419 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\codesOrder_2025-09-26_1.csv
-2025-09-26 16:49:05,459 - INFO - XLS export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: inProgress
-2025-09-26 16:49:05,681 - INFO - XLS export started for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c, resultId: 0ca01927-13ba-423a-96d4-b096455225ca
-2025-09-26 16:49:05,846 - INFO - XLS export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: inProgress
-2025-09-26 16:49:15,606 - INFO - XLS export status for bb89cf37-4bf7-4f3e-8f1e-8f1dd0efefa2: success
-2025-09-26 16:49:15,773 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\codesOrder_2025-09-26_1.xls
-2025-09-26 16:49:15,993 - INFO - XLS export status for aebcc979-8cdf-4deb-b385-faa2cc5a9a4c: success
-2025-09-26 16:49:16,198 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\codesOrder_2025-09-26_1.xls
-2025-09-26 17:00:02,223 - INFO - Cookies устарели (911 сек). Нужно обновить.
-2025-09-26 17:00:06,863 - INFO - Clicked cookie accept
-2025-09-26 17:00:07,947 - INFO - Clicked profile (best-effort)
-2025-09-26 17:00:09,696 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 17:00:10,705 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 17:05:48,670 - INFO - Clicked cookie accept
-2025-09-26 17:05:49,758 - INFO - Clicked profile (best-effort)
-2025-09-26 17:05:51,591 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 17:05:52,601 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 18:12:35,618 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-26_18-12-35.txt
-2025-09-26 18:12:35,620 - INFO - Получаем cookies...
-2025-09-26 18:12:35,621 - INFO - Cookies устарели (4003 сек). Нужно обновить.
-2025-09-26 18:12:42,609 - INFO - Clicked cookie accept
-2025-09-26 18:12:43,688 - INFO - Clicked profile (best-effort)
-2025-09-26 18:12:45,450 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 18:12:46,459 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 18:12:48,898 - INFO - Создание документа: тест 1
-2025-09-26 18:12:49,649 - INFO - Документ создан: 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09
-2025-09-26 18:12:51,453 - INFO - Подписываем order id=d22bc038-ec29-443a-b7dc-fa3c2e0f1a1f (base64Content length=460)
-2025-09-26 18:12:51,524 - INFO - Обновление токена OMS...
-2025-09-26 18:12:52,589 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 18:12:52,864 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 18:12:53,043 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 18:12:53,048 - INFO - Получаем cookies...
-2025-09-26 18:12:53,062 - INFO - Создание документа: тест 2
-2025-09-26 18:12:53,711 - INFO - Документ создан: 16fe809e-5120-41f9-9551-980dd372349b
-2025-09-26 18:12:54,631 - INFO - Подписываем order id=bbbe0729-423c-4141-b55b-dd9db196616d (base64Content length=460)
-2025-09-26 18:12:54,637 - INFO - Обновление токена OMS...
-2025-09-26 18:12:55,393 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 18:12:55,727 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 18:12:55,877 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 18:15:15,513 - INFO - Начало скачивания PDF/CSV/XLS для заказа 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09 ('тест 1')
-2025-09-26 18:15:15,713 - INFO - Начало скачивания PDF/CSV/XLS для заказа 16fe809e-5120-41f9-9551-980dd372349b ('тест 2')
-2025-09-26 18:15:16,098 - INFO - Статус заказа 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09: released
-2025-09-26 18:15:16,378 - INFO - Статус заказа 16fe809e-5120-41f9-9551-980dd372349b: released
-2025-09-26 18:15:16,658 - INFO - PDF export started for 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09, resultId: fa054467-2957-418c-b02f-8585e3fb8d53
-2025-09-26 18:15:16,855 - INFO - PDF export started for 16fe809e-5120-41f9-9551-980dd372349b, resultId: 6d1a2817-c5ec-4604-9c33-3db424a6bc4f
-2025-09-26 18:15:37,770 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
-2025-09-26 18:15:43,021 - INFO - CSV export started for 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09, resultId: 9c13502c-53db-4005-a80b-bdf809444ebd
-2025-09-26 18:15:43,173 - INFO - CSV export status for 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09: inProgress
-2025-09-26 18:15:48,068 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\тест 2.pdf
-2025-09-26 18:15:48,394 - INFO - CSV export started for 16fe809e-5120-41f9-9551-980dd372349b, resultId: b7f7cbd7-4c32-41d0-b6e0-44988e112500
-2025-09-26 18:15:48,553 - INFO - CSV export status for 16fe809e-5120-41f9-9551-980dd372349b: inProgress
-2025-09-26 18:15:53,315 - INFO - CSV export status for 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09: success
-2025-09-26 18:15:53,479 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1
-2025-09-26 18:15:53,840 - INFO - XLS export started for 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09, resultId: 3e8f2d59-437c-4238-a77b-0cb6c5813e34
-2025-09-26 18:15:53,995 - INFO - XLS export status for 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09: inProgress
-2025-09-26 18:15:58,703 - INFO - CSV export status for 16fe809e-5120-41f9-9551-980dd372349b: success
-2025-09-26 18:15:58,843 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\тест 2
-2025-09-26 18:15:59,187 - INFO - XLS export started for 16fe809e-5120-41f9-9551-980dd372349b, resultId: 5c20a146-c825-4cdc-81d4-ded79dd696a6
-2025-09-26 18:15:59,326 - INFO - XLS export status for 16fe809e-5120-41f9-9551-980dd372349b: inProgress
-2025-09-26 18:16:04,157 - INFO - XLS export status for 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09: success
-2025-09-26 18:16:04,304 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1
-2025-09-26 18:16:09,471 - INFO - XLS export status for 16fe809e-5120-41f9-9551-980dd372349b: success
-2025-09-26 18:16:09,611 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 2\тест 2
-2025-09-26 18:22:00,583 - INFO - Создаём ввод в оборот из заказа 7a5dbdca-ca7c-4e98-ab56-8254dd8c5a09 ...
-2025-09-26 18:22:02,305 - INFO - Создана заявка ввода в оборот: e4692924-0267-4a4b-b960-56be72bff3a1
-2025-09-26 18:22:03,323 - INFO - codes-checking status for e4692924-0267-4a4b-b960-56be72bff3a1: inProgress
-2025-09-26 18:22:13,733 - INFO - codes-checking status for e4692924-0267-4a4b-b960-56be72bff3a1: doesNotHaveErrors
-2025-09-26 18:22:14,049 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/e4692924-0267-4a4b-b960-56be72bff3a1/production
-2025-09-26 18:22:15,261 - INFO - POST positions/autocomplete ...
-2025-09-26 18:22:15,839 - ERROR - Ошибка generate-multiple: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/e4692924-0267-4a4b-b960-56be72bff3a1/generate-multiple
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 687, in perform_introduction_from_order
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 704, in perform_introduction_from_order
     r_gen.raise_for_status()
     ~~~~~~~~~~~~~~~~~~~~~~^^
   File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
     raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/e4692924-0267-4a4b-b960-56be72bff3a1/generate-multiple
-2025-09-26 18:28:14,589 - INFO - Cookies устарели (928 сек). Нужно обновить.
-2025-09-26 18:28:19,349 - INFO - Clicked cookie accept
-2025-09-26 18:28:20,470 - INFO - Clicked profile (best-effort)
-2025-09-26 18:28:22,831 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 18:28:23,842 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 18:55:24,186 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-26_18-55-24.txt
-2025-09-26 18:55:24,189 - INFO - Получаем cookies...
-2025-09-26 18:55:24,210 - INFO - Cookies устарели (1620 сек). Нужно обновить.
-2025-09-26 18:55:29,322 - INFO - Clicked cookie accept
-2025-09-26 18:55:30,426 - INFO - Clicked profile (best-effort)
-2025-09-26 18:55:32,330 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 18:55:33,341 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 18:55:36,043 - INFO - Создание документа: тест 1
-2025-09-26 18:55:37,404 - INFO - Документ создан: 1e91c56f-fd27-4c63-8274-5c50e9ea7dee
-2025-09-26 18:55:39,608 - INFO - Подписываем order id=46f0cb8b-7800-47ca-963d-29f7b5557da5 (base64Content length=460)
-2025-09-26 18:55:39,692 - INFO - Обновление токена OMS...
-2025-09-26 18:55:42,177 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 18:55:43,086 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 18:55:43,357 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 18:58:43,330 - INFO - Начало скачивания PDF/CSV/XLS для заказа 1e91c56f-fd27-4c63-8274-5c50e9ea7dee ('тест 1')
-2025-09-26 18:58:44,555 - INFO - Статус заказа 1e91c56f-fd27-4c63-8274-5c50e9ea7dee: released
-2025-09-26 18:58:45,275 - INFO - PDF export started for 1e91c56f-fd27-4c63-8274-5c50e9ea7dee, resultId: 48165118-4764-4df7-9b97-a9815d466475
-2025-09-26 18:59:08,451 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
-2025-09-26 18:59:09,140 - INFO - CSV export started for 1e91c56f-fd27-4c63-8274-5c50e9ea7dee, resultId: bceeebf1-1d26-46d5-a74a-170b3927abd9
-2025-09-26 18:59:09,545 - INFO - CSV export status for 1e91c56f-fd27-4c63-8274-5c50e9ea7dee: inProgress
-2025-09-26 18:59:19,700 - INFO - CSV export status for 1e91c56f-fd27-4c63-8274-5c50e9ea7dee: success
-2025-09-26 18:59:19,858 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv
-2025-09-26 18:59:20,136 - INFO - XLS export started for 1e91c56f-fd27-4c63-8274-5c50e9ea7dee, resultId: 33876f36-c35c-4d71-9ff3-e202463835c5
-2025-09-26 18:59:20,286 - INFO - XLS export status for 1e91c56f-fd27-4c63-8274-5c50e9ea7dee: success
-2025-09-26 18:59:20,453 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1
-2025-09-26 18:59:43,907 - INFO - Создаём ввод в оборот из заказа 1e91c56f-fd27-4c63-8274-5c50e9ea7dee ...
-2025-09-26 18:59:45,935 - INFO - Создана заявка ввода в оборот: c942897d-6b30-413e-90d9-4eed62bfb788
-2025-09-26 18:59:46,629 - INFO - codes-checking status for c942897d-6b30-413e-90d9-4eed62bfb788: inProgress
-2025-09-26 18:59:56,870 - INFO - codes-checking status for c942897d-6b30-413e-90d9-4eed62bfb788: doesNotHaveErrors
-2025-09-26 18:59:57,176 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/c942897d-6b30-413e-90d9-4eed62bfb788/production
-2025-09-26 18:59:58,677 - INFO - POST positions/autocomplete ...
-2025-09-26 18:59:59,211 - ERROR - Ошибка generate-multiple: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/c942897d-6b30-413e-90d9-4eed62bfb788/generate-multiple
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 687, in perform_introduction_from_order
-    r_gen.raise_for_status()
-    ~~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
-    raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/c942897d-6b30-413e-90d9-4eed62bfb788/generate-multiple
-2025-09-26 19:02:16,429 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-26_19-02-16.txt
-2025-09-26 19:02:16,434 - INFO - Получаем cookies...
-2025-09-26 19:02:16,435 - INFO - Создание документа: тест 1
-2025-09-26 19:02:17,446 - INFO - Документ создан: 9a719b5f-6e69-412b-8681-36cbc5b1be8b
-2025-09-26 19:02:20,036 - INFO - Подписываем order id=c089383f-499d-4f11-9aaf-7d7162a742a7 (base64Content length=460)
-2025-09-26 19:02:20,144 - INFO - Обновление токена OMS...
-2025-09-26 19:02:21,671 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 19:02:22,209 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 19:02:22,614 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 19:05:37,685 - INFO - Начало скачивания PDF/CSV/XLS для заказа 9a719b5f-6e69-412b-8681-36cbc5b1be8b ('тест 1')
-2025-09-26 19:05:38,512 - INFO - Статус заказа 9a719b5f-6e69-412b-8681-36cbc5b1be8b: released
-2025-09-26 19:05:39,202 - INFO - PDF export started for 9a719b5f-6e69-412b-8681-36cbc5b1be8b, resultId: d6e3f54a-ba88-4b11-b11c-18cb3cf28d3d
-2025-09-26 19:06:00,978 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
-2025-09-26 19:06:01,294 - INFO - CSV export started for 9a719b5f-6e69-412b-8681-36cbc5b1be8b, resultId: 373779f7-1b78-48c7-ac90-0c6b6f16bf9c
-2025-09-26 19:06:01,647 - INFO - CSV export status for 9a719b5f-6e69-412b-8681-36cbc5b1be8b: inProgress
-2025-09-26 19:06:12,217 - INFO - CSV export status for 9a719b5f-6e69-412b-8681-36cbc5b1be8b: success
-2025-09-26 19:06:13,008 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv
-2025-09-26 19:06:13,627 - INFO - XLS export started for 9a719b5f-6e69-412b-8681-36cbc5b1be8b, resultId: bc548062-9272-4ddb-98f1-3df9981e8297
-2025-09-26 19:06:14,111 - INFO - XLS export status for 9a719b5f-6e69-412b-8681-36cbc5b1be8b: success
-2025-09-26 19:06:14,327 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1
-2025-09-26 19:06:37,454 - INFO - Создаём ввод в оборот из заказа 9a719b5f-6e69-412b-8681-36cbc5b1be8b ...
-2025-09-26 19:06:39,538 - INFO - Создана заявка ввода в оборот: 7cde680c-a035-40ec-9d50-f79b1b69620a
-2025-09-26 19:06:40,190 - INFO - codes-checking status for 7cde680c-a035-40ec-9d50-f79b1b69620a: doesNotHaveErrors
-2025-09-26 19:06:40,441 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/7cde680c-a035-40ec-9d50-f79b1b69620a/production
-2025-09-26 19:06:41,323 - INFO - POST positions/autocomplete ...
-2025-09-26 19:06:42,832 - ERROR - Ошибка generate-multiple: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/7cde680c-a035-40ec-9d50-f79b1b69620a/generate-multiple
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 687, in perform_introduction_from_order
-    r_gen.raise_for_status()
-    ~~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
-    raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/7cde680c-a035-40ec-9d50-f79b1b69620a/generate-multiple
-2025-09-26 19:09:45,201 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-26_19-09-45.txt
-2025-09-26 19:09:45,208 - INFO - Получаем cookies...
-2025-09-26 19:09:45,210 - INFO - Создание документа: тест 1
-2025-09-26 19:09:46,736 - INFO - Документ создан: 622d390b-60be-4876-b384-5ee7e04ebfb0
-2025-09-26 19:09:48,524 - INFO - Подписываем order id=ff7574ff-9a52-4006-849a-623c5408e74b (base64Content length=460)
-2025-09-26 19:09:48,614 - INFO - Обновление токена OMS...
-2025-09-26 19:09:50,641 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 19:09:51,074 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 19:09:51,454 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 19:11:00,471 - INFO - Cookies устарели (927 сек). Нужно обновить.
-2025-09-26 19:11:05,686 - INFO - Clicked cookie accept
-2025-09-26 19:11:06,847 - INFO - Clicked profile (best-effort)
-2025-09-26 19:11:08,733 - INFO - Clicked warehouse (fallback selector)
-2025-09-26 19:11:09,747 - INFO - Cookies сохранены в kontur_cookies.json
-2025-09-26 19:12:15,341 - INFO - Начало скачивания PDF/CSV/XLS для заказа 622d390b-60be-4876-b384-5ee7e04ebfb0 ('тест 1')
-2025-09-26 19:12:16,100 - INFO - Статус заказа 622d390b-60be-4876-b384-5ee7e04ebfb0: released
-2025-09-26 19:12:17,253 - INFO - PDF export started for 622d390b-60be-4876-b384-5ee7e04ebfb0, resultId: 05469cc8-e0cd-41f2-be84-cd1c46e9f814
-2025-09-26 19:12:39,205 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
-2025-09-26 19:12:39,549 - INFO - CSV export started for 622d390b-60be-4876-b384-5ee7e04ebfb0, resultId: 8cf73d47-f091-4006-bd64-188d7fb2d814
-2025-09-26 19:12:40,025 - INFO - CSV export status for 622d390b-60be-4876-b384-5ee7e04ebfb0: success
-2025-09-26 19:12:40,431 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv
-2025-09-26 19:12:41,045 - INFO - XLS export started for 622d390b-60be-4876-b384-5ee7e04ebfb0, resultId: 74f45bbe-c578-4796-bee9-972f3017a0e9
-2025-09-26 19:12:41,559 - INFO - XLS export status for 622d390b-60be-4876-b384-5ee7e04ebfb0: inProgress
-2025-09-26 19:12:51,900 - INFO - XLS export status for 622d390b-60be-4876-b384-5ee7e04ebfb0: success
-2025-09-26 19:12:52,098 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1
-2025-09-26 19:14:51,217 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-26_19-14-51.txt
-2025-09-26 19:14:51,225 - INFO - Получаем cookies...
-2025-09-26 19:14:51,227 - INFO - Создание документа: тест 1
-2025-09-26 19:14:53,096 - INFO - Документ создан: 57887a83-b377-47b2-8968-ad4939c8f33a
-2025-09-26 19:14:55,821 - INFO - Подписываем order id=0d7f9bf3-3958-4091-977f-81ba9c7556a5 (base64Content length=460)
-2025-09-26 19:14:55,930 - INFO - Обновление токена OMS...
-2025-09-26 19:14:57,867 - INFO - Токен OMS обновлён успешно. Ответ: 
-2025-09-26 19:14:58,684 - INFO - Отправка прошла успешно (detached signature)
-2025-09-26 19:14:59,237 - INFO - Финальный статус документа: sendForRelease
-2025-09-26 19:17:38,836 - INFO - Начало скачивания PDF/CSV/XLS для заказа 57887a83-b377-47b2-8968-ad4939c8f33a ('тест 1')
-2025-09-26 19:17:39,614 - INFO - Статус заказа 57887a83-b377-47b2-8968-ad4939c8f33a: released
-2025-09-26 19:17:40,501 - INFO - PDF export started for 57887a83-b377-47b2-8968-ad4939c8f33a, resultId: 0881341b-387d-4c19-ab11-0e5f458c7f0c
-2025-09-26 19:18:02,497 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1.pdf
-2025-09-26 19:18:02,859 - INFO - CSV export started for 57887a83-b377-47b2-8968-ad4939c8f33a, resultId: cec9be73-fbdb-49ca-a4c8-bba86e580618
-2025-09-26 19:18:03,138 - INFO - CSV export status for 57887a83-b377-47b2-8968-ad4939c8f33a: success
-2025-09-26 19:18:03,470 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1_csv
-2025-09-26 19:18:03,907 - INFO - XLS export started for 57887a83-b377-47b2-8968-ad4939c8f33a, resultId: b7c7bf6a-2eeb-4d5c-8b7a-d7d204a431e2
-2025-09-26 19:18:04,164 - INFO - XLS export status for 57887a83-b377-47b2-8968-ad4939c8f33a: success
-2025-09-26 19:18:04,369 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест 1\тест 1
-2025-09-26 19:18:23,842 - INFO - Создаём ввод в оборот из заказа 57887a83-b377-47b2-8968-ad4939c8f33a ...
-2025-09-26 19:18:25,667 - INFO - Создана заявка ввода в оборот: 20c5fdbc-86c5-4612-a1e8-37d8012cda30
-2025-09-26 19:18:26,382 - INFO - codes-checking status for 20c5fdbc-86c5-4612-a1e8-37d8012cda30: inProgress
-2025-09-26 19:18:36,622 - INFO - codes-checking status for 20c5fdbc-86c5-4612-a1e8-37d8012cda30: doesNotHaveErrors
-2025-09-26 19:18:37,003 - INFO - PATCH production https://mk.kontur.ru/api/v1/codes-introduction/20c5fdbc-86c5-4612-a1e8-37d8012cda30/production
-2025-09-26 19:18:37,587 - INFO - POST positions/autocomplete ...
-2025-09-26 19:18:39,011 - ERROR - Ошибка generate-multiple: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/20c5fdbc-86c5-4612-a1e8-37d8012cda30/generate-multiple
-Traceback (most recent call last):
-  File "C:\Users\sklad\Desktop\crypto\api.py", line 687, in perform_introduction_from_order
-    r_gen.raise_for_status()
-    ~~~~~~~~~~~~~~~~~~~~~~^^
-  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
-    raise HTTPError(http_error_msg, response=self)
-requests.exceptions.HTTPError: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/20c5fdbc-86c5-4612-a1e8-37d8012cda30/generate-multiple
+requests.exceptions.HTTPError: 500 Server Error: Internal Server Error for url: https://mk.kontur.ru/api/v1/codes-introduction/a1963fa5-43c6-4b5d-9062-9bd443665dbd/generate-multiple
+2025-09-28 15:22:06,482 - INFO - Cookies устарели (907 сек). Нужно обновить.
+2025-09-28 15:22:09,989 - INFO - Clicked cookie accept
+2025-09-28 15:22:11,067 - INFO - Clicked profile (best-effort)
+2025-09-28 15:22:12,775 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 15:22:13,784 - INFO - Cookies сохранены в kontur_cookies.json
