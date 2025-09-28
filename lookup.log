@@ -429,3 +429,41 @@ Stacktrace:
 	RtlUserThreadStart [0x0x7ffae4d88d9c+44]
 
 2025-09-28 17:43:43,009 - INFO - Cookies не получены; прерываем выполнение.
+2025-09-28 17:53:19,310 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-28_17-53-19.txt
+2025-09-28 17:53:19,314 - INFO - Получаем cookies...
+2025-09-28 17:53:23,159 - INFO - Clicked cookie accept
+2025-09-28 17:53:24,237 - INFO - Clicked profile (best-effort)
+2025-09-28 17:53:25,239 - INFO - Warehouse select not found/ignored
+2025-09-28 17:53:25,240 - ERROR - get_cookies failed
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\cookies.py", line 133, in get_cookies
+    raw = driver.get_cookies()
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 743, in get_cookies
+    return self.execute(Command.GET_ALL_COOKIES)["value"]
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.InvalidSessionIdException: Message: invalid session id; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#invalidsessionidexception
+Stacktrace:
+	GetHandleVerifier [0x0x7ff663d87c15+24469]
+	(No symbol) [0x0x7ff663ccf920]
+	(No symbol) [0x0x7ff663b1afcc]
+	(No symbol) [0x0x7ff663b61460]
+	(No symbol) [0x0x7ff663b9c192]
+	(No symbol) [0x0x7ff663b98429]
+	(No symbol) [0x0x7ff663b974f9]
+	(No symbol) [0x0x7ff663adf275]
+	GetHandleVerifier [0x0x7ff664100cfd+3666045]
+	GetHandleVerifier [0x0x7ff664134332+3876530]
+	GetHandleVerifier [0x0x7ff664129f13+3834515]
+	GetHandleVerifier [0x0x7ff663e7486e+994286]
+	(No symbol) [0x0x7ff663cd904d]
+	(No symbol) [0x0x7ff663ade147]
+	GetHandleVerifier [0x0x7ff6641a62c8+4343368]
+	BaseThreadInitThunk [0x0x7ffae382e8d7+23]
+	RtlUserThreadStart [0x0x7ffae4d88d9c+44]
+
+2025-09-28 17:53:27,301 - INFO - Cookies не получены; прерываем выполнение.

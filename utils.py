@@ -101,36 +101,53 @@ def save_snapshot(to_process) -> bool:
         logger.error("Не удалось сохранить snapshot в json")
         
 
-def get_yandex_paths():
-    """Получает пути Яндекс Браузера с резервными вариантами"""
-    
-    # Базовый путь из переменных окружения
-    local_appdata = Path(os.environ.get('LOCALAPPDATA', ''))
-    
-    # Основные предполагаемые пути
-    default_paths = {
-        'browser': local_appdata / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
-        'user_data': local_appdata / "Yandex" / "YandexBrowser" / "User Data" / "Default"
+def find_yandex_paths():
+    """Автоматически находит пути Яндекс Браузера"""
+    paths = {
+        'browser': None,
+        'user_data': None,
+        'profile': "Vinsent O`neal"
     }
     
-    # Проверяем существование основных путей
-    if default_paths['browser'].exists() and default_paths['user_data'].exists():
-        return default_paths
+    # Поиск браузера через реестр
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Classes\YandexBrowserHTML\shell\open\command") as key:
+            value = winreg.QueryValue(key, "")
+            if value:
+                # Извлекаем путь из строки типа "C:\path\browser.exe" -- "%1"
+                browser_path = value.split('"')[1] if '"' in value else value.split()[0]
+                paths['browser'] = Path(browser_path)
+    except:
+        pass
     
-    # Если основные пути не найдены, ищем альтернативные
-    alternative_paths = [
-        # Разные возможные расположения
-        Path(os.environ.get('PROGRAMFILES', '')) / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
-        Path(os.environ.get('PROGRAMFILES(X86)', '')) / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
-    ]
+    # Альтернативные пути поиска браузера
+    if not paths['browser'] or not paths['browser'].exists():
+        possible_browser_paths = [
+            Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
+            Path(os.environ.get('PROGRAMFILES', '')) / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
+            Path(os.environ.get('PROGRAMFILES(X86)', '')) / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
+        ]
+        
+        for browser_path in possible_browser_paths:
+            if browser_path.exists():
+                paths['browser'] = browser_path
+                break
     
-    for browser_path in alternative_paths:
-        if browser_path.exists():
-            user_data = browser_path.parent.parent / "User Data" / "Default"
-            return {
-                'browser': browser_path,
-                'user_data': user_data if user_data.exists() else None
-            }
+    # Поиск папки с пользовательскими данными
+    if paths['browser'] and paths['browser'].exists():
+        user_data_paths = [
+            Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex" / "YandexBrowser" / "User Data" / "Default",
+            paths['browser'].parent.parent / "User Data" / "Default",
+        ]
+        
+        for user_data_path in user_data_paths:
+            if user_data_path.exists():
+                paths['user_data'] = user_data_path
+                break
     
-    # Если ничего не найдено, возвращаем None
-    return {'browser': None, 'user_data': None}
+    # Если папка с данными не найдена, но браузер найден, создаем путь по умолчанию
+    if paths['browser'] and not paths['user_data']:
+        default_user_data = Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex" / "YandexBrowser" / "User Data" / "Default"
+        paths['user_data'] = default_user_data
+    
+    return paths

@@ -3,9 +3,9 @@ from logger import logger
 import time
 from pathlib import Path
 from typing import Dict, Optional
-from utils import get_yandex_paths
+from utils import find_yandex_paths
 
-paths = get_yandex_paths()
+paths = find_yandex_paths()
 # Настройки — поправь пути под систему
 YANDEX_DRIVER_PATH = Path(r"driver\yandexdriver.exe")
 YANDEX_BROWSER_PATH = paths['browser']
