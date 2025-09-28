@@ -238,12 +238,12 @@ class App(ctk.CTk):
         tab_download = self.tabview.add("Скачивание кодов")
 
         # Treeview for downloads
-        download_columns = ("order_name", "document_id", "status", "filename")
+        download_columns = ("order_name", "status", "filename", "document_id")
         self.download_tree = ttk.Treeview(tab_download, columns=download_columns, show="headings", height=10)
         self.download_tree.heading("order_name", text="Заявка")
-        self.download_tree.heading("document_id", text="ID заказа")
         self.download_tree.heading("status", text="Статус")
         self.download_tree.heading("filename", text="Файл")
+        self.download_tree.heading("document_id", text="ID заказа")
         self.download_tree.pack(pady=10, padx=10, fill="both", expand=True)
 
         # Buttons for download tab
@@ -855,27 +855,27 @@ class App(ctk.CTk):
         intro_inputs.pack(padx=10, pady=5, fill="x")
 
         # Первая строка
-        ctk.CTkLabel(intro_inputs, text="Дата производства (YYYY-MM-DD):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.prod_date_entry = ctk.CTkEntry(intro_inputs, width=200)
+        ctk.CTkLabel(intro_inputs, text="Дата производства (ДД-ММ-ГГГГ):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        self.prod_date_entry = ctk.CTkEntry(intro_inputs, width=200, placeholder_text="ДД-ММ-ГГГГ")
         self.prod_date_entry.grid(row=0, column=1, padx=5, pady=5)
 
-
         # Вторая строка
-        ctk.CTkLabel(intro_inputs, text="Дата окончания (YYYY-MM-DD):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.exp_date_entry = ctk.CTkEntry(intro_inputs, width=200)
+        ctk.CTkLabel(intro_inputs, text="Дата окончания (ДД-ММ-ГГГГ):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        self.exp_date_entry = ctk.CTkEntry(intro_inputs, width=200, placeholder_text="ДД-ММ-ГГГГ")
         self.exp_date_entry.grid(row=1, column=1, padx=5, pady=5)
 
         ctk.CTkLabel(intro_inputs, text="Номер партии:").grid(row=1, column=2, sticky="w", padx=5, pady=5)
         self.batch_entry = ctk.CTkEntry(intro_inputs, width=300)
         self.batch_entry.grid(row=1, column=3, padx=5, pady=5)
 
-        # Заполняем текущей датой по умолчанию
-        today = datetime.now().strftime("%Y-%m-%d")
+        # Заполняем текущей датой по умолчанию в формате ДД-ММ-ГГГГ
+        today = datetime.now().strftime("%d-%m-%Y")
         self.prod_date_entry.insert(0, today)
-        
-        # Через 2 года как дату окончания по умолчанию
-        future_date = (datetime.now() + timedelta(days=730)).strftime("%Y-%m-%d")
+
+        # Через 2 года как дату окончания по умолчанию в формате ДД-ММ-ГГГГ
+        future_date = (datetime.now() + timedelta(days=730)).strftime("%d-%m-%Y")
         self.exp_date_entry.insert(0, future_date)
+
 
         # Кнопки
         btn_frame = ctk.CTkFrame(tab_intro)
@@ -900,6 +900,21 @@ class App(ctk.CTk):
 
         # Инициализация отображения
         self.update_introduction_tree()
+    
+    # Функция для преобразования даты из ДД-ММ-ГГГГ в ГГГГ-ММ-ДД
+    def convert_date_format(self, date_str):
+        """Преобразует дату из формата ДД-ММ-ГГГГ в ГГГГ-ММ-ДД"""
+        try:
+            if date_str and len(date_str) == 10 and date_str[2] == '-' and date_str[5] == '-':
+                day, month, year = date_str.split('-')
+                # Проверяем корректность даты
+                datetime(int(year), int(month), int(day))
+                return f"{year}-{month}-{day}"
+        except (ValueError, IndexError):
+            # Если дата некорректна или в другом формате, возвращаем как есть
+            pass
+        return date_str
+
 
     def clear_intro_log(self):
         """Очищает лог ввода в оборот"""
@@ -977,17 +992,15 @@ class App(ctk.CTk):
                 self.intro_log_insert("❌ Не выбрано ни одного заказа.")
                 return
 
-            prod_date = self.prod_date_entry.get().strip()
-            exp_date = self.exp_date_entry.get().strip()
+            # При получении данных используем преобразование:
+            prod_date = self.convert_date_format(self.prod_date_entry.get().strip())
+            exp_date = self.convert_date_format(self.exp_date_entry.get().strip())
             batch_num = self.batch_entry.get().strip()
             thumbprint = THUMBPRINT
 
             # Валидация
             errors = []
-            if not self.validate_iso_date(prod_date):
-                errors.append("Неверная дата производства. Ожидается YYYY-MM-DD.")
-            if not self.validate_iso_date(exp_date):
-                errors.append("Неверная дата окончания срока годности. Ожидается YYYY-MM-DD.")
+            
             if not batch_num:
                 errors.append("Введите номер партии.")
             if not thumbprint:
@@ -1105,7 +1118,7 @@ class App(ctk.CTk):
             order_name = item.get("order_name", "Unknown")
             
             if ok:
-                self.intro_log_insert(f"✅ УСПЕХ: {order_name} (ID: {docid}) - {msg}")
+                self.intro_log_insert(f"✅ Заявка на ввод в оборот отправлена!")
                 item["status"] = "Введен в оборот"
                 # Можно также изменить цвет строки или добавить пометку
             else:

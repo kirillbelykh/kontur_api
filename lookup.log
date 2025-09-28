@@ -358,3 +358,31 @@ Stacktrace:
 2025-09-28 16:17:21,417 - INFO - POST positions/autocomplete ...
 2025-09-28 16:17:22,342 - INFO - Ответ сервера при вводе в оборот: [{'documentId': '1a8853b4-52cb-4bb9-bd75-0c4ca428db33', 'base64Content': 'eyJkb2NfdHlwZSI6IlByb21vdGlvbl9JbmZvcm1fU2VsZm1hZGUiLCJwYXJ0aWNpcGFudF9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl9kYXRlIjoiMjAyNS0wOS0yOCIsInByb2R1Y2VyX2lubiI6Ijc4NDMzMTY3OTQiLCJvd25lcl9pbm4iOiI3ODQzMzE2Nzk0IiwicHJvZHVjdGlvbl90eXBlIjoiT1dOX1BST0RVQ1RJT04iLCJwcm9kdWN0cyI6W3sidWl0X2NvZGUiOiIwMTA0NjUwMTE4MDQzMjk5MjE1czBJKWR4IWpcIjBrUyIsInRudmVkX2NvZGUiOiI0MDE1MTIwMDA5In1dfQ=='}, {'documentId': 'a0ddc9d6-b058-47e2-ac25-24e2b9f84a53', 'base64Content': 'eyJzbnRpbnMiOlsiMDEwNDY1MDExODA0MzI5OTIxNXMwSSlkeCFqXCIwa1NcdTAwMWQ5MUVFMTFcdTAwMWQ5MmJWQUhXUTQ1S0gwRFc2V0Q0RU5jdzNWTkdHR1Z1U0EybVF5YkhNT3dzQWc9Il0sInByb2R1Y3RHcm91cCI6IndoZWVsY2hhaXJzIiwiYXR0cmlidXRlcyI6eyJwcm9kdWN0aW9uRGF0ZSI6IjIwMjUtMDktMjgiLCJleHBpcmF0aW9uRGF0ZSI6IjIwMjctMDktMjgiLCJiYXRjaE51bWJlciI6IjI4MDkyNSJ9fQ=='}]
 2025-09-28 16:17:22,355 - INFO - Отправка send-multiple ...
+2025-09-28 16:24:54,599 - INFO - Cookies устарели (911 сек). Нужно обновить.
+2025-09-28 16:25:17,841 - INFO - Cookie accept not found/ignored
+2025-09-28 16:25:38,235 - INFO - Profile select not found/ignored
+2025-09-28 16:25:58,623 - INFO - Warehouse select not found/ignored
+2025-09-28 16:25:58,630 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 16:26:34,374 - INFO - Clicked cookie accept
+2025-09-28 16:26:35,454 - INFO - Clicked profile (best-effort)
+2025-09-28 16:26:36,661 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 16:26:37,669 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 16:41:40,080 - INFO - Cookies устарели (902 сек). Нужно обновить.
+2025-09-28 16:41:43,546 - INFO - Clicked cookie accept
+2025-09-28 16:41:44,629 - INFO - Clicked profile (best-effort)
+2025-09-28 16:41:46,410 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 16:41:47,420 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 16:56:49,799 - INFO - Cookies устарели (902 сек). Нужно обновить.
+2025-09-28 16:57:12,791 - INFO - Cookie accept not found/ignored
+2025-09-28 16:57:33,158 - INFO - Profile select not found/ignored
+2025-09-28 16:57:53,515 - INFO - Warehouse select not found/ignored
+2025-09-28 16:57:53,522 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 17:12:54,286 - INFO - Cookies устарели (901 сек). Нужно обновить.
+2025-09-28 17:13:29,935 - INFO - Cookie accept not found/ignored
+2025-09-28 17:13:50,346 - INFO - Profile select not found/ignored
+2025-09-28 17:14:10,761 - INFO - Warehouse select not found/ignored
+2025-09-28 17:14:10,768 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-28 17:14:56,438 - INFO - Clicked cookie accept
+2025-09-28 17:14:57,550 - INFO - Clicked profile (best-effort)
+2025-09-28 17:14:58,769 - INFO - Clicked warehouse (fallback selector)
+2025-09-28 17:14:59,780 - INFO - Cookies сохранены в kontur_cookies.json
