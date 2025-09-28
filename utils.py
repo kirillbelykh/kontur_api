@@ -1,5 +1,7 @@
 from pathlib import Path
 import requests
+import os
+import winreg
 import json
 from typing import Dict, Optional
 from dataclasses import asdict
@@ -98,3 +100,37 @@ def save_snapshot(to_process) -> bool:
     except Exception as e:
         logger.error("Не удалось сохранить snapshot в json")
         
+
+def get_yandex_paths():
+    """Получает пути Яндекс Браузера с резервными вариантами"""
+    
+    # Базовый путь из переменных окружения
+    local_appdata = Path(os.environ.get('LOCALAPPDATA', ''))
+    
+    # Основные предполагаемые пути
+    default_paths = {
+        'browser': local_appdata / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
+        'user_data': local_appdata / "Yandex" / "YandexBrowser" / "User Data" / "Default"
+    }
+    
+    # Проверяем существование основных путей
+    if default_paths['browser'].exists() and default_paths['user_data'].exists():
+        return default_paths
+    
+    # Если основные пути не найдены, ищем альтернативные
+    alternative_paths = [
+        # Разные возможные расположения
+        Path(os.environ.get('PROGRAMFILES', '')) / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
+        Path(os.environ.get('PROGRAMFILES(X86)', '')) / "Yandex" / "YandexBrowser" / "Application" / "browser.exe",
+    ]
+    
+    for browser_path in alternative_paths:
+        if browser_path.exists():
+            user_data = browser_path.parent.parent / "User Data" / "Default"
+            return {
+                'browser': browser_path,
+                'user_data': user_data if user_data.exists() else None
+            }
+    
+    # Если ничего не найдено, возвращаем None
+    return {'browser': None, 'user_data': None}

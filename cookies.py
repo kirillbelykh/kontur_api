@@ -3,12 +3,13 @@ from logger import logger
 import time
 from pathlib import Path
 from typing import Dict, Optional
+from utils import get_yandex_paths
 
-
+paths = get_yandex_paths()
 # Настройки — поправь пути под систему
 YANDEX_DRIVER_PATH = Path(r"driver\yandexdriver.exe")
-YANDEX_BROWSER_PATH = Path(r"C:\Users\sklad\AppData\Local\Yandex\YandexBrowser\Application\browser.exe")
-PROFILE_USER_DATA_DIR = Path(r"C:\Users\sklad\AppData\Local\Yandex\YandexBrowser\User Data\Default")
+YANDEX_BROWSER_PATH = paths['browser']
+PROFILE_USER_DATA_DIR = paths['user_data']
 PROFILE_DIRECTORY = "Vinsent O`neal"
 HEADLESS = False
 
