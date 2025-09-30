@@ -867,12 +867,12 @@ def perform_introduction_from_order_tsd(
             "productionType": "ownProduction",
             "warehouseId": warehouse_id,
             "expirationType": "milkMoreThan72",
-            "containsUtilisationReport": True,
+            "containsUtilisationReport": "true",
             "usageType": "verified",
             "cisType": "unit",
             "fillingMethod": "tsd",
-            "isAutocompletePositionsDataNeeded": True,
-            "productsHasSameDates": True,
+            "isAutocompletePositionsDataNeeded": "true",
+            "productsHasSameDates": "true",
             "productionDate": production_patch.get("productionDate"),
             "expirationDate": production_patch.get("expirationDate"),  # Или рассчитать +5 лет
             "batchNumber": production_patch.get("batchNumber"),
@@ -915,7 +915,7 @@ def perform_introduction_from_order_tsd(
                 {
                     "name": row[0],
                     "gtin": row[1],
-                    "tnvedCode": "",  # Если нужно
+                    "tnvedCode": production_patch.get("TnvedCode", ""),  # Если нужно
                     "certificateDocumentNumber": "",
                     "certificateDocumentDate": "",
                     "costInKopecksWithVat": 0,

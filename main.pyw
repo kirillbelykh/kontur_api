@@ -2,7 +2,7 @@ import os
 import copy
 import uuid
 import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 import queue
 import time
 from datetime import datetime, timedelta
@@ -844,7 +844,7 @@ class App(ctk.CTk):
 
         # Treeview для заказов (берём из download_list те, что имеют файл / скачаны)
         intro_columns = ("order_name", "document_id", "status", "filename")
-        self.intro_tree = ttk.Treeview(tab_intro, columns=intro_columns, show="headings", height=8, selectmode="extended")
+        self.intro_tree = ttk.Treeview(tab_intro, columns=intro_columns, show="headings", height=10, selectmode="extended")
         self.intro_tree.heading("order_name", text="Заявка")
         self.intro_tree.heading("document_id", text="ID заказа")
         self.intro_tree.heading("status", text="Статус")
@@ -865,16 +865,16 @@ class App(ctk.CTk):
         self.exp_date_entry = ctk.CTkEntry(intro_inputs, width=200, placeholder_text="ДД-ММ-ГГГГ")
         self.exp_date_entry.grid(row=1, column=1, padx=5, pady=5)
 
-        ctk.CTkLabel(intro_inputs, text="Номер партии:").grid(row=1, column=2, sticky="w", padx=5, pady=5)
-        self.batch_entry = ctk.CTkEntry(intro_inputs, width=300)
-        self.batch_entry.grid(row=1, column=3, padx=5, pady=5)
+        ctk.CTkLabel(intro_inputs, text="Номер партии:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.batch_entry = ctk.CTkEntry(intro_inputs, width=200)
+        self.batch_entry.grid(row=2, column=1, padx=5, pady=5)
 
         # Заполняем текущей датой по умолчанию в формате ДД-ММ-ГГГГ
         today = datetime.now().strftime("%d-%m-%Y")
         self.prod_date_entry.insert(0, today)
 
         # Через 2 года как дату окончания по умолчанию в формате ДД-ММ-ГГГГ
-        future_date = (datetime.now() + timedelta(days=730)).strftime("%d-%m-%Y")
+        future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
         self.exp_date_entry.insert(0, future_date)
 
 
@@ -1140,7 +1140,7 @@ class App(ctk.CTk):
 
         # Treeview для заказов (аналогично intro_tree)
         tsd_columns = ("order_name", "document_id", "status", "filename")
-        self.tsd_tree = ttk.Treeview(tab_tsd, columns=tsd_columns, show="headings", height=8, selectmode="extended")
+        self.tsd_tree = ttk.Treeview(tab_tsd, columns=tsd_columns, show="headings", height=10, selectmode="extended")
         self.tsd_tree.heading("order_name", text="Заявка")
         self.tsd_tree.heading("document_id", text="ID заказа")
         self.tsd_tree.heading("status", text="Статус")
@@ -1176,6 +1176,12 @@ class App(ctk.CTk):
         # Лог
         self.tsd_log_text = ctk.CTkTextbox(tab_tsd, height=150)
         self.tsd_log_text.pack(padx=10, pady=10, fill="x")
+
+        today = datetime.now().strftime("%d-%m-%Y")
+        self.tsd_prod_date_entry.insert(0, today)
+
+        future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
+        self.tsd_exp_date_entry.insert(0, future_date)
 
         # Инициализация
         self.update_tsd_tree()
