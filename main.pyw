@@ -11,7 +11,7 @@ import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Tuple, Dict, Any
 from get_gtin import lookup_gtin, lookup_by_gtin
-from api import try_single_post, download_codes_pdf_and_convert
+from api import try_single_post, download_codes_pdf_and_convert, perform_introduction_from_order_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
@@ -261,6 +261,7 @@ class App(ctk.CTk):
         self.start_auto_download()
 
         self.setup_introduction_tab()
+        self.setup_introduction_tsd_tab()
 
 
     def _add_entry_context_menu(self, entry: ctk.CTkEntry):
@@ -1131,6 +1132,192 @@ class App(ctk.CTk):
             
         except Exception as e:
             self.intro_log_insert(f"❌ Ошибка при обработке результата: {e}")
+
+    def setup_introduction_tsd_tab(self):
+        """Создаёт таб 'Ввод в оборот (ТСД)'."""
+        tab_tsd = self.tabview.add("Ввод в оборот (ТСД)")
+        self.tsd_tab = tab_tsd
+
+        # Treeview для заказов (аналогично intro_tree)
+        tsd_columns = ("order_name", "document_id", "status", "filename")
+        self.tsd_tree = ttk.Treeview(tab_tsd, columns=tsd_columns, show="headings", height=8, selectmode="extended")
+        self.tsd_tree.heading("order_name", text="Заявка")
+        self.tsd_tree.heading("document_id", text="ID заказа")
+        self.tsd_tree.heading("status", text="Статус")
+        self.tsd_tree.heading("filename", text="Файл")
+        self.tsd_tree.pack(padx=10, pady=10, fill="both", expand=True)
+
+        # Контейнер для полей ввода
+        tsd_inputs = ctk.CTkFrame(tab_tsd)
+        tsd_inputs.pack(padx=10, pady=5, fill="x")
+
+        ctk.CTkLabel(tsd_inputs, text="Дата производства (YYYY-MM-DD):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        self.tsd_prod_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
+        self.tsd_prod_date_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        ctk.CTkLabel(tsd_inputs, text="Дата окончания (YYYY-MM-DD):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        self.tsd_exp_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
+        self.tsd_exp_date_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        ctk.CTkLabel(tsd_inputs, text="Номер партии:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        self.tsd_batch_entry = ctk.CTkEntry(tsd_inputs, width=200)
+        self.tsd_batch_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        # Кнопки
+        btn_frame = ctk.CTkFrame(tab_tsd)
+        btn_frame.pack(padx=10, pady=5, fill="x")
+
+        self.tsd_btn = ctk.CTkButton(btn_frame, text="Отправить на ТСД", command=self.on_tsd_clicked)
+        self.tsd_btn.pack(side="left", padx=5)
+
+        self.tsd_refresh_btn = ctk.CTkButton(btn_frame, text="Обновить список", command=self.update_tsd_tree)
+        self.tsd_refresh_btn.pack(side="left", padx=5)
+
+        # Лог
+        self.tsd_log_text = ctk.CTkTextbox(tab_tsd, height=150)
+        self.tsd_log_text.pack(padx=10, pady=10, fill="x")
+
+        # Инициализация
+        self.update_tsd_tree()
+
+    def tsd_log_insert(self, text: str):
+        """Удобная функция логирования в таб 'ТСД' (вызовы только из GUI-потока)."""
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        msg = f"{now} - {text}\n"
+        try:
+            self.tsd_log_text.insert("end", msg)
+            self.tsd_log_text.see("end")
+        except Exception:
+            pass
+
+    def update_tsd_tree(self):
+        """Наполнить дерево заказами, у которых status == 'Скачан' или filename != None"""
+        # Очистить дерево
+        for i in self.tsd_tree.get_children():
+            self.tsd_tree.delete(i)
+        # Добавить записи из self.download_list
+        for item in self.download_list:
+            if item.get("status") in ("Скачан", "Downloaded", "Ожидает") or item.get("filename"):
+                vals = (item.get("order_name"), item.get("document_id"), item.get("status"), item.get("filename") or "")
+                self.tsd_tree.insert("", "end", iid=item.get("document_id"), values=vals)
+
+    def get_selected_tsd_items(self):
+        """Возвращает список объектов download_list, соответствующих выбранным строкам в tsd_tree."""
+        sel = self.tsd_tree.selection()
+        selected = []
+        id_to_item = {it['document_id']: it for it in self.download_list}
+        for iid in sel:
+            docid = iid
+            it = id_to_item.get(docid)
+            if it:
+                selected.append(it)
+        return selected
+
+    def on_tsd_clicked(self):
+        """Обработчик кнопки — собирает данные, запускает threads для выбранных заказов."""
+        selected_items = self.get_selected_tsd_items()
+        if not selected_items:
+            self.tsd_log_insert("❌ Не выбрано ни одного заказа.")
+            return
+
+        prod_date = self.convert_date_format(self.tsd_prod_date_entry.get().strip())
+        exp_date = self.convert_date_format(self.tsd_exp_date_entry.get().strip())
+        batch_num = self.tsd_batch_entry.get().strip()
+
+        # валидация (пустые значения допускаем? тут — требуем)
+        errors = []
+        if not batch_num:
+            errors.append("Введите номер партии.")
+
+        if errors:
+            for error in errors:
+                self.tsd_log_insert(f"❌ {error}")
+            return
+
+        # отключаем кнопку пока выполняется
+        self.tsd_btn.configure(state="disabled")
+        self.tsd_log_insert(f"🚀 Запуск ввода в оборот для ТСД для {len(selected_items)} заказа(ов)...")
+        self.tsd_log_insert(f"📅 Дата производства: {prod_date}, Окончание: {exp_date}, Партия: {batch_num}")
+
+        # submit jobs to executor
+        futures = []
+        for it in selected_items:
+            docid = it["document_id"]
+            order_name = it.get("order_name", "Unknown")
+            simpl_name = it.get("simpl", "")
+            gtin = it.get("gtin", "")  # Предполагаем, что в item есть gtin; если нет — извлеките из download_list или заказа
+            tnved_code = get_tnved_code(simpl_name)  # Ваша функция
+            positions_data = [{"name": simpl_name, "gtin": gtin}]  # Для одной позиции; если много — list из данных заказа
+            production_patch = {
+                "documentNumber": order_name,
+                "productionDate": prod_date,
+                "expirationDate": exp_date,
+                "batchNumber": batch_num,
+                "TnvedCode": tnved_code
+            }
+            fut = self.intro_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
+            futures.append((fut, it))
+
+        # создаём нитку-отслеживатель, чтобы не блокировать GUI и чтобы знать когда всё закончится
+        def monitor():
+            for fut, it in futures:
+                try:
+                    ok, result = fut.result()  # result — dict с данными/ошибками
+                    # Формируем msg на основе result
+                    if ok:
+                        msg = f"Успех: introduction_id = {result.get('introduction_id', 'unknown')}, статус = {result.get('final_introduction', {}).get('status', 'unknown')}"
+                    else:
+                        msg = f"Ошибка: {'; '.join(result.get('errors', ['unknown error']))}"
+                    self.after(0, self._on_tsd_finished, it, ok, msg)
+                except Exception as e:
+                    self.after(0, self._on_tsd_finished, it, False, f"Exception: {e}")
+            # всё done — разблокировать кнопку в GUI
+            self.after(0, lambda: self.tsd_btn.configure(state="normal"))
+
+        threading.Thread(target=monitor, daemon=True).start()
+
+    def _tsd_worker(self, item: dict, positions_data: List[Dict[str, str]], production_patch: dict, thumbprint: str) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Фоновая задача — производит ввод в оборот для одного заказа item.
+        Возвращает (ok, result: dict).
+        """
+        # получаем cookies/session
+        try:
+            cookies = get_valid_cookies()   # <- твоя реальная функция
+        except Exception as e:
+            return False, {"errors": [f"Cannot get cookies: {e}"]}
+
+        if not cookies:
+            return False, {"errors": ["Cookies not available"]}
+
+        session = make_session_with_cookies(cookies)
+
+        document_id = item["document_id"]
+
+        # ВЫЗОВ API
+        ok, result = perform_introduction_from_order_tsd(
+            session=session,
+            codes_order_id=document_id,
+            positions_data=positions_data,  # Новый аргумент для генерации XLS
+            production_patch=production_patch,
+            thumbprint=thumbprint
+        )
+        return ok, result
+
+    def _on_tsd_finished(self, item: dict, ok: bool, msg: str):
+        """Обновление GUI после завершения одного задания (в главном потоке)."""
+        docid = item.get("document_id")
+        if ok:
+            self.tsd_log_insert(f"[OK] {docid} — {msg}")
+            # пометим заказ как введённый
+            item["status"] = "Отправлено на ТСД"
+        else:
+            self.tsd_log_insert(f"[ERR] {docid} — {msg}")
+            item["status"] = "Ошибка ТСД"
+
+        # обновить таблицы
+        self.update_tsd_tree()
+        # self.update_download_tree()  # Если есть такая функция для другой таблицы, раскомментируйте
 
 if __name__ == "__main__":
     if not os.path.exists(NOMENCLATURE_XLSX):
