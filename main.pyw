@@ -481,8 +481,8 @@ class App(ctk.CTk):
             self.tree.delete(item)
         for idx, it in enumerate(self.collected, start=1):
             self.tree.insert("", "end", values=(
-                idx, getattr(it, "_uid", "no-uid"), it.full_name, it.simpl_name, it.size, it.units_per_pack,
-                it.gtin, it.codes_count, it.order_name
+                idx, it.full_name, it.simpl_name, it.size, it.units_per_pack,   
+                it.gtin, it.codes_count, it.order_name, getattr(it, "_uid", "no-uid")
             ))
 
     def delete_item(self):
