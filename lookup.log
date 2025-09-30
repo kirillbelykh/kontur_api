@@ -1,0 +1,236 @@
+2025-09-30 15:52:33,612 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_15-52-33.txt
+2025-09-30 15:52:33,616 - INFO - Получаем cookies...
+2025-09-30 15:52:51,926 - INFO - Clicked cookie accept
+2025-09-30 15:52:53,035 - INFO - Clicked profile (best-effort)
+2025-09-30 15:52:55,025 - INFO - Clicked warehouse (fallback selector)
+2025-09-30 15:52:56,037 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-30 15:52:58,686 - INFO - Создание документа: 793 HR нитрил S партия 250927
+2025-09-30 15:52:59,841 - INFO - Документ создан: 2a1badac-8066-4fdf-a867-bf3cc3bc0aea
+2025-09-30 15:53:02,202 - INFO - Подписываем order id=5dd8bb30-8855-4644-aa23-996f9d9cbed5 (base64Content length=500)
+2025-09-30 15:53:02,326 - INFO - Обновление токена OMS...
+2025-09-30 15:53:04,711 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 15:53:05,064 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 15:53:05,576 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 15:56:07,528 - INFO - Начало скачивания PDF/CSV/XLS для заказа 2a1badac-8066-4fdf-a867-bf3cc3bc0aea ('793 HR нитрил S партия 250927')
+2025-09-30 15:56:08,145 - INFO - Статус заказа 2a1badac-8066-4fdf-a867-bf3cc3bc0aea: released
+2025-09-30 15:56:08,664 - INFO - PDF export started for 2a1badac-8066-4fdf-a867-bf3cc3bc0aea, resultId: 2af422ea-1463-41b6-bd3f-b139c9e9e510
+2025-09-30 15:56:29,784 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\793 HR нитрил S партия 250927\793 HR нитрил S партия 250927.pdf
+2025-09-30 15:56:30,091 - INFO - CSV export started for 2a1badac-8066-4fdf-a867-bf3cc3bc0aea, resultId: b76db782-8e72-41c1-bd13-2e3945b896e2
+2025-09-30 15:56:30,262 - INFO - CSV export status for 2a1badac-8066-4fdf-a867-bf3cc3bc0aea: inProgress
+2025-09-30 15:56:40,419 - INFO - CSV export status for 2a1badac-8066-4fdf-a867-bf3cc3bc0aea: success
+2025-09-30 15:56:40,587 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\793 HR нитрил S партия 250927\793 HR нитрил S партия 250927_csv.csv
+2025-09-30 15:56:40,993 - INFO - XLS export started for 2a1badac-8066-4fdf-a867-bf3cc3bc0aea, resultId: 377cd1cb-0bb3-448e-95a4-67276da8070e
+2025-09-30 15:56:41,204 - INFO - XLS export status for 2a1badac-8066-4fdf-a867-bf3cc3bc0aea: inProgress
+2025-09-30 15:56:51,347 - INFO - XLS export status for 2a1badac-8066-4fdf-a867-bf3cc3bc0aea: success
+2025-09-30 15:56:51,585 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\793 HR нитрил S партия 250927\793 HR нитрил S партия 250927.xls
+2025-09-30 16:08:07,562 - INFO - Cookies устарели (912 сек). Нужно обновить.
+2025-09-30 16:15:03,820 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-15-03.txt
+2025-09-30 16:15:03,822 - INFO - Получаем cookies...
+2025-09-30 16:15:03,823 - INFO - Cookies устарели (1328 сек). Нужно обновить.
+2025-09-30 16:15:19,465 - INFO - Cookie accept not found/ignored
+2025-09-30 16:15:19,467 - INFO - Profile select not found/ignored
+2025-09-30 16:15:19,469 - INFO - Warehouse select not found/ignored
+2025-09-30 16:15:19,470 - ERROR - get_cookies failed
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\cookies.py", line 133, in get_cookies
+    raw = driver.get_cookies()
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 743, in get_cookies
+    return self.execute(Command.GET_ALL_COOKIES)["value"]
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.InvalidSessionIdException: Message: invalid session id; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#invalidsessionidexception
+Stacktrace:
+	GetHandleVerifier [0x0x7ff608a77c15+24469]
+	(No symbol) [0x0x7ff6089bf920]
+	(No symbol) [0x0x7ff60880afcc]
+	(No symbol) [0x0x7ff608851460]
+	(No symbol) [0x0x7ff60888c192]
+	(No symbol) [0x0x7ff608888429]
+	(No symbol) [0x0x7ff6088874f9]
+	(No symbol) [0x0x7ff6087cf275]
+	GetHandleVerifier [0x0x7ff608df0cfd+3666045]
+	GetHandleVerifier [0x0x7ff608e24332+3876530]
+	GetHandleVerifier [0x0x7ff608e19f13+3834515]
+	GetHandleVerifier [0x0x7ff608b6486e+994286]
+	(No symbol) [0x0x7ff6089c904d]
+	(No symbol) [0x0x7ff6087ce147]
+	GetHandleVerifier [0x0x7ff608e962c8+4343368]
+	BaseThreadInitThunk [0x0x7ffa3bfce8d7+23]
+	RtlUserThreadStart [0x0x7ffa3d3a8d9c+44]
+
+2025-09-30 16:15:21,585 - INFO - Cookies не получены; прерываем выполнение.
+2025-09-30 16:15:38,043 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-15-38.txt
+2025-09-30 16:15:38,046 - INFO - Получаем cookies...
+2025-09-30 16:15:38,046 - INFO - Cookies устарели (1362 сек). Нужно обновить.
+2025-09-30 16:15:57,180 - INFO - Cookie accept not found/ignored
+2025-09-30 16:15:57,182 - INFO - Profile select not found/ignored
+2025-09-30 16:15:57,184 - INFO - Warehouse select not found/ignored
+2025-09-30 16:15:57,185 - ERROR - get_cookies failed
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\cookies.py", line 133, in get_cookies
+    raw = driver.get_cookies()
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 743, in get_cookies
+    return self.execute(Command.GET_ALL_COOKIES)["value"]
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\webdriver.py", line 458, in execute
+    self.error_handler.check_response(response)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\selenium\webdriver\remote\errorhandler.py", line 232, in check_response
+    raise exception_class(message, screen, stacktrace)
+selenium.common.exceptions.InvalidSessionIdException: Message: invalid session id; For documentation on this error, please visit: https://www.selenium.dev/documentation/webdriver/troubleshooting/errors#invalidsessionidexception
+Stacktrace:
+	GetHandleVerifier [0x0x7ff608a77c15+24469]
+	(No symbol) [0x0x7ff6089bf920]
+	(No symbol) [0x0x7ff60880afcc]
+	(No symbol) [0x0x7ff608851460]
+	(No symbol) [0x0x7ff60888c192]
+	(No symbol) [0x0x7ff608888429]
+	(No symbol) [0x0x7ff6088874f9]
+	(No symbol) [0x0x7ff6087cf275]
+	GetHandleVerifier [0x0x7ff608df0cfd+3666045]
+	GetHandleVerifier [0x0x7ff608e24332+3876530]
+	GetHandleVerifier [0x0x7ff608e19f13+3834515]
+	GetHandleVerifier [0x0x7ff608b6486e+994286]
+	(No symbol) [0x0x7ff6089c904d]
+	(No symbol) [0x0x7ff6087ce147]
+	GetHandleVerifier [0x0x7ff608e962c8+4343368]
+	BaseThreadInitThunk [0x0x7ffa3bfce8d7+23]
+	RtlUserThreadStart [0x0x7ffa3d3a8d9c+44]
+
+2025-09-30 16:15:59,270 - INFO - Cookies не получены; прерываем выполнение.
+2025-09-30 16:18:39,702 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-18-39.txt
+2025-09-30 16:18:39,705 - INFO - Получаем cookies...
+2025-09-30 16:18:39,705 - INFO - Cookies устарели (1544 сек). Нужно обновить.
+2025-09-30 16:18:44,039 - INFO - Cookie accept button not found on page - skipping
+2025-09-30 16:18:44,137 - INFO - Clicked profile (best-effort)
+2025-09-30 16:18:45,957 - INFO - Clicked warehouse (fallback selector)
+2025-09-30 16:18:46,964 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-30 16:18:49,383 - INFO - Создание документа: тест новый
+2025-09-30 16:18:50,237 - INFO - Документ создан: 79db059c-7f61-4e5b-be11-d27546bb5afd
+2025-09-30 16:18:52,115 - INFO - Подписываем order id=25ed88b6-930e-44d9-8c34-0a87ee44fcdd (base64Content length=472)
+2025-09-30 16:18:52,202 - INFO - Обновление токена OMS...
+2025-09-30 16:18:53,755 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 16:18:54,160 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 16:18:54,317 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 16:22:23,247 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-22-23.txt
+2025-09-30 16:22:23,249 - INFO - Получаем cookies...
+2025-09-30 16:22:23,250 - INFO - Создание документа: тест новый
+2025-09-30 16:22:24,008 - INFO - Документ создан: 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c
+2025-09-30 16:22:25,037 - INFO - Подписываем order id=47baee33-9a15-4abd-b37b-07dbd624ac9c (base64Content length=472)
+2025-09-30 16:22:25,121 - INFO - Обновление токена OMS...
+2025-09-30 16:22:26,125 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 16:22:26,569 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 16:22:26,714 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 16:25:22,428 - INFO - Начало скачивания PDF/CSV/XLS для заказа 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c ('тест новый')
+2025-09-30 16:25:23,035 - INFO - Статус заказа 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c: released
+2025-09-30 16:25:23,605 - INFO - PDF export started for 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c, resultId: 64702dcd-1e14-426b-b66b-6d4863a42622
+2025-09-30 16:25:44,873 - INFO - PDF сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест новый\тест новый.pdf
+2025-09-30 16:25:45,139 - INFO - CSV export started for 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c, resultId: 4843471b-29f7-4ab4-8eec-b61044ab8c5e
+2025-09-30 16:25:45,327 - INFO - CSV export status for 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c: inProgress
+2025-09-30 16:25:55,477 - INFO - CSV export status for 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c: success
+2025-09-30 16:25:55,621 - INFO - CSV сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест новый\тест новый_csv.csv
+2025-09-30 16:25:55,955 - INFO - XLS export started for 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c, resultId: 2f853707-fe17-40b8-afdb-a7812679b1d5
+2025-09-30 16:25:56,112 - INFO - XLS export status for 3ae5deb4-6cf5-48ff-b7d8-275a560d7a9c: success
+2025-09-30 16:25:56,292 - INFO - XLS сохранён: C:\Users\sklad\Desktop\pdf-коды км\тест новый\тест новый.xls
+2025-09-30 16:30:12,617 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-30-12.txt
+2025-09-30 16:30:12,620 - INFO - Получаем cookies...
+2025-09-30 16:30:12,621 - INFO - Создание документа: тест новый
+2025-09-30 16:30:13,384 - INFO - Документ создан: 9310104e-a425-42e4-9210-645bed467908
+2025-09-30 16:30:15,343 - INFO - Подписываем order id=2a0fecd0-53df-449a-a425-32deb10a902f (base64Content length=472)
+2025-09-30 16:30:15,461 - INFO - Обновление токена OMS...
+2025-09-30 16:30:16,616 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 16:30:16,950 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 16:30:17,115 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 16:31:47,793 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-31-47.txt
+2025-09-30 16:31:47,796 - INFO - Получаем cookies...
+2025-09-30 16:31:47,797 - INFO - Создание документа: тест новый 2
+2025-09-30 16:31:48,562 - INFO - Документ создан: 5164f930-44d4-4fa1-928e-1c014edacb9c
+2025-09-30 16:31:49,822 - INFO - Подписываем order id=29250204-6784-4b46-b161-2b2c1790a648 (base64Content length=476)
+2025-09-30 16:31:49,904 - INFO - Обновление токена OMS...
+2025-09-30 16:31:50,982 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 16:31:51,467 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 16:31:51,642 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 16:33:57,644 - INFO - Cookies устарели (911 сек). Нужно обновить.
+2025-09-30 16:34:03,634 - INFO - Cookie accept button not found on page - skipping
+2025-09-30 16:34:03,748 - INFO - Clicked profile (best-effort)
+2025-09-30 16:34:05,712 - INFO - Clicked warehouse (fallback selector)
+2025-09-30 16:34:06,721 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-30 16:35:11,505 - INFO - Начало скачивания PDF/CSV/XLS для заказа 5164f930-44d4-4fa1-928e-1c014edacb9c ('тест новый 2')
+2025-09-30 16:35:12,120 - INFO - Статус заказа 5164f930-44d4-4fa1-928e-1c014edacb9c: released
+2025-09-30 16:35:12,580 - INFO - PDF export started for 5164f930-44d4-4fa1-928e-1c014edacb9c, resultId: 9f1299b3-4b04-49a5-8b95-5db9b991bb56
+2025-09-30 16:42:03,351 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-42-03.txt
+2025-09-30 16:42:03,362 - INFO - Получаем cookies...
+2025-09-30 16:42:03,362 - INFO - Создание документа: тест новый
+2025-09-30 16:42:04,289 - INFO - Документ создан: 3e88eb01-dc61-41e8-a480-bf4110845dbe
+2025-09-30 16:42:05,456 - INFO - Подписываем order id=765bb722-f801-4d35-8f15-efe735ed5721 (base64Content length=472)
+2025-09-30 16:42:05,554 - INFO - Обновление токена OMS...
+2025-09-30 16:42:06,547 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 16:42:06,989 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 16:42:07,235 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 16:44:18,509 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-44-18.txt
+2025-09-30 16:44:18,512 - INFO - Получаем cookies...
+2025-09-30 16:44:18,513 - INFO - Создание документа: тест новый 2
+2025-09-30 16:44:19,314 - INFO - Документ создан: b048e591-926c-4c41-af95-dab9c36b3f69
+2025-09-30 16:44:20,903 - INFO - Подписываем order id=4d7359bc-ca73-49bd-a388-7edae6c31902 (base64Content length=476)
+2025-09-30 16:44:20,977 - INFO - Обновление токена OMS...
+2025-09-30 16:44:22,120 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 16:44:22,608 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 16:44:22,824 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 16:44:31,059 - INFO - Создаём ввод в оборот для ТСД...
+2025-09-30 16:44:31,537 - ERROR - Ошибка в perform_introduction_from_order_tsd: 400 Client Error: Bad Request for url: https://mk.kontur.ru/api/v1/codes-introduction?warehouseId=59739360-7d62-434b-ad13-4617c87a6d13
+Traceback (most recent call last):
+  File "C:\Users\sklad\Desktop\crypto\api.py", line 853, in perform_introduction_from_order_tsd
+    r.raise_for_status()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\sklad\AppData\Local\Programs\Python\Python313\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 400 Client Error: Bad Request for url: https://mk.kontur.ru/api/v1/codes-introduction?warehouseId=59739360-7d62-434b-ad13-4617c87a6d13
+2025-09-30 16:56:36,093 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_16-56-36.txt
+2025-09-30 16:56:36,095 - INFO - Получаем cookies...
+2025-09-30 16:56:36,095 - INFO - Cookies устарели (1349 сек). Нужно обновить.
+2025-09-30 16:56:41,062 - INFO - Cookie accept button not found on page - skipping
+2025-09-30 16:56:41,680 - INFO - Clicked profile (best-effort)
+2025-09-30 16:56:43,462 - INFO - Clicked warehouse (fallback selector)
+2025-09-30 16:56:44,471 - INFO - Cookies сохранены в kontur_cookies.json
+2025-09-30 16:56:46,963 - INFO - Создание документа: тест новый
+2025-09-30 16:56:47,676 - INFO - Документ создан: 5f1960b7-f9d1-46b6-b359-5d0dd420fa6c
+2025-09-30 16:56:49,359 - INFO - Подписываем order id=763b1e10-84db-4d3d-b593-bb8ece3f4195 (base64Content length=472)
+2025-09-30 16:56:49,433 - INFO - Обновление токена OMS...
+2025-09-30 16:56:50,442 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 16:56:50,801 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 16:56:50,960 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 16:56:58,907 - INFO - 🚀 Начало создания задания ТСД для заказа 5f1960b7-f9d1-46b6-b359-5d0dd420fa6c
+2025-09-30 16:56:58,907 - INFO - 📝 Создаем документ: https://mk.kontur.ru/api/v1/codes-introduction?warehouseId=59739360-7d62-434b-ad13-4617c87a6d13
+2025-09-30 16:56:59,418 - INFO - 📡 Статус создания: 400
+2025-09-30 16:56:59,418 - INFO - 📡 Ответ создания: {"type":"unknownError","message":"Provided parameters is not correct. A non-empty request body is required."}
+2025-09-30 16:56:59,419 - ERROR - ❌ HTTP ошибка 400: {"type":"unknownError","message":"Provided parameters is not correct. A non-empty request body is required."}
+2025-09-30 17:00:51,988 - INFO - История заказа сохранена в файл: C:\Users\sklad\Desktop\История заказов КМ\Заказ_2025-09-30_17-00-51.txt
+2025-09-30 17:00:51,997 - INFO - Получаем cookies...
+2025-09-30 17:00:51,998 - INFO - Создание документа: тест новый
+2025-09-30 17:00:52,663 - INFO - Документ создан: be431db3-82da-451c-a775-6e6f6028ca45
+2025-09-30 17:00:53,599 - INFO - Подписываем order id=8c99303b-5cf5-4b51-8e81-223544993568 (base64Content length=472)
+2025-09-30 17:00:53,672 - INFO - Обновление токена OMS...
+2025-09-30 17:00:54,794 - INFO - Токен OMS обновлён успешно. Ответ: 
+2025-09-30 17:00:55,850 - INFO - Отправка прошла успешно (detached signature)
+2025-09-30 17:00:56,108 - INFO - Финальный статус документа: sendForRelease
+2025-09-30 17:01:04,479 - INFO - 🚀 Начало создания задания ТСД для заказа be431db3-82da-451c-a775-6e6f6028ca45
+2025-09-30 17:01:04,479 - INFO - 📝 Создаем документ: https://mk.kontur.ru/api/v1/codes-introduction?warehouseId=59739360-7d62-434b-ad13-4617c87a6d13
+2025-09-30 17:01:05,091 - INFO - 📡 Статус создания: 200
+2025-09-30 17:01:05,091 - INFO - 📡 Ответ создания: "d61fef9b-21e0-426e-aec3-2a851c313c51"
+2025-09-30 17:01:05,091 - INFO - ✅ Создан документ: d61fef9b-21e0-426e-aec3-2a851c313c51
+2025-09-30 17:01:05,091 - INFO - ⚙️ Обновляем production: https://mk.kontur.ru/api/v1/codes-introduction/d61fef9b-21e0-426e-aec3-2a851c313c51/production
+2025-09-30 17:01:05,091 - INFO - 📦 Production payload: {'documentNumber': 'тест новый', 'producerInn': '', 'productionDate': '2025-09-30T00:00:00.000+03:00', 'productionType': 'ownProduction', 'warehouseId': '59739360-7d62-434b-ad13-4617c87a6d13', 'expirationType': 'milkMoreThan72', 'expirationDate': '2030-09-30T00:00:00.000+03:00', 'containsUtilisationReport': True, 'usageType': 'verified', 'cisType': 'unit', 'fillingMethod': 'tsd', 'batchNumber': '300925', 'isAutocompletePositionsDataNeeded': True, 'productsHasSameDates': True}
+2025-09-30 17:01:05,451 - INFO - 📡 Статус production: 200
+2025-09-30 17:01:05,452 - INFO - ✅ Production данные обновлены
+2025-09-30 17:01:05,452 - INFO - 📋 Добавляем позиции: https://mk.kontur.ru/api/v1/codes-introduction/d61fef9b-21e0-426e-aec3-2a851c313c51/positions
+2025-09-30 17:01:05,452 - INFO - 📦 Positions payload: {'rows': [{'name': 'стер латекс', 'gtin': '4650118046245', 'tnvedCode': '4015120009', 'certificateDocumentNumber': '', 'certificateDocumentDate': '', 'costInKopecksWithVat': 0, 'exciseInKopecks': 0}]}
+2025-09-30 17:01:05,688 - INFO - 📡 Статус позиций: 200
+2025-09-30 17:01:05,688 - INFO - ✅ Добавлено 1 позиций
+2025-09-30 17:01:05,688 - INFO - 📱 Отправляем на ТСД: https://mk.kontur.ru/api/v1/codes-introduction/d61fef9b-21e0-426e-aec3-2a851c313c51/send-to-tsd
+2025-09-30 17:01:05,985 - INFO - 📡 Статус отправки ТСД: 200
+2025-09-30 17:01:05,985 - INFO - ✅ Задание отправлено на ТСД
+2025-09-30 17:01:06,133 - INFO - ✅ Финальный статус: {'codesIntroductionType': 'introduction', 'documentNumber': 'тест новый', 'warehouseId': '59739360-7d62-434b-ad13-4617c87a6d13'}

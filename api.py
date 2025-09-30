@@ -809,162 +809,120 @@ def perform_introduction_from_order(
 def perform_introduction_from_order_tsd(
     session: requests.Session,
     codes_order_id: str,
-    positions_data: List[Dict[str, str]],  # Список {'name': str, 'gtin': str} для позиций в XLS
-    organization_id: str = ORGANIZATION_ID,
-    warehouse_id: str = WAREHOUSE_ID,  # Фиксированный склад
-    thumbprint: Optional[str] = None,
-    production_patch: Optional[Dict[str, Any]] = None,  # Только productionDate, expirationDate, batchNumber из GUI
-    check_poll_interval: int = 5,
-    check_poll_attempts: int = 24,
-    tsd_poll_interval: int = 5,  # Для polling после send-to-tsd
-    tsd_poll_attempts: int = 20
+    positions_data: List[Dict[str, str]],
+    production_patch: Dict[str, Any],
 ) -> Tuple[bool, Dict[str, Any]]:
     """
-    Создаёт задание ввода в оборот через ТСД для codes_order_id.
-    Автоматически генерирует XLS на основе positions_data.
-    Возвращает (ok: bool, result: dict) с полями: introduction_id, errors, final_status, etc.
+    Создаёт задание ввода в оборот через ТСД.
     """
     result: Dict[str, Any] = {"errors": []}
+    
     try:
-        # Автоматическая генерация XLS
-        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp_file:
-            wb = openpyxl.Workbook()
-            ws = wb.active
-            # Заголовки (опционально, но в логах без — просто данные)
-            # ws['A1'] = "Name"
-            # ws['B1'] = "GTIN"
-            row_num = 1
-            for pos in positions_data:
-                ws.cell(row=row_num, column=1, value=pos.get('name', ''))
-                ws.cell(row=row_num, column=2, value=pos.get('gtin', ''))
-                row_num += 1
-            wb.save(tmp_file.name)
-            file_path = tmp_file.name
+        logger.info(f"🚀 Начало создания задания ТСД для заказа {codes_order_id}")
+        
+        # 1. Создаем документ ввода в оборот
+        url_create = f"{BASE}/api/v1/codes-introduction?warehouseId={WAREHOUSE_ID}"
+        logger.info(f"📝 Создаем документ: {url_create}")
+        
+        # Отправляем POST запрос для создания документа
+        r_create = session.post(url_create, json={}, timeout=30)
+        logger.info(f"📡 Статус создания: {r_create.status_code}")
+        logger.info(f"📡 Ответ создания: {r_create.text}")
+        
+        r_create.raise_for_status()
+        document_id = r_create.text.strip().strip('"')
+        result["introduction_id"] = document_id
+        logger.info(f"✅ Создан документ: {document_id}")
 
-        # Теперь используем file_path как раньше
-        with open(file_path, "rb") as f:
-            file_content = f.read()
-            base64_content = base64.b64encode(file_content).decode('utf-8')
-
-        # 1. POST /codes-introduction?warehouseId — Создать документ
-        url_create = f"{BASE}/api/v1/codes-introduction?warehouseId={warehouse_id}"
-        logger.info("Создаём ввод в оборот для ТСД...")
-        r = session.post(url_create, timeout=30)
-        r.raise_for_status()
-        intro_id = r.text.strip().strip('"')
-        result["introduction_id"] = intro_id
-        logger.info("Создана заявка: %s", intro_id)
-
-        # 2. GET /codes-introduction/{id} — Проверить создание
-        r_intro = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}", timeout=15)
-        r_intro.raise_for_status()
-        result["created_introduction"] = r_intro.json()
-
-        # 3. POST /production — Обновить метаданные (с fillingMethod="tsd")
-        patch_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/production"
-        full_patch = {
-            "documentNumber": production_patch.get("documentNumber", "NO_NAME"),  # Из item/order_name
+        # 2. Обновляем данные production
+        url_production = f"{BASE}/api/v1/codes-introduction/{document_id}/production"
+        logger.info(f"⚙️ Обновляем production: {url_production}")
+        
+        # Формируем полный payload для production
+        production_payload = {
+            "documentNumber": production_patch["documentNumber"],
+            "producerInn": "",
+            "productionDate": production_patch["productionDate"] + "T00:00:00.000+03:00",
             "productionType": "ownProduction",
-            "warehouseId": warehouse_id,
+            "warehouseId": WAREHOUSE_ID,
             "expirationType": "milkMoreThan72",
-            "containsUtilisationReport": "true",
+            "expirationDate": production_patch["expirationDate"] + "T00:00:00.000+03:00",
+            "containsUtilisationReport": True,
             "usageType": "verified",
             "cisType": "unit",
             "fillingMethod": "tsd",
-            "isAutocompletePositionsDataNeeded": "true",
-            "productsHasSameDates": "true",
-            "productionDate": production_patch.get("productionDate"),
-            "expirationDate": production_patch.get("expirationDate"),  # Или рассчитать +5 лет
-            "batchNumber": production_patch.get("batchNumber"),
-            "TnvedCode": production_patch.get("TnvedCode", "")  # Если есть
+            "batchNumber": production_patch["batchNumber"],
+            "isAutocompletePositionsDataNeeded": True,
+            "productsHasSameDates": True,
+            "productGroup": "wheelChairs"
         }
-        logger.info("PATCH production для ТСД...")
-        r_patch = session.post(patch_url, json=full_patch, timeout=30)
-        r_patch.raise_for_status()
-        result["production_patch_response"] = r_patch.json() if r_patch.content else {"status": "ok"}
+        
+        logger.info(f"📦 Production payload: {production_payload}")
+        r_production = session.patch(url_production, json=production_payload, timeout=30)
+        logger.info(f"📡 Статус production: {r_production.status_code}")
+        
+        r_production.raise_for_status()
+        result["production_response"] = r_production.json() if r_production.content else {}
+        logger.info("✅ Production данные обновлены")
 
-        # 4. Upload XLS и parse
-        # Инициация upload
-        init_url = f"{BASE}/drive/v1/contents/js/initPartialUpload-v2?client=js_v0&UploadId={codes_order_id}&source=blob"  # Используем codes_order_id как UploadId или генерировать
-        init_payload = {
-            "Name": f"srv/upload/uid/{organization_id}/auto_generated_{codes_order_id}.xlsx",
-            "Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"  # Для XLSX
-        }
-        r_init = session.post(init_url, json=init_payload, timeout=30)
-        r_init.raise_for_status()
-        init_resp = r_init.json()
-        session_id = init_resp["UploadSessionId"]
-        parts_uri = init_resp["PartsUploadUri"]
-
-        # PUT parts (base64 upload)
-        parts_url = f"{parts_uri}&client=js_v0&source=blob&te=base64"
-        r_parts = session.put(parts_url, data=base64_content, timeout=60)
-        r_parts.raise_for_status()
-
-        # Parse importer
-        file_uri = init_resp["Name"]  # Из init
-        parse_url = f"{BASE}/import/v1/api/Importer/Parse?fileUri={file_uri}&disableDataBoundsDetection=true&extension=xlsx"
-        r_parse = session.get(parse_url, timeout=30)
-        r_parse.raise_for_status()
-        parse_data = r_parse.json()["data"]  # [[name, gtin], ...]
-
-        # 5. POST /positions — Отправить распарсеные данные
-        positions_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/positions"
-        positions_payload = {
-            "rows": [
-                {
-                    "name": row[0],
-                    "gtin": row[1],
-                    "tnvedCode": production_patch.get("TnvedCode", ""),  # Если нужно
-                    "certificateDocumentNumber": "",
-                    "certificateDocumentDate": "",
-                    "costInKopecksWithVat": 0,
-                    "exciseInKopecks": 0
-                } for row in parse_data
-            ]
-        }
-        r_positions = session.post(positions_url, json=positions_payload, timeout=30)
+        # 3. Добавляем позиции в документ (упрощенная версия без загрузки XLS)
+        url_positions = f"{BASE}/api/v1/codes-introduction/{document_id}/positions"
+        logger.info(f"📋 Добавляем позиции: {url_positions}")
+        
+        # Форматируем позиции для API
+        positions_payload = {"rows": []}
+        for pos in positions_data:
+            position = {
+                "name": pos["name"],
+                "gtin": pos["gtin"],
+                "tnvedCode": production_patch.get("TnvedCode", ""),
+                "certificateDocumentNumber": "",
+                "certificateDocumentDate": "",
+                "costInKopecksWithVat": 0,
+                "exciseInKopecks": 0
+            }
+            positions_payload["rows"].append(position)
+        
+        logger.info(f"📦 Positions payload: {positions_payload}")
+        r_positions = session.post(url_positions, json=positions_payload, timeout=30)
+        logger.info(f"📡 Статус позиций: {r_positions.status_code}")
+        
         r_positions.raise_for_status()
-        result["positions_response"] = r_positions.json() if r_positions.content else {"status": "ok"}
+        result["positions_response"] = r_positions.json() if r_positions.content else {}
+        logger.info(f"✅ Добавлено {len(positions_data)} позиций")
 
-        # 6. GET /production — Проверить обновления
-        r_prod = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}/production", timeout=15)
-        r_prod.raise_for_status()
-        result["production_final"] = r_prod.json()
+        # 4. Отправляем задание на ТСД
+        url_send_tsd = f"{BASE}/api/v1/codes-introduction/{document_id}/send-to-tsd"
+        logger.info(f"📱 Отправляем на ТСД: {url_send_tsd}")
+        
+        r_send_tsd = session.post(url_send_tsd, timeout=30)
+        logger.info(f"📡 Статус отправки ТСД: {r_send_tsd.status_code}")
+        
+        r_send_tsd.raise_for_status()
+        result["send_to_tsd_response"] = r_send_tsd.json() if r_send_tsd.content else {}
+        logger.info("✅ Задание отправлено на ТСД")
 
-        # 7. POST /send-to-tsd — Отправить задание на ТСД
-        tsd_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/send-to-tsd"
-        r_tsd = session.post(tsd_url, timeout=30)
-        r_tsd.raise_for_status()
-        result["tsd_response"] = r_tsd.json() if r_tsd.content else {"status": "ok"}
+        # 5. Получаем финальный статус документа
+        url_final = f"{BASE}/api/v1/codes-introduction/{document_id}"
+        r_final = session.get(url_final, timeout=15)
+        r_final.raise_for_status()
+        result["final_introduction"] = r_final.json()
+        logger.info(f"✅ Финальный статус: {result['final_introduction']}")
 
-        # Опциональный polling статуса после send-to-tsd
-        tsd_ok = False
-        attempts = 0
-        while attempts < tsd_poll_attempts:
-            r_final = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}", timeout=15)
-            if r_final.status_code == 200:
-                final_data = r_final.json()
-                result["final_introduction"] = final_data
-                status = final_data.get("documentStatus")
-                if status in ("sent_to_tsd", "completed"):  # Предполагаемые статусы
-                    tsd_ok = True
-                    break
-            attempts += 1
-            time.sleep(tsd_poll_interval)
+        return True, result
 
-        if not tsd_ok:
-            result["errors"].append("Не удалось подтвердить отправку на ТСД")
-
-        # Удаляем temp файл
-        os.unlink(file_path)
-
-        ok = not bool(result["errors"])
-        return ok, result
-
+    except requests.exceptions.HTTPError as e:
+        error_msg = f"❌ HTTP ошибка {e.response.status_code}: {e.response.text}"
+        logger.error(error_msg)
+        result["errors"].append(error_msg)
+        return False, result
+    except requests.exceptions.RequestException as e:
+        error_msg = f"❌ Ошибка сети: {str(e)}"
+        logger.error(error_msg)
+        result["errors"].append(error_msg)
+        return False, result
     except Exception as e:
-        logger.exception("Ошибка в perform_introduction_from_order_tsd: %s", e)
-        result["errors"].append(str(e))
-        if 'file_path' in locals():
-            os.unlink(file_path)
+        error_msg = f"❌ Неожиданная ошибка: {str(e)}"
+        logger.error(error_msg)
+        result["errors"].append(error_msg)
         return False, result

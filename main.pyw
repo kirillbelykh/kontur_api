@@ -2,6 +2,7 @@ import os
 import copy
 import uuid
 import threading
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import time
@@ -112,7 +113,7 @@ class App(ctk.CTk):
     def __init__(self, df):
         super().__init__()
         self.title("Kontur Marking")
-        self.geometry("800x800")
+        self.geometry("800x600")
         self.df = df
         self.collected: List[OrderItem] = []
         self.download_list: List[dict] = []  # [{'document_id': str, 'status': str, 'filename': str or None, 'order_name': str}]
@@ -125,6 +126,8 @@ class App(ctk.CTk):
         self.stop_auto_download = False
         self.download_workers = []
         self.max_workers = 3  # Максимальное количество одновременных скачиваний
+        # Executor для фоновой обработки
+        self.intro_executor = ThreadPoolExecutor(max_workers=2)  # Меньше потоков для стабильности
         
         # Tabview for sections
         self.tabview = ctk.CTkTabview(self)
@@ -598,26 +601,6 @@ class App(ctk.CTk):
                 if not ok:
                     self.log_insert(f" - uid={getattr(it,'_uid',None)} | {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}' => {msg}")
 
-        self._clear_after_execution()
-    def _clear_after_execution(self):
-        """Очищает данные после выполнения заказов"""
-        try:
-            # Очищаем основной список заказов
-            self.collected.clear()
-            
-            # Очищаем дерево заказов
-            for item in self.tree.get_children():
-                self.tree.delete(item)
-            
-            # Очищаем поле количества кодов (опционально)
-            if hasattr(self, 'codes_entry'):
-                self.codes_entry.delete(0, "end")
-            
-            # Сбрасываем комбо-боксы к значениям по умолчанию (опционально)
-            self._reset_input_fields()
-            
-        except Exception as e:
-            self.log_insert(f"Ошибка при очистке памяти: {e}")
 
     def _reset_input_fields(self):
         """Сбрасывает поля ввода к значениям по умолчанию"""
@@ -896,8 +879,6 @@ class App(ctk.CTk):
         self.intro_log_text.pack(padx=10, pady=10, fill="both", expand=True)
         self.intro_log_text.configure(state="disabled")  # Только для чтения
 
-        # Executor для фоновой обработки
-        self.intro_executor = ThreadPoolExecutor(max_workers=2)  # Меньше потоков для стабильности
 
         # Инициализация отображения
         self.update_introduction_tree()
@@ -1188,7 +1169,7 @@ class App(ctk.CTk):
 
     def tsd_log_insert(self, text: str):
         """Удобная функция логирования в таб 'ТСД' (вызовы только из GUI-потока)."""
-        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         msg = f"{now} - {text}\n"
         try:
             self.tsd_log_text.insert("end", msg)
@@ -1221,94 +1202,218 @@ class App(ctk.CTk):
 
     def on_tsd_clicked(self):
         """Обработчик кнопки — собирает данные, запускает threads для выбранных заказов."""
-        selected_items = self.get_selected_tsd_items()
-        if not selected_items:
-            self.tsd_log_insert("❌ Не выбрано ни одного заказа.")
-            return
+        try:
+            self.tsd_log_insert("🔍 Начало обработки нажатия кнопки ТСД...")
+            
+            # Получаем выбранные элементы
+            selected_items = self.get_selected_tsd_items()
+            self.tsd_log_insert(f"📋 Выбрано элементов: {len(selected_items)}")
+            
+            for item in selected_items:
+                self.tsd_log_insert(f"   - {item.get('order_name', 'Unknown')} (ID: {item.get('document_id', 'Unknown')})")
+            
+            if not selected_items:
+                self.tsd_log_insert("❌ Не выбрано ни одного заказа.")
+                return
 
-        prod_date = self.convert_date_format(self.tsd_prod_date_entry.get().strip())
-        exp_date = self.convert_date_format(self.tsd_exp_date_entry.get().strip())
-        batch_num = self.tsd_batch_entry.get().strip()
+            # Получаем данные из полей ввода
+            prod_date_raw = self.tsd_prod_date_entry.get().strip()
+            exp_date_raw = self.tsd_exp_date_entry.get().strip()
+            batch_num = self.tsd_batch_entry.get().strip()
+            
+            self.tsd_log_insert(f"📅 Получены данные из полей: prod='{prod_date_raw}', exp='{exp_date_raw}', batch='{batch_num}'")
 
-        # валидация (пустые значения допускаем? тут — требуем)
-        errors = []
-        if not batch_num:
-            errors.append("Введите номер партии.")
+            # Преобразуем даты
+            try:
+                prod_date = self.convert_date_format(prod_date_raw)
+                exp_date = self.convert_date_format(exp_date_raw)
+                self.tsd_log_insert(f"📅 Преобразованные даты: prod='{prod_date}', exp='{exp_date}'")
+            except Exception as e:
+                self.tsd_log_insert(f"❌ Ошибка преобразования дат: {e}")
+                return
 
-        if errors:
-            for error in errors:
-                self.tsd_log_insert(f"❌ {error}")
-            return
+            # Валидация
+            errors = []
+            if not batch_num:
+                errors.append("Введите номер партии.")
+            if not prod_date:
+                errors.append("Неверная дата производства.")
+            if not exp_date:
+                errors.append("Неверная дата окончания срока годности.")
 
-        # отключаем кнопку пока выполняется
-        self.tsd_btn.configure(state="disabled")
-        self.tsd_log_insert(f"🚀 Запуск ввода в оборот для ТСД для {len(selected_items)} заказа(ов)...")
-        self.tsd_log_insert(f"📅 Дата производства: {prod_date}, Окончание: {exp_date}, Партия: {batch_num}")
+            if errors:
+                for error in errors:
+                    self.tsd_log_insert(f"❌ {error}")
+                return
 
-        # submit jobs to executor
-        futures = []
-        for it in selected_items:
-            docid = it["document_id"]
-            order_name = it.get("order_name", "Unknown")
-            simpl_name = it.get("simpl", "")
-            gtin = it.get("gtin", "")  # Предполагаем, что в item есть gtin; если нет — извлеките из download_list или заказа
-            tnved_code = get_tnved_code(simpl_name)  # Ваша функция
-            positions_data = [{"name": simpl_name, "gtin": gtin}]  # Для одной позиции; если много — list из данных заказа
-            production_patch = {
-                "documentNumber": order_name,
-                "productionDate": prod_date,
-                "expirationDate": exp_date,
-                "batchNumber": batch_num,
-                "TnvedCode": tnved_code
-            }
-            fut = self.intro_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
-            futures.append((fut, it))
+            # Отключаем кнопку пока выполняется
+            self.tsd_btn.configure(state="disabled")
+            self.tsd_log_insert("🚀 Запуск создания заданий ТСД...")
+            self.tsd_log_insert(f"📊 Будет обработано заказов: {len(selected_items)}")
 
-        # создаём нитку-отслеживатель, чтобы не блокировать GUI и чтобы знать когда всё закончится
-        def monitor():
-            for fut, it in futures:
+            # Запускаем задачи
+            futures = []
+            for it in selected_items:
                 try:
-                    ok, result = fut.result()  # result — dict с данными/ошибками
-                    # Формируем msg на основе result
-                    if ok:
-                        msg = f"Успех: introduction_id = {result.get('introduction_id', 'unknown')}, статус = {result.get('final_introduction', {}).get('status', 'unknown')}"
-                    else:
-                        msg = f"Ошибка: {'; '.join(result.get('errors', ['unknown error']))}"
-                    self.after(0, self._on_tsd_finished, it, ok, msg)
-                except Exception as e:
-                    self.after(0, self._on_tsd_finished, it, False, f"Exception: {e}")
-            # всё done — разблокировать кнопку в GUI
-            self.after(0, lambda: self.tsd_btn.configure(state="normal"))
+                    docid = it["document_id"]
+                    self.tsd_log_insert(f"Нашли doc_id для поиска gtin: {docid}")
+                    order_name = it.get("order_name", "Unknown")
+                    simpl_name = it.get("simpl", "")
+                    full_name = it.get("full_name")
 
-        threading.Thread(target=monitor, daemon=True).start()
+                    
+                    self.tsd_log_insert(f"⏳ Подготовка заказа: {order_name} (ID: {docid})")
+                    
+                    # Получаем GTIN из исходных данных заказа
+                    gtin = self._get_gtin_for_order(docid)
+                    self.tsd_log_insert(f"   GTIN: {gtin}")
+                    
+                    if not gtin:
+                        self.tsd_log_insert(f"⚠️ Не найден GTIN для заказа {docid}, пропускаем")
+                        continue
+                    
+                    # Получаем TNVED код
+                    tnved_code = get_tnved_code(simpl_name)
+                    self.tsd_log_insert(f"   TNVED: {tnved_code}")
+                    
+                    # Формируем данные позиций
+                    positions_data = [{
+                        "name": full_name, 
+                        "gtin": gtin
+                    }]
+                    
+                    # Формируем production_patch
+                    production_patch = {
+                        "documentNumber": order_name,
+                        "productionDate": prod_date,
+                        "expirationDate": exp_date,
+                        "batchNumber": batch_num,
+                        "TnvedCode": tnved_code
+                    }
+                    
+                    self.tsd_log_insert(f"📦 Данные для API: {production_patch}")
+                    
+                    # Запускаем задачу
+                    fut = self.intro_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
+                    futures.append((fut, it))
+                    self.tsd_log_insert(f"✅ Задача для {order_name} добавлена в очередь")
+                    
+                except Exception as e:
+                    self.tsd_log_insert(f"❌ Ошибка при подготовке заказа {it.get('order_name', 'Unknown')}: {e}")
+                    import traceback
+                    self.tsd_log_insert(f"🔍 Детали: {traceback.format_exc()}")
+
+            if not futures:
+                self.tsd_log_insert("❌ Нет задач для выполнения")
+                self.tsd_btn.configure(state="normal")
+                return
+
+            # Создаём нитку-отслеживатель
+            def monitor():
+                try:
+                    self.tsd_log_insert("👀 Мониторинг запущен...")
+                    completed = 0
+                    for fut, it in futures:
+                        try:
+                            self.tsd_log_insert(f"⏳ Ожидание завершения задачи {completed + 1}/{len(futures)}...")
+                            ok, result = fut.result(timeout=300)  # 5 минут таймаут
+                            
+                            # Формируем сообщение
+                            if ok:
+                                intro_id = result.get('introduction_id', 'unknown')
+                                msg = f"Успех: introduction_id = {intro_id}"
+                            else:
+                                errors = result.get('errors', ['unknown error'])
+                                msg = f"Ошибка: {'; '.join(errors)}"
+                            
+                            self.after(0, self._on_tsd_finished, it, ok, msg)
+                            completed += 1
+                            self.tsd_log_insert(f"✅ Задача {completed}/{len(futures)} завершена: {'УСПЕХ' if ok else 'ОШИБКА'}")
+                            
+                        except Exception as e:
+                            error_msg = f"Исключение при выполнении задачи: {e}"
+                            self.after(0, self._on_tsd_finished, it, False, error_msg)
+                            completed += 1
+                            self.tsd_log_insert(f"❌ Задача {completed}/{len(futures)} завершена с ошибкой: {e}")
+                            import traceback
+                            self.tsd_log_insert(f"🔍 Детали ошибки: {traceback.format_exc()}")
+                    
+                    self.tsd_log_insert(f"🎉 Все задачи завершены ({completed}/{len(futures)})")
+                    
+                except Exception as e:
+                    self.tsd_log_insert(f"💥 Критическая ошибка в мониторе: {e}")
+                    import traceback
+                    self.tsd_log_insert(f"🔍 Детали: {traceback.format_exc()}")
+                finally:
+                    # Всегда разблокируем кнопку
+                    self.after(0, lambda: self.tsd_btn.configure(state="normal"))
+                    self.after(0, lambda: self.tsd_log_insert("🔓 Кнопка разблокирована"))
+
+            # Запускаем мониторинг в отдельном потоке
+            monitor_thread = threading.Thread(target=monitor, daemon=True)
+            monitor_thread.start()
+            self.tsd_log_insert("📊 Мониторинг задач запущен в фоне")
+
+        except Exception as e:
+            self.tsd_log_insert(f"💥 Критическая ошибка в on_tsd_clicked: {e}")
+            import traceback
+            self.tsd_log_insert(f"🔍 Детали: {traceback.format_exc()}")
+            self.tsd_btn.configure(state="normal")
 
     def _tsd_worker(self, item: dict, positions_data: List[Dict[str, str]], production_patch: dict, thumbprint: str) -> Tuple[bool, Dict[str, Any]]:
         """
         Фоновая задача — производит ввод в оборот для одного заказа item.
         Возвращает (ok, result: dict).
         """
-        # получаем cookies/session
         try:
-            cookies = get_valid_cookies()   # <- твоя реальная функция
+            self.tsd_log_insert(f"🔧 Начало работы _tsd_worker для {item.get('order_name', 'Unknown')}")
+            
+            # получаем cookies/session
+            try:
+                self.tsd_log_insert("🍪 Получение cookies...")
+                cookies = get_valid_cookies()
+            except Exception as e:
+                error_msg = f"Cannot get cookies: {e}"
+                self.tsd_log_insert(f"❌ {error_msg}")
+                return False, {"errors": [error_msg]}
+
+            if not cookies:
+                error_msg = "Cookies not available"
+                self.tsd_log_insert(f"❌ {error_msg}")
+                return False, {"errors": [error_msg]}
+
+            self.tsd_log_insert("✅ Cookies получены")
+            session = make_session_with_cookies(cookies)
+
+            document_id = item["document_id"]
+            self.tsd_log_insert(f"📄 Document ID: {document_id}")
+
+            # ВЫЗОВ API
+            try:
+                self.tsd_log_insert("📡 Вызов API perform_introduction_from_order_tsd...")
+                
+                ok, result = perform_introduction_from_order_tsd(
+                    session=session,
+                    codes_order_id=document_id,
+                    positions_data=positions_data,
+                    production_patch=production_patch,
+                )
+                self.tsd_log_insert(f"📡 Результат API: {'УСПЕХ' if ok else 'ОШИБКА'}")
+                return ok, result
+                
+            except Exception as e:
+                error_msg = f"Ошибка при вызове API: {e}"
+                self.tsd_log_insert(f"❌ {error_msg}")
+                import traceback
+                self.tsd_log_insert(f"🔍 Детали API ошибки: {traceback.format_exc()}")
+                return False, {"errors": [error_msg]}
+                
         except Exception as e:
-            return False, {"errors": [f"Cannot get cookies: {e}"]}
-
-        if not cookies:
-            return False, {"errors": ["Cookies not available"]}
-
-        session = make_session_with_cookies(cookies)
-
-        document_id = item["document_id"]
-
-        # ВЫЗОВ API
-        ok, result = perform_introduction_from_order_tsd(
-            session=session,
-            codes_order_id=document_id,
-            positions_data=positions_data,  # Новый аргумент для генерации XLS
-            production_patch=production_patch,
-            thumbprint=thumbprint
-        )
-        return ok, result
+            error_msg = f"Общая ошибка в _tsd_worker: {e}"
+            self.tsd_log_insert(f"❌ {error_msg}")
+            import traceback
+            self.tsd_log_insert(f"🔍 Детали общей ошибки: {traceback.format_exc()}")
+            return False, {"errors": [error_msg]}
 
     def _on_tsd_finished(self, item: dict, ok: bool, msg: str):
         """Обновление GUI после завершения одного задания (в главном потоке)."""
@@ -1324,6 +1429,36 @@ class App(ctk.CTk):
         # обновить таблицы
         self.update_tsd_tree()
         # self.update_download_tree()  # Если есть такая функция для другой таблицы, раскомментируйте
+    def _get_gtin_for_order(self, document_id: str) -> str:
+        """Получает GTIN для заказа по document_id"""
+        try:
+            self.tsd_log_insert(f"🔍 Поиск GTIN для document_id: {document_id}")
+            
+            # Ищем в collected
+            for item in self.collected:
+                if hasattr(item, '_uid') and item._uid == document_id:
+                    gtin = getattr(item, 'gtin', '')
+                    self.tsd_log_insert(f"✅ Найден GTIN в collected: {gtin}")
+                    return gtin
+            
+            # Ищем в download_list по связанным данным
+            for dl_item in self.download_list:
+                if dl_item.get('document_id') == document_id:
+                    order_name = dl_item.get('order_name', '')
+                    self.tsd_log_insert(f"🔍 Поиск в collected по order_name: {order_name}")
+                    
+                    # Ищем в collected по order_name
+                    for collected_item in self.collected:
+                        if getattr(collected_item, 'order_name', '') == order_name:
+                            gtin = getattr(collected_item, 'gtin', '')
+                            self.tsd_log_insert(f"✅ Найден GTIN по order_name: {gtin}")
+                            return gtin
+            
+            self.tsd_log_insert("❌ GTIN не найден")
+            return ""
+        except Exception as e:
+            self.tsd_log_insert(f"❌ Ошибка при получении GTIN для {document_id}: {e}")
+            return ""
 
 if __name__ == "__main__":
     if not os.path.exists(NOMENCLATURE_XLSX):

@@ -102,14 +102,16 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
 
         # best-effort шаги
         try:
-            cookie_btn = wait.until(EC.element_to_be_clickable(
-                (By.XPATH, '//*[@id="root"]/div/div/div[1]/div[1]/span/button/div[2]/span')
-            ))
-            cookie_btn.click()
-            logger.info("Clicked cookie accept")
-            time.sleep(SLEEP)
-        except Exception:
-            logger.info("Cookie accept not found/ignored")
+            # Проверяем наличие кнопки на странице
+            cookie_btn = driver.find_elements(By.XPATH, '//*[@id="root"]/div/div/div[1]/div[1]/span/button/div[2]/span')
+            if cookie_btn:
+                cookie_btn[0].click()
+                logger.info("Clicked cookie accept")
+                time.sleep(SLEEP)
+            else:
+                logger.info("Cookie accept button not found on page - skipping")
+        except Exception as e:
+            logger.info(f"Error with cookie accept button: {e} - skipping")
 
         try:
             profile_xpath = '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div/div[1]/div/div/div/div[1]/div/div'
