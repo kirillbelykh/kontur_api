@@ -1151,11 +1151,11 @@ class App(ctk.CTk):
         tsd_inputs = ctk.CTkFrame(tab_tsd)
         tsd_inputs.pack(padx=10, pady=5, fill="x")
 
-        ctk.CTkLabel(tsd_inputs, text="Дата производства (YYYY-MM-DD):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(tsd_inputs, text="Дата производства (ДД-ММ-ГГГГ):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.tsd_prod_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
         self.tsd_prod_date_entry.grid(row=0, column=1, padx=5, pady=5)
 
-        ctk.CTkLabel(tsd_inputs, text="Дата окончания (YYYY-MM-DD):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(tsd_inputs, text="Дата окончания (ДД-ММ-ГГГГ):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.tsd_exp_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
         self.tsd_exp_date_entry.grid(row=1, column=1, padx=5, pady=5)
 
