@@ -879,7 +879,8 @@ def perform_introduction_from_order_tsd(
                 "certificateDocumentNumber": "",
                 "certificateDocumentDate": "",
                 "costInKopecksWithVat": 0,
-                "exciseInKopecks": 0
+                "exciseInKopecks": 0,
+                "productGroup": "wheelChairs"
             }
             positions_payload["rows"].append(position)
         
