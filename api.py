@@ -1,117 +1,38 @@
-import time
+import os
 import json
-import os
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
-import requests
-import datetime
-from logger import logger
-import win32com.client
-from win32com.client import Dispatch
-import pythoncom
-from dotenv import load_dotenv
-import time
 import socket
-import base64
-import os
-import openpyxl  # Для создания XLS
-import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
+import requests
+from dotenv import load_dotenv
+
+from logger import logger
+from cryptopro import find_certificate_by_thumbprint, sign_data
+from winhttp import post_with_winhttp
+
+
+# ------------------- Инициализация окружения -------------------
 load_dotenv()
 
-# ---------------- config ----------------
-BASE = os.getenv("BASE_URL")
-ORGANIZATION_ID = os.getenv("ORGANIZATION_ID")
-OMS_ID = os.getenv("OMS_ID")
-WAREHOUSE_ID = os.getenv("WAREHOUSE_ID")
-PRODUCT_GROUP = os.getenv("PRODUCT_GROUP")
-RELEASE_METHOD_TYPE = os.getenv("RELEASE_METHOD_TYPE")
-CIS_TYPE = os.getenv("CIS_TYPE")
-FILLING_METHOD = os.getenv("FILLING_METHOD")
 
-# debug files
-LAST_SINGLE_REQ = Path("last_single_request.json")
-LAST_SINGLE_RESP = Path("last_single_response.json")
-LAST_MULTI_LOG = Path("last_multistep_log.json")
-
-# CAdES / CAPICOM constants
-CADES_BES = 1
-CADESCOM_BASE64_TO_BINARY = 1
-CAPICOM_ENCODE_BASE64 = 0
-CAPICOM_AUTHENTICATED_ATTRIBUTE_SIGNING_TIME = 0
-CAPICOM_CURRENT_USER_STORE = 2
-CAPICOM_MY_STORE = "My"
-CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
+# ------------------- Константы конфигурации -------------------
+BASE_URL: str = os.getenv("BASE_URL", "")
+ORGANIZATION_ID: str = os.getenv("ORGANIZATION_ID", "")
+OMS_ID: str = os.getenv("OMS_ID", "")
+WAREHOUSE_ID: str = os.getenv("WAREHOUSE_ID", "")
+PRODUCT_GROUP: str = os.getenv("PRODUCT_GROUP", "")
+RELEASE_METHOD_TYPE: str = os.getenv("RELEASE_METHOD_TYPE", "")
+CIS_TYPE: str = os.getenv("CIS_TYPE", "")
+FILLING_METHOD: str = os.getenv("FILLING_METHOD", "")
 
 
-# ---------- certificate utilities (pywin32 / CAdES) ----------
-def find_certificate_by_thumbprint(thumbprint: Optional[str] = None):
-    pythoncom.CoInitialize()
-    store = win32com.client.Dispatch("CAdESCOM.Store")
-    store.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
-    found = None
-    try:
-        for cert in store.Certificates:
-            try:
-                if thumbprint:
-                    if getattr(cert, "Thumbprint", "").lower() == thumbprint.lower():
-                        found = cert
-                        break
-                else:
-                    found = cert
-                    break
-            except Exception:
-                continue
-    finally:
-        store.Close()
-    pythoncom.CoUninitialize()
-    return found
-
-def sign_data(cert, base64_content: str, b_detached: bool = False) -> str:
-    """
-    Подписывает данные из base64-строки CAdES-BES подписью.
-    base64_content - base64-строка данных для подписи.
-    b_detached - True для отсоединенной (detached), False для присоединенной (attached).
-    Возвращает подпись в base64 (ASCII).
-    """
-    pythoncom.CoInitialize()
-    signer = Dispatch("CAdESCOM.CPSigner")
-    signer.Certificate = cert
-
-    oSigningTimeAttr = Dispatch("CAdESCOM.CPAttribute")
-    oSigningTimeAttr.Name = CAPICOM_AUTHENTICATED_ATTRIBUTE_SIGNING_TIME
-    oSigningTimeAttr.Value = datetime.datetime.now()
-    signer.AuthenticatedAttributes2.Add(oSigningTimeAttr)
-
-    signed_data = Dispatch("CAdESCOM.CadesSignedData")
-    signed_data.ContentEncoding = CADESCOM_BASE64_TO_BINARY
-    signed_data.Content = base64_content
-    signature = signed_data.SignCades(signer, CADES_BES, b_detached, CAPICOM_ENCODE_BASE64)
-
-    if isinstance(signature, bytes):
-        signature = signature.decode("ascii", errors="ignore")
-    pythoncom.CoUninitialize()
-    return signature.replace("\r", "").replace("\n", "")
-
-def post_with_winhttp(url, payload, headers=None):
-    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
-    win_http.Open("POST", url, False)
-    win_http.SetRequestHeader("User-Agent", "Mozilla/5.0")
-    win_http.SetRequestHeader("Accept", "application/json, text/plain, */*")
-    win_http.SetRequestHeader("Content-Type", "application/json; charset=utf-8")
-    if headers:
-        for k, v in headers.items():
-            win_http.SetRequestHeader(k, v)
-    win_http.Send(json.dumps(payload))
-    win_http.WaitForResponse()
-    status = win_http.Status
-    response_text = win_http.ResponseText
-    all_headers = win_http.GetAllResponseHeaders()
-    if status != 200:
-        raise Exception(f"WinHTTP POST failed: Status {status} - {response_text}")
-    pythoncom.CoUninitialize()
-    return status, response_text, all_headers
-
+# ------------------- Пути к отладочным JSON-файлам -------------------
+DEBUG_DIR = Path(__file__).resolve().parent
+LAST_SINGLE_REQ = DEBUG_DIR / "last_single_request.json"
+LAST_SINGLE_RESP = DEBUG_DIR / "last_single_response.json"
+LAST_MULTI_LOG = DEBUG_DIR / "last_multistep_log.json"
 
 # ---------------- Refresh OMS token ----------------
 def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> bool:
@@ -171,7 +92,7 @@ def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> 
         return False
 
 # ---------------- API flows ----------------
-def try_single_post(session: requests.Session, document_number: str,
+def codes_order(session: requests.Session, document_number: str,
                     product_group: str, release_method_type: str,
                     positions: list[dict],
                     filling_method: str = "productsCatalog", thumbprint: str | None = None) -> dict | None:
@@ -290,32 +211,6 @@ def try_single_post(session: requests.Session, document_number: str,
         logger.error(f"Получение финального статуса: {e}")
         return None
 
-# ---------------- Download PDF ----------------
-def get_with_winhttp(url: str, headers: dict | None = None):
-    """
-    Выполнить GET через WinHTTP и вернуть (status, response_bytes, all_headers)
-    """
-    win_http = Dispatch('WinHTTP.WinHTTPRequest.5.1')
-    win_http.Open("GET", url, False)
-    # стандартные заголовки
-    win_http.SetRequestHeader("User-Agent", "Mozilla/5.0")
-    if headers:
-        for k, v in headers.items():
-            # не пересоздаём User-Agent
-            if k.lower() == "user-agent":
-                continue
-            win_http.SetRequestHeader(k, v)
-    win_http.Send()
-    win_http.WaitForResponse()
-    status = int(win_http.Status)
-    # ResponseBody в COM возвращает бинарные данные
-    try:
-        body = win_http.ResponseBody  # binary
-    except Exception:
-        body = None
-    all_headers = win_http.GetAllResponseHeaders()
-    return status, body, all_headers
-
 
 def check_order_status(session: requests.Session, document_id: str) -> str:
     """
@@ -331,7 +226,7 @@ def check_order_status(session: requests.Session, document_id: str) -> str:
         return "error"
     
     
-def download_codes_pdf_and_convert(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[Optional[str], Optional[str], Optional[str]]]:
+def download_codes(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[Optional[str], Optional[str], Optional[str]]]:
     """
     Скачивает PDF, CSV и XLS (если доступны) для заказа document_id и сохраняет их в папку:
       Desktop / "pdf-коды км" / <safe_order_name>/
@@ -375,7 +270,7 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
     # Подготовка каталога для сохранения: Desktop / "pdf-коды км" / <safe_order_name>
     try:
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
-        parent_dir = os.path.join(desktop, "pdf-коды км")
+        parent_dir = os.path.join(desktop, "Коды км")
         # безопасное имя папки
         safe_order_name = "".join(c for c in (order_name or document_id) if c.isalnum() or c in " -_").strip()
         if not safe_order_name:
@@ -565,7 +460,7 @@ def download_codes_pdf_and_convert(session: requests.Session, document_id: str, 
 
 
 
-def perform_introduction_from_order(
+def put_into_circulation(
     session: requests.Session,
     codes_order_id: str,
     organization_id: str = ORGANIZATION_ID,
@@ -574,9 +469,7 @@ def perform_introduction_from_order(
     production_patch: Optional[Dict[str, Any]] = None,
     # автоперезапросы / таймауты
     check_poll_interval: int = 5,      # сек для /codes-checking polling (короткий интервал)
-    check_poll_attempts: int = 24,     # сколько попыток (24*5=120s default)
-    gen_poll_interval: int = 2,        # сек для ожидания generate/send результатов
-    gen_poll_attempts: int = 30        # сколько попыток для generate (примерно 60s)
+    check_poll_attempts: int = 24,     # сколько попыток (24*5=120s default)       
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Выполняет ввод в оборот (codes introduction) для указанного codes_order_id.
@@ -806,7 +699,7 @@ def perform_introduction_from_order(
         return False, result
 
 
-def perform_introduction_from_order_tsd(
+def make_task_on_tsd(
     session: requests.Session,
     codes_order_id: str,
     positions_data: List[Dict[str, str]],

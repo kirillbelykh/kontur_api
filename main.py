@@ -12,7 +12,7 @@ import pandas as pd
 from dataclasses import dataclass, asdict
 from typing import List, Tuple, Dict, Any
 from get_gtin import lookup_gtin, lookup_by_gtin
-from api import try_single_post, download_codes_pdf_and_convert, perform_introduction_from_order_tsd
+from api import codes_order, download_codes, make_task_on_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
@@ -86,7 +86,7 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
         session = make_session_with_cookies(cookies)
 
         # --- пробуем быстрый POST ---
-        resp = try_single_post(
+        resp = codes_order(
             session,
             str(document_number),
             str(PRODUCT_GROUP),
@@ -708,7 +708,7 @@ class App(ctk.CTk):
                         continue
                         
                     session = make_session_with_cookies(cookies)
-                    filename = download_codes_pdf_and_convert(session, item['document_id'], item['order_name'])
+                    filename = download_codes(session, item['document_id'], item['order_name'])
                     
                     if filename:
                         self.after(0, lambda i=item, f=filename: self._finish_download(i, f, 'Скачан'))
@@ -1067,10 +1067,10 @@ class App(ctk.CTk):
             session = make_session_with_cookies(cookies)
             
             # Импортируем функцию из api.py
-            from api import perform_introduction_from_order
+            from api import put_into_circulation
             
             # Вызываем API функцию
-            ok, result = perform_introduction_from_order(
+            ok, result = put_into_circulation(
                 session=session,
                 codes_order_id=document_id,
                 production_patch=production_patch,
@@ -1078,8 +1078,6 @@ class App(ctk.CTk):
                 thumbprint=THUMBPRINT,
                 check_poll_interval=10,      # Увеличим интервалы для стабильности
                 check_poll_attempts=30,      # Больше попыток
-                gen_poll_interval=5,
-                gen_poll_attempts=20
             )
             
             if ok:
@@ -1390,9 +1388,9 @@ class App(ctk.CTk):
 
             # ВЫЗОВ API
             try:
-                self.tsd_log_insert("📡 Вызов API perform_introduction_from_order_tsd...")
+                self.tsd_log_insert("📡 Вызов API make_task_on_tsd...")
                 
-                ok, result = perform_introduction_from_order_tsd(
+                ok, result = make_task_on_tsd(
                     session=session,
                     codes_order_id=document_id,
                     positions_data=positions_data,
