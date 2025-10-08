@@ -24,7 +24,6 @@ def lookup_gtin(
         color_l = color.strip().lower() if color else None
         venchik_l = venchik.strip().lower() if venchik else None
 
-        # Гарантия наличия нужных колонок
         required_cols = [
             'GTIN',
             'Полное наименование товара',
@@ -40,11 +39,9 @@ def lookup_gtin(
 
         # --- Точный поиск ---
         cond = (
-            df['Упрощенно'].astype(str).str.strip().str.lower() == simpl
-        ) & (
-            df['Размер'].astype(str).str.strip().str.lower().str.contains(size_l, na=False)
-        ) & (
-            df['Количество единиц употребления в потребительской упаковке'].astype(str).str.strip() == units_str
+            (df['Упрощенно'].astype(str).str.strip().str.lower() == simpl)
+            & (df['Размер'].astype(str).str.strip().str.lower() == size_l)
+            & (df['Количество единиц употребления в потребительской упаковке'].astype(str).str.strip() == units_str)
         )
 
         if venchik_l:
@@ -60,7 +57,7 @@ def lookup_gtin(
                 str(row['Полное наименование товара']).strip()
             )
 
-        # --- Частичный поиск ---
+        # --- Частичный поиск (fallback) ---
         cond2 = (
             df['Упрощенно'].astype(str).str.strip().str.lower().str.contains(simpl, na=False)
         ) & (
@@ -82,7 +79,6 @@ def lookup_gtin(
     except Exception as e:
         logger.exception("Ошибка в lookup_gtin")
 
-    # если ничего не нашли
     return None, None
 
 
