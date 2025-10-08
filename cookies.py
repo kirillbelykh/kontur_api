@@ -161,47 +161,6 @@ def get_valid_cookies() -> Optional[Dict[str, str]]:
 
 
 
-# Глобальный кэш cookies с блокировкой для потокобезопасности
-_cookies_cache: Optional[Dict[str, Any]] = None
-_cookies_lock = threading.Lock()
-_last_cookies_update = 0
-COOKIES_CACHE_TTL = 300  # 5 минут
-
-def get_shared_cookies() -> Optional[Dict[str, Any]]:
-    """
-    Потокобезопасное получение cookies с кэшированием
-    """
-    global _cookies_cache, _last_cookies_update
-    
-    with _cookies_lock:
-        current_time = time.time()
-        
-        # Если cookies устарели или отсутствуют, обновляем
-        if (_cookies_cache is None or 
-            current_time - _last_cookies_update > COOKIES_CACHE_TTL):
-            try:
-                logger.info("Обновление cookies через Selenium...")
-                _cookies_cache = get_valid_cookies()
-                _last_cookies_update = current_time
-                logger.info("Cookies успешно обновлены")
-            except Exception as e:
-                logger.error(f"Ошибка при обновлении cookies: {e}")
-                # Если не удалось обновить, используем старые (если есть)
-                if _cookies_cache is None:
-                    raise
-        
-        return _cookies_cache
-
-def invalidate_cookies_cache():
-    """
-    Принудительное обновление cookies при следующем запросе
-    """
-    global _cookies_cache, _last_cookies_update
-    with _cookies_lock:
-        _cookies_cache = None
-        _last_cookies_update = 0
-
-
 if __name__ == "__main__":
     c = get_valid_cookies()
     if c:

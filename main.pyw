@@ -50,6 +50,22 @@ class OrderItem:
     tnved_code: str = ""    # Тнвэд-код
     cisType: str = ""       # тип кода (CIS_TYPE из .env)
 
+class SessionManager:
+    _lock = threading.Lock()
+    _session = None
+    _last_update = 0
+    _lifetime = 60 * 5  # обновлять cookies раз в 5 минут
+
+    @classmethod
+    def get_session(cls):
+        with cls._lock:
+            now = time.time()
+            if cls._session is None or now - cls._last_update > cls._lifetime:
+                cookies = get_valid_cookies()
+                cls._session = make_session_with_cookies(cookies)
+                cls._last_update = now
+            return cls._session
+
 def make_order_to_kontur(it, session) -> Tuple[bool, str]:
     """
     API-обёртка для OrderItem.
@@ -107,11 +123,10 @@ class App(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
         #THREADING
-        self.auto_download_queue = queue.Queue()
-        self.auto_download_thread = None
-        self.stop_auto_download = False
-        self.download_workers = []
-        self.max_workers = 3  # Максимальное количество одновременных скачиваний
+        self.download_executor = ThreadPoolExecutor(max_workers=2)  # Для скачивания
+        self.status_check_executor = ThreadPoolExecutor(max_workers=1)  # Для проверки статусов
+        self.auto_download_active = False
+        
         # Executor для фоновой обработки
         self.execute_all_executor = ThreadPoolExecutor(max_workers=3)  # Один поток для последовательной обработки
         self.intro_executor = ThreadPoolExecutor(max_workers=3)  # Меньше потоков для стабильности
@@ -248,7 +263,7 @@ class App(ctk.CTk):
         # Initial update
         self.update_download_tree()
         # Запускаем автоматическое скачивание при старте
-        self.start_auto_download()
+        self.start_auto_status_check()
 
         self.setup_introduction_tab()
         self.setup_introduction_tsd_tab()
@@ -537,6 +552,7 @@ class App(ctk.CTk):
     def execute_all(self):
         """Запуск выполнения всех накопленных позиций в многопоточном режиме"""
         try:
+            self._reset_input_fields()  # Сбрасываем поля ввода
             if not self.collected:
                 self.log_insert("Нет накопленных позиций.")
                 return
@@ -559,29 +575,14 @@ class App(ctk.CTk):
             # Запускаем задачи в ThreadPoolExecutor
             futures = []
             for it in to_process:
-                uid = getattr(it, "_uid", None)
                 self.log_insert(f"⏳ Добавлен в очередь: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
-                
-                # Запускаем задачу в отдельном потоке
-                # cookies → session
-                cookies = None
-                try:
-                    logger.info("Получаем cookies...")
-                    cookies = get_valid_cookies()
-                except Exception as e:
-                    logger.error("Ошибка при получении cookies:", e)
-                    return False, f"Cannot get cookies: {e}"
 
-                if not cookies:
-                    logger.info("Cookies не получены; прерываем выполнение.")
-                    return False, "Cookies not obtained"
-
-                session = make_session_with_cookies(cookies)
+                session = SessionManager.get_session()
                 fut = self.execute_all_executor.submit(self._execute_worker, it, session)
                 futures.append((fut, it))
 
             # Мониторинг завершения задач
-            def monitor():
+            def execute_all_monitor():
                 completed = 0
                 success_count = 0
                 fail_count = 0
@@ -613,10 +614,10 @@ class App(ctk.CTk):
                 self.after(0, self._on_all_execute_finished, success_count, fail_count, results)
                 
                 # Запускаем автоматическую загрузку
-                self.after(0, self._start_auto_download_for_new_orders)
+                self.after(0, self.start_auto_status_check)
 
             # Запускаем мониторинг в отдельном потоке
-            threading.Thread(target=monitor, daemon=True).start()
+            threading.Thread(target=execute_all_monitor, daemon=True).start()
 
         except Exception as e:
             self.log_insert(f"❌ Ошибка при запуске выполнения: {e}")
@@ -644,7 +645,8 @@ class App(ctk.CTk):
                     'document_id': document_id,
                     'status': 'Ожидает',
                     'filename': None,
-                    'simpl': order_item.simpl_name
+                    'simpl': order_item.simpl_name,
+                    'full_name': order_item.full_name
                 })
                 self.update_download_tree()
             except Exception as e:
@@ -682,143 +684,7 @@ class App(ctk.CTk):
         except Exception as e:
             print(f"Ошибка при сбросе полей ввода: {e}")
 
-    def _start_auto_download_for_new_orders(self):
-        """Добавляет новые заказы в систему автоматического скачивания"""
-        for item in self.download_list:
-            if item['status'] == 'Ожидает':
-                # Можно сразу проверить статус или подождать следующей итерации worker'а
-                pass
-
-
-    def start_auto_download(self):
-        """Запускает систему автоматического скачивания"""
-        self.stop_auto_download = False
-        
-        # Поток для обработки очереди заказов
-        self.auto_download_thread = threading.Thread(target=self._auto_download_worker, daemon=True)
-        self.auto_download_thread.start()
-        
-        # Потоки-воркеры для скачивания
-        for i in range(self.max_workers):
-            worker = threading.Thread(target=self._download_worker, daemon=True, args=(i,))
-            worker.start()
-            self.download_workers.append(worker)
-        
-        self.download_log_insert("Автоматическое скачивание запущено")
-
-    def stop_auto_download_system(self):
-        """Останавливает систему автоматического скачивания"""
-        self.stop_auto_download = True
-        self.download_log_insert("Автоматическое скачивание остановлено")
-
-    def _auto_download_worker(self):
-        """Фоновый worker для проверки статусов заказов"""
-        while not self.stop_auto_download:
-            try:
-                # Проверяем заказы каждые 30 секунд
-                time.sleep(30)
-                
-                if not self.download_list:
-                    continue
-                    
-                # Получаем cookies для сессии
-                try:
-                    cookies = get_valid_cookies()
-                    if not cookies:
-                        continue
-                    session = make_session_with_cookies(cookies)
-                except Exception as e:
-                    self.after(0, lambda: self.download_log_insert(f"Ошибка получения cookies: {e}"))
-                    continue
-                
-                # Проверяем статусы заказов
-                for item in self.download_list:
-                    if self.stop_auto_download:
-                        break
-                        
-                    if item['status'] == 'Ожидает':
-                        document_id = item['document_id']
-                        
-                        # Проверяем статус заказа
-                        try:
-                            status = self._check_order_status(session, document_id)
-                            if status == 'released':
-                                # Добавляем в очередь на скачивание
-                                self.auto_download_queue.put(item)
-                                # Обновляем статус в GUI
-                                self.after(0, lambda i=item: self._update_item_status(i, 'В очереди на скачивание'))
-                        except Exception as e:
-                            self.after(0, lambda e=e: self.download_log_insert(f"Ошибка проверки статуса: {e}"))
-                            
-            except Exception as e:
-                self.after(0, lambda e=e: self.download_log_insert(f"Ошибка в auto_download_worker: {e}"))
-
-    def _download_worker(self, worker_id):
-        """Worker для скачивания PDF"""
-        while not self.stop_auto_download:
-            try:
-                # Берем задание из очереди (с таймаутом для graceful shutdown)
-                try:
-                    item = self.auto_download_queue.get(timeout=5)
-                except queue.Empty:
-                    continue
-                    
-                self.after(0, lambda i=item: self._update_item_status(i, 'Скачивается'))
-                
-                # Скачиваем PDF
-                try:
-                    cookies = get_valid_cookies()
-                    if not cookies:
-                        self.after(0, lambda i=item: self._update_item_status(i, 'Ошибка: нет cookies'))
-                        continue
-                        
-                    session = make_session_with_cookies(cookies)
-                    filename = download_codes(session, item['document_id'], item['order_name'])
-                    
-                    if filename:
-                        self.after(0, lambda i=item, f=filename: self._finish_download(i, f, 'Скачан'))
-                    else:
-                        self.after(0, lambda i=item: self._update_item_status(i, 'Ошибка скачивания'))
-                        
-                except Exception as e:
-                    self.after(0, lambda i=item, e=e: self._update_item_status(i, f'Ошибка: {str(e)}'))
-                    
-                finally:
-                    self.auto_download_queue.task_done()
-                    
-            except Exception as e:
-                self.after(0, lambda e=e: self.download_log_insert(f"Ошибка в download_worker {worker_id}: {e}"))
-
-    def _check_order_status(self, session, document_id):
-        """Проверяет статус заказа (укороченная версия без ожидания)"""
-        try:
-            resp_status = session.get(f"{BASE}/api/v1/codes-order/{document_id}", timeout=15)
-            resp_status.raise_for_status()
-            doc = resp_status.json()
-            return doc.get("status", "unknown")
-        except Exception as e:
-            raise Exception(f"Ошибка проверки статуса {document_id}: {e}")
-
-    def _update_item_status(self, item, new_status):
-        """Обновляет статус элемента в основном потоке"""
-        item['status'] = new_status
-        self.update_download_tree()
-        self.download_log_insert(f"Заказ {item['document_id']}: {new_status}")
-
-    def _finish_download(self, item, filename, status):
-        """Завершает скачивание и обsновляет интерфейс"""
-        item['status'] = status
-        item['filename'] = filename
-        self.update_download_tree()
-        self.download_log_insert(f"Успешно скачан: {filename}")
-
-    def update_download_tree(self):
-        for item in self.download_tree.get_children():
-            self.download_tree.delete(item)
-        for it in self.download_list:
-            self.download_tree.insert("", "end", values=(
-                it['order_name'], it['document_id'], it['status'], it['filename'] or "-"
-            ))
+    
 
     def log_insert(self, msg: str):
         """Выводит сообщение в лог (с ограничением доступа только для чтения)"""
@@ -876,15 +742,155 @@ class App(ctk.CTk):
         except:
             pass
 
+
+    def start_auto_status_check(self):
+        """Запускает автоматическую проверку статусов заказов"""
+        if self.auto_download_active:
+            return
+            
+        self.auto_download_active = True
+        self.download_log_insert("🔄 Автоматическая проверка статусов запущена")
+        
+        def status_check_worker():
+            while self.auto_download_active:
+                try:
+                    # Проверяем каждые 2 секунды
+                    time.sleep(2)
+                    
+                    # Получаем заказы, которые ожидают скачивания
+                    pending_orders = [item for item in self.download_list 
+                                    if item['status'] in ['Ожидает', 'В обработке']]
+                    
+                    if not pending_orders:
+                        continue
+                    
+                    self.download_log_insert(f"🔍 Проверка статусов {len(pending_orders)} заказов...")
+                    
+                    # Проверяем статусы и запускаем скачивание для готовых
+                    for item in pending_orders:
+                        if not self.auto_download_active:
+                            break
+                            
+                        try:
+                            # Проверяем статус заказа
+                            status = self._check_order_status(item['document_id'])
+                            
+                            if status == 'released':
+                                self.download_log_insert(f"✅ Заказ {item['order_name']} готов к скачиванию")
+                                # Запускаем скачивание в отдельном потоке
+                                self.download_executor.submit(self._download_order, item)
+                                item['status'] = 'В обработке'
+                                self.after(0, self.update_download_tree)
+                            elif status in ['processing', 'created']:
+                                item['status'] = 'В обработке'
+                                self.after(0, self.update_download_tree)
+                            elif status == 'error':
+                                item['status'] = 'Ошибка генерации'
+                                self.after(0, self.update_download_tree)
+                                
+                        except Exception as e:
+                            self.download_log_insert(f"❌ Ошибка проверки заказа {item['order_name']}: {e}")
+                            continue
+                            
+                except Exception as e:
+                    self.download_log_insert(f"❌ Ошибка в статус-чекере: {e}")
+                    time.sleep(30)  # Ждем перед повторной попыткой
+        
+        # Запускаем в отдельном потоке
+        threading.Thread(target=status_check_worker, daemon=True).start()
+
+    def _check_order_status(self, document_id):
+        """Проверяет статус заказа"""
+        try:
+            
+            session = SessionManager.get_session()
+            
+            resp = session.get(f"{BASE}/api/v1/codes-order/{document_id}", timeout=15)
+            resp.raise_for_status()
+            
+            doc = resp.json()
+            return doc.get("status", "unknown")
+            
+        except Exception as e:
+            raise Exception(f"Ошибка проверки статуса {document_id}: {e}")
+
+    def _download_order(self, item):
+        """Скачивает заказ в отдельном потоке"""
+        try:
+            self.after(0, lambda: self._update_download_status(item, 'Скачивается'))
+            
+            session = SessionManager.get_session()
+            
+            # Скачиваем файл
+            filename = download_codes(session, item['document_id'], item['order_name'])
+            
+            if filename:
+                self.after(0, lambda: self._finish_download(item, filename))
+            else:
+                self.after(0, lambda: self._update_download_status(item, 'Ошибка скачивания'))
+                
+        except Exception as e:
+            self.after(0, lambda: self._update_download_status(item, f'Ошибка: {e}'))
+
+    def _update_download_status(self, item, status):
+        """Обновляет статус скачивания в UI"""
+        item['status'] = status
+        self.update_download_tree()
+        self.download_log_insert(f"📦 {item['order_name']}: {status}")
+
+    def _finish_download(self, item, filename):
+        """Завершает скачивание"""
+        item['status'] = 'Скачан'
+        item['filename'] = filename
+        self.update_download_tree()
+        self.download_log_insert(f"✅ Успешно скачан: {filename}")
+
+
+    def _add_to_download_list(self, order_item, document_id):
+        """Добавляет заказ в список для скачивания"""
+        # Проверяем, нет ли уже такого заказа
+        for item in self.download_list:
+            if item['document_id'] == document_id:
+                return
+                
+        new_item = {
+            'order_name': order_item.order_name,
+            'document_id': document_id,
+            'status': 'Ожидает',
+            'filename': None,
+            'simpl': order_item.simpl_name
+        }
+        
+        self.download_list.append(new_item)
+        self.update_download_tree()
+        self.download_log_insert(f"📝 Добавлен в очередь скачивания: {order_item.order_name}")
+
+    def update_download_tree(self):
+        """Обновляет таблицу скачиваний"""
+        for item in self.download_tree.get_children():
+            self.download_tree.delete(item)
+            
+        for item in self.download_list:
+            self.download_tree.insert("", "end", values=(
+                item['order_name'],
+                item['status'],
+                item['filename'] or "-",
+                item['document_id']
+            ))
+
     def download_log_insert(self, msg: str):
-        self.download_log_text.insert("end", f"{msg}\n")
+        """Добавляет сообщение в лог скачиваний"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.download_log_text.insert("end", f"[{timestamp}] {msg}\n")
         self.download_log_text.see("end")
 
     def on_closing(self):
-        """Вызывается при закрытии приложения"""
-        self.stop_auto_download_system()
+        self.auto_download_active = False
+        for executor in [self.download_executor, self.status_check_executor,
+                        self.execute_all_executor, self.intro_executor, self.intro_tsd_executor]:
+            executor.shutdown(wait=False, cancel_futures=True)
         self.destroy()
-
+        
     def setup_introduction_tab(self):
         """Создаёт таб 'Ввод в оборот' — вызвать из __init__ после создания tabview."""
         tab_intro = self.tabview.add("Ввод в оборот")
@@ -995,7 +1001,7 @@ class App(ctk.CTk):
             # Добавить записи из self.download_list
             for item in self.download_list:
                 # показываем только скачанные заказы
-                if item.get("status") == "Скачан" and item.get("document_id"):
+                if item.get("status") in ("Скачан", "Downloaded", "Ожидает") and item.get("document_id"):
                     vals = (
                         item.get("order_name", ""), 
                         item.get("document_id", ""), 
@@ -1096,7 +1102,7 @@ class App(ctk.CTk):
                 futures.append((fut, it))
 
             # Мониторинг завершения
-            def monitor():
+            def intro_monitor():
                 completed = 0
                 for fut, it in futures:
                     try:
@@ -1111,7 +1117,7 @@ class App(ctk.CTk):
                 self.after(0, lambda: self.intro_btn.configure(state="normal"))
                 self.after(0, lambda: self.intro_log_insert(f"✅ Все задачи завершены ({completed}/{len(futures)})"))
 
-            threading.Thread(target=monitor, daemon=True).start()
+            threading.Thread(target=intro_monitor, daemon=True).start()
 
         except Exception as e:
             self.intro_log_insert(f"❌ Ошибка при запуске ввода в оборот: {e}")
@@ -1124,12 +1130,7 @@ class App(ctk.CTk):
         document_id = item["document_id"]
         
         try:
-            # Получаем cookies/session
-            cookies = get_valid_cookies()
-            if not cookies:
-                return False, "Не удалось получить cookies"
-            
-            session = make_session_with_cookies(cookies)
+            session = SessionManager.get_session()
             
             # Импортируем функцию из api.py
             from api import put_into_circulation
@@ -1365,7 +1366,8 @@ class App(ctk.CTk):
                     self.tsd_log_insert(f"📦 Данные для API: {production_patch}")
                     
                     # Запускаем задачу
-                    fut = self.intro_tsd_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
+                    session = SessionManager.get_session()
+                    fut = self.intro_tsd_executor.submit(self._tsd_worker, it, positions_data, production_patch, session)
                     futures.append((fut, it))
                     self.tsd_log_insert(f"✅ Задача для {intro_number} добавлена в очередь")
                     
@@ -1380,7 +1382,7 @@ class App(ctk.CTk):
                 return
 
             # Создаём нитку-отслеживатель
-            def monitor():
+            def tsd_monitor():
                 try:
                     self.tsd_log_insert("👀 Мониторинг запущен...")
                     completed = 0
@@ -1421,7 +1423,7 @@ class App(ctk.CTk):
                     self.after(0, lambda: self.tsd_log_insert("🔓 Кнопка разблокирована"))
 
             # Запускаем мониторинг в отдельном потоке
-            monitor_thread = threading.Thread(target=monitor, daemon=True)
+            monitor_thread = threading.Thread(target=tsd_monitor, daemon=True)
             monitor_thread.start()
             self.tsd_log_insert("📊 Мониторинг задач запущен в фоне")
 
@@ -1431,30 +1433,13 @@ class App(ctk.CTk):
             self.tsd_log_insert(f"🔍 Детали: {traceback.format_exc()}")
             self.tsd_btn.configure(state="normal")
 
-    def _tsd_worker(self, item: dict, positions_data: List[Dict[str, str]], production_patch: dict, thumbprint: str) -> Tuple[bool, Dict[str, Any]]:
+    def _tsd_worker(self, item: dict, positions_data: List[Dict[str, str]], production_patch: dict, session) -> Tuple[bool, Dict[str, Any]]:
         """
         Фоновая задача — производит ввод в оборот для одного заказа item.
         Возвращает (ok, result: dict).
         """
         try:
             self.tsd_log_insert(f"🔧 Начало работы _tsd_worker для {item.get('order_name', 'Unknown')}")
-            
-            # получаем cookies/session
-            try:
-                self.tsd_log_insert("🍪 Получение cookies...")
-                cookies = get_valid_cookies()
-            except Exception as e:
-                error_msg = f"Cannot get cookies: {e}"
-                self.tsd_log_insert(f"❌ {error_msg}")
-                return False, {"errors": [error_msg]}
-
-            if not cookies:
-                error_msg = "Cookies not available"
-                self.tsd_log_insert(f"❌ {error_msg}")
-                return False, {"errors": [error_msg]}
-
-            self.tsd_log_insert("✅ Cookies получены")
-            session = make_session_with_cookies(cookies)
 
             document_id = item["document_id"]
             self.tsd_log_insert(f"📄 Document ID: {document_id}")
@@ -1503,15 +1488,6 @@ class App(ctk.CTk):
     def _get_gtin_for_order(self, document_id: str) -> str:
         """Получает GTIN для заказа по document_id"""
         try:
-            self.tsd_log_insert(f"🔍 Поиск GTIN для document_id: {document_id}")
-            
-            # Ищем в collected
-            for item in self.collected:
-                if hasattr(item, '_uid') and item._uid == document_id:
-                    gtin = getattr(item, 'gtin', '')
-                    self.tsd_log_insert(f"✅ Найден GTIN в collected: {gtin}")
-                    return gtin
-            
             # Ищем в download_list по связанным данным
             for dl_item in self.download_list:
                 if dl_item.get('document_id') == document_id:
