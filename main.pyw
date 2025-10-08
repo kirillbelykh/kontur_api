@@ -1285,7 +1285,7 @@ class App(ctk.CTk):
                     # Формируем данные позиций
                     positions_data = [{
                         "name": full_name, 
-                        "gtin": gtin
+                        "gtin": f"0{gtin}"
                     }]
                     
                     # Формируем production_patch
