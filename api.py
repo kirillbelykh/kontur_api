@@ -722,7 +722,7 @@ def make_task_on_tsd(
         }
         
         # Отправляем POST запрос для создания документа
-        r_create = session.post(url_create, json={}, timeout=30)
+        r_create = session.post(url_create, json=req_payload, timeout=30)
         logger.info(f"📡 Статус создания: {r_create.status_code}")
         logger.info(f"📡 Ответ создания: {r_create.text}")
         
