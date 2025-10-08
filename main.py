@@ -126,7 +126,9 @@ class App(ctk.CTk):
         self.download_workers = []
         self.max_workers = 3  # Максимальное количество одновременных скачиваний
         # Executor для фоновой обработки
-        self.intro_executor = ThreadPoolExecutor(max_workers=3)  # Меньше потоков для стабильности
+        self.executor_execute_all = ThreadPoolExecutor(max_workers=3)
+        self.executor_intro = ThreadPoolExecutor(max_workers=3)
+        self.executor_tsd = ThreadPoolExecutor(max_workers=3)
         
         # Tabview for sections
         self.tabview = ctk.CTkTabview(self)
@@ -575,7 +577,7 @@ class App(ctk.CTk):
                 self.log_insert(f"⏳ Добавлен в очередь: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
                 
                 # Запускаем задачу в отдельном потоке
-                fut = self.intro_executor.submit(self._execute_worker, it)
+                fut = self.executor_execute_all.submit(self._execute_worker, it)
                 futures.append((fut, it))
 
             # Мониторинг завершения задач
@@ -1094,7 +1096,7 @@ class App(ctk.CTk):
                     "TnvedCode": tnved_code
                 }
                 
-                fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint)
+                fut = self.executor_intro.submit(self._intro_worker, it, production_patch, thumbprint)
                 futures.append((fut, it))
 
             # Мониторинг завершения
@@ -1367,7 +1369,7 @@ class App(ctk.CTk):
                     self.tsd_log_insert(f"📦 Данные для API: {production_patch}")
                     
                     # Запускаем задачу
-                    fut = self.intro_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
+                    fut = self.executor_tsd.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
                     futures.append((fut, it))
                     self.tsd_log_insert(f"✅ Задача для {intro_number} добавлена в очередь")
                     
