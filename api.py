@@ -9,8 +9,8 @@ import requests
 from dotenv import load_dotenv
 
 from logger import logger
-from cryptopro import find_certificate_by_thumbprint, sign_data
-from winhttp import post_with_winhttp
+from cryptopro import find_certificate_by_thumbprint, sign_data, refresh_oms_token
+
 
 
 # ------------------- Инициализация окружения -------------------
@@ -33,63 +33,6 @@ DEBUG_DIR = Path(__file__).resolve().parent
 LAST_SINGLE_REQ = DEBUG_DIR / "last_single_request.json"
 LAST_SINGLE_RESP = DEBUG_DIR / "last_single_response.json"
 LAST_MULTI_LOG = DEBUG_DIR / "last_multistep_log.json"
-
-# ---------------- Refresh OMS token ----------------
-def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> bool:
-    logger.info("Обновление токена OMS...")
-    url_auth = f"{BASE}/api/v1/crpt/auth?organizationId={organization_id}"
-
-    try:
-        resp_get = session.get(url_auth, timeout=15)
-        resp_get.raise_for_status()
-        challenges = resp_get.json()
-        logger.debug(f"Ответ /crpt/auth GET: {json.dumps(challenges, indent=2)}")
-        if not isinstance(challenges, list):
-            logger.error(f"[ERR] Некорректный формат challenges: {challenges}")
-            return False
-    except Exception as e:
-        logger.error(f"[ERR] GET challenges для OMS: {e}")
-        return False
-
-    payload = []
-    for ch in challenges:
-        if ch['productGroup'] in ['oms', 'trueApi']:
-            try:
-                sig = sign_data(cert, ch["base64Data"], b_detached=False)  # attached для auth
-                payload.append({
-                    "uuid": ch["uuid"],
-                    "productGroup": ch["productGroup"],
-                    "base64Data": sig  # trueApi/oms используют одно поле
-                })
-            except Exception as e:
-                logger.error(f"Подпись challenge для {ch['productGroup']} (uuid={ch['uuid']}): {e}")
-                return False
-
-
-    if not payload:
-        logger.error("Нет challenge для OMS в ответе")
-        return False
-
-    try:
-        cookies_dict = session.cookies.get_dict()
-        cookie_str = "; ".join([f"{k}={v}" for k, v in cookies_dict.items()]) if cookies_dict else ""
-        custom_headers = {"Cookie": cookie_str} if cookie_str else None
-        status, resp_text, all_headers = post_with_winhttp(url_auth, payload, headers=custom_headers)
-
-        # Обновление cookies в session из Set-Cookie
-        set_cookie_lines = [line.strip()[len("Set-Cookie:"):].strip() for line in all_headers.splitlines() if line.strip().startswith("Set-Cookie:")]
-        if set_cookie_lines:
-            temp_resp = requests.Response()
-            temp_resp.headers['Set-Cookie'] = set_cookie_lines
-            temp_resp.status_code = status
-            temp_resp.url = url_auth
-            session.cookies.update(temp_resp.cookies)
-
-        logger.info(f"Токен OMS обновлён успешно. Ответ: {resp_text}")
-        return True
-    except Exception as e:
-        logger.error(f"POST signed challenges для OMS: {e}")
-        return False
 
 # ---------------- API flows ----------------
 def codes_order(session: requests.Session, document_number: str,
