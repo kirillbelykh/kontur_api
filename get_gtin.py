@@ -19,11 +19,12 @@ def lookup_gtin(
     """
     try:
         simpl = simpl_name.strip().lower()
-        size_l = str(size).strip().lower()
+        size_input = str(size).strip().lower()
         units_str = str(units_per_pack).strip()
         color_l = color.strip().lower() if color else None
         venchik_l = venchik.strip().lower() if venchik else None
 
+        # Гарантия наличия нужных колонок
         required_cols = [
             'GTIN',
             'Полное наименование товара',
@@ -37,11 +38,50 @@ def lookup_gtin(
             if col not in df.columns:
                 df[col] = ""
 
+        # Функция для нормализации размера из таблицы
+        def extract_size_from_table(size_str):
+            """Извлекает размер в формате S/M/L/XL из строки типа 'СВЕРХБОЛЬШОЙ (XL)'"""
+            if not isinstance(size_str, str):
+                return ""
+            
+            # Ищем содержимое в скобках
+            import re
+            match = re.search(r'\(([A-Z]+)\)', size_str.upper())
+            if match:
+                return match.group(1).lower()
+            
+            # Если скобок нет, пытаемся определить по ключевым словам
+            size_str_lower = size_str.lower()
+            if "сверхбольшой" in size_str_lower or "xl" in size_str_lower:
+                return "xl"
+            elif "большой" in size_str_lower or "l" in size_str_lower:
+                return "l"
+            elif "средний" in size_str_lower or "m" in size_str_lower:
+                return "m"
+            elif "маленький" in size_str_lower or "s" in size_str_lower:
+                return "s"
+            
+            return size_str_lower
+
+        # Нормализуем размеры в DataFrame
+        df['normalized_size'] = df['Размер'].apply(extract_size_from_table)
+        
+        # Нормализуем входной размер
+        size_mapping = {
+            's': 's', 'маленький': 's',
+            'm': 'm', 'средний': 'm',
+            'l': 'l', 'большой': 'l', 
+            'xl': 'xl', 'сверхбольшой': 'xl'
+        }
+        normalized_input_size = size_mapping.get(size_input, size_input)
+
         # --- Точный поиск ---
         cond = (
-            (df['Упрощенно'].astype(str).str.strip().str.lower() == simpl)
-            & (df['Размер'].astype(str).str.strip().str.lower() == size_l)
-            & (df['Количество единиц употребления в потребительской упаковке'].astype(str).str.strip() == units_str)
+            df['Упрощенно'].astype(str).str.strip().str.lower() == simpl
+        ) & (
+            df['normalized_size'] == normalized_input_size
+        ) & (
+            df['Количество единиц употребления в потребительской упаковке'].astype(str).str.strip() == units_str
         )
 
         if venchik_l:
@@ -57,12 +97,15 @@ def lookup_gtin(
                 str(row['Полное наименование товара']).strip()
             )
 
-        # --- Частичный поиск (fallback) ---
+        # --- Частичный поиск (только по simpl_name) ---
         cond2 = (
             df['Упрощенно'].astype(str).str.strip().str.lower().str.contains(simpl, na=False)
         ) & (
-            df['Размер'].astype(str).str.strip().str.lower().str.contains(size_l, na=False)
+            df['normalized_size'] == normalized_input_size
+        ) & (
+            df['Количество единиц употребления в потребительской упаковке'].astype(str).str.strip() == units_str
         )
+
         if venchik_l:
             cond2 &= df['венчик'].astype(str).str.strip().str.lower() == venchik_l
         if color_l:
@@ -75,6 +118,11 @@ def lookup_gtin(
                 str(row['GTIN']).strip(),
                 str(row['Полное наименование товара']).strip()
             )
+
+        # Логируем для отладки
+        logger.debug(f"Не найдено совпадений для: simpl={simpl}, size={normalized_input_size}, units={units_str}")
+        available_sizes = df[df['Упрощенно'].str.lower() == simpl]['normalized_size'].unique()
+        logger.debug(f"Доступные размеры для {simpl}: {list(available_sizes)}")
 
     except Exception as e:
         logger.exception("Ошибка в lookup_gtin")
