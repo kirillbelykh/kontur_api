@@ -50,7 +50,7 @@ class OrderItem:
     tnved_code: str = ""    # Тнвэд-код
     cisType: str = ""       # тип кода (CIS_TYPE из .env)
 
-def make_order_to_kontur(it) -> Tuple[bool, str]:
+def make_order_to_kontur(it, session) -> Tuple[bool, str]:
     """
     API-обёртка для OrderItem.
     """
@@ -70,20 +70,6 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
             "cisType": payload.get("cisType")
         }]
 
-        # cookies → session
-        cookies = None
-        try:
-            logger.info("Получаем cookies...")
-            cookies = get_valid_cookies()
-        except Exception as e:
-            logger.error("Ошибка при получении cookies:", e)
-            return False, f"Cannot get cookies: {e}"
-
-        if not cookies:
-            logger.info("Cookies не получены; прерываем выполнение.")
-            return False, "Cookies not obtained"
-
-        session = make_session_with_cookies(cookies)
 
         # --- пробуем быстрый POST ---
         resp = codes_order(
@@ -576,7 +562,21 @@ class App(ctk.CTk):
                 self.log_insert(f"⏳ Добавлен в очередь: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
                 
                 # Запускаем задачу в отдельном потоке
-                fut = self.intro_executor.submit(self._execute_worker, it)
+                # cookies → session
+                cookies = None
+                try:
+                    logger.info("Получаем cookies...")
+                    cookies = get_valid_cookies()
+                except Exception as e:
+                    logger.error("Ошибка при получении cookies:", e)
+                    return False, f"Cannot get cookies: {e}"
+
+                if not cookies:
+                    logger.info("Cookies не получены; прерываем выполнение.")
+                    return False, "Cookies not obtained"
+
+                session = make_session_with_cookies(cookies)
+                fut = self.intro_executor.submit(self._execute_worker, it, session)
                 futures.append((fut, it))
 
             # Мониторинг завершения задач
@@ -622,11 +622,11 @@ class App(ctk.CTk):
             # В случае ошибки разблокируем кнопку
             self.execute_btn.configure(state="normal")
 
-    def _execute_worker(self, order_item):
+    def _execute_worker(self, order_item, session):
         """Воркер для выполнения одного заказа в отдельном потоке"""
         try:
             self.log_insert(f"🎬 Запуск позиции: {order_item.simpl_name} | GTIN {order_item.gtin} | заявка '{order_item.order_name}'")
-            ok, msg = make_order_to_kontur(order_item)
+            ok, msg = make_order_to_kontur(order_item, session)
             return ok, msg
         except Exception as e:
             return False, f"Ошибка в воркере: {e}"

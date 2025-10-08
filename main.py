@@ -2,6 +2,7 @@ import os
 import copy
 import uuid
 import threading
+import traceback
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import time
@@ -12,7 +13,7 @@ from dataclasses import dataclass, asdict
 from typing import List, Tuple, Dict, Any
 from get_gtin import lookup_gtin, lookup_by_gtin
 from api import codes_order, download_codes, make_task_on_tsd
-from cookies import get_valid_cookies, get_shared_cookies, invalidate_cookies_cache
+from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
 import tkinter as tk
@@ -49,7 +50,7 @@ class OrderItem:
     tnved_code: str = ""    # Тнвэд-код
     cisType: str = ""       # тип кода (CIS_TYPE из .env)
 
-def make_order_to_kontur(it) -> Tuple[bool, str]:
+def make_order_to_kontur(it, session) -> Tuple[bool, str]:
     """
     API-обёртка для OrderItem.
     """
@@ -69,20 +70,6 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
             "cisType": payload.get("cisType")
         }]
 
-        # Используем общие cookies вместо получения новых
-        cookies = None
-        try:
-            logger.info("Получаем cookies из кэша...")
-            cookies = get_shared_cookies()
-        except Exception as e:
-            logger.error("Ошибка при получении cookies:", e)
-            return False, f"Cannot get cookies: {e}"
-
-        if not cookies:
-            logger.info("Cookies не получены; прерываем выполнение.")
-            return False, "Cookies not obtained"
-
-        session = make_session_with_cookies(cookies)
 
         # --- пробуем быстрый POST ---
         resp = codes_order(
@@ -97,25 +84,6 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
 
         if not resp:
             return False, "No response from API"
-
-        # Если получили ошибку авторизации, инвалидируем кэш и пробуем еще раз
-        if isinstance(resp, dict) and resp.get('code') == 401:
-            logger.warning("Cookies устарели, обновляем кэш...")
-            invalidate_cookies_cache()
-            try:
-                cookies = get_shared_cookies()
-                session = make_session_with_cookies(cookies)
-                resp = codes_order(
-                    session,
-                    str(document_number),
-                    str(PRODUCT_GROUP),
-                    str(RELEASE_METHOD_TYPE),
-                    positions,
-                    filling_method=str(FILLING_METHOD),
-                    thumbprint=str(THUMBPRINT)
-                )
-            except Exception as retry_e:
-                return False, f"Retry failed after auth error: {retry_e}"
 
         # проверка дублирования: если documentId уже есть, не создаём новую заявку
         document_id = resp.get("documentId") or resp.get("id")  # зависит от API
@@ -145,12 +113,7 @@ class App(ctk.CTk):
         self.download_workers = []
         self.max_workers = 3  # Максимальное количество одновременных скачиваний
         # Executor для фоновой обработки
-        self.executor_execute_all = ThreadPoolExecutor(max_workers=3)
-        self.executor_intro = ThreadPoolExecutor(max_workers=3)
-        self.executor_tsd = ThreadPoolExecutor(max_workers=3)
-        
-        # Предварительная загрузка cookies при старте
-        self.after(100, self._preload_cookies)
+        self.intro_executor = ThreadPoolExecutor(max_workers=3)  # Меньше потоков для стабильности
         
         # Tabview for sections
         self.tabview = ctk.CTkTabview(self)
@@ -289,15 +252,7 @@ class App(ctk.CTk):
         self.setup_introduction_tab()
         self.setup_introduction_tsd_tab()
 
-    def _preload_cookies(self):
-        """Предварительная загрузка cookies в основном потоке"""
-        try:
-            logger.info("Предварительная загрузка cookies...")
-            get_shared_cookies()
-            logger.info("Cookies успешно загружены")
-        except Exception as e:
-            logger.error(f"Ошибка при предварительной загрузке cookies: {e}")
-            
+
     def _add_entry_context_menu(self, entry: ctk.CTkEntry):
         """Добавляет контекстное меню (правый клик) и обработку вставки через клавиши для поля entry.
 
@@ -607,7 +562,21 @@ class App(ctk.CTk):
                 self.log_insert(f"⏳ Добавлен в очередь: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
                 
                 # Запускаем задачу в отдельном потоке
-                fut = self.executor_execute_all.submit(self._execute_worker, it)
+                # cookies → session
+                cookies = None
+                try:
+                    logger.info("Получаем cookies...")
+                    cookies = get_valid_cookies()
+                except Exception as e:
+                    logger.error("Ошибка при получении cookies:", e)
+                    return False, f"Cannot get cookies: {e}"
+
+                if not cookies:
+                    logger.info("Cookies не получены; прерываем выполнение.")
+                    return False, "Cookies not obtained"
+
+                session = make_session_with_cookies(cookies)
+                fut = self.intro_executor.submit(self._execute_worker, it, session)
                 futures.append((fut, it))
 
             # Мониторинг завершения задач
@@ -653,11 +622,11 @@ class App(ctk.CTk):
             # В случае ошибки разблокируем кнопку
             self.execute_btn.configure(state="normal")
 
-    def _execute_worker(self, order_item):
+    def _execute_worker(self, order_item, session):
         """Воркер для выполнения одного заказа в отдельном потоке"""
         try:
             self.log_insert(f"🎬 Запуск позиции: {order_item.simpl_name} | GTIN {order_item.gtin} | заявка '{order_item.order_name}'")
-            ok, msg = make_order_to_kontur(order_item)
+            ok, msg = make_order_to_kontur(order_item, session)
             return ok, msg
         except Exception as e:
             return False, f"Ошибка в воркере: {e}"
@@ -745,12 +714,10 @@ class App(ctk.CTk):
         """Фоновый worker для проверки статусов заказов"""
         while not self.stop_auto_download:
             try:
-                logger.info("Auto-download worker проверяет статусы заказов...")
                 # Проверяем заказы каждые 30 секунд
                 time.sleep(30)
                 
                 if not self.download_list:
-                    logger.info("Нет заказов для проверки статусов.")
                     continue
                     
                 # Получаем cookies для сессии
@@ -789,12 +756,10 @@ class App(ctk.CTk):
         """Worker для скачивания PDF"""
         while not self.stop_auto_download:
             try:
-                logger.info(f"Worker {worker_id} ждет задания...")
                 # Берем задание из очереди (с таймаутом для graceful shutdown)
                 try:
                     item = self.auto_download_queue.get(timeout=5)
                 except queue.Empty:
-                    logger.info(f"Worker {worker_id} таймаут ожидания задания.")
                     continue
                     
                 self.after(0, lambda i=item: self._update_item_status(i, 'Скачивается'))
@@ -1126,7 +1091,7 @@ class App(ctk.CTk):
                     "TnvedCode": tnved_code
                 }
                 
-                fut = self.executor_intro.submit(self._intro_worker, it, production_patch, thumbprint)
+                fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint)
                 futures.append((fut, it))
 
             # Мониторинг завершения
@@ -1399,7 +1364,7 @@ class App(ctk.CTk):
                     self.tsd_log_insert(f"📦 Данные для API: {production_patch}")
                     
                     # Запускаем задачу
-                    fut = self.executor_tsd.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
+                    fut = self.intro_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
                     futures.append((fut, it))
                     self.tsd_log_insert(f"✅ Задача для {intro_number} добавлена в очередь")
                     
