@@ -2,7 +2,6 @@ import os
 import copy
 import uuid
 import threading
-import traceback
 from concurrent.futures import ThreadPoolExecutor
 import queue
 import time
@@ -714,10 +713,12 @@ class App(ctk.CTk):
         """Фоновый worker для проверки статусов заказов"""
         while not self.stop_auto_download:
             try:
+                logger.info("Auto-download worker проверяет статусы заказов...")
                 # Проверяем заказы каждые 30 секунд
                 time.sleep(30)
                 
                 if not self.download_list:
+                    logger.info("Нет заказов для проверки статусов.")
                     continue
                     
                 # Получаем cookies для сессии
@@ -756,10 +757,12 @@ class App(ctk.CTk):
         """Worker для скачивания PDF"""
         while not self.stop_auto_download:
             try:
+                logger.info(f"Worker {worker_id} ждет задания...")
                 # Берем задание из очереди (с таймаутом для graceful shutdown)
                 try:
                     item = self.auto_download_queue.get(timeout=5)
                 except queue.Empty:
+                    logger.info(f"Worker {worker_id} таймаут ожидания задания.")
                     continue
                     
                 self.after(0, lambda i=item: self._update_item_status(i, 'Скачивается'))
