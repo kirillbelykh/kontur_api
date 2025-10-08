@@ -1130,17 +1130,22 @@ class App(ctk.CTk):
         tsd_inputs = ctk.CTkFrame(tab_tsd)
         tsd_inputs.pack(padx=10, pady=5, fill="x")
 
-        ctk.CTkLabel(tsd_inputs, text="Дата производства (ДД-ММ-ГГГГ):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        # Ровные поля — метки в первом столбце, поля во втором
+        ctk.CTkLabel(tsd_inputs, text="Ввод в оборот №:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        self.tsd_intro_number_entry = ctk.CTkEntry(tsd_inputs, width=200)
+        self.tsd_intro_number_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        ctk.CTkLabel(tsd_inputs, text="Дата производства (ДД-ММ-ГГГГ):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
         self.tsd_prod_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
-        self.tsd_prod_date_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.tsd_prod_date_entry.grid(row=1, column=1, padx=5, pady=5)
 
-        ctk.CTkLabel(tsd_inputs, text="Дата окончания (ДД-ММ-ГГГГ):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(tsd_inputs, text="Дата окончания (ДД-ММ-ГГГГ):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
         self.tsd_exp_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
-        self.tsd_exp_date_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.tsd_exp_date_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        ctk.CTkLabel(tsd_inputs, text="Номер партии:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
+        ctk.CTkLabel(tsd_inputs, text="Номер партии:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.tsd_batch_entry = ctk.CTkEntry(tsd_inputs, width=200)
-        self.tsd_batch_entry.grid(row=2, column=1, padx=5, pady=5)
+        self.tsd_batch_entry.grid(row=3, column=1, padx=5, pady=5)
 
         # Кнопки
         btn_frame = ctk.CTkFrame(tab_tsd)
@@ -1215,11 +1220,13 @@ class App(ctk.CTk):
                 return
 
             # Получаем данные из полей ввода
+            intro_number = self.tsd_intro_number_entry.get().strip()
             prod_date_raw = self.tsd_prod_date_entry.get().strip()
             exp_date_raw = self.tsd_exp_date_entry.get().strip()
             batch_num = self.tsd_batch_entry.get().strip()
             
-            self.tsd_log_insert(f"📅 Получены данные из полей: prod='{prod_date_raw}', exp='{exp_date_raw}', batch='{batch_num}'")
+            
+            self.tsd_log_insert(f"📅 Получены данные из полей: into_num='{intro_number}', prod='{prod_date_raw}', exp='{exp_date_raw}', batch='{batch_num}'")
 
             # Преобразуем даты
             try:
@@ -1232,6 +1239,8 @@ class App(ctk.CTk):
 
             # Валидация
             errors = []
+            if not intro_number:
+                errors.append("Введите номер ввода в оборот.")
             if not batch_num:
                 errors.append("Введите номер партии.")
             if not prod_date:
@@ -1255,19 +1264,18 @@ class App(ctk.CTk):
                 try:
                     docid = it["document_id"]
                     self.tsd_log_insert(f"Нашли doc_id для поиска gtin: {docid}")
-                    order_name = it.get("order_name", "Unknown")
                     simpl_name = it.get("simpl", "")
                     full_name = it.get("full_name")
 
                     
-                    self.tsd_log_insert(f"⏳ Подготовка заказа: {order_name} (ID: {docid})")
+                    self.tsd_log_insert(f"⏳ Подготовка заказа: {intro_number} (ID: {docid})")
                     
                     # Получаем GTIN из исходных данных заказа
                     gtin = self._get_gtin_for_order(docid)
                     self.tsd_log_insert(f"   GTIN: {gtin}")
                     
                     if not gtin:
-                        self.tsd_log_insert(f"⚠️ Не найден GTIN для заказа {docid}, пропускаем")
+                        self.tsd_log_insert(f"⚠️ Не найден GTIN для заказа {intro_number}, пропускаем")
                         continue
                     
                     # Получаем TNVED код
@@ -1282,7 +1290,7 @@ class App(ctk.CTk):
                     
                     # Формируем production_patch
                     production_patch = {
-                        "documentNumber": order_name,
+                        "documentNumber": intro_number,
                         "productionDate": prod_date,
                         "expirationDate": exp_date,
                         "batchNumber": batch_num,
@@ -1294,7 +1302,7 @@ class App(ctk.CTk):
                     # Запускаем задачу
                     fut = self.intro_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
                     futures.append((fut, it))
-                    self.tsd_log_insert(f"✅ Задача для {order_name} добавлена в очередь")
+                    self.tsd_log_insert(f"✅ Задача для {intro_number} добавлена в очередь")
                     
                 except Exception as e:
                     self.tsd_log_insert(f"❌ Ошибка при подготовке заказа {it.get('order_name', 'Unknown')}: {e}")
