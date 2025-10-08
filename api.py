@@ -716,6 +716,10 @@ def make_task_on_tsd(
         # 1. Создаем документ ввода в оборот
         url_create = f"{BASE}/api/v1/codes-introduction?warehouseId={WAREHOUSE_ID}"
         logger.info(f"📝 Создаем документ: {url_create}")
+        req_payload = {
+            "introductionType": "introduction",
+            "productGroup": PRODUCT_GROUP,
+        }
         
         # Отправляем POST запрос для создания документа
         r_create = session.post(url_create, json={}, timeout=30)
