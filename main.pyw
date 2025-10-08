@@ -113,7 +113,7 @@ class App(ctk.CTk):
     def __init__(self, df):
         super().__init__()
         self.title("Kontur Marking")
-        self.geometry("800x600")
+        self.geometry("800x700")
         self.df = df
         self.collected: List[OrderItem] = []
         self.download_list: List[dict] = []  # [{'document_id': str, 'status': str, 'filename': str or None, 'order_name': str}]
