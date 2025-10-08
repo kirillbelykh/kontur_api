@@ -9,7 +9,7 @@ import requests
 from dotenv import load_dotenv
 
 from logger import logger
-from cryptopro import find_certificate_by_thumbprint, sign_data, refresh_oms_token
+from cryptopro import find_certificate_by_thumbprint, sign_data
 
 
 
@@ -130,10 +130,6 @@ def codes_order(session: requests.Session, document_number: str,
 
     # отправка документа
     try:
-        if not refresh_oms_token(session, cert, str(ORGANIZATION_ID)):
-            logger.error("Не удалось обновить токен OMS")
-            return None
-
         send_url = f"{BASE}/api/v1/codes-order/{document_id}/send"
         payload = {"signedOrders": signed_orders_payload}
         r_send = session.post(send_url, json=payload, timeout=30)
