@@ -12,7 +12,7 @@ from dataclasses import dataclass, asdict
 from typing import List, Tuple, Dict, Any
 from get_gtin import lookup_gtin, lookup_by_gtin
 from api import codes_order, download_codes, make_task_on_tsd
-from cookies import get_valid_cookies
+from cookies import get_valid_cookies, get_shared_cookies, invalidate_cookies_cache
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
 import tkinter as tk
@@ -69,11 +69,11 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
             "cisType": payload.get("cisType")
         }]
 
-        # cookies → session
+        # Используем общие cookies вместо получения новых
         cookies = None
         try:
-            logger.info("Получаем cookies...")
-            cookies = get_valid_cookies()
+            logger.info("Получаем cookies из кэша...")
+            cookies = get_shared_cookies()
         except Exception as e:
             logger.error("Ошибка при получении cookies:", e)
             return False, f"Cannot get cookies: {e}"
@@ -97,6 +97,25 @@ def make_order_to_kontur(it) -> Tuple[bool, str]:
 
         if not resp:
             return False, "No response from API"
+
+        # Если получили ошибку авторизации, инвалидируем кэш и пробуем еще раз
+        if isinstance(resp, dict) and resp.get('code') == 401:
+            logger.warning("Cookies устарели, обновляем кэш...")
+            invalidate_cookies_cache()
+            try:
+                cookies = get_shared_cookies()
+                session = make_session_with_cookies(cookies)
+                resp = codes_order(
+                    session,
+                    str(document_number),
+                    str(PRODUCT_GROUP),
+                    str(RELEASE_METHOD_TYPE),
+                    positions,
+                    filling_method=str(FILLING_METHOD),
+                    thumbprint=str(THUMBPRINT)
+                )
+            except Exception as retry_e:
+                return False, f"Retry failed after auth error: {retry_e}"
 
         # проверка дублирования: если documentId уже есть, не создаём новую заявку
         document_id = resp.get("documentId") or resp.get("id")  # зависит от API
@@ -129,6 +148,9 @@ class App(ctk.CTk):
         self.executor_execute_all = ThreadPoolExecutor(max_workers=3)
         self.executor_intro = ThreadPoolExecutor(max_workers=3)
         self.executor_tsd = ThreadPoolExecutor(max_workers=3)
+        
+        # Предварительная загрузка cookies при старте
+        self.after(100, self._preload_cookies)
         
         # Tabview for sections
         self.tabview = ctk.CTkTabview(self)
@@ -267,7 +289,15 @@ class App(ctk.CTk):
         self.setup_introduction_tab()
         self.setup_introduction_tsd_tab()
 
-
+    def _preload_cookies(self):
+        """Предварительная загрузка cookies в основном потоке"""
+        try:
+            logger.info("Предварительная загрузка cookies...")
+            get_shared_cookies()
+            logger.info("Cookies успешно загружены")
+        except Exception as e:
+            logger.error(f"Ошибка при предварительной загрузке cookies: {e}")
+            
     def _add_entry_context_menu(self, entry: ctk.CTkEntry):
         """Добавляет контекстное меню (правый клик) и обработку вставки через клавиши для поля entry.
 
