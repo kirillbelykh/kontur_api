@@ -552,7 +552,6 @@ class App(ctk.CTk):
     def execute_all(self):
         """Запуск выполнения всех накопленных позиций в многопоточном режиме"""
         try:
-            self._reset_input_fields()  # Сбрасываем поля ввода
             if not self.collected:
                 self.log_insert("Нет накопленных позиций.")
                 return
@@ -764,7 +763,6 @@ class App(ctk.CTk):
                     if not pending_orders:
                         continue
                     
-                    self.download_log_insert(f"🔍 Проверка статусов {len(pending_orders)} заказов...")
                     
                     # Проверяем статусы и запускаем скачивание для готовых
                     for item in pending_orders:
