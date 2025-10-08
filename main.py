@@ -113,8 +113,9 @@ class App(ctk.CTk):
         self.download_workers = []
         self.max_workers = 3  # Максимальное количество одновременных скачиваний
         # Executor для фоновой обработки
+        self.execute_all_executor = ThreadPoolExecutor(max_workers=3)  # Один поток для последовательной обработки
         self.intro_executor = ThreadPoolExecutor(max_workers=3)  # Меньше потоков для стабильности
-        
+        self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)  # Для ТСД
         # Tabview for sections
         self.tabview = ctk.CTkTabview(self)
         self.tabview.pack(pady=10, padx=10, fill="both", expand=True)
@@ -576,7 +577,7 @@ class App(ctk.CTk):
                     return False, "Cookies not obtained"
 
                 session = make_session_with_cookies(cookies)
-                fut = self.intro_executor.submit(self._execute_worker, it, session)
+                fut = self.execute_all_executor.submit(self._execute_worker, it, session)
                 futures.append((fut, it))
 
             # Мониторинг завершения задач
@@ -589,7 +590,7 @@ class App(ctk.CTk):
                 for fut, it in futures:
                     try:
                         # Ждем завершения задачи с таймаутом
-                        ok, msg = fut.result(timeout=600)  # 10 минут таймаут
+                        ok, msg = fut.result(timeout=60)  # 1 минута таймаут
                         results.append((ok, msg, it))
                         
                         # Обновляем GUI в основном потоке
@@ -1364,7 +1365,7 @@ class App(ctk.CTk):
                     self.tsd_log_insert(f"📦 Данные для API: {production_patch}")
                     
                     # Запускаем задачу
-                    fut = self.intro_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
+                    fut = self.intro_tsd_executor.submit(self._tsd_worker, it, positions_data, production_patch, THUMBPRINT)
                     futures.append((fut, it))
                     self.tsd_log_insert(f"✅ Задача для {intro_number} добавлена в очередь")
                     
@@ -1386,7 +1387,7 @@ class App(ctk.CTk):
                     for fut, it in futures:
                         try:
                             self.tsd_log_insert(f"⏳ Ожидание завершения задачи {completed + 1}/{len(futures)}...")
-                            ok, result = fut.result(timeout=300)  # 5 минут таймаут
+                            ok, result = fut.result(timeout=15)
                             
                             # Формируем сообщение
                             if ok:
