@@ -758,8 +758,7 @@ class App(ctk.CTk):
                     
                     # Получаем заказы, которые ожидают скачивания
                     pending_orders = [item for item in self.download_list 
-                                    if item['status'] in ['Ожидает', 'В обработке']]
-                    
+                                if item['status'] not in ['Скачивается', 'Скачан']]
                     if not pending_orders:
                         continue
                     
