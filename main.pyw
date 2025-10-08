@@ -127,7 +127,7 @@ class App(ctk.CTk):
         self.download_workers = []
         self.max_workers = 3  # Максимальное количество одновременных скачиваний
         # Executor для фоновой обработки
-        self.intro_executor = ThreadPoolExecutor(max_workers=2)  # Меньше потоков для стабильности
+        self.intro_executor = ThreadPoolExecutor(max_workers=3)  # Меньше потоков для стабильности
         
         # Tabview for sections
         self.tabview = ctk.CTkTabview(self)
@@ -210,8 +210,8 @@ class App(ctk.CTk):
         delete_btn = ctk.CTkButton(btn_frame, text="Удалить позицию", command=self.delete_item)
         delete_btn.pack(side="left", padx=10)
 
-        execute_btn = ctk.CTkButton(btn_frame, text="Выполнить все", command=self.execute_all)
-        execute_btn.pack(side="left", padx=10)
+        self.execute_btn = ctk.CTkButton(btn_frame, text="Выполнить все", command=self.execute_all)
+        self.execute_btn.pack(side="left", padx=10)
         
         clear_btn = ctk.CTkButton(btn_frame, text="Очистить", command=self.clear_all)
         clear_btn.pack(side="left", padx=10)
@@ -548,60 +548,124 @@ class App(ctk.CTk):
 
 
     def execute_all(self):
-        if not self.collected:
-            self.log_insert("Нет накопленных позиций.")
-            return
+        """Запуск выполнения всех накопленных позиций в многопоточном режиме"""
+        try:
+            if not self.collected:
+                self.log_insert("Нет накопленных позиций.")
+                return
 
-        confirm = tk.messagebox.askyesno("Подтверждение", f"Подтвердите выполнение {len(self.collected)} задач(и)?")
-        if not confirm:
-            self.log_insert("Выполнение отменено пользователем.")
-            return
+            confirm = tk.messagebox.askyesno("Подтверждение", f"Подтвердите выполнение {len(self.collected)} задач(и)?")
+            if not confirm:
+                self.log_insert("Выполнение отменено пользователем.")
+                return
 
-        to_process = copy.deepcopy(self.collected)
+            to_process = copy.deepcopy(self.collected)
+            save_snapshot(to_process)
+            save_order_history(to_process)
+            
+            self.log_insert(f"\nБудет выполнено {len(to_process)} заказов.")
+            self.log_insert("Запуск в многопоточном режиме...")
+            
+            # Отключаем кнопку выполнения на время работы
+            self.execute_btn.configure(state="disabled")  # Предполагается, что у вас есть такая кнопка
+            
+            # Запускаем задачи в ThreadPoolExecutor
+            futures = []
+            for it in to_process:
+                uid = getattr(it, "_uid", None)
+                self.log_insert(f"⏳ Добавлен в очередь: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
+                
+                # Запускаем задачу в отдельном потоке
+                fut = self.intro_executor.submit(self._execute_worker, it)
+                futures.append((fut, it))
 
-        save_snapshot(to_process)
-        save_order_history(to_process)
+            # Мониторинг завершения задач
+            def monitor():
+                completed = 0
+                success_count = 0
+                fail_count = 0
+                results = []
+                
+                for fut, it in futures:
+                    try:
+                        # Ждем завершения задачи с таймаутом
+                        ok, msg = fut.result(timeout=600)  # 10 минут таймаут
+                        results.append((ok, msg, it))
+                        
+                        # Обновляем GUI в основном потоке
+                        self.after(0, self._on_execute_finished, it, ok, msg)
+                        
+                        if ok:
+                            success_count += 1
+                        else:
+                            fail_count += 1
+                            
+                        completed += 1
+                        
+                    except Exception as e:
+                        error_msg = f"Таймаут или ошибка выполнения: {e}"
+                        self.after(0, self._on_execute_finished, it, False, error_msg)
+                        fail_count += 1
+                        completed += 1
+                
+                # Все задачи завершены - разблокируем кнопку и выводим итоги
+                self.after(0, self._on_all_execute_finished, success_count, fail_count, results)
+                
+                # Запускаем автоматическую загрузку
+                self.after(0, self._start_auto_download_for_new_orders)
+
+            # Запускаем мониторинг в отдельном потоке
+            threading.Thread(target=monitor, daemon=True).start()
+
+        except Exception as e:
+            self.log_insert(f"❌ Ошибка при запуске выполнения: {e}")
+            # В случае ошибки разблокируем кнопку
+            self.execute_btn.configure(state="normal")
+
+    def _execute_worker(self, order_item):
+        """Воркер для выполнения одного заказа в отдельном потоке"""
+        try:
+            self.log_insert(f"🎬 Запуск позиции: {order_item.simpl_name} | GTIN {order_item.gtin} | заявка '{order_item.order_name}'")
+            ok, msg = make_order_to_kontur(order_item)
+            return ok, msg
+        except Exception as e:
+            return False, f"Ошибка в воркере: {e}"
+
+    def _on_execute_finished(self, order_item, ok, msg):
+        """Обработчик завершения выполнения одного заказа"""
+        if ok:
+            self.log_insert(f"✅ Успешно: {order_item.simpl_name} | заявка '{order_item.order_name}' => {msg}")
+            try:
+                # Парсим document_id из сообщения
+                document_id = msg.split("id: ")[1].strip()
+                self.download_list.append({
+                    'order_name': order_item.order_name,
+                    'document_id': document_id,
+                    'status': 'Ожидает',
+                    'filename': None,
+                    'simpl': order_item.simpl_name
+                })
+                self.update_download_tree()
+            except Exception as e:
+                self.log_insert(f"⚠️ Не удалось извлечь document_id из: {msg} - {e}")
+        else:
+            self.log_insert(f"❌ Ошибка: {order_item.simpl_name} | заявка '{order_item.order_name}' => {msg}")
+
+    def _on_all_execute_finished(self, success_count, fail_count, results):
+        """Обработчик завершения всех задач"""
+        # Разблокируем кнопку
+        self.execute_btn.configure(state="normal")
         
-        self.log_insert(f"\nБудет выполнено {len(to_process)} заказов.")
-        self.log_insert("Запуск...")
-        results = []
-        success_count = 0
-        fail_count = 0
-        for it in to_process:
-            uid = getattr(it, "_uid", None)
-            self.log_insert(f"Запуск позиции: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
-            ok, msg = make_order_to_kontur(it)
-            results.append((ok, msg, it))
-            if ok:
-                success_count += 1
-                # Parse document_id from msg (assuming format "Document ... id: {id}")
-                try:
-                    document_id = msg.split("id: ")[1].strip()
-                    self.download_list.append({
-                        'order_name': it.order_name,
-                        'document_id': document_id,
-                        'status': 'Ожидает',
-                        'filename': None,
-                        'simpl': it.simpl_name
-                    })
-                    self.update_download_tree()
-                except:
-                    self.log_insert(f"Не удалось извлечь document_id из: {msg}")
-            else:
-                fail_count += 1
-
-        self._start_auto_download_for_new_orders()
-
         self.log_insert("\n=== Выполнение завершено ===")
-        self.log_insert(f"Успешно: {success_count}, Ошибок: {fail_count}.")
+        self.log_insert(f"✅ Успешно: {success_count}, ❌ Ошибок: {fail_count}.")
 
+        # Выводим список неудачных позиций
         if any(not r[0] for r in results):
             self.log_insert("\nНеудачные позиции:")
             for ok, msg, it in results:
                 if not ok:
-                    self.log_insert(f" - uid={getattr(it,'_uid',None)} | {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}' => {msg}")
-
-
+                    uid = getattr(it, '_uid', None)
+                    self.log_insert(f" - uid={uid} | {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}' => {msg}")
     def _reset_input_fields(self):
         """Сбрасывает поля ввода к значениям по умолчанию"""
         try:
@@ -610,10 +674,10 @@ class App(ctk.CTk):
             for combo_name in comboboxes:
                 if hasattr(self, combo_name):
                     getattr(self, combo_name).set("")
-            
+                
             # Можно также очистить поле заявки, если нужно
             # self.order_entry.delete(0, "end")
-            
+                
         except Exception as e:
             print(f"Ошибка при сбросе полей ввода: {e}")
 
