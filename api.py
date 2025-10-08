@@ -18,7 +18,7 @@ load_dotenv()
 
 
 # ------------------- Константы конфигурации -------------------
-BASE_URL: str = os.getenv("BASE_URL", "")
+BASE: str = os.getenv("BASE_URL", "")
 ORGANIZATION_ID: str = os.getenv("ORGANIZATION_ID", "")
 OMS_ID: str = os.getenv("OMS_ID", "")
 WAREHOUSE_ID: str = os.getenv("WAREHOUSE_ID", "")
