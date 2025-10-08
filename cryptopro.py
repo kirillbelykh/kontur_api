@@ -90,6 +90,7 @@ def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> 
     for ch in challenges:
         if ch['productGroup'] in ['oms', 'trueApi']:
             try:
+                pythoncom.CoUninitialize()
                 sig = sign_data(cert, ch["base64Data"], b_detached=False)  # attached для auth
                 payload.append({
                     "uuid": ch["uuid"],
