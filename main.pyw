@@ -1,5 +1,7 @@
 import os
 import copy
+import subprocess
+import sys
 import uuid
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -15,6 +17,7 @@ from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
 import tkinter as tk
+import tkinter.messagebox as mbox
 from tkinter import ttk, font
 from dotenv import load_dotenv
 from options import (
@@ -210,6 +213,7 @@ class App(ctk.CTk):
         self.download_list: List[dict] = []
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.check_for_updates()
         SessionManager.initialize()
         
         # THREADING
@@ -222,6 +226,46 @@ class App(ctk.CTk):
         
         self._setup_ui()
         self.start_auto_status_check()
+    
+    def check_for_updates(self):
+        try:
+            local_commit = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=os.path.dirname(__file__),
+                text=True
+            ).strip()
+
+            remote_commit = subprocess.check_output(
+                ["git", "ls-remote", "origin", "main"],
+                cwd=os.path.dirname(__file__),
+                text=True
+            ).split()[0]
+
+            if local_commit != remote_commit:
+                answer = mbox.askyesno(
+                    "Обновление доступно",
+                    "🔄 Обнаружена новая версия приложения.\nУстановить обновление сейчас?"
+                )
+                if answer:
+                    repo_dir = os.path.dirname(__file__)
+
+                    # Сохраняем локальные изменения
+                    subprocess.run(["git", "stash"], cwd=repo_dir)
+
+                    # Тянем обновление
+                    subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir)
+
+                    # Восстанавливаем локальные изменения (если есть)
+                    subprocess.run(["git", "stash", "pop"], cwd=repo_dir)
+
+                    mbox.showinfo("Обновление", "✅ Обновление успешно установлено!\nПриложение будет перезапущено.")
+                    python = sys.executable
+                    os.execl(python, python, *sys.argv)
+            else:
+                print("Приложение актуально.")
+        except Exception as e:
+            print(f"Ошибка при проверке обновлений: {e}")
+
     
     def _setup_fonts(self):
         """Настройка системы шрифтов"""
