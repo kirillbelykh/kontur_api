@@ -1616,6 +1616,27 @@ class App(ctk.CTk):
         
         self.update_tsd_tree()
 
+    def clear_tsd_log(self):
+        """Очищает лог ТСД"""
+        try:
+            # Включаем редактирование для очистки
+            self.tsd_log_text.configure(state="normal")
+            # Удаляем весь текст
+            self.tsd_log_text.delete("1.0", "end")
+            # Возвращаем состояние "только чтение"
+            self.tsd_log_text.configure(state="disabled")
+            
+            # Добавляем сообщение о том, что лог очищен
+            self.tsd_log_text.configure(state="normal")
+            self.tsd_log_text.insert("end", f"[{datetime.now().strftime('%H:%M:%S')}] Лог очищен\n")
+            self.tsd_log_text.configure(state="disabled")
+            
+            # Прокручиваем к последнему сообщению
+            self.tsd_log_text.see("end")
+            
+        except Exception as e:
+            print(f"Ошибка при очистке лога ТСД: {e}")
+
     def _configure_treeview_style(self):
         """Настройка стиля таблиц"""
         style = ttk.Style()
