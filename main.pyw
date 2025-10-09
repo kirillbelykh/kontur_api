@@ -2,9 +2,7 @@ import os
 import copy
 import uuid
 import threading
-import traceback
 from concurrent.futures import ThreadPoolExecutor
-import queue
 import time
 from datetime import datetime, timedelta
 from logger import logger
@@ -17,7 +15,7 @@ from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, font
 from dotenv import load_dotenv
 from options import (
     simplified_options, color_required, venchik_required,
@@ -197,161 +195,343 @@ def make_order_to_kontur(it, session) -> Tuple[bool, str]:
 class App(ctk.CTk):
     def __init__(self, df):
         super().__init__()
+        
+        # Настройка темы и внешнего вида
+        ctk.set_appearance_mode("dark")
+        ctk.set_default_color_theme("blue")
+        
         self.title("Kontur Marking")
-        self.geometry("800x700")
+        self.geometry("1000x800")
+        self.minsize(900, 700)
+        self._setup_fonts()
+
         self.df = df
         self.collected: List[OrderItem] = []
-        self.download_list: List[dict] = []  # [{'document_id': str, 'status': str, 'filename': str or None, 'order_name': str}]
+        self.download_list: List[dict] = []
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-
         SessionManager.initialize()
         
-        #THREADING
-        self.download_executor = ThreadPoolExecutor(max_workers=2)  # Для скачивания
-        self.status_check_executor = ThreadPoolExecutor(max_workers=1)  # Для проверки статусов
+        # THREADING
+        self.download_executor = ThreadPoolExecutor(max_workers=2)
+        self.status_check_executor = ThreadPoolExecutor(max_workers=1)
         self.auto_download_active = False
+        self.execute_all_executor = ThreadPoolExecutor(max_workers=3)
+        self.intro_executor = ThreadPoolExecutor(max_workers=3)
+        self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)
         
-        # Executor для фоновой обработки
-        self.execute_all_executor = ThreadPoolExecutor(max_workers=3)  # Один поток для последовательной обработки
-        self.intro_executor = ThreadPoolExecutor(max_workers=3)  # Меньше потоков для стабильности
-        self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)  # Для ТСД
-        # Tabview for sections
-        self.tabview = ctk.CTkTabview(self)
-        self.tabview.pack(pady=10, padx=10, fill="both", expand=True)
+        self._setup_ui()
+        self.start_auto_status_check()
+    
+    def _setup_fonts(self):
+        """Настройка системы шрифтов"""
+        # Проверяем доступные шрифты
+        available_fonts = font.families()
+        
+        # Приоритетные шрифты (от наиболее предпочтительных к менее)
+        preferred_fonts = [
+            "Segoe UI Variable Display",  # Windows 11
+            "Segoe UI",                   # Windows 10/11
+            "Arial",                      # Универсальный
+            "Tahoma",                     # Хорошая читаемость
+            "Verdana",                    # Широкий
+            "Microsoft Sans Serif",       # Классический Windows
+            "Calibri",                    # Современный
+            "DejaVu Sans",                # Кроссплатформенный
+        ]
+        
+        # Выбираем первый доступный шрифт
+        self.font_family = "TkDefaultFont"
+        for font_name in preferred_fonts:
+            if font_name in available_fonts:
+                self.font_family = font_name
+                break
+        
+        print(f"Используется шрифт: {self.font_family}")
+        
+        # Создаем систему шрифтов
+        self.fonts = {
+            "title": ctk.CTkFont(family=self.font_family, size=24, weight="bold"),
+            "heading": ctk.CTkFont(family=self.font_family, size=16, weight="bold"),
+            "subheading": ctk.CTkFont(family=self.font_family, size=14, weight="bold"),
+            "normal": ctk.CTkFont(family=self.font_family, size=12),
+            "small": ctk.CTkFont(family=self.font_family, size=11),
+            "button": ctk.CTkFont(family=self.font_family, size=12, weight="bold"),
+        }
+        
+        # Устанавливаем шрифт по умолчанию для основных виджетов
+        self._set_default_fonts()
 
-        # Tab 1: Создание заказов
-        tab_create = self.tabview.add("Создание заказов")
+    def _set_default_fonts(self):
+        """Устанавливает шрифты по умолчанию для виджетов"""
+        # Для CustomTkinter виджетов
+        ctk.CTkLabel._font = self.fonts["normal"]
+        ctk.CTkButton._font = self.fonts["button"]
+        ctk.CTkEntry._font = self.fonts["normal"]
+        ctk.CTkComboBox._font = self.fonts["normal"]
+        ctk.CTkRadioButton._font = self.fonts["normal"]
+        ctk.CTkTextbox._font = self.fonts["normal"]
+        ctk.CTkTabview._font = self.fonts["normal"]
 
-        # Input frame
-        input_frame = ctk.CTkFrame(tab_create)
-        input_frame.pack(pady=10, padx=10, fill="x")
+    def _setup_ui(self):
+        """Настройка основного интерфейса с использованием кастомных шрифтов"""
+        # Главный контейнер
+        self.main_container = ctk.CTkFrame(self)
+        self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Заголовок с кастомным шрифтом
+        self.header_frame = ctk.CTkFrame(self.main_container, height=70)
+        self.header_frame.pack(fill="x", pady=(0, 20))
+        self.header_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(
+            self.header_frame, 
+            text="Kontur Marking System", 
+            font=self.fonts["title"]  # Используем кастомный шрифт
+        ).pack(side="left", padx=25, pady=20)
+        
+        # Tabview
+        self.tabview = ctk.CTkTabview(self.main_container)
+        self.tabview.pack(fill="both", expand=True)
+        
+        # Создаем все табы
+        self._setup_create_tab()
+        self._setup_download_tab()
+        self._setup_introduction_tab()
+        self._setup_introduction_tsd_tab()
+        
+        # Статус бар с малым шрифтом
+        self.status_bar = ctk.CTkLabel(
+            self.main_container, 
+            text="Готов к работе", 
+            anchor="w",
+            font=self.fonts["small"]
+        )
+        self.status_bar.pack(fill="x", pady=(10, 0))
 
-        ctk.CTkLabel(input_frame, text="Заявка №:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
-        self.order_entry = ctk.CTkEntry(input_frame, width=400)
-        self.order_entry.grid(row=0, column=1, pady=5, padx=5)
-
+    def _setup_create_tab(self):
+        """Таб создания заказов с кастомными шрифтами"""
+        tab_create = self.tabview.add("📦 Создание заказов")
+        
+        # Основной контейнер с сеткой
+        main_frame = ctk.CTkFrame(tab_create)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Левая панель - форма ввода
+        input_frame = ctk.CTkFrame(main_frame)
+        input_frame.pack(side="left", fill="y", padx=(0, 10))
+        
+        # Заголовок формы с подзаголовочным шрифтом
+        ctk.CTkLabel(
+            input_frame, 
+            text="Добавление позиции", 
+            font=self.fonts["subheading"]
+        ).pack(pady=(15, 15))
+        
+        # Поля ввода
+        form_frame = ctk.CTkFrame(input_frame)
+        form_frame.pack(fill="x", padx=15, pady=10)
+        
+        # Заявка №
+        ctk.CTkLabel(form_frame, text="Заявка №:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
+        self.order_entry = ctk.CTkEntry(form_frame, width=250, placeholder_text="Введите номер заявки", font=self.fonts["normal"])
+        self.order_entry.grid(row=0, column=1, pady=10, padx=(10, 0))
+        
+        # Режим поиска
+        ctk.CTkLabel(form_frame, text="Режим поиска:", font=self.fonts["normal"]).grid(row=1, column=0, sticky="w", pady=10)
+        mode_frame = ctk.CTkFrame(form_frame)
+        mode_frame.grid(row=1, column=1, sticky="w", pady=10, padx=(10, 0))
+        
         self.gtin_var = ctk.StringVar(value="No")
-        ctk.CTkRadioButton(input_frame, text="Поиск по GTIN", variable=self.gtin_var, value="Yes", command=self.toggle_mode).grid(row=1, column=0, pady=5, padx=5)
-        ctk.CTkRadioButton(input_frame, text="Выбор опций", variable=self.gtin_var, value="No", command=self.toggle_mode).grid(row=1, column=1, pady=5, padx=5)
-
-        # GTIN frame
-        self.gtin_frame = ctk.CTkFrame(input_frame)
-        ctk.CTkLabel(self.gtin_frame, text="GTIN:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
-        self.gtin_entry = ctk.CTkEntry(self.gtin_frame, width=400)
-        self.gtin_entry.grid(row=0, column=1, pady=5, padx=5)
-
-        # Добавляем поддержку вставки/копирования через правый клик, сочетания клавиш и русскую раскладку
-        self._add_entry_context_menu(self.gtin_entry)
-
-        # Select frame
-        self.select_frame = ctk.CTkFrame(input_frame)
-        ctk.CTkLabel(self.select_frame, text="Вид товара:").grid(row=0, column=0, pady=5, padx=5, sticky="w")
-        self.simpl_combo = ctk.CTkComboBox(self.select_frame, values=simplified_options, command=self.update_options, width=400)
-        self.simpl_combo.grid(row=0, column=1, pady=5, padx=5)
-
-        self.color_label = ctk.CTkLabel(self.select_frame, text="Цвет:")
-        self.color_combo = ctk.CTkComboBox(self.select_frame, values=color_options, width=400)
-
-        self.venchik_label = ctk.CTkLabel(self.select_frame, text="С венчиком/без венчика?")
-        self.venchik_combo = ctk.CTkComboBox(self.select_frame, values=venchik_options, width=400)
-
-        ctk.CTkLabel(self.select_frame, text="Размер:").grid(row=3, column=0, pady=5, padx=5, sticky="w")
-        self.size_combo = ctk.CTkComboBox(self.select_frame, values=size_options, width=400)
-        self.size_combo.grid(row=3, column=1, pady=5, padx=5)
-
-        ctk.CTkLabel(self.select_frame, text="Количество единиц в упаковке:").grid(row=4, column=0, pady=5, padx=5, sticky="w")
-        self.units_combo = ctk.CTkComboBox(self.select_frame, values=[str(u) for u in units_options], width=400)
-        self.units_combo.grid(row=4, column=1, pady=5, padx=5)
-
-        # Codes count (common) - перемещено вниз
-        ctk.CTkLabel(input_frame, text="Количество кодов:").grid(row=5, column=0, pady=5, padx=5, sticky="w")
-        self.codes_entry = ctk.CTkEntry(input_frame, width=400)
-        self.codes_entry.grid(row=5, column=1, pady=5, padx=5)
-
-        # Add button - теперь под полем "Количество кодов"
-        add_btn = ctk.CTkButton(input_frame, text="Добавить позицию", command=self.add_item)
-        add_btn.grid(row=6, column=0, columnspan=2, pady=10)
-
-        # Initial mode
-        self.toggle_mode()
-
-        # Treeview for orders
-        columns = ("idx",  "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name", "uid")
-        self.tree = ttk.Treeview(tab_create, columns=columns, show="headings", height=10)
-        self.tree.heading("idx", text="Порядковый номер")
-        self.tree.heading("full_name", text="Наименование")
-        self.tree.heading("simpl_name", text="Упрощенно")
-        self.tree.heading("size", text="Размер")
-        self.tree.heading("units_per_pack", text="Упаковка")
-        self.tree.heading("gtin", text="GTIN")
-        self.tree.heading("codes_count", text="Кодов")
-        self.tree.heading("order_name", text="Заявка")
-        self.tree.heading("uid", text="UID")
-        self.tree.pack(pady=10, padx=10, fill="both", expand=True)
-
-        # Buttons frame for create tab
-        btn_frame = ctk.CTkFrame(tab_create)
-        btn_frame.pack(pady=10, fill="x")
-
-        delete_btn = ctk.CTkButton(btn_frame, text="Удалить позицию", command=self.delete_item)
-        delete_btn.pack(side="left", padx=10)
-
-        self.execute_btn = ctk.CTkButton(btn_frame, text="Выполнить все", command=self.execute_all)
-        self.execute_btn.pack(side="left", padx=10)
+        ctk.CTkRadioButton(mode_frame, text="Поиск по GTIN", variable=self.gtin_var, value="Yes", 
+                        command=self.toggle_mode, font=self.fonts["normal"]).pack(side="left", padx=(0, 10))
+        ctk.CTkRadioButton(mode_frame, text="Выбор опций", variable=self.gtin_var, value="No", 
+                        command=self.toggle_mode, font=self.fonts["normal"]).pack(side="left")
         
-        clear_btn = ctk.CTkButton(btn_frame, text="Очистить", command=self.clear_all)
-        clear_btn.pack(side="left", padx=10)
-
-        # Log textbox for create tab
-        self.log_text = ctk.CTkTextbox(tab_create, height=150)
-        self.log_text.pack(pady=10, padx=10, fill="x")
-
-        # Ограничение доступа только для чтения/копирования
-        self.log_text.configure(state="disabled")  # Блокирует редактирование
-
-        # Добавляем контекстное меню для копирования
-        self.log_text.bind("<Button-3>", self._show_log_context_menu)  # Правая кнопка мыши
-
-        # Разрешаем стандартные сочетания клавиш для копирования
+        # GTIN frame (изначально скрыт)
+        self.gtin_frame = ctk.CTkFrame(form_frame)
+        ctk.CTkLabel(self.gtin_frame, text="GTIN:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
+        self.gtin_entry = ctk.CTkEntry(self.gtin_frame, width=250, placeholder_text="Введите GTIN", font=self.fonts["normal"])
+        self.gtin_entry.grid(row=0, column=1, pady=10, padx=(10, 0))
+        self._add_entry_context_menu(self.gtin_entry)
+        
+        # Select frame
+        self.select_frame = ctk.CTkFrame(form_frame)
+        
+        # Вид товара
+        ctk.CTkLabel(self.select_frame, text="Вид товара:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
+        self.simpl_combo = ctk.CTkComboBox(self.select_frame, values=simplified_options, 
+                                        command=self.update_options, width=250, font=self.fonts["normal"])
+        self.simpl_combo.grid(row=0, column=1, pady=10, padx=(10, 0))
+        
+        # Цвет
+        self.color_label = ctk.CTkLabel(self.select_frame, text="Цвет:", font=self.fonts["normal"])
+        self.color_combo = ctk.CTkComboBox(self.select_frame, values=color_options, width=250, font=self.fonts["normal"])
+        
+        # Венчик
+        self.venchik_label = ctk.CTkLabel(self.select_frame, text="Венчик:", font=self.fonts["normal"])
+        self.venchik_combo = ctk.CTkComboBox(self.select_frame, values=venchik_options, width=250, font=self.fonts["normal"])
+        
+        # Размер
+        ctk.CTkLabel(self.select_frame, text="Размер:", font=self.fonts["normal"]).grid(row=3, column=0, sticky="w", pady=10)
+        self.size_combo = ctk.CTkComboBox(self.select_frame, values=size_options, width=250, font=self.fonts["normal"])
+        self.size_combo.grid(row=3, column=1, pady=10, padx=(10, 0))
+        
+        # Упаковка
+        ctk.CTkLabel(self.select_frame, text="Единиц в упаковке:", font=self.fonts["normal"]).grid(row=4, column=0, sticky="w", pady=10)
+        self.units_combo = ctk.CTkComboBox(self.select_frame, values=[str(u) for u in units_options], width=250, font=self.fonts["normal"])
+        self.units_combo.grid(row=4, column=1, pady=10, padx=(10, 0))
+        
+        # Количество кодов
+        ctk.CTkLabel(form_frame, text="Количество кодов:", font=self.fonts["normal"]).grid(row=6, column=0, sticky="w", pady=10)
+        self.codes_entry = ctk.CTkEntry(form_frame, width=250, placeholder_text="Введите количество", font=self.fonts["normal"])
+        self.codes_entry.grid(row=6, column=1, pady=10, padx=(10, 0))
+        
+        # Кнопка добавления
+        add_btn = ctk.CTkButton(
+            form_frame, 
+            text="➕ Добавить позицию", 
+            command=self.add_item,
+            height=35,
+            fg_color="#2AA876",
+            hover_color="#228B69",
+            font=self.fonts["button"]
+        )
+        add_btn.grid(row=7, column=0, columnspan=2, pady=20)
+        
+        self.toggle_mode()
+        
+        # Правая панель - таблица и лог
+        right_frame = ctk.CTkFrame(main_frame)
+        right_frame.pack(side="right", fill="both", expand=True)
+        
+        # Таблица
+        table_frame = ctk.CTkFrame(right_frame)
+        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        
+        # Заголовок таблицы
+        ctk.CTkLabel(
+            table_frame, 
+            text="Список позиций", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(10, 5))
+        
+        columns = ("idx", "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name", "uid")
+        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=12)
+        
+        # Заголовки
+        headers = {
+            "idx": "№", "full_name": "Наименование", "simpl_name": "Упрощенно",
+            "size": "Размер", "units_per_pack": "Упаковка", "gtin": "GTIN",
+            "codes_count": "Кодов", "order_name": "Заявка", "uid": "UID"
+        }
+        
+        for col, text in headers.items():
+            self.tree.heading(col, text=text)
+            self.tree.column(col, width=80 if col == "idx" else 120)
+        
+        # Scrollbar для таблицы
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=scrollbar.set)
+        self.tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Кнопки управления
+        btn_frame = ctk.CTkFrame(right_frame)
+        btn_frame.pack(fill="x", pady=(0, 10))
+        
+        delete_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🗑️ Удалить", 
+            command=self.delete_item, 
+            width=120,
+            font=self.fonts["button"]
+        )
+        delete_btn.pack(side="left", padx=5)
+        
+        self.execute_btn = ctk.CTkButton(
+            btn_frame, 
+            text="⚡ Выполнить все", 
+            command=self.execute_all,
+            width=120,
+            fg_color="#2E86C1",
+            hover_color="#2874A6",
+            font=self.fonts["button"]
+        )
+        self.execute_btn.pack(side="left", padx=5)
+        
+        clear_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🧹 Очистить", 
+            command=self.clear_all, 
+            width=120,
+            font=self.fonts["button"]
+        )
+        clear_btn.pack(side="left", padx=5)
+        
+        # Лог
+        log_frame = ctk.CTkFrame(right_frame)
+        log_frame.pack(fill="both", expand=True)
+        
+        ctk.CTkLabel(
+            log_frame, 
+            text="Лог операций:", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(10, 5))
+        
+        self.log_text = ctk.CTkTextbox(log_frame, height=150, font=self.fonts["normal"])
+        self.log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.log_text.configure(state="disabled")
+        
+        # Контекстное меню для лога
+        self.log_text.bind("<Button-3>", self._show_log_context_menu)
         self.log_text.bind("<Control-c>", lambda e: self._copy_log_text())
         self.log_text.bind("<Control-C>", lambda e: self._copy_log_text())
+        
+        # Стиль для таблицы
+        self._configure_treeview_style()
     
-        # Style Treeview for dark mode
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure("Treeview", background="#2b2b2b", fieldbackground="#2b2b2b", foreground="white")
-        style.configure("Treeview.Heading", background="#3a3a3a", foreground="white")
-        style.map("Treeview", background=[("selected", "#1f6aa5")])
-
-        # Tab 2: Скачивание кодов
-        tab_download = self.tabview.add("Скачивание кодов")
-
-        # Treeview for downloads
+    def _setup_download_tab(self):
+        """Таб скачивания кодов"""
+        tab_download = self.tabview.add("📥 Скачивание кодов")
+        
+        main_frame = ctk.CTkFrame(tab_download)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Верхняя часть - таблица
+        table_frame = ctk.CTkFrame(main_frame)
+        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        
+        ctk.CTkLabel(table_frame, text="Список заказов для скачивания:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
         download_columns = ("order_name", "status", "filename", "document_id")
-        self.download_tree = ttk.Treeview(tab_download, columns=download_columns, show="headings", height=10)
-        self.download_tree.heading("order_name", text="Заявка")
-        self.download_tree.heading("status", text="Статус")
-        self.download_tree.heading("filename", text="Файл")
-        self.download_tree.heading("document_id", text="ID заказа")
-        self.download_tree.pack(pady=10, padx=10, fill="both", expand=True)
-
-        # Buttons for download tab
-        download_btn_frame = ctk.CTkFrame(tab_download)
-        download_btn_frame.pack(pady=10, fill="x")
-
-
-        # Log textbox for download tab
-        self.download_log_text = ctk.CTkTextbox(tab_download, height=150)
-        self.download_log_text.pack(pady=10, padx=10, fill="x")
-
-        # Initial update
-        self.update_download_tree()
-        # Запускаем автоматическое скачивание при старте
-        self.start_auto_status_check()
-
-        self.setup_introduction_tab()
-        self.setup_introduction_tsd_tab()
+        self.download_tree = ttk.Treeview(table_frame, columns=download_columns, show="headings", height=12)
+        
+        headers = {
+            "order_name": "Заявка", "status": "Статус", 
+            "filename": "Файл", "document_id": "ID заказа"
+        }
+        
+        for col, text in headers.items():
+            self.download_tree.heading(col, text=text)
+            self.download_tree.column(col, width=150)
+        
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.download_tree.yview)
+        self.download_tree.configure(yscrollcommand=scrollbar.set)
+        self.download_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Нижняя часть - лог
+        log_frame = ctk.CTkFrame(main_frame)
+        log_frame.pack(fill="both", expand=True)
+        
+        ctk.CTkLabel(log_frame, text="Лог скачивания:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
+        self.download_log_text = ctk.CTkTextbox(log_frame, height=150)
+        self.download_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.download_log_text.configure(state="disabled")
 
 
     def _add_entry_context_menu(self, entry: ctk.CTkEntry):
@@ -558,8 +738,8 @@ class App(ctk.CTk):
                 cisType=str(CIS_TYPE)
             )
             self.log_insert(
-                f"✅Добавлено: {simpl} ({size}, {units} уп., {color or 'без цвета'}) — "
-                f"GTIN {gtin} — {codes_count} кодов — ТНВЭД {tnved_code} — заявка № {order_name}"
+                f"✅Добавлено: {simpl} {size}, {units} уп., {color or ''} — "
+                f"GTIN {gtin} — {codes_count} код(ов) — ТНВЭД {tnved_code} — заявка № {order_name}"
             )
 
         setattr(it, "_uid", uuid.uuid4().hex)
@@ -651,7 +831,6 @@ class App(ctk.CTk):
             save_order_history(to_process)
             
             self.log_insert(f"\nБудет выполнено {len(to_process)} заказов.")
-            self.log_insert("Запуск в многопоточном режиме...")
             
             # Отключаем кнопку выполнения на время работы
             self.execute_btn.configure(state="disabled")  # Предполагается, что у вас есть такая кнопка
@@ -659,8 +838,6 @@ class App(ctk.CTk):
             # Запускаем задачи в ThreadPoolExecutor
             futures = []
             for it in to_process:
-                self.log_insert(f"⏳ Добавлен в очередь: {it.simpl_name} | GTIN {it.gtin} | заявка '{it.order_name}'")
-
                 session = SessionManager.get_session()
                 fut = self.execute_all_executor.submit(self._execute_worker, it, session)
                 futures.append((fut, it))
@@ -711,7 +888,7 @@ class App(ctk.CTk):
     def _execute_worker(self, order_item, session):
         """Воркер для выполнения одного заказа в отдельном потоке"""
         try:
-            self.log_insert(f"🎬 Запуск позиции: {order_item.simpl_name} | GTIN {order_item.gtin} | заявка '{order_item.order_name}'")
+            self.log_insert(f"🎬 Запуск позиции: {order_item.simpl_name}  GTIN {order_item.gtin}  заявка № {order_item.order_name}")
             ok, msg = make_order_to_kontur(order_item, session)
             return ok, msg
         except Exception as e:
@@ -720,7 +897,7 @@ class App(ctk.CTk):
     def _on_execute_finished(self, order_item, ok, msg):
         """Обработчик завершения выполнения одного заказа"""
         if ok:
-            self.log_insert(f"✅ Успешно: {order_item.simpl_name} | заявка '{order_item.order_name}' => {msg}")
+            self.log_insert(f"✨ Заявка «{order_item.order_name}» на {order_item.simpl_name} успешно создана ✅")
             try:
                 # Парсим document_id из сообщения
                 document_id = msg.split("id: ")[1].strip()
@@ -743,8 +920,8 @@ class App(ctk.CTk):
         # Разблокируем кнопку
         self.execute_btn.configure(state="normal")
         
-        self.log_insert("\n=== Выполнение завершено ===")
-        self.log_insert(f"✅ Успешно: {success_count}, ❌ Ошибок: {fail_count}.")
+        self.log_insert("\n=== ВЫПОЛНЕНИЕ ЗАВЕРШЕНО ===")
+        self.log_insert(f"✅ Успешно: {success_count}\n❌ Ошибок: {fail_count}")
 
         # Выводим список неудачных позиций
         if any(not r[0] for r in results):
@@ -973,67 +1150,95 @@ class App(ctk.CTk):
             executor.shutdown(wait=False, cancel_futures=True)
         self.destroy()
         
-    def setup_introduction_tab(self):
-        """Создаёт таб 'Ввод в оборот' — вызвать из __init__ после создания tabview."""
-        tab_intro = self.tabview.add("Ввод в оборот")
+    def _setup_introduction_tab(self):
+        """Таб ввода в оборот"""
+        tab_intro = self.tabview.add("🔄 Ввод в оборот")
         self.intro_tab = tab_intro
-
-        # Treeview для заказов (берём из download_list те, что имеют файл / скачаны)
+        
+        main_frame = ctk.CTkFrame(tab_intro)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Верхняя часть - таблица
+        table_frame = ctk.CTkFrame(main_frame)
+        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        
+        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
         intro_columns = ("order_name", "document_id", "status", "filename")
-        self.intro_tree = ttk.Treeview(tab_intro, columns=intro_columns, show="headings", height=10, selectmode="extended")
-        self.intro_tree.heading("order_name", text="Заявка")
-        self.intro_tree.heading("document_id", text="ID заказа")
-        self.intro_tree.heading("status", text="Статус")
-        self.intro_tree.heading("filename", text="Файл")
-        self.intro_tree.pack(padx=10, pady=10, fill="both", expand=True)
-
-        # Контейнер для полей ввода
-        intro_inputs = ctk.CTkFrame(tab_intro)
-        intro_inputs.pack(padx=10, pady=5, fill="x")
-
-        # Первая строка
-        ctk.CTkLabel(intro_inputs, text="Дата производства (ДД-ММ-ГГГГ):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.prod_date_entry = ctk.CTkEntry(intro_inputs, width=200, placeholder_text="ДД-ММ-ГГГГ")
-        self.prod_date_entry.grid(row=0, column=1, padx=5, pady=5)
-
-        # Вторая строка
-        ctk.CTkLabel(intro_inputs, text="Дата окончания (ДД-ММ-ГГГГ):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.exp_date_entry = ctk.CTkEntry(intro_inputs, width=200, placeholder_text="ДД-ММ-ГГГГ")
-        self.exp_date_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        ctk.CTkLabel(intro_inputs, text="Номер партии:").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.batch_entry = ctk.CTkEntry(intro_inputs, width=200)
-        self.batch_entry.grid(row=2, column=1, padx=5, pady=5)
-
-        # Заполняем текущей датой по умолчанию в формате ДД-ММ-ГГГГ
+        self.intro_tree = ttk.Treeview(table_frame, columns=intro_columns, show="headings", 
+                                     height=10, selectmode="extended")
+        
+        headers = {
+            "order_name": "Заявка", "document_id": "ID заказа",
+            "status": "Статус", "filename": "Файл"
+        }
+        
+        for col, text in headers.items():
+            self.intro_tree.heading(col, text=text)
+            self.intro_tree.column(col, width=150)
+        
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.intro_tree.yview)
+        self.intro_tree.configure(yscrollcommand=scrollbar.set)
+        self.intro_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Средняя часть - форма ввода
+        form_frame = ctk.CTkFrame(main_frame)
+        form_frame.pack(fill="x", pady=10)
+        
+        ctk.CTkLabel(form_frame, text="Параметры ввода:", 
+                    font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
+        
+        # Сетка для полей ввода
+        labels = [
+            ("Дата производства (ДД-ММ-ГГГГ):", "prod_date_entry"),
+            ("Дата окончания (ДД-ММ-ГГГГ):", "exp_date_entry"),
+            ("Номер партии:", "batch_entry")
+        ]
+        
+        for i, (label_text, attr_name) in enumerate(labels):
+            ctk.CTkLabel(form_frame, text=label_text).grid(row=i+1, column=0, sticky="w", pady=8, padx=5)
+            entry = ctk.CTkEntry(form_frame, width=200)
+            entry.grid(row=i+1, column=1, pady=8, padx=5)
+            setattr(self, attr_name, entry)
+        
+        # Заполнение дат по умолчанию
         today = datetime.now().strftime("%d-%m-%Y")
-        self.prod_date_entry.insert(0, today)
-
-        # Через 2 года как дату окончания по умолчанию в формате ДД-ММ-ГГГГ
         future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
+        self.prod_date_entry.insert(0, today)
         self.exp_date_entry.insert(0, future_date)
-
-
+        
         # Кнопки
-        btn_frame = ctk.CTkFrame(tab_intro)
-        btn_frame.pack(padx=10, pady=5, fill="x")
-
-        self.intro_btn = ctk.CTkButton(btn_frame, text="Ввести в оборот выбранные", command=self.on_introduce_clicked)
+        btn_frame = ctk.CTkFrame(main_frame)
+        btn_frame.pack(fill="x", pady=(0, 10))
+        
+        self.intro_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🔄 Ввести в оборот", 
+            command=self.on_introduce_clicked,
+            fg_color="#2AA876",
+            hover_color="#228B69"
+        )
         self.intro_btn.pack(side="left", padx=5)
-
-        self.intro_refresh_btn = ctk.CTkButton(btn_frame, text="Обновить список", command=self.update_introduction_tree)
+        
+        self.intro_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_introduction_tree)
         self.intro_refresh_btn.pack(side="left", padx=5)
-
-        self.intro_clear_btn = ctk.CTkButton(btn_frame, text="Очистить лог", command=self.clear_intro_log)
+        
+        self.intro_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_intro_log)
         self.intro_clear_btn.pack(side="left", padx=5)
-
+        
         # Лог
-        self.intro_log_text = ctk.CTkTextbox(tab_intro, height=150)
-        self.intro_log_text.pack(padx=10, pady=10, fill="both", expand=True)
-        self.intro_log_text.configure(state="disabled")  # Только для чтения
-
-
-        # Инициализация отображения
+        log_frame = ctk.CTkFrame(main_frame)
+        log_frame.pack(fill="both", expand=True)
+        
+        ctk.CTkLabel(log_frame, text="Лог операций:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
+        self.intro_log_text = ctk.CTkTextbox(log_frame, height=150)
+        self.intro_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.intro_log_text.configure(state="disabled")
+        
         self.update_introduction_tree()
     
     # Функция для преобразования даты из ДД-ММ-ГГГГ в ГГГГ-ММ-ДД
@@ -1260,63 +1465,118 @@ class App(ctk.CTk):
         except Exception as e:
             self.intro_log_insert(f"❌ Ошибка при обработке результата: {e}")
 
-    def setup_introduction_tsd_tab(self):
-        """Создаёт таб 'Ввод в оборот (ТСД)'."""
-        tab_tsd = self.tabview.add("Ввод в оборот (ТСД)")
+    def _setup_introduction_tsd_tab(self):
+        """Таб ввода в оборот (ТСД)"""
+        tab_tsd = self.tabview.add("📱 Ввод в оборот (ТСД)")
         self.tsd_tab = tab_tsd
-
-        # Treeview для заказов (аналогично intro_tree)
+        
+        main_frame = ctk.CTkFrame(tab_tsd)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Верхняя часть - таблица
+        table_frame = ctk.CTkFrame(main_frame)
+        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        
+        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
         tsd_columns = ("order_name", "document_id", "status", "filename")
-        self.tsd_tree = ttk.Treeview(tab_tsd, columns=tsd_columns, show="headings", height=10, selectmode="extended")
-        self.tsd_tree.heading("order_name", text="Заявка")
-        self.tsd_tree.heading("document_id", text="ID заказа")
-        self.tsd_tree.heading("status", text="Статус")
-        self.tsd_tree.heading("filename", text="Файл")
-        self.tsd_tree.pack(padx=10, pady=10, fill="both", expand=True)
-
-        # Контейнер для полей ввода
-        tsd_inputs = ctk.CTkFrame(tab_tsd)
-        tsd_inputs.pack(padx=10, pady=5, fill="x")
-
-        # Ровные поля — метки в первом столбце, поля во втором
-        ctk.CTkLabel(tsd_inputs, text="Ввод в оборот №:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.tsd_intro_number_entry = ctk.CTkEntry(tsd_inputs, width=200)
-        self.tsd_intro_number_entry.grid(row=0, column=1, padx=5, pady=5)
-
-        ctk.CTkLabel(tsd_inputs, text="Дата производства (ДД-ММ-ГГГГ):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        self.tsd_prod_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
-        self.tsd_prod_date_entry.grid(row=1, column=1, padx=5, pady=5)
-
-        ctk.CTkLabel(tsd_inputs, text="Дата окончания (ДД-ММ-ГГГГ):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.tsd_exp_date_entry = ctk.CTkEntry(tsd_inputs, width=200)
-        self.tsd_exp_date_entry.grid(row=2, column=1, padx=5, pady=5)
-
-        ctk.CTkLabel(tsd_inputs, text="Номер партии:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
-        self.tsd_batch_entry = ctk.CTkEntry(tsd_inputs, width=200)
-        self.tsd_batch_entry.grid(row=3, column=1, padx=5, pady=5)
-
-        # Кнопки
-        btn_frame = ctk.CTkFrame(tab_tsd)
-        btn_frame.pack(padx=10, pady=5, fill="x")
-
-        self.tsd_btn = ctk.CTkButton(btn_frame, text="Отправить на ТСД", command=self.on_tsd_clicked)
-        self.tsd_btn.pack(side="left", padx=5)
-
-        self.tsd_refresh_btn = ctk.CTkButton(btn_frame, text="Обновить список", command=self.update_tsd_tree)
-        self.tsd_refresh_btn.pack(side="left", padx=5)
-
-        # Лог
-        self.tsd_log_text = ctk.CTkTextbox(tab_tsd, height=150)
-        self.tsd_log_text.pack(padx=10, pady=10, fill="x")
-
+        self.tsd_tree = ttk.Treeview(table_frame, columns=tsd_columns, show="headings", 
+                                   height=10, selectmode="extended")
+        
+        headers = {
+            "order_name": "Заявка", "document_id": "ID заказа",
+            "status": "Статус", "filename": "Файл"
+        }
+        
+        for col, text in headers.items():
+            self.tsd_tree.heading(col, text=text)
+            self.tsd_tree.column(col, width=150)
+        
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tsd_tree.yview)
+        self.tsd_tree.configure(yscrollcommand=scrollbar.set)
+        self.tsd_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Средняя часть - форма ввода
+        form_frame = ctk.CTkFrame(main_frame)
+        form_frame.pack(fill="x", pady=10)
+        
+        ctk.CTkLabel(form_frame, text="Параметры ТСД:", 
+                    font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
+        
+        # Сетка для полей ввода
+        tsd_labels = [
+            ("Ввод в оборот №:", "tsd_intro_number_entry"),
+            ("Дата производства (ДД-ММ-ГГГГ):", "tsd_prod_date_entry"),
+            ("Дата окончания (ДД-ММ-ГГГГ):", "tsd_exp_date_entry"),
+            ("Номер партии:", "tsd_batch_entry")
+        ]
+        
+        for i, (label_text, attr_name) in enumerate(tsd_labels):
+            ctk.CTkLabel(form_frame, text=label_text).grid(row=i+1, column=0, sticky="w", pady=8, padx=5)
+            entry = ctk.CTkEntry(form_frame, width=200)
+            entry.grid(row=i+1, column=1, pady=8, padx=5)
+            setattr(self, attr_name, entry)
+        
+        # Заполнение дат по умолчанию
         today = datetime.now().strftime("%d-%m-%Y")
-        self.tsd_prod_date_entry.insert(0, today)
-
         future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
+        self.tsd_prod_date_entry.insert(0, today)
         self.tsd_exp_date_entry.insert(0, future_date)
-
-        # Инициализация
+        
+        # Кнопки
+        btn_frame = ctk.CTkFrame(main_frame)
+        btn_frame.pack(fill="x", pady=(0, 10))
+        
+        self.tsd_btn = ctk.CTkButton(
+            btn_frame, 
+            text="📱 Отправить на ТСД", 
+            command=self.on_tsd_clicked,
+            fg_color="#E67E22",
+            hover_color="#D35400"
+        )
+        self.tsd_btn.pack(side="left", padx=5)
+        
+        self.tsd_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_tsd_tree)
+        self.tsd_refresh_btn.pack(side="left", padx=5)
+        
+        # Лог
+        log_frame = ctk.CTkFrame(main_frame)
+        log_frame.pack(fill="both", expand=True)
+        
+        ctk.CTkLabel(log_frame, text="Лог ТСД:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
+        self.tsd_log_text = ctk.CTkTextbox(log_frame, height=150)
+        self.tsd_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        
         self.update_tsd_tree()
+
+    def _configure_treeview_style(self):
+        """Настройка стиля таблиц"""
+        style = ttk.Style()
+        style.theme_use("clam")
+        
+        # Стиль для Treeview
+        style.configure("Treeview",
+                       background="#2b2b2b",
+                       foreground="white",
+                       fieldbackground="#2b2b2b",
+                       borderwidth=0)
+        
+        style.configure("Treeview.Heading",
+                       background="#3a3a3a",
+                       foreground="white",
+                       relief="flat",
+                       font=('TkDefaultFont', 10, 'bold'))
+        
+        style.map("Treeview",
+                 background=[('selected', '#1f6aa5')],
+                 foreground=[('selected', 'white')])
+        
+        style.map("Treeview.Heading",
+                 background=[('active', '#4a4a4a')])
 
     def tsd_log_insert(self, text: str):
         """Удобная функция логирования в таб 'ТСД' (вызовы только из GUI-потока)."""
