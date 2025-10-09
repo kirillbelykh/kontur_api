@@ -54,42 +54,100 @@ class SessionManager:
     _lock = threading.Lock()
     _session = None
     _last_update = 0
-    _lifetime = 60 * 15  # обновлять cookies каждые 15 минут
+    _lifetime = 60 * 13  # 13 минут
+    _update_event = threading.Event()
+    _update_thread = None
+    _initialized = False
 
     @classmethod
-    def _refresh_session(cls):
-        """Обновляет cookies и создаёт новую сессию (в отдельном потоке)"""
-        try:
-            cookies = get_valid_cookies()
-            with cls._lock:
-                cls._session = make_session_with_cookies(cookies)
-                cls._last_update = time.time()
-            print("✅ Cookies обновлены.")
-        except Exception as e:
-            print(f"❌ Ошибка при обновлении cookies: {e}")
+    def initialize(cls):
+        """Инициализация менеджера сессий - запускается при старте приложения"""
+        if not cls._initialized:
+            cls._initialized = True
+            # Сразу запускаем фоновый процесс
+            cls.start_background_update()
+            # Принудительно запускаем первое обновление
+            cls._update_event.set()
 
     @classmethod
-    def start_background_refresh(cls):
-        """Запускает периодическое обновление cookies в фоновом потоке"""
-        def refresh_loop():
-            while True:
-                now = time.time()
+    def start_background_update(cls):
+        """Запуск фонового процесса обновления cookies"""
+        if cls._update_thread is None or not cls._update_thread.is_alive():
+            cls._update_thread = threading.Thread(
+                target=cls._background_update_worker, 
+                daemon=True,
+                name="SessionUpdater"
+            )
+            cls._update_thread.start()
+            print("✅ Фоновое обновление cookies запущено")
+
+    @classmethod
+    def _background_update_worker(cls):
+        """Фоновый процесс для регулярного обновления cookies"""
+        while True:
+            try:
+                # Ждем 13 минут или принудительного запроса
+                update_triggered = cls._update_event.wait(timeout=cls._lifetime)
+                
+                print(f"🔧 Фоновое обновление cookies: {'принудительное' if update_triggered else 'плановое'}")
+                
+                # Получаем новые cookies
+                cookies = get_valid_cookies()
+                new_session = make_session_with_cookies(cookies)
+                
                 with cls._lock:
-                    needs_refresh = (
-                        cls._session is None or now - cls._last_update > cls._lifetime
-                    )
-                if needs_refresh:
-                    print("🔄 Обновляем cookies в фоне...")
-                    cls._refresh_session()
-                time.sleep(60)  # проверяем раз в минуту
-
-        threading.Thread(target=refresh_loop, daemon=True).start()
+                    cls._session = new_session
+                    cls._last_update = time.time()
+                    
+                print(f"✅ Cookies успешно обновлены. Следующее обновление через 13 минут")
+                
+                # Сбрасываем событие для следующей итерации
+                cls._update_event.clear()
+                
+            except Exception as e:
+                print(f"❌ Ошибка при фоновом обновлении cookies: {e}")
+                # При ошибке ждем 1 минуту и пробуем снова
+                time.sleep(60)
 
     @classmethod
     def get_session(cls):
-        """Возвращает актуальную сессию (без блокировки интерфейса)"""
+        """Получение текущей сессии (блокирующий вызов только при первом обращении)"""
+        cls.initialize()  # Гарантируем инициализацию
+        
         with cls._lock:
+            now = time.time()
+            
+            # Если сессии нет или она просрочена, создаем синхронно
+            if cls._session is None or now - cls._last_update > cls._lifetime:
+                print("⚠️  Синхронное получение cookies (сессия отсутствует или просрочена)")
+                cookies = get_valid_cookies()
+                cls._session = make_session_with_cookies(cookies)
+                cls._last_update = now
+                # Запускаем фоновое обновление для следующего цикла
+                cls._update_event.set()
+            elif now - cls._last_update > cls._lifetime * 0.8:
+                # Если сессия скоро устареет, запускаем фоновое обновление заранее
+                cls._update_event.set()
+                
             return cls._session
+
+    @classmethod
+    def trigger_immediate_update(cls):
+        """Принудительно запустить обновление cookies"""
+        cls._update_event.set()
+        print("🔄 Принудительное обновление cookies запущено")
+
+    @classmethod
+    def get_session_info(cls):
+        """Информация о текущей сессии (для отладки)"""
+        with cls._lock:
+            now = time.time()
+            age = now - cls._last_update if cls._last_update else 0
+            return {
+                "has_session": cls._session is not None,
+                "age_seconds": age,
+                "minutes_until_update": max(0, cls._lifetime - age) / 60
+            }
 
 def make_order_to_kontur(it, session) -> Tuple[bool, str]:
     """
@@ -147,8 +205,7 @@ class App(ctk.CTk):
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
-
-        SessionManager.start_background_refresh()
+        SessionManager.initialize()
         
         #THREADING
         self.download_executor = ThreadPoolExecutor(max_workers=2)  # Для скачивания
