@@ -5,6 +5,7 @@ __pycache__
 kontur_cookies.json
 last_snapshot.json
 История заказов.txt
+lookup.log
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
