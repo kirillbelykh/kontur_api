@@ -231,18 +231,27 @@ class App(ctk.CTk):
         try:
             repo_dir = os.path.dirname(__file__)
             
-            # Получаем текущий коммит
+            # Параметры для скрытия консольного окна
+            if os.name == 'nt':  # Windows
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0  # SW_HIDE
+                kwargs = {'startupinfo': startupinfo, 'creationflags': subprocess.CREATE_NO_WINDOW}
+            else:  # Linux/Mac
+                kwargs = {}
+            
             local_commit = subprocess.check_output(
                 ["git", "rev-parse", "HEAD"],
                 cwd=repo_dir,
-                text=True
+                text=True,
+                **kwargs
             ).strip()
 
-            # Получаем последний коммит с удаленного репозитория
             remote_commit = subprocess.check_output(
                 ["git", "ls-remote", "origin", "HEAD"],
                 cwd=repo_dir,
-                text=True
+                text=True,
+                **kwargs
             ).split()[0]
 
             if local_commit != remote_commit:
@@ -252,14 +261,13 @@ class App(ctk.CTk):
                 )
                 if answer:
                     # Сбрасываем все локальные изменения
-                    subprocess.run(["git", "reset", "--hard"], cwd=repo_dir, check=True)
+                    subprocess.run(["git", "reset", "--hard"], cwd=repo_dir, check=True, **kwargs)
                     
-                    # Получаем актуальную информацию о ветке
-                    subprocess.run(["git", "fetch", "origin"], cwd=repo_dir, check=True)
+                    # Получаем актуальную информацию
+                    subprocess.run(["git", "fetch", "origin"], cwd=repo_dir, check=True, **kwargs)
                     
-                    # Переключаемся на основную ветку и тянем обновления
-                    subprocess.run(["git", "checkout", "main"], cwd=repo_dir, check=True)
-                    subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir, check=True)
+                    # Тянем обновления
+                    subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir, check=True, **kwargs)
 
                     mbox.showinfo("Обновление", "✅ Обновление успешно установлено!\nПриложение будет перезапущено.")
                     
@@ -271,7 +279,7 @@ class App(ctk.CTk):
                 
         except subprocess.CalledProcessError as e:
             print(f"Ошибка Git при проверке обновлений: {e}")
-            mbox.showerror("Ошибка обновления", "Не удалось выполнить обновление. Проверьте подключение к интернету.")
+            mbox.showerror("Ошибка обновления", "Не удалось выполнить обновление.")
         except Exception as e:
             print(f"Общая ошибка при проверке обновлений: {e}")
 
