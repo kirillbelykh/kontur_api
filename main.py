@@ -1211,34 +1211,9 @@ class App(ctk.CTk):
         left_frame = ctk.CTkFrame(main_frame)
         left_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
         
-        # Верхняя часть - таблица
-        table_frame = ctk.CTkFrame(left_frame)
-        table_frame.pack(fill="both", expand=True, pady=(0, 10))
-        
-        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
-        
-        intro_columns = ("order_name", "document_id", "status", "filename")
-        self.intro_tree = ttk.Treeview(table_frame, columns=intro_columns, show="headings", 
-                                    height=10, selectmode="extended")
-        
-        headers = {
-            "order_name": "Заявка", "document_id": "ID заказа",
-            "status": "Статус", "filename": "Файл"
-        }
-        
-        for col, text in headers.items():
-            self.intro_tree.heading(col, text=text)
-            self.intro_tree.column(col, width=150)
-        
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.intro_tree.yview)
-        self.intro_tree.configure(yscrollcommand=scrollbar.set)
-        self.intro_tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Средняя часть - форма ввода
+        # Верхняя часть - форма ввода
         form_frame = ctk.CTkFrame(left_frame)
-        form_frame.pack(fill="x", pady=10)
+        form_frame.pack(fill="x", pady=(0, 10))
         
         ctk.CTkLabel(form_frame, text="Параметры ввода:", 
                     font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
@@ -1262,7 +1237,7 @@ class App(ctk.CTk):
         self.prod_date_entry.insert(0, today) # type: ignore
         self.exp_date_entry.insert(0, future_date) # type: ignore
         
-        # Кнопки
+        # Кнопки (теперь сразу после формы)
         btn_frame = ctk.CTkFrame(left_frame)
         btn_frame.pack(fill="x", pady=(0, 10))
         
@@ -1280,6 +1255,31 @@ class App(ctk.CTk):
         
         self.intro_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_intro_log)
         self.intro_clear_btn.pack(side="left", padx=5)
+        
+        # Нижняя часть - таблица заказов
+        table_frame = ctk.CTkFrame(left_frame)
+        table_frame.pack(fill="both", expand=True, pady=(10, 0))
+        
+        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
+        intro_columns = ("order_name", "document_id", "status", "filename")
+        self.intro_tree = ttk.Treeview(table_frame, columns=intro_columns, show="headings", 
+                                    height=10, selectmode="extended")
+        
+        headers = {
+            "order_name": "Заявка", "document_id": "ID заказа",
+            "status": "Статус", "filename": "Файл"
+        }
+        
+        for col, text in headers.items():
+            self.intro_tree.heading(col, text=text)
+            self.intro_tree.column(col, width=150)
+        
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.intro_tree.yview)
+        self.intro_tree.configure(yscrollcommand=scrollbar.set)
+        self.intro_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
         
         # Правая часть - лог
         right_frame = ctk.CTkFrame(main_frame)
@@ -1538,34 +1538,9 @@ class App(ctk.CTk):
         left_frame = ctk.CTkFrame(main_frame)
         left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 5))
         
-        # Таблица в левой части
-        table_frame = ctk.CTkFrame(left_frame)
-        table_frame.pack(fill="both", expand=True, pady=(0, 10))
-        
-        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
-        
-        tsd_columns = ("order_name", "document_id", "status", "filename")
-        self.tsd_tree = ttk.Treeview(table_frame, columns=tsd_columns, show="headings", 
-                                height=12, selectmode="extended")
-        
-        headers = {
-            "order_name": "Заявка", "document_id": "ID заказа",
-            "status": "Статус", "filename": "Файл"
-        }
-        
-        for col, text in headers.items():
-            self.tsd_tree.heading(col, text=text)
-            self.tsd_tree.column(col, width=150)
-        
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tsd_tree.yview)
-        self.tsd_tree.configure(yscrollcommand=scrollbar.set)
-        self.tsd_tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Форма ввода в левой части
+        # Форма ввода в левой части (теперь сверху)
         form_frame = ctk.CTkFrame(left_frame)
-        form_frame.pack(fill="x", pady=10)
+        form_frame.pack(fill="x", pady=(0, 10))
         
         ctk.CTkLabel(form_frame, text="Параметры ТСД:", 
                     font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
@@ -1590,7 +1565,7 @@ class App(ctk.CTk):
         self.tsd_prod_date_entry.insert(0, today) # type: ignore
         self.tsd_exp_date_entry.insert(0, future_date) # type: ignore
         
-        # Кнопки в левой части
+        # Кнопки в левой части (теперь после формы)
         btn_frame = ctk.CTkFrame(left_frame)
         btn_frame.pack(fill="x", pady=(0, 10))
         
@@ -1608,6 +1583,31 @@ class App(ctk.CTk):
         
         self.tsd_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_tsd_log)
         self.tsd_clear_btn.pack(side="left", padx=5)
+        
+        # Таблица в левой части (теперь снизу)
+        table_frame = ctk.CTkFrame(left_frame)
+        table_frame.pack(fill="both", expand=True, pady=(10, 0))
+        
+        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
+                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        
+        tsd_columns = ("order_name", "document_id", "status", "filename")
+        self.tsd_tree = ttk.Treeview(table_frame, columns=tsd_columns, show="headings", 
+                                height=12, selectmode="extended")
+        
+        headers = {
+            "order_name": "Заявка", "document_id": "ID заказа",
+            "status": "Статус", "filename": "Файл"
+        }
+        
+        for col, text in headers.items():
+            self.tsd_tree.heading(col, text=text)
+            self.tsd_tree.column(col, width=150)
+        
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tsd_tree.yview)
+        self.tsd_tree.configure(yscrollcommand=scrollbar.set)
+        self.tsd_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
         
         # Правая часть - только лог
         right_frame = ctk.CTkFrame(main_frame)
