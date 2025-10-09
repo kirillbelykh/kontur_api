@@ -232,6 +232,9 @@ class App(ctk.CTk):
         self.exp_date_entry: ctk.CTkEntry | None = None
         self.intro_number_entry: ctk.CTkEntry | None = None
         self.batch_entry: ctk.CTkEntry | None = None
+
+        # TSD status check
+        self.sent_to_tsd_items = set()
     
     def cleanup_before_update(self):
         """Очистка ресурсов перед обновлением."""
@@ -1649,15 +1652,23 @@ class App(ctk.CTk):
             pass
 
     def update_tsd_tree(self):
-        """Наполнить дерево заказами, у которых status == 'Скачан' или filename != None"""
+        """Наполнить дерево заказами, у которых status == 'Скачан' или filename != None, но не отправлены на ТСД"""
         # Очистить дерево
         for i in self.tsd_tree.get_children():
             self.tsd_tree.delete(i)
-        # Добавить записи из self.download_list
+        
+        # Добавить записи из self.download_list, которые не были отправлены на ТСД
         for item in self.download_list:
-            if item.get("status") in ("Скачан", "Скачивается", "Downloaded", "Ожидает") or item.get("filename"):
-                vals = (item.get("order_name"), item.get("document_id"), item.get("status"), item.get("filename") or "")
-                self.tsd_tree.insert("", "end", iid=item.get("document_id"), values=vals)
+            document_id = item.get("document_id")
+            # Показываем только если статус подходящий И заказ еще не отправлялся на ТСД
+            if (item.get("status") in ("Скачан", "Скачивается", "Downloaded", "Ожидает") or item.get("filename")) and document_id not in self.sent_to_tsd_items:
+                vals = (
+                    item.get("order_name"), 
+                    document_id, 
+                    item.get("status"), 
+                    item.get("filename") or ""
+                )
+                self.tsd_tree.insert("", "end", iid=document_id, values=vals)
 
     def get_selected_tsd_items(self):
         """Возвращает список объектов download_list, соответствующих выбранным строкам в tsd_tree."""
@@ -1878,15 +1889,18 @@ class App(ctk.CTk):
         docid = item.get("document_id")
         if ok:
             self.tsd_log_insert(f"[OK] {docid} — {msg}")
+            # Добавляем в множество отправленных заказов
+            self.sent_to_tsd_items.add(docid)
             # пометим заказ как введённый
             item["status"] = "Отправлено на ТСД"
         else:
             self.tsd_log_insert(f"[ERR] {docid} — {msg}")
             item["status"] = "Ошибка ТСД"
+            # Не добавляем в sent_to_tsd_items при ошибке
 
         # обновить таблицы
         self.update_tsd_tree()
-        # self.update_download_tree()  # Если есть такая функция для другой таблицы, раскомментируйте
+        
     def _get_gtin_for_order(self, document_id: str) -> str:
         """Получает GTIN для заказа по document_id"""
         try:
