@@ -506,17 +506,19 @@ class App(ctk.CTk):
         
         # Лог
         log_frame = ctk.CTkFrame(right_frame)
-        log_frame.pack(fill="both", expand=True)
-        
+        log_frame.pack(fill="both", expand=True, pady=(5, 10))  # добавил немного отступа сверху/снизу
+
         ctk.CTkLabel(
             log_frame, 
             text="Лог операций:", 
             font=self.fonts["subheading"]
         ).pack(anchor="w", pady=(10, 5))
-        
-        self.log_text = ctk.CTkTextbox(log_frame, height=150, font=self.fonts["normal"])
+
+        # Увеличиваем высоту поля лога
+        self.log_text = ctk.CTkTextbox(log_frame, height=250, font=self.fonts["normal"])  # было 150, стало 250
         self.log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
         self.log_text.configure(state="disabled")
+
         
         # Контекстное меню для лога
         self.log_text.bind("<Button-3>", self._show_log_context_menu)
@@ -1205,8 +1207,12 @@ class App(ctk.CTk):
         main_frame = ctk.CTkFrame(tab_intro)
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
+        # Левая часть
+        left_frame = ctk.CTkFrame(main_frame)
+        left_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        
         # Верхняя часть - таблица
-        table_frame = ctk.CTkFrame(main_frame)
+        table_frame = ctk.CTkFrame(left_frame)
         table_frame.pack(fill="both", expand=True, pady=(0, 10))
         
         ctk.CTkLabel(table_frame, text="Доступные заказы:", 
@@ -1214,7 +1220,7 @@ class App(ctk.CTk):
         
         intro_columns = ("order_name", "document_id", "status", "filename")
         self.intro_tree = ttk.Treeview(table_frame, columns=intro_columns, show="headings", 
-                                     height=10, selectmode="extended")
+                                    height=10, selectmode="extended")
         
         headers = {
             "order_name": "Заявка", "document_id": "ID заказа",
@@ -1231,7 +1237,7 @@ class App(ctk.CTk):
         scrollbar.pack(side="right", fill="y")
         
         # Средняя часть - форма ввода
-        form_frame = ctk.CTkFrame(main_frame)
+        form_frame = ctk.CTkFrame(left_frame)
         form_frame.pack(fill="x", pady=10)
         
         ctk.CTkLabel(form_frame, text="Параметры ввода:", 
@@ -1257,7 +1263,7 @@ class App(ctk.CTk):
         self.exp_date_entry.insert(0, future_date) # type: ignore
         
         # Кнопки
-        btn_frame = ctk.CTkFrame(main_frame)
+        btn_frame = ctk.CTkFrame(left_frame)
         btn_frame.pack(fill="x", pady=(0, 10))
         
         self.intro_btn = ctk.CTkButton(
@@ -1275,14 +1281,17 @@ class App(ctk.CTk):
         self.intro_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_intro_log)
         self.intro_clear_btn.pack(side="left", padx=5)
         
-        # Лог
-        log_frame = ctk.CTkFrame(main_frame)
+        # Правая часть - лог
+        right_frame = ctk.CTkFrame(main_frame)
+        right_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
+        
+        log_frame = ctk.CTkFrame(right_frame)
         log_frame.pack(fill="both", expand=True)
         
         ctk.CTkLabel(log_frame, text="Лог операций:", 
                     font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
         
-        self.intro_log_text = ctk.CTkTextbox(log_frame, height=150)
+        self.intro_log_text = ctk.CTkTextbox(log_frame)
         self.intro_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
         self.intro_log_text.configure(state="disabled")
         
@@ -1604,14 +1613,15 @@ class App(ctk.CTk):
         right_frame = ctk.CTkFrame(main_frame)
         right_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(5, 0))
         right_frame.grid_rowconfigure(1, weight=1)  # Лог будет растягиваться
-        
+        right_frame.grid_columnconfigure(0, weight=1)
+
         # Заголовок лога
         ctk.CTkLabel(right_frame, text="Лог ТСД:", 
                     font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=(10, 5), padx=10)
-        
+
         # Большое поле для лога - занимает всю правую часть
-        self.tsd_log_text = ctk.CTkTextbox(right_frame)
-        self.tsd_log_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.tsd_log_text = ctk.CTkTextbox(right_frame, font=ctk.CTkFont(size=13))
+        self.tsd_log_text.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 10))
         self.tsd_log_text.configure(state="disabled")
         
         self.update_tsd_tree()
