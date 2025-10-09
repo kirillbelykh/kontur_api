@@ -242,7 +242,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
         templates = resp_templates.json()
         template_id = None
         for t in templates:
-            if t.get("size") == "2x2":
+            if t.get("name") == "Этикетка 2x2см" or t.get("size") == "2x2":
                 template_id = t.get("id")
                 break
         if template_id:
@@ -287,7 +287,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
             else:
                 logger.warning(f"PDF export для {document_id} завершился без fileUrl")
         else:
-            logger.warning("Шаблон '30x20' для PDF не найден — пропускаем PDF экспорт")
+            logger.warning("Шаблон '2x2' для PDF не найден — пропускаем PDF экспорт")
     except Exception as e:
         logger.exception(f"Ошибка в PDF-части для {document_id}: {e}")
         pdf_path = None
