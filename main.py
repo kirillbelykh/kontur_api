@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 from datetime import datetime, timedelta
 from logger import logger
-import pandas as pd
+import pandas as pd # type: ignore
 from dataclasses import dataclass, asdict
 from typing import List, Tuple, Dict, Any
 from get_gtin import lookup_gtin, lookup_by_gtin
@@ -18,7 +18,7 @@ import customtkinter as ctk
 import tkinter as tk
 import tkinter.messagebox as mbox
 from tkinter import ttk, font
-from dotenv import load_dotenv
+from dotenv import load_dotenv # type: ignore
 from options import (
     simplified_options, color_required, venchik_required,
     color_options, venchik_options, size_options, units_options
@@ -226,6 +226,12 @@ class App(ctk.CTk):
         
         self._setup_ui()
         self.start_auto_status_check()
+        
+        # Atributes for linter
+        self.prod_date_entry: ctk.CTkEntry | None = None
+        self.exp_date_entry: ctk.CTkEntry | None = None
+        self.intro_number_entry: ctk.CTkEntry | None = None
+        self.batch_entry: ctk.CTkEntry | None = None
     
     def cleanup_before_update(self):
         """Очистка ресурсов перед обновлением."""
@@ -281,15 +287,14 @@ class App(ctk.CTk):
         self._set_default_fonts()
 
     def _set_default_fonts(self):
-        """Устанавливает шрифты по умолчанию для виджетов"""
-        # Для CustomTkinter виджетов
-        ctk.CTkLabel._font = self.fonts["normal"]
-        ctk.CTkButton._font = self.fonts["button"]
-        ctk.CTkEntry._font = self.fonts["normal"]
-        ctk.CTkComboBox._font = self.fonts["normal"]
-        ctk.CTkRadioButton._font = self.fonts["normal"]
-        ctk.CTkTextbox._font = self.fonts["normal"]
-        ctk.CTkTabview._font = self.fonts["normal"]
+        """Устанавливает шрифты по умолчанию для всех виджетов"""
+        normal_font = self.fonts["normal"]
+        button_font = self.fonts["button"]
+
+        # Задаём глобальный шрифт
+        ctk.set_default_font(family=normal_font.cget("family"), # type: ignore
+                            size=normal_font.cget("size"),
+                            weight=normal_font.cget("weight"))
 
     def _setup_ui(self):
         """Настройка основного интерфейса с использованием кастомных шрифтов"""
@@ -839,7 +844,7 @@ class App(ctk.CTk):
                 self.log_insert("Нет накопленных позиций.")
                 return
 
-            confirm = tk.messagebox.askyesno("Подтверждение", f"Подтвердите выполнение {len(self.collected)} задач(и)?")
+            confirm = tk.messagebox.askyesno("Подтверждение", f"Подтвердите выполнение {len(self.collected)} задач(и)?") # type: ignore
             if not confirm:
                 self.log_insert("Выполнение отменено пользователем.")
                 return
@@ -1224,8 +1229,8 @@ class App(ctk.CTk):
         # Заполнение дат по умолчанию
         today = datetime.now().strftime("%d-%m-%Y")
         future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
-        self.prod_date_entry.insert(0, today)
-        self.exp_date_entry.insert(0, future_date)
+        self.prod_date_entry.insert(0, today) # type: ignore
+        self.exp_date_entry.insert(0, future_date) # type: ignore
         
         # Кнопки
         btn_frame = ctk.CTkFrame(main_frame)
@@ -1351,9 +1356,9 @@ class App(ctk.CTk):
                 return
 
             # При получении данных используем преобразование:
-            prod_date = self.convert_date_format(self.prod_date_entry.get().strip())
-            exp_date = self.convert_date_format(self.exp_date_entry.get().strip())
-            batch_num = self.batch_entry.get().strip()
+            prod_date = self.convert_date_format(self.prod_date_entry.get().strip()) # type: ignore
+            exp_date = self.convert_date_format(self.exp_date_entry.get().strip()) # type: ignore
+            batch_num = self.batch_entry.get().strip() # type: ignore
             thumbprint = THUMBPRINT
 
             # Валидация
@@ -1403,7 +1408,7 @@ class App(ctk.CTk):
                     "TnvedCode": tnved_code
                 }
                 
-                fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint)
+                fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint) # type: ignore
                 futures.append((fut, it))
 
             # Мониторинг завершения
@@ -1445,7 +1450,7 @@ class App(ctk.CTk):
                 session=session,
                 codes_order_id=document_id,
                 production_patch=production_patch,
-                organization_id=os.getenv("ORGANIZATION_ID"),
+                organization_id=os.getenv("ORGANIZATION_ID"), # type: ignore
                 thumbprint=THUMBPRINT,
                 check_poll_interval=10,      # Увеличим интервалы для стабильности
                 check_poll_attempts=30,      # Больше попыток
@@ -1540,8 +1545,8 @@ class App(ctk.CTk):
         # Заполнение дат по умолчанию
         today = datetime.now().strftime("%d-%m-%Y")
         future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
-        self.tsd_prod_date_entry.insert(0, today)
-        self.tsd_exp_date_entry.insert(0, future_date)
+        self.tsd_prod_date_entry.insert(0, today) # type: ignore
+        self.tsd_exp_date_entry.insert(0, future_date) # type: ignore
         
         # Кнопки
         btn_frame = ctk.CTkFrame(main_frame)
@@ -1646,10 +1651,10 @@ class App(ctk.CTk):
                 return
 
             # Получаем данные из полей ввода
-            intro_number = self.tsd_intro_number_entry.get().strip()
-            prod_date_raw = self.tsd_prod_date_entry.get().strip()
-            exp_date_raw = self.tsd_exp_date_entry.get().strip()
-            batch_num = self.tsd_batch_entry.get().strip()
+            intro_number = self.tsd_intro_number_entry.get().strip() # type: ignore
+            prod_date_raw = self.tsd_prod_date_entry.get().strip() # type: ignore
+            exp_date_raw = self.tsd_exp_date_entry.get().strip() # type: ignore
+            batch_num = self.tsd_batch_entry.get().strip() # type: ignore
             
             
             self.tsd_log_insert(f"📅 Получены данные из полей: into_num='{intro_number}', prod='{prod_date_raw}', exp='{exp_date_raw}', batch='{batch_num}'")
