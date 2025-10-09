@@ -1108,6 +1108,7 @@ class App(ctk.CTk):
     def _download_order(self, item):
         """Скачивает заказ в отдельном потоке"""
         try:
+            # Обновляем статус в главном потоке
             self.after(0, lambda: self._update_download_status(item, 'Скачивается'))
             
             session = SessionManager.get_session()
@@ -1116,6 +1117,7 @@ class App(ctk.CTk):
             filename = download_codes(session, item['document_id'], item['order_name'])
             
             if filename:
+                # Успешное скачивание - обновляем в главном потоке
                 self.after(0, lambda: self._finish_download(item, filename))
             else:
                 self.after(0, lambda: self._update_download_status(item, 'Ошибка скачивания'))
@@ -1125,16 +1127,26 @@ class App(ctk.CTk):
 
     def _update_download_status(self, item, status):
         """Обновляет статус скачивания в UI"""
-        item['status'] = status
-        self.update_download_tree()
-        self.download_log_insert(f"📦 {item['order_name']}: {status}")
+        try:
+            item['status'] = status
+            self.update_download_tree()
+            self.download_log_insert(f"📦 {item['order_name']}: {status}")
+            # Принудительно обновляем интерфейс
+            self.update_idletasks()
+        except Exception as e:
+            print(f"Ошибка обновления статуса: {e}")
 
     def _finish_download(self, item, filename):
         """Завершает скачивание"""
-        item['status'] = 'Скачан'
-        item['filename'] = filename
-        self.update_download_tree()
-        self.download_log_insert(f"✅ Успешно скачан: {filename}")
+        try:
+            item['status'] = 'Скачан'
+            item['filename'] = filename
+            self.update_download_tree()
+            self.download_log_insert(f"✅ Успешно скачан: {filename}")
+            # Принудительно обновляем интерфейс
+            self.update_idletasks()
+        except Exception as e:
+            print(f"Ошибка завершения скачивания: {e}")
 
 
     def _add_to_download_list(self, order_item, document_id):
@@ -1505,8 +1517,17 @@ class App(ctk.CTk):
         main_frame = ctk.CTkFrame(tab_tsd)
         main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Верхняя часть - таблица
-        table_frame = ctk.CTkFrame(main_frame)
+        # Используем grid для разделения на левую и правую части
+        main_frame.grid_columnconfigure(0, weight=1)  # Левая колонка - таблица и форма
+        main_frame.grid_columnconfigure(1, weight=1)  # Правая колонка - лог
+        main_frame.grid_rowconfigure(1, weight=1)     # Вторая строка - растягиваемая
+        
+        # Левая часть - таблица и форма
+        left_frame = ctk.CTkFrame(main_frame)
+        left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 5))
+        
+        # Таблица в левой части
+        table_frame = ctk.CTkFrame(left_frame)
         table_frame.pack(fill="both", expand=True, pady=(0, 10))
         
         ctk.CTkLabel(table_frame, text="Доступные заказы:", 
@@ -1514,7 +1535,7 @@ class App(ctk.CTk):
         
         tsd_columns = ("order_name", "document_id", "status", "filename")
         self.tsd_tree = ttk.Treeview(table_frame, columns=tsd_columns, show="headings", 
-                                   height=10, selectmode="extended")
+                                height=12, selectmode="extended")
         
         headers = {
             "order_name": "Заявка", "document_id": "ID заказа",
@@ -1530,8 +1551,8 @@ class App(ctk.CTk):
         self.tsd_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Средняя часть - форма ввода
-        form_frame = ctk.CTkFrame(main_frame)
+        # Форма ввода в левой части
+        form_frame = ctk.CTkFrame(left_frame)
         form_frame.pack(fill="x", pady=10)
         
         ctk.CTkLabel(form_frame, text="Параметры ТСД:", 
@@ -1557,8 +1578,8 @@ class App(ctk.CTk):
         self.tsd_prod_date_entry.insert(0, today) # type: ignore
         self.tsd_exp_date_entry.insert(0, future_date) # type: ignore
         
-        # Кнопки
-        btn_frame = ctk.CTkFrame(main_frame)
+        # Кнопки в левой части
+        btn_frame = ctk.CTkFrame(left_frame)
         btn_frame.pack(fill="x", pady=(0, 10))
         
         self.tsd_btn = ctk.CTkButton(
@@ -1573,15 +1594,22 @@ class App(ctk.CTk):
         self.tsd_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_tsd_tree)
         self.tsd_refresh_btn.pack(side="left", padx=5)
         
-        # Лог
-        log_frame = ctk.CTkFrame(main_frame)
-        log_frame.pack(fill="both", expand=True)
+        self.tsd_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_tsd_log)
+        self.tsd_clear_btn.pack(side="left", padx=5)
         
-        ctk.CTkLabel(log_frame, text="Лог ТСД:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        # Правая часть - только лог
+        right_frame = ctk.CTkFrame(main_frame)
+        right_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(5, 0))
+        right_frame.grid_rowconfigure(1, weight=1)  # Лог будет растягиваться
         
-        self.tsd_log_text = ctk.CTkTextbox(log_frame, height=150)
-        self.tsd_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        # Заголовок лога
+        ctk.CTkLabel(right_frame, text="Лог ТСД:", 
+                    font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=(10, 5), padx=10)
+        
+        # Большое поле для лога - занимает всю правую часть
+        self.tsd_log_text = ctk.CTkTextbox(right_frame)
+        self.tsd_log_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.tsd_log_text.configure(state="disabled")
         
         self.update_tsd_tree()
 
@@ -1627,7 +1655,7 @@ class App(ctk.CTk):
             self.tsd_tree.delete(i)
         # Добавить записи из self.download_list
         for item in self.download_list:
-            if item.get("status") in ("Скачан", "Downloaded", "Ожидает") or item.get("filename"):
+            if item.get("status") in ("Скачан", "Скачивается", "Downloaded", "Ожидает") or item.get("filename"):
                 vals = (item.get("order_name"), item.get("document_id"), item.get("status"), item.get("filename") or "")
                 self.tsd_tree.insert("", "end", iid=item.get("document_id"), values=vals)
 

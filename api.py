@@ -240,9 +240,10 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
         resp_templates = session.get(f"{BASE}/api/v1/print-templates?organizationId={ORGANIZATION_ID}&formTypes=codesOrder", timeout=15)
         resp_templates.raise_for_status()
         templates = resp_templates.json()
+        logger.info(f"Список шаблонов: {templates}")
         template_id = None
         for t in templates:
-            if t.get("name") == "Этикетка 2x2см" or t.get("size") == "2x2":
+            if t.get("name") == "Этикетка 2х2см" or t.get("size") == "2х2" or t.get("dekkoId") == "20x20Template_v2":
                 template_id = t.get("id")
                 break
         if template_id:
