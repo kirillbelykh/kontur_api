@@ -232,12 +232,12 @@ class App(ctk.CTk):
             repo_dir = os.path.dirname(__file__)
             
             # Параметры для скрытия консольного окна
-            if os.name == 'nt':  # Windows
+            if os.name == 'nt':
                 startupinfo = subprocess.STARTUPINFO()
                 startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0  # SW_HIDE
+                startupinfo.wShowWindow = 0
                 kwargs = {'startupinfo': startupinfo, 'creationflags': subprocess.CREATE_NO_WINDOW}
-            else:  # Linux/Mac
+            else:
                 kwargs = {}
             
             local_commit = subprocess.check_output(
@@ -257,32 +257,45 @@ class App(ctk.CTk):
             if local_commit != remote_commit:
                 answer = mbox.askyesno(
                     "Обновление доступно",
-                    "🔄 Обнаружена новая версия приложения.\nУстановить обновление сейчас?"
+                    "🔄 Обнова версия приложения.\nУстановить обновление сейчас?"
                 )
                 if answer:
-                    # Сбрасываем все локальные изменения
-                    subprocess.run(["git", "reset", "--hard"], cwd=repo_dir, check=True, **kwargs)
+                    # Закрываем все открытые файлы логов перед обновлением
+                    self.cleanup_before_update()
                     
-                    # Получаем актуальную информацию
+                    # Используем более безопасный подход вместо reset --hard
                     subprocess.run(["git", "fetch", "origin"], cwd=repo_dir, check=True, **kwargs)
-                    
-                    # Тянем обновления
+                    subprocess.run(["git", "checkout", "--", "."], cwd=repo_dir, check=True, **kwargs)  # Сбрасываем изменения
                     subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir, check=True, **kwargs)
 
                     mbox.showinfo("Обновление", "✅ Обновление успешно установлено!\nПриложение будет перезапущено.")
                     
-                    # Перезапускаем приложение
                     python = sys.executable
                     os.execl(python, python, *sys.argv)
             else:
                 print("Приложение актуально.")
                 
         except subprocess.CalledProcessError as e:
-            print(f"Ошибка Git при проверке обновлений: {e}")
-            mbox.showerror("Ошибка обновления", "Не удалось выполнить обновление.")
+            print(f"Ошибка Git: {e}")
+            mbox.showerror("Ошибка", "Не удалось выполнить обновление.")
         except Exception as e:
-            print(f"Общая ошибка при проверке обновлений: {e}")
+            print(f"Ошибка при проверке обновлений: {e}")
 
+    def cleanup_before_update(self):
+        """Закрывает все открытые файлы и ресурсы перед обновлением"""
+        try:
+            # Закрываем логгеры если они есть
+            import logging
+            for handler in logging.getLogger().handlers[:]:
+                handler.close()
+                logging.getLogger().removeHandler(handler)
+                
+            # Дополнительно: принудительно закрываем файловые дескрипторы
+            import gc
+            gc.collect()
+            
+        except Exception as e:
+            print(f"Ошибка при очистке: {e}")
     
     def _setup_fonts(self):
         """Настройка системы шрифтов"""
