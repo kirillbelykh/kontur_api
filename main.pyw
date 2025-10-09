@@ -229,15 +229,19 @@ class App(ctk.CTk):
     
     def check_for_updates(self):
         try:
+            repo_dir = os.path.dirname(__file__)
+            
+            # Получаем текущий коммит
             local_commit = subprocess.check_output(
                 ["git", "rev-parse", "HEAD"],
-                cwd=os.path.dirname(__file__),
+                cwd=repo_dir,
                 text=True
             ).strip()
 
+            # Получаем последний коммит с удаленного репозитория
             remote_commit = subprocess.check_output(
-                ["git", "ls-remote", "origin", "main"],
-                cwd=os.path.dirname(__file__),
+                ["git", "ls-remote", "origin", "HEAD"],
+                cwd=repo_dir,
                 text=True
             ).split()[0]
 
@@ -247,24 +251,29 @@ class App(ctk.CTk):
                     "🔄 Обнаружена новая версия приложения.\nУстановить обновление сейчас?"
                 )
                 if answer:
-                    repo_dir = os.path.dirname(__file__)
-
-                    # Сохраняем локальные изменения
-                    subprocess.run(["git", "stash"], cwd=repo_dir)
-
-                    # Тянем обновление
-                    subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir)
-
-                    # Восстанавливаем локальные изменения (если есть)
-                    subprocess.run(["git", "stash", "pop"], cwd=repo_dir)
+                    # Сбрасываем все локальные изменения
+                    subprocess.run(["git", "reset", "--hard"], cwd=repo_dir, check=True)
+                    
+                    # Получаем актуальную информацию о ветке
+                    subprocess.run(["git", "fetch", "origin"], cwd=repo_dir, check=True)
+                    
+                    # Переключаемся на основную ветку и тянем обновления
+                    subprocess.run(["git", "checkout", "main"], cwd=repo_dir, check=True)
+                    subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir, check=True)
 
                     mbox.showinfo("Обновление", "✅ Обновление успешно установлено!\nПриложение будет перезапущено.")
+                    
+                    # Перезапускаем приложение
                     python = sys.executable
                     os.execl(python, python, *sys.argv)
             else:
                 print("Приложение актуально.")
+                
+        except subprocess.CalledProcessError as e:
+            print(f"Ошибка Git при проверке обновлений: {e}")
+            mbox.showerror("Ошибка обновления", "Не удалось выполнить обновление. Проверьте подключение к интернету.")
         except Exception as e:
-            print(f"Ошибка при проверке обновлений: {e}")
+            print(f"Общая ошибка при проверке обновлений: {e}")
 
     
     def _setup_fonts(self):
