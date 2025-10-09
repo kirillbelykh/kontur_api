@@ -214,7 +214,6 @@ class App(ctk.CTk):
         self.download_list: List[dict] = []
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
-        self.check_for_updates()
         SessionManager.initialize()
         
         # THREADING
@@ -228,7 +227,20 @@ class App(ctk.CTk):
         self._setup_ui()
         self.start_auto_status_check()
     
-    
+    def cleanup_before_update(self):
+        """Очистка ресурсов перед обновлением."""
+        try:
+            # Завершаем все активные потоки
+            self.auto_download_active = False
+            self.download_executor.shutdown(wait=False)
+            self.status_check_executor.shutdown(wait=False)
+            self.execute_all_executor.shutdown(wait=False)
+            self.intro_executor.shutdown(wait=False)
+            self.intro_tsd_executor.shutdown(wait=False)
+            print("✅ Потоки остановлены перед обновлением.")
+        except Exception as e:
+            print(f"⚠️ Ошибка при очистке перед обновлением: {e}")
+
     def _setup_fonts(self):
         """Настройка системы шрифтов"""
         # Проверяем доступные шрифты
