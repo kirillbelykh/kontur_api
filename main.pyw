@@ -1052,51 +1052,53 @@ class App(ctk.CTk):
         def status_check_worker():
             while self.auto_download_active:
                 try:
-                    time.sleep(30)
+                    # Проверяем каждые 10 секунд (увеличили для снижения нагрузки на API)
+                    time.sleep(10)
                     
                     # Получаем заказы, которые ожидают скачивания
                     pending_orders = [item for item in self.download_list 
-                                    if item['status'] in ['Ожидает', 'В обработке']]
-                    
+                                    if item['status'] not in ['Скачивается', 'Скачан', 'Ошибка генерации']]
                     if not pending_orders:
                         continue
                     
-                    self.after(0, lambda: self.download_log_insert(f"🔍 Проверка статусов {len(pending_orders)} заказов..."))
                     
-                    # Создаем сессию для всех проверок
-                    try:
-                        session = SessionManager.get_session()
-                    except Exception as e:
-                        self.after(0, lambda: self.download_log_insert(f"❌ Ошибка создания сессии: {e}"))
-                        continue
-                    
-                    # Проверяем статусы
+                    # Проверяем статусы и запускаем скачивание для готовых
                     for item in pending_orders:
                         if not self.auto_download_active:
                             break
+                        
+                        if item.get('downloading', False):
+                            continue  # Пропускаем, если уже скачивается
                             
                         try:
-                            status = self._check_order_status(session, item['document_id'])
+                            # Проверяем статус заказа
+                            status = self._check_order_status(item['document_id'])
                             
-                            if status == 'released':
-                                # Проверяем, не скачивается ли уже
-                                if item['status'] != 'Скачивается':
-                                    self.after(0, lambda i=item: self.download_log_insert(f"✅ Заказ {i['order_name']} готов к скачиванию"))
-                                    self.download_executor.submit(self._download_order, item.copy())
-                                    self.after(0, lambda i=item: self._update_download_status(i, 'В очереди на скачивание'))
-                            elif status in ['processing', 'created']:
-                                self.after(0, lambda i=item: self._update_download_status(i, 'В обработке'))
+                            if status in ('released', 'received'):
+                                self.download_log_insert(f"✅ Заказ {item['order_name']} готов к скачиванию")
+                                # Устанавливаем флаг и статус синхронно
+                                item['downloading'] = True
+                                item['status'] = 'Скачивается'
+                                # Обновляем UI в главном потоке
+                                self.after(0, self.update_download_tree)
+                                # Запускаем скачивание в отдельном потоке
+                                self.download_executor.submit(self._download_order, item)
+                            elif status in ('processing', 'created'):
+                                item['status'] = 'Генерируется'
+                                self.after(0, self.update_download_tree)
                             elif status == 'error':
-                                self.after(0, lambda i=item: self._update_download_status(i, 'Ошибка генерации'))
+                                item['status'] = 'Ошибка генерации'
+                                self.after(0, self.update_download_tree)
                                 
                         except Exception as e:
-                            self.after(0, lambda i=item: self._update_download_status(i, 'Ошибка проверки'))
+                            self.download_log_insert(f"❌ Ошибка проверки заказа {item['order_name']}: {e}")
                             continue
                             
                 except Exception as e:
-                    self.after(0, lambda: self.download_log_insert(f"❌ Ошибка в статус-чекере: {e}"))
-                    time.sleep(30)
+                    self.download_log_insert(f"❌ Ошибка в статус-чекере: {e}")
+                    time.sleep(30)  # Ждем перед повторной попыткой
         
+        # Запускаем в отдельном потоке
         threading.Thread(target=status_check_worker, daemon=True).start()
 
     def _check_order_status(self, document_id):
@@ -1116,25 +1118,33 @@ class App(ctk.CTk):
 
     def _download_order(self, item):
         """Скачивает заказ в отдельном потоке"""
+        # Убрали проверку downloading здесь, т.к. она теперь в worker
         try:
-            # Проверяем, не скачивается ли уже этот заказ
-            if item.get('status') == 'Скачивается':
-                return
-                
+            # Обновляем статус в главном потоке (на случай, если не установлен)
             self.after(0, lambda: self._update_download_status(item, 'Скачивается'))
             
             session = SessionManager.get_session()
             
             # Скачиваем файлы
-            folder_name = download_codes(session, item['document_id'], item['order_name'])
+            paths = download_codes(session, item['document_id'], item['order_name'])
             
-            if folder_name:
-                self.after(0, lambda: self._finish_download(item, folder_name))
+            # paths: tuple (pdf, csv, xls) или None (если early fail, e.g. status not ready)
+            if paths is None:
+                raise ValueError("download_codes вернул None (заказ не готов или ошибка подготовки)")
+            
+            non_none_paths = [p for p in paths if p is not None]
+            if non_none_paths:
+                filename = ', '.join(non_none_paths)  # Или просто paths[0] если нужен один
+                self.after(0, lambda f=filename: self._finish_download(item, f))
             else:
-                self.after(0, lambda: self._update_download_status(item, 'Ошибка скачивания'))
-                
+                raise ValueError("Нет скачанных файлов (все пути None)")
+            
         except Exception as e:
+            logger.error(f"Ошибка скачивания {item['order_name']}: {e}", exc_info=True)
             self.after(0, lambda: self._update_download_status(item, f'Ошибка: {e}'))
+        finally:
+            item['downloading'] = False
+            self.after(0, self.update_idletasks)  # Принудительно обновить UI
 
     def _update_download_status(self, item, status):
         """Обновляет статус скачивания в UI"""
@@ -1147,16 +1157,18 @@ class App(ctk.CTk):
         except Exception as e:
             print(f"Ошибка обновления статуса: {e}")
 
-    def _finish_download(self, item, folder_name):
+    def _finish_download(self, item, filename):
         """Завершает скачивание"""
         try:
             item['status'] = 'Скачан'
-            item['filename'] = folder_name  # Теперь храним имя папки
+            item['filename'] = filename
             self.update_download_tree()
-            self.download_log_insert(f"✅ Успешно скачаны файлы в папку: {folder_name}")
+            self.download_log_insert(f"✅ Успешно скачан: {filename}")
+            # Принудительно обновляем интерфейс
             self.update_idletasks()
         except Exception as e:
             print(f"Ошибка завершения скачивания: {e}")
+
 
     def _add_to_download_list(self, order_item, document_id):
         """Добавляет заказ в список для скачивания"""
