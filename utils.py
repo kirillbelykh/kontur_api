@@ -85,7 +85,6 @@ def save_order_history(order_items) -> Optional[str]:
             total_codes = sum(int(getattr(item, 'codes_count', 0)) for item in order_items)
             f.write(f"Общее количество кодов: {total_codes}\n")
 
-        logger.info(f"История заказа сохранена в файл: {file_path}")
         return str(file_path)
 
     except Exception as e:

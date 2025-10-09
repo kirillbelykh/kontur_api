@@ -180,7 +180,6 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         cookies = {c["name"]: c["value"] for c in raw}
         save_cookies_to_file(cookies)
 
-        logger.info("Collected cookies keys: " + str(list(cookies.keys())))
         return cookies
 
     except Exception as e:

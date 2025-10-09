@@ -194,7 +194,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
             doc = resp_status.json()
             status = doc.get("status")
             logger.info(f"Статус заказа {document_id}: {status}")
-            if status == "released":
+            if status in ("released", "received"):
                 break
             time.sleep(30)
             attempt += 1
@@ -202,7 +202,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
             logger.error(f"Ошибка проверки статуса заказа {document_id}: {e}", exc_info=True)
             return None
 
-    if status != "released":
+    if status not in ("released", "received"):
         logger.error(f"Заказ {document_id} не перешёл в 'released' за {max_attempts * 30} сек")
         return None
 
@@ -240,7 +240,6 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
         resp_templates = session.get(f"{BASE}/api/v1/print-templates?organizationId={ORGANIZATION_ID}&formTypes=codesOrder", timeout=15)
         resp_templates.raise_for_status()
         templates = resp_templates.json()
-        logger.info(f"Список шаблонов: {templates}")
         template_id = None
         for t in templates:
             if t.get("name") == "Этикетка 2х2см" or t.get("size") == "2х2" or t.get("dekkoId") == "20x20Template_v2":
@@ -655,7 +654,6 @@ def make_task_on_tsd(
         
         # 1. Создаем документ ввода в оборот
         url_create = f"{BASE}/api/v1/codes-introduction?warehouseId={WAREHOUSE_ID}"
-        logger.info(f"📝 Создаем документ: {url_create}")
         req_payload = {
             "introductionType": "introduction",
             "productGroup": PRODUCT_GROUP,
@@ -673,7 +671,6 @@ def make_task_on_tsd(
 
         # 2. Обновляем данные production
         url_production = f"{BASE}/api/v1/codes-introduction/{document_id}/production"
-        logger.info(f"⚙️ Обновляем production: {url_production}")
         
         # Формируем полный payload для production
         production_payload = {
@@ -694,7 +691,6 @@ def make_task_on_tsd(
             "productGroup": "wheelChairs"
         }
         
-        logger.info(f"📦 Production payload: {production_payload}")
         r_production = session.patch(url_production, json=production_payload, timeout=30)
         logger.info(f"📡 Статус production: {r_production.status_code}")
         
@@ -704,7 +700,6 @@ def make_task_on_tsd(
 
         # 3. Добавляем позиции в документ (упрощенная версия без загрузки XLS)
         url_positions = f"{BASE}/api/v1/codes-introduction/{document_id}/positions"
-        logger.info(f"📋 Добавляем позиции: {url_positions}")
         
         # Форматируем позиции для API
         positions_payload = {"rows": []}
@@ -721,7 +716,6 @@ def make_task_on_tsd(
             }
             positions_payload["rows"].append(position)
         
-        logger.info(f"📦 Positions payload: {positions_payload}")
         r_positions = session.post(url_positions, json=positions_payload, timeout=30)
         logger.info(f"📡 Статус позиций: {r_positions.status_code}")
         
@@ -731,7 +725,6 @@ def make_task_on_tsd(
 
         # 4. Отправляем задание на ТСД
         url_send_tsd = f"{BASE}/api/v1/codes-introduction/{document_id}/send-to-tsd"
-        logger.info(f"📱 Отправляем на ТСД: {url_send_tsd}")
         
         r_send_tsd = session.post(url_send_tsd, timeout=30)
         logger.info(f"📡 Статус отправки ТСД: {r_send_tsd.status_code}")
