@@ -54,16 +54,41 @@ class SessionManager:
     _lock = threading.Lock()
     _session = None
     _last_update = 0
-    _lifetime = 60 * 15  # обновлять cookies раз в 5 минут
+    _lifetime = 60 * 15  # обновлять cookies каждые 15 минут
+
+    @classmethod
+    def _refresh_session(cls):
+        """Обновляет cookies и создаёт новую сессию (в отдельном потоке)"""
+        try:
+            cookies = get_valid_cookies()
+            with cls._lock:
+                cls._session = make_session_with_cookies(cookies)
+                cls._last_update = time.time()
+            print("✅ Cookies обновлены.")
+        except Exception as e:
+            print(f"❌ Ошибка при обновлении cookies: {e}")
+
+    @classmethod
+    def start_background_refresh(cls):
+        """Запускает периодическое обновление cookies в фоновом потоке"""
+        def refresh_loop():
+            while True:
+                now = time.time()
+                with cls._lock:
+                    needs_refresh = (
+                        cls._session is None or now - cls._last_update > cls._lifetime
+                    )
+                if needs_refresh:
+                    print("🔄 Обновляем cookies в фоне...")
+                    cls._refresh_session()
+                time.sleep(60)  # проверяем раз в минуту
+
+        threading.Thread(target=refresh_loop, daemon=True).start()
 
     @classmethod
     def get_session(cls):
+        """Возвращает актуальную сессию (без блокировки интерфейса)"""
         with cls._lock:
-            now = time.time()
-            if cls._session is None or now - cls._last_update > cls._lifetime:
-                cookies = get_valid_cookies()
-                cls._session = make_session_with_cookies(cookies)
-                cls._last_update = now
             return cls._session
 
 def make_order_to_kontur(it, session) -> Tuple[bool, str]:
@@ -122,6 +147,9 @@ class App(ctk.CTk):
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
 
+
+        SessionManager.start_background_refresh()
+        
         #THREADING
         self.download_executor = ThreadPoolExecutor(max_workers=2)  # Для скачивания
         self.status_check_executor = ThreadPoolExecutor(max_workers=1)  # Для проверки статусов
