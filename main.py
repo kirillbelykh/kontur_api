@@ -1,7 +1,5 @@
 import os
 import copy
-import subprocess
-import sys
 import uuid
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -15,6 +13,7 @@ from get_gtin import lookup_gtin, lookup_by_gtin
 from api import codes_order, download_codes, make_task_on_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
+import update
 import customtkinter as ctk
 import tkinter as tk
 import tkinter.messagebox as mbox
@@ -202,6 +201,8 @@ class App(ctk.CTk):
         # Настройка темы и внешнего вида
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
+        repo_dir = os.path.abspath(os.path.dirname(__file__))
+        update.check_for_updates(repo_dir=repo_dir, pre_update_cleanup=self.cleanup_before_update, auto_restart=True)
         
         self.title("Kontur Marking")
         self.geometry("1000x800")
@@ -227,75 +228,6 @@ class App(ctk.CTk):
         self._setup_ui()
         self.start_auto_status_check()
     
-    def check_for_updates(self):
-        try:
-            repo_dir = os.path.dirname(__file__)
-            
-            # Параметры для скрытия консольного окна
-            if os.name == 'nt':
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-                kwargs = {'startupinfo': startupinfo, 'creationflags': subprocess.CREATE_NO_WINDOW}
-            else:
-                kwargs = {}
-            
-            local_commit = subprocess.check_output(
-                ["git", "rev-parse", "HEAD"],
-                cwd=repo_dir,
-                text=True,
-                **kwargs
-            ).strip()
-
-            remote_commit = subprocess.check_output(
-                ["git", "ls-remote", "origin", "HEAD"],
-                cwd=repo_dir,
-                text=True,
-                **kwargs
-            ).split()[0]
-
-            if local_commit != remote_commit:
-                answer = mbox.askyesno(
-                    "Обновление доступно",
-                    "🔄 Обнова версия приложения.\nУстановить обновление сейчас?"
-                )
-                if answer:
-                    # Закрываем все открытые файлы логов перед обновлением
-                    self.cleanup_before_update()
-                    
-                    # Используем более безопасный подход вместо reset --hard
-                    subprocess.run(["git", "fetch", "origin"], cwd=repo_dir, check=True, **kwargs)
-                    subprocess.run(["git", "checkout", "--", "."], cwd=repo_dir, check=True, **kwargs)  # Сбрасываем изменения
-                    subprocess.run(["git", "pull", "origin", "main"], cwd=repo_dir, check=True, **kwargs)
-
-                    mbox.showinfo("Обновление", "✅ Обновление успешно установлено!\nПриложение будет перезапущено.")
-                    
-                    python = sys.executable
-                    os.execl(python, python, *sys.argv)
-            else:
-                print("Приложение актуально.")
-                
-        except subprocess.CalledProcessError as e:
-            print(f"Ошибка Git: {e}")
-            mbox.showerror("Ошибка", "Не удалось выполнить обновление.")
-        except Exception as e:
-            print(f"Ошибка при проверке обновлений: {e}")
-
-    def cleanup_before_update(self):
-        """Закрывает все открытые файлы и ресурсы перед обновлением"""
-        try:
-            # Закрываем логгеры если они есть
-            import logging
-            for handler in logging.getLogger().handlers[:]:
-                handler.close()
-                logging.getLogger().removeHandler(handler)
-                
-            # Дополнительно: принудительно закрываем файловые дескрипторы
-            import gc
-            gc.collect()
-            
-        except Exception as e:
-            print(f"Ошибка при очистке: {e}")
     
     def _setup_fonts(self):
         """Настройка системы шрифтов"""
