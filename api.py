@@ -236,13 +236,13 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
 
     # ---------------- PDF export ----------------
     try:
-        # получить templateId для size "30x20"
+        # получить templateId для size "2x2"
         resp_templates = session.get(f"{BASE}/api/v1/print-templates?organizationId={ORGANIZATION_ID}&formTypes=codesOrder", timeout=15)
         resp_templates.raise_for_status()
         templates = resp_templates.json()
         template_id = None
         for t in templates:
-            if t.get("size") == "30x20":
+            if t.get("size") == "2x2":
                 template_id = t.get("id")
                 break
         if template_id:
