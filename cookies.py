@@ -75,6 +75,18 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         logger.error("Selenium не установлен или недоступен:", e)
         return None
 
+    # Импорт pywin32 для скрытия окна
+    win32gui = None
+    win32con = None
+    win32process = None
+    try:
+        import win32gui
+        import win32con
+        import win32process
+    except ImportError as e:
+        logger.warning("pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32")
+        logger.warning(f"Ошибка импорта pywin32: {e}")
+
     if not driver_path.exists():
         logger.error(f"Driver not found: {driver_path}")
         logger.error("Driver not found:", driver_path)
@@ -93,16 +105,38 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         opts.add_argument("--no-sandbox")
         opts.add_argument("--disable-dev-shm-usage")
         opts.add_argument("--disable-gpu")
+    # Добавляем сдвиг окна за экран как fallback
+    opts.add_argument("--window-position=-32000,-32000")
+    opts.add_argument("--window-size=1920,1080")  # Устанавливаем нормальный размер, чтобы избежать маленького окна
 
     service = Service(str(driver_path))
     driver = webdriver.Chrome(service=service, options=opts)
     wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
     try:
-        driver.get(target_url)
-        time.sleep(0.8)
+        # Скрытие окна браузера с помощью Windows API по PID (если pywin32 доступен)
+        if win32gui and win32con and win32process:
+            pid = driver.service.process.pid
+            time.sleep(1.0)  # Ждём запуска окна
 
-        # best-effort шаги
+            def enum_window_callback(hwnd, results):
+                _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
+                if window_pid == pid:
+                    results.append(hwnd)
+
+            results = []
+            win32gui.EnumWindows(enum_window_callback, results)
+            if results:
+                for hwnd in results:
+                    win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+                logger.info(f"Скрыто {len(results)} окон браузера по PID {pid}")
+            else:
+                logger.warning("Не удалось найти окна браузера по PID для скрытия")
+
+        driver.get(target_url)
+        time.sleep(2.0)  # Увеличили задержку для полной загрузки
+
+        # best-effort шаги с дополнительными проверками
         try:
             # Проверяем наличие кнопки на странице
             cookie_btn = driver.find_elements(By.XPATH, '//*[@id="root"]/div/div/div[1]/div[1]/span/button/div[2]/span')
@@ -121,8 +155,8 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
             profile_el.click()
             logger.info("Clicked profile (best-effort)")
             time.sleep(SLEEP)
-        except Exception:
-            logger.info("Profile select not found/ignored")
+        except Exception as e:
+            logger.info(f"Profile select error: {e} - ignored")
 
         try:
             warehouse_el = wait.until(EC.element_to_be_clickable(
@@ -131,19 +165,27 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
             warehouse_el.click()
             logger.info("Clicked warehouse (fallback selector)")
             time.sleep(SLEEP)
-        except Exception:
-            logger.info("Warehouse select not found/ignored")
+        except Exception as e:
+            logger.info(f"Warehouse select error: {e} - ignored")
+
+        # Дополнительная проверка загрузки страницы
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        logger.info("Страница загружена (body найден)")
 
         raw = driver.get_cookies()
+        if not raw:
+            logger.warning("Нет cookies после загрузки - возможно, требуется авторизация или ошибка")
+            return None
+
         cookies = {c["name"]: c["value"] for c in raw}
         save_cookies_to_file(cookies)
 
-        logger.info("Collected cookies keys:", list(cookies.keys()))
+        logger.info("Collected cookies keys: " + str(list(cookies.keys())))
         return cookies
 
     except Exception as e:
         logger.exception("get_cookies failed")
-        logger.error("get_cookies failed:", e)
+        logger.error("get_cookies failed: " + str(e))
         return None
     finally:
         try:
