@@ -54,7 +54,7 @@ class SessionManager:
     _lock = threading.Lock()
     _session = None
     _last_update = 0
-    _lifetime = 60 * 5  # обновлять cookies раз в 5 минут
+    _lifetime = 60 * 15  # обновлять cookies раз в 5 минут
 
     @classmethod
     def get_session(cls):
@@ -552,7 +552,6 @@ class App(ctk.CTk):
     def execute_all(self):
         """Запуск выполнения всех накопленных позиций в многопоточном режиме"""
         try:
-            self._reset_input_fields()  # Сбрасываем поля ввода
             if not self.collected:
                 self.log_insert("Нет накопленных позиций.")
                 return
@@ -759,12 +758,10 @@ class App(ctk.CTk):
                     
                     # Получаем заказы, которые ожидают скачивания
                     pending_orders = [item for item in self.download_list 
-                                    if item['status'] in ['Ожидает', 'В обработке']]
-                    
+                                if item['status'] not in ['Скачивается', 'Скачан']]
                     if not pending_orders:
                         continue
                     
-                    self.download_log_insert(f"🔍 Проверка статусов {len(pending_orders)} заказов...")
                     
                     # Проверяем статусы и запускаем скачивание для готовых
                     for item in pending_orders:

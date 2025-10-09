@@ -54,7 +54,7 @@ class SessionManager:
     _lock = threading.Lock()
     _session = None
     _last_update = 0
-    _lifetime = 60 * 5  # обновлять cookies раз в 5 минут
+    _lifetime = 60 * 15  # обновлять cookies раз в 5 минут
 
     @classmethod
     def get_session(cls):
