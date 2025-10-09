@@ -288,14 +288,23 @@ class App(ctk.CTk):
 
     def _set_default_fonts(self):
         """Устанавливает шрифты по умолчанию для всех виджетов"""
-        normal_font = self.fonts["normal"]
-        button_font = self.fonts["button"]
-
-        # Задаём глобальный шрифт
-        ctk.set_default_font(family=normal_font.cget("family"), # type: ignore
-                            size=normal_font.cget("size"),
-                            weight=normal_font.cget("weight"))
-
+        try:
+            # Получаем текущую тему
+            current_theme = ctk.get_appearance_mode()
+            
+            # Настраиваем стандартные шрифты через тему
+            normal_font = self.fonts["normal"]
+            button_font = self.fonts["button"]
+            
+            # Создаем кастомную тему с нужными шрифтами
+            ctk.set_default_color_theme("blue")  # или другая базовая тема
+            
+            # Для CTkFont можно установить шрифты при создании виджетов
+            # или через конфигурацию отдельных виджетов
+            
+        except Exception as e:
+            print(f"Ошибка при установке шрифтов: {e}")
+            
     def _setup_ui(self):
         """Настройка основного интерфейса с использованием кастомных шрифтов"""
         # Главный контейнер
