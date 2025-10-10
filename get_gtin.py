@@ -40,18 +40,19 @@ def lookup_gtin(
 
         # Функция для нормализации размера из таблицы
         def extract_size_from_table(size_str):
-            """Извлекает размер в формате S/M/L/XL из строки типа 'СВЕРХБОЛЬШОЙ (XL)'"""
+            """Извлекает размер в формате S/M/L/XL или числовой размер из строки"""
             if not isinstance(size_str, str):
                 return ""
             
-            # Ищем содержимое в скобках
+            size_str_lower = size_str.lower().strip()
+            
+            # Ищем содержимое в скобках для буквенных размеров
             import re
             match = re.search(r'\(([A-Z]+)\)', size_str.upper())
             if match:
                 return match.group(1).lower()
             
-            # Если скобок нет, пытаемся определить по ключевым словам
-            size_str_lower = size_str.lower()
+            # Если скобок нет, пытаемся определить по ключевым словам для буквенных размеров
             if "сверхбольшой" in size_str_lower or "xl" in size_str_lower:
                 return "xl"
             elif "большой" in size_str_lower or "l" in size_str_lower:
@@ -61,19 +62,45 @@ def lookup_gtin(
             elif "маленький" in size_str_lower or "s" in size_str_lower:
                 return "s"
             
+            # Пытаемся извлечь числовой размер
+            # Ищем числа с возможными разделителями (точка, запятая)
+            num_match = re.search(r'(\d+[.,]?\d*)', size_str_lower)
+            if num_match:
+                # Нормализуем числовой размер: заменяем запятую на точку
+                num_size = num_match.group(1).replace(',', '.')
+                return num_size
+            
             return size_str_lower
 
         # Нормализуем размеры в DataFrame
         df['normalized_size'] = df['Размер'].apply(extract_size_from_table)
         
         # Нормализуем входной размер
-        size_mapping = {
-            's': 's', 'маленький': 's',
-            'm': 'm', 'средний': 'm',
-            'l': 'l', 'большой': 'l', 
-            'xl': 'xl', 'сверхбольшой': 'xl'
-        }
-        normalized_input_size = size_mapping.get(size_input, size_input)
+        def normalize_input_size(size_str):
+            """Нормализует входной размер"""
+            size_lower = size_str.lower().strip()
+            
+            # Буквенные размеры
+            size_mapping = {
+                's': 's', 'маленький': 's',
+                'm': 'm', 'средний': 'm',
+                'l': 'l', 'большой': 'l', 
+                'xl': 'xl', 'сверхбольшой': 'xl'
+            }
+            
+            if size_lower in size_mapping:
+                return size_mapping[size_lower]
+            
+            # Числовые размеры - нормализуем формат
+            import re
+            num_match = re.search(r'(\d+[.,]?\d*)', size_lower)
+            if num_match:
+                num_size = num_match.group(1).replace(',', '.')
+                return num_size
+            
+            return size_lower
+
+        normalized_input_size = normalize_input_size(size_input)
 
         # --- Точный поиск ---
         cond = (
