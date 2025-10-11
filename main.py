@@ -205,7 +205,7 @@ class App(ctk.CTk):
         update.check_for_updates(repo_dir=repo_dir, pre_update_cleanup=self.cleanup_before_update, auto_restart=True)
         
         self.title("Kontur Marking")
-        self.geometry("1000x800")
+        self.geometry("1400x800")
         self.minsize(900, 700)
         self._setup_fonts()
 
