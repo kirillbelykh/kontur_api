@@ -1217,103 +1217,264 @@ class App(ctk.CTk):
         
     def _setup_introduction_tab(self):
         """Таб ввода в оборот"""
-        tab_intro = self.tabview.add("🔄 Ввод в оборот")
-        self.intro_tab = tab_intro
-        
-        main_frame = ctk.CTkFrame(tab_intro)
-        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Левая часть
-        left_frame = ctk.CTkFrame(main_frame)
-        left_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
-        
-        # Верхняя часть - форма ввода
-        form_frame = ctk.CTkFrame(left_frame)
-        form_frame.pack(fill="x", pady=(0, 10))
-        
-        ctk.CTkLabel(form_frame, text="Параметры ввода:", 
-                    font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
-        
-        # Сетка для полей ввода
-        labels = [
-            ("Дата производства (ДД-ММ-ГГГГ):", "prod_date_entry"),
-            ("Дата окончания (ДД-ММ-ГГГГ):", "exp_date_entry"),
-            ("Номер партии:", "batch_entry")
-        ]
-        
-        for i, (label_text, attr_name) in enumerate(labels):
-            ctk.CTkLabel(form_frame, text=label_text).grid(row=i+1, column=0, sticky="w", pady=8, padx=5)
-            entry = ctk.CTkEntry(form_frame, width=200)
-            entry.grid(row=i+1, column=1, pady=8, padx=5)
-            setattr(self, attr_name, entry)
-        
-        # Заполнение дат по умолчанию
-        today = datetime.now().strftime("%d-%m-%Y")
-        future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
-        self.prod_date_entry.insert(0, today) # type: ignore
-        self.exp_date_entry.insert(0, future_date) # type: ignore
-        
-        # Кнопки (теперь сразу после формы)
-        btn_frame = ctk.CTkFrame(left_frame)
-        btn_frame.pack(fill="x", pady=(0, 10))
-        
-        self.intro_btn = ctk.CTkButton(
-            btn_frame, 
-            text="🔄 Ввести в оборот", 
-            command=self.on_introduce_clicked,
-            fg_color="#2AA876",
-            hover_color="#228B69"
-        )
-        self.intro_btn.pack(side="left", padx=5)
-        
-        self.intro_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_introduction_tree)
-        self.intro_refresh_btn.pack(side="left", padx=5)
-        
-        self.intro_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_intro_log)
-        self.intro_clear_btn.pack(side="left", padx=5)
-        
-        # Нижняя часть - таблица заказов
-        table_frame = ctk.CTkFrame(left_frame)
-        table_frame.pack(fill="both", expand=True, pady=(10, 0))
-        
-        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
-        
-        intro_columns = ("order_name", "document_id", "status", "filename")
-        self.intro_tree = ttk.Treeview(table_frame, columns=intro_columns, show="headings", 
-                                    height=10, selectmode="extended")
-        
-        headers = {
-            "order_name": "Заявка", "document_id": "ID заказа",
-            "status": "Статус", "filename": "Файл"
-        }
-        
-        for col, text in headers.items():
-            self.intro_tree.heading(col, text=text)
-            self.intro_tree.column(col, width=150)
-        
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.intro_tree.yview)
-        self.intro_tree.configure(yscrollcommand=scrollbar.set)
-        self.intro_tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
-        
-        # Правая часть - лог
-        right_frame = ctk.CTkFrame(main_frame)
-        right_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
-        
-        log_frame = ctk.CTkFrame(right_frame)
-        log_frame.pack(fill="both", expand=True)
-        
-        ctk.CTkLabel(log_frame, text="Лог операций:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
-        
-        self.intro_log_text = ctk.CTkTextbox(log_frame)
-        self.intro_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
-        self.intro_log_text.configure(state="disabled")
-        
-        self.update_introduction_tree()
-    
-    # Функция для преобразования даты из ДД-ММ-ГГГГ в ГГГГ-ММ-ДД
+        try:
+            tab_intro = self.tabview.add("🔄 Ввод в оборот")
+            self.intro_tab = tab_intro
+            
+            main_frame = ctk.CTkFrame(tab_intro)
+            main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            # Левая часть
+            left_frame = ctk.CTkFrame(main_frame)
+            left_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+            
+            # Верхняя часть - форма ввода
+            form_frame = ctk.CTkFrame(left_frame)
+            form_frame.pack(fill="x", pady=(0, 10))
+            
+            ctk.CTkLabel(form_frame, text="Параметры ввода:", 
+                        font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
+            
+            # Явно инициализируем поля ввода как None
+            self.prod_date_intro_entry = None
+            self.exp_date_intro_entry = None
+            self.batch_intro_entry = None
+            
+            # Сетка для полей ввода с гарантированной инициализацией
+            labels = [
+                ("Дата производства (ДД-ММ-ГГГГ):", "prod_date_intro_entry"),
+                ("Дата окончания (ДД-ММ-ГГГГ):", "exp_date_intro_entry"),
+                ("Номер партии:", "batch_intro_entry")
+            ]
+            
+            for i, (label_text, attr_name) in enumerate(labels):
+                ctk.CTkLabel(form_frame, text=label_text).grid(row=i+1, column=0, sticky="w", pady=8, padx=5)
+                entry = ctk.CTkEntry(form_frame, width=200)
+                entry.grid(row=i+1, column=1, pady=8, padx=5)
+                setattr(self, attr_name, entry)
+            
+            # Проверяем, что все поля были созданы
+            if not all([self.prod_date_intro_entry, self.exp_date_intro_entry, self.batch_intro_entry]):
+                self._show_error("Ошибка инициализации полей ввода")
+                return
+                
+            # Заполнение дат по умолчанию
+            today = datetime.now().strftime("%d-%m-%Y")
+            future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
+            
+            self.prod_date_intro_entry.insert(0, today)
+            self.exp_date_intro_entry.insert(0, future_date)
+            
+            # Кнопки
+            btn_frame = ctk.CTkFrame(left_frame)
+            btn_frame.pack(fill="x", pady=(0, 10))
+            
+            self.intro_btn = ctk.CTkButton(
+                btn_frame, 
+                text="🔄 Ввести в оборот", 
+                command=self.on_introduce_clicked,
+                fg_color="#2AA876",
+                hover_color="#228B69"
+            )
+            self.intro_btn.pack(side="left", padx=5)
+            
+            self.intro_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_introduction_tree)
+            self.intro_refresh_btn.pack(side="left", padx=5)
+            
+            self.intro_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_intro_log)
+            self.intro_clear_btn.pack(side="left", padx=5)
+            
+            # Нижняя часть - таблица заказов
+            table_frame = ctk.CTkFrame(left_frame)
+            table_frame.pack(fill="both", expand=True, pady=(10, 0))
+            
+            ctk.CTkLabel(table_frame, text="Доступные заказы:", 
+                        font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+            
+            intro_columns = ("order_name", "document_id", "status", "filename")
+            self.intro_tree = ttk.Treeview(table_frame, columns=intro_columns, show="headings", 
+                                        height=10, selectmode="extended")
+            
+            headers = {
+                "order_name": "Заявка", "document_id": "ID заказа",
+                "status": "Статус", "filename": "Файл"
+            }
+            
+            for col, text in headers.items():
+                self.intro_tree.heading(col, text=text)
+                self.intro_tree.column(col, width=150)
+            
+            scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.intro_tree.yview)
+            self.intro_tree.configure(yscrollcommand=scrollbar.set)
+            self.intro_tree.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+            
+            # Правая часть - лог
+            right_frame = ctk.CTkFrame(main_frame)
+            right_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
+            
+            log_frame = ctk.CTkFrame(right_frame)
+            log_frame.pack(fill="both", expand=True)
+            
+            ctk.CTkLabel(log_frame, text="Лог операций:", 
+                        font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+            
+            self.intro_log_text = ctk.CTkTextbox(log_frame)
+            self.intro_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+            self.intro_log_text.configure(state="disabled")
+            
+            self.update_introduction_tree()
+            
+            # Подтверждаем успешную инициализацию
+            print("✅ Таб ввода в оборот успешно инициализирован")
+            
+        except Exception as e:
+            print(f"❌ Ошибка при создании таба ввода в оборот: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _show_error(self, message):
+        """Вспомогательный метод для показа ошибок"""
+        print(f"❌ {message}")
+        # Если лог уже инициализирован, пишем туда
+        if hasattr(self, 'intro_log_text'):
+            try:
+                self.intro_log_text.configure(state="normal")
+                self.intro_log_text.insert("end", f"❌ {message}\n")
+                self.intro_log_text.configure(state="disabled")
+            except:
+                pass
+
+    def on_introduce_clicked(self):
+        """Обработчик кнопки — собирает данные, запускает threads для выбранных заказов."""
+        try:
+            # Улучшенная проверка инициализации полей
+            field_checks = [
+                (self.prod_date_intro_entry, "Дата производства"),
+                (self.exp_date_intro_entry, "Дата окончания"), 
+                (self.batch_intro_entry, "Номер партии")
+            ]
+            
+            for field, name in field_checks:
+                if field is None:
+                    self.intro_log_insert(f"❌ Ошибка: поле '{name}' не инициализировано")
+                    return
+                if not hasattr(field, 'get'):
+                    self.intro_log_insert(f"❌ Ошибка: поле '{name}' имеет неверный тип")
+                    return
+
+            selected_items = self.get_selected_intro_items()
+            if not selected_items:
+                self.intro_log_insert("❌ Не выбрано ни одного заказа.")
+                return
+
+            # Безопасное получение данных из полей ввода
+            prod_date_text = self.prod_date_intro_entry.get().strip() if self.prod_date_intro_entry.get() else ""
+            exp_date_text = self.exp_date_intro_entry.get().strip() if self.exp_date_intro_entry.get() else ""
+            batch_num = self.batch_intro_entry.get().strip() if self.batch_intro_entry.get() else ""
+
+            # Преобразование дат
+            prod_date = self.convert_date_format(prod_date_text)
+            exp_date = self.convert_date_format(exp_date_text)
+            thumbprint = THUMBPRINT
+
+            # Валидация
+            errors = []
+            
+            if not prod_date:
+                errors.append("Введите дату производства.")
+            elif not self.validate_iso_date(prod_date):
+                errors.append("Неверный формат даты производства. Используйте ДД-ММ-ГГГГ.")
+                
+            if not exp_date:
+                errors.append("Введите дату окончания.")
+            elif not self.validate_iso_date(exp_date):
+                errors.append("Неверный формат даты окончания. Используйте ДД-ММ-ГГГГ.")
+                
+            if not batch_num:
+                errors.append("Введите номер партии.")
+                
+            if not thumbprint:
+                errors.append("Введите отпечаток сертификата.")
+
+            if errors:
+                for error in errors:
+                    self.intro_log_insert(f"❌ {error}")
+                return
+
+            # Отключаем кнопку пока выполняется
+            self.intro_btn.configure(state="disabled")
+            self.intro_log_insert(f"🚀 Запуск ввода в оборот для {len(selected_items)} заказа(ов)...")
+            self.intro_log_insert(f"📅 Дата производства: {prod_date}, Окончание: {exp_date}, Партия: {batch_num}")
+
+            # Запускаем задачи
+            futures = []
+            for it in selected_items:
+                if not it or 'document_id' not in it:
+                    self.intro_log_insert("❌ Пропущен некорректный элемент заказа")
+                    continue
+                    
+                docid = it["document_id"]
+                order_name = it.get("order_name", "Unknown")
+                simpl_name = it.get("simpl")
+                self.intro_log_insert(f"⏳ Добавлен в очередь: {order_name} (ID: {docid})")
+                tnved_code = get_tnved_code(simpl_name) if simpl_name else ""
+                
+                # Формируем production_patch
+                production_patch = {
+                    "comment": "",
+                    "documentNumber": order_name,
+                    "productionType": "ownProduction",
+                    "warehouseId": "59739364-7d62-434b-ad13-4617c87a6d13",
+                    "expirationType": "milkMoreThan72",
+                    "containsUtilisationReport": "true",
+                    "usageType": "verified",
+                    "cisType": "unit",
+                    "fillingMethod": "file",
+                    "isAutocompletePositionsDataNeeded": "true",
+                    "productsHasSameDates": "true",
+                    "isForKegs": "true",
+                    "productionDate": prod_date,
+                    "expirationDate": exp_date,
+                    "batchNumber": batch_num,
+                    "TnvedCode": tnved_code
+                }
+                
+                fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint)
+                futures.append((fut, it))
+
+            if not futures:
+                self.intro_log_insert("❌ Нет валидных задач для выполнения")
+                self.intro_btn.configure(state="normal")
+                return
+
+            # Мониторинг завершения
+            def intro_monitor():
+                completed = 0
+                for fut, it in futures:
+                    try:
+                        ok, msg = fut.result(timeout=600)  # 10 минут таймаут
+                        self.after(0, self._on_intro_finished, it, ok, msg)
+                        completed += 1
+                    except Exception as e:
+                        self.after(0, self._on_intro_finished, it, False, f"Таймаут или ошибка: {e}")
+                        completed += 1
+                
+                # Всё завершено - разблокируем кнопку
+                self.after(0, lambda: self.intro_btn.configure(state="normal"))
+                self.after(0, lambda: self.intro_log_insert(f"✅ Все задачи завершены ({completed}/{len(futures)})"))
+
+            threading.Thread(target=intro_monitor, daemon=True).start()
+
+        except Exception as e:
+            self.intro_log_insert(f"❌ Критическая ошибка при запуске ввода в оборот: {e}")
+            # Пытаемся разблокировать кнопку в случае ошибки
+            try:
+                self.intro_btn.configure(state="normal")
+            except:
+                pass
+
+    # Остальные методы остаются без изменений
     def convert_date_format(self, date_str):
         """Преобразует дату из формата ДД-ММ-ГГГГ в ГГГГ-ММ-ДД"""
         try:
@@ -1326,7 +1487,6 @@ class App(ctk.CTk):
             # Если дата некорректна или в другом формате, возвращаем как есть
             pass
         return date_str
-
 
     def clear_intro_log(self):
         """Очищает лог ввода в оборот"""
@@ -1396,99 +1556,17 @@ class App(ctk.CTk):
             return True
         except ValueError:
             return False
-    def on_introduce_clicked(self):
-        """Обработчик кнопки — собирает данные, запускает threads для выбранных заказов."""
-        try:
-            selected_items = self.get_selected_intro_items()
-            if not selected_items:
-                self.intro_log_insert("❌ Не выбрано ни одного заказа.")
-                return
 
-            # При получении данных используем преобразование:
-            prod_date = self.convert_date_format(self.prod_date_entry.get().strip()) # type: ignore
-            exp_date = self.convert_date_format(self.exp_date_entry.get().strip()) # type: ignore
-            batch_num = self.batch_entry.get().strip() # type: ignore
-            thumbprint = THUMBPRINT
-
-            # Валидация
-            errors = []
-            
-            if not batch_num:
-                errors.append("Введите номер партии.")
-            if not thumbprint:
-                errors.append("Введите отпечаток сертификата.")
-
-            if errors:
-                for error in errors:
-                    self.intro_log_insert(f"❌ {error}")
-                return
-
-
-            # Отключаем кнопку пока выполняется
-            self.intro_btn.configure(state="disabled")
-            self.intro_log_insert(f"🚀 Запуск ввода в оборот для {len(selected_items)} заказа(ов)...")
-            self.intro_log_insert(f"📅 Дата производства: {prod_date}, Окончание: {exp_date}, Партия: {batch_num}")
-
-            # Запускаем задачи
-            futures = []
-            for it in selected_items:
-                docid = it["document_id"]
-                order_name = it.get("order_name", "Unknown")
-                simpl_name = it.get("simpl")
-                self.intro_log_insert(f"⏳ Добавлен в очередь: {order_name} (ID: {docid})")
-                tnved_code = get_tnved_code(simpl_name)
-                # Формируем production_patch
-                production_patch = {
-                    "comment": "",
-                    "documentNumber": order_name,
-                    "productionType": "ownProduction",
-                    "warehouseId": "59739364-7d62-434b-ad13-4617c87a6d13",
-                    "expirationType": "milkMoreThan72",
-                    "containsUtilisationReport": "true",
-                    "usageType": "verified",
-                    "cisType": "unit",
-                    "fillingMethod": "file",
-                    "isAutocompletePositionsDataNeeded": "true",
-                    "productsHasSameDates": "true",
-                    "isForKegs": "true",
-                    "productionDate": prod_date,
-                    "expirationDate": exp_date,
-                    "batchNumber": batch_num,
-                    "TnvedCode": tnved_code
-                }
-                
-                fut = self.intro_executor.submit(self._intro_worker, it, production_patch, thumbprint) # type: ignore
-                futures.append((fut, it))
-
-            # Мониторинг завершения
-            def intro_monitor():
-                completed = 0
-                for fut, it in futures:
-                    try:
-                        ok, msg = fut.result(timeout=600)  # 10 минут таймаут
-                        self.after(0, self._on_intro_finished, it, ok, msg)
-                        completed += 1
-                    except Exception as e:
-                        self.after(0, self._on_intro_finished, it, False, f"Таймаут или ошибка: {e}")
-                        completed += 1
-                
-                # Всё завершено - разблокируем кнопку
-                self.after(0, lambda: self.intro_btn.configure(state="normal"))
-                self.after(0, lambda: self.intro_log_insert(f"✅ Все задачи завершены ({completed}/{len(futures)})"))
-
-            threading.Thread(target=intro_monitor, daemon=True).start()
-
-        except Exception as e:
-            self.intro_log_insert(f"❌ Ошибка при запуске ввода в оборот: {e}")
-            self.intro_btn.configure(state="normal")
-    def _intro_worker(self, item: dict, production_patch: dict, thumbprint: str) -> Tuple[bool, str]:
+    def _intro_worker(self, item: dict, production_patch: dict, thumbprint: str):
         """
         Фоновая задача — производит ввод в оборот для одного заказа.
         Возвращает (ok, message).
         """
-        document_id = item["document_id"]
-        
         try:
+            document_id = item.get("document_id")
+            if not document_id:
+                return False, "Отсутствует document_id"
+            
             session = SessionManager.get_session()
             
             # Импортируем функцию из api.py
@@ -1499,7 +1577,7 @@ class App(ctk.CTk):
                 session=session,
                 codes_order_id=document_id,
                 production_patch=production_patch,
-                organization_id=os.getenv("ORGANIZATION_ID"), # type: ignore
+                organization_id=os.getenv("ORGANIZATION_ID"),
                 thumbprint=THUMBPRINT,
                 check_poll_interval=10,      # Увеличим интервалы для стабильности
                 check_poll_attempts=30,      # Больше попыток
@@ -1523,17 +1601,17 @@ class App(ctk.CTk):
             order_name = item.get("order_name", "Unknown")
             
             if ok:
-                self.intro_log_insert(f"✅ Заявка на ввод в оборот отправлена!")
+                self.intro_log_insert(f"✅ Успешно: {order_name} (ID: {docid})")
                 item["status"] = "Введен в оборот"
-                # Можно также изменить цвет строки или добавить пометку
             else:
                 self.intro_log_insert(f"❌ ОШИБКА: {order_name} (ID: {docid}) - {msg}")
                 item["status"] = "Ошибка ввода"
             
             # Обновляем отображение
             self.update_introduction_tree()
-            self.update_download_tree()  # Если у вас есть этот метод
-            
+            if hasattr(self, 'update_download_tree'):
+                self.update_download_tree()
+                
         except Exception as e:
             self.intro_log_insert(f"❌ Ошибка при обработке результата: {e}")
 
