@@ -188,7 +188,7 @@ def make_order_to_kontur(it, session) -> Tuple[bool, str]:
         document_id = resp.get("documentId") or resp.get("id")  # зависит от API
         status = resp.get("status") or "unknown"
 
-        logger.info("ФИНАЛЬНЫЙ СТАТУС ДОКУМЕНТА:", status)
+        logger.info(f"ФИНАЛЬНЫЙ СТАТУС ДОКУМЕНТА:{status}")
         return True, f"Document {document_number} processed, status: {status}, id: {document_id}"
 
     except Exception as e:

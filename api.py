@@ -445,7 +445,7 @@ def put_into_circulation(
         r.raise_for_status()
         intro_id = r.text.strip().strip('"')
         result["introduction_id"] = intro_id
-        logger.info("Создана заявка ввода в оборот: %s", intro_id)
+        logger.info(f"Создана заявка ввода в оборот: {intro_id}")
         
         # 2) initial GET introduction
         r_intro = session.get(f"{BASE}/api/v1/codes-introduction/{intro_id}", timeout=15)
@@ -462,12 +462,12 @@ def put_into_circulation(
                 last_check = r_check.json()
                 result["check_status_latest"] = last_check
                 status = last_check.get("status")
-                logger.info("codes-checking status for %s: %s", intro_id, status)
+                logger.info(f"codes-checking status for , {intro_id}, {status}")
                 if status in ("inProgress", "doesNotHaveErrors", "created", "checked", "noErrors"):  # возможные статусы
                     check_ok = True
                     break
             else:
-                logger.debug("codes-checking returned non-200: %s", r_check.status_code)
+                logger.debug(f"codes-checking returned non-200: {r_check.status_code}")
             attempts += 1
             time.sleep(check_poll_interval)
 
@@ -484,14 +484,14 @@ def put_into_circulation(
             r_prod.raise_for_status()
             result["production"] = r_prod.json()
         except Exception as e:
-            logger.warning("Не удалось получить /production: %s", e)
+            logger.warning(f"Не удалось получить /production: {e}")
             result["errors"].append(f"production GET error: {e}")
 
         # 5) Если переданы поля для PATCH /production — применим
         if production_patch:
             try:
                 patch_url = f"{BASE}/api/v1/codes-introduction/{intro_id}/production"
-                logger.info("PATCH production %s", patch_url)
+                logger.info("PATCH production {patch_url}")
                 r_patch = session.patch(patch_url, json=production_patch, timeout=30)
                 r_patch.raise_for_status()
                 result["production_patch_response"] = r_patch.json() if r_patch.content else {"status": "ok"}
@@ -500,7 +500,7 @@ def put_into_circulation(
                 r_prod2.raise_for_status()
                 result["production_after_patch"] = r_prod2.json()
             except Exception as e:
-                logger.exception("Ошибка PATCH production: %s", e)
+                logger.exception("Ошибка PATCH production: {e}")
                 result["errors"].append(f"production PATCH error: {e}")
 
         # 6) попытка автозаполнения позиций (autocomplete) — не обязателен, но делаем если нужно
@@ -510,10 +510,10 @@ def put_into_circulation(
             r_auto = session.post(auto_url, timeout=30)
             # многие реализации возвращают 204/200/empty; не обязательно требовать body
             if r_auto.status_code not in (200, 204):
-                logger.debug("autocomplete returned status %s", r_auto.status_code)
+                logger.debug("autocomplete returned status {r_auto.status_code}")
             result["autocomplete_status"] = r_auto.status_code
         except Exception as e:
-            logger.warning("autocomplete failed: %s", e)
+            logger.warning("autocomplete failed: {e}")
             result["errors"].append(f"autocomplete error: {e}")
 
         # 7) проверить наличие сертификата у сотрудника в организации
@@ -529,7 +529,7 @@ def put_into_circulation(
                     result["errors"].append(msg)
                     return False, result
         except Exception as e:
-            logger.exception("Ошибка проверки сертификата: %s", e)
+            logger.exception("Ошибка проверки сертификата: {e}")
             result["errors"].append(f"cert check error: {e}")
             return False, result
 
@@ -547,7 +547,7 @@ def put_into_circulation(
                 result["errors"].append(msg)
                 return False, result
         except Exception as e:
-            logger.exception("Ошибка generate-multiple: %s", e)
+            logger.exception("Ошибка generate-multiple: {e}")
             result["errors"].append(f"generate-multiple error: {e}")
             return False, result
 
@@ -574,7 +574,7 @@ def put_into_circulation(
                 if isinstance(sig, tuple):
                     sig = sig[0]
             except Exception as e:
-                logger.warning("Attached sign failed for %s: %s — попробуем detached", docid, e)
+                logger.warning(f"Attached sign failed for {docid}, {e} — попробуем detached")
                 try:
                     sig = sign_data(cert, b64, b_detached=True)
                     if isinstance(sig, tuple):
