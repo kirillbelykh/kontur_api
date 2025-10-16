@@ -13,6 +13,7 @@ from get_gtin import lookup_gtin, lookup_by_gtin
 from api import codes_order, download_codes, make_task_on_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
+from get_thumb import get_thumbprint
 import update
 import customtkinter as ctk
 import tkinter as tk
@@ -32,7 +33,7 @@ PRODUCT_GROUP = os.getenv("PRODUCT_GROUP")
 RELEASE_METHOD_TYPE = os.getenv("RELEASE_METHOD_TYPE")
 CIS_TYPE = os.getenv("CIS_TYPE")  
 FILLING_METHOD = os.getenv("FILLING_METHOD")  
-THUMBPRINT = os.getenv("THUMBPRINT")
+THUMBPRINT = get_thumbprint()
 NOMENCLATURE_XLSX = "data/nomenclature.xlsx"
 
 # -----------------------------

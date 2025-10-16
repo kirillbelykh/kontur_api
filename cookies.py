@@ -19,7 +19,7 @@ COOKIES_FILE = Path("kontur_cookies.json")
 TARGET_URL = "https://mk.kontur.ru/organizations/5cda50fa-523f-4bb5-85b6-66d7241b23cd/warehouses"
 WAIT_TIMEOUT = 20
 SLEEP = 1.0
-COOKIE_TTL = 15 * 60  # 15 минут в секундах
+COOKIE_TTL = 10 * 60  # 15 минут в секундах
 
 
 def load_cookies_from_file() -> Optional[Dict[str, str]]:
