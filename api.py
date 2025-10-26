@@ -165,11 +165,61 @@ def check_order_status(session: requests.Session, document_id: str) -> str:
         return "error"
     
     
+def process_csv_file(csv_path):
+    """
+    Обрабатывает CSV-файл: очищает первый столбец от кавычек и добавляет префикс ^1
+    """
+    try:
+        temp_file = csv_path + ".tmp"
+        
+        with open(csv_path, 'r', encoding='utf-8') as infile, \
+             open(temp_file, 'w', encoding='utf-8', newline='') as outfile:
+            
+            for line in infile:
+                # Разделяем строку по табуляции
+                parts = line.strip().split('\t')
+                
+                if len(parts) >= 3:
+                    # Обрабатываем первый столбец
+                    first_col = parts[0]
+                    
+                    # Удаляем кавычки в начале и конце, если есть
+                    first_col = first_col.strip('"')
+                    
+                    # Заменяем двойные кавычки на одинарные внутри строки
+                    first_col = first_col.replace('""', '"')
+                    
+                    # Добавляем префикс ^1
+                    formatted_first_col = f"^1{first_col}"
+                    
+                    # Формируем новую строку
+                    new_line = f"{formatted_first_col}\t{parts[1]}\t{parts[2]}"
+                    outfile.write(new_line + '\n')
+                else:
+                    # Если строка не соответствует ожидаемому формату, записываем как есть
+                    outfile.write(line)
+        
+        # Заменяем оригинальный файл обработанным
+        import shutil
+        shutil.move(temp_file, csv_path)
+        logger.info(f"CSV файл обработан: {csv_path}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обработке CSV файла {csv_path}: {e}")
+        # Удаляем временный файл в случае ошибки
+        import os
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+        return False
+
+
 def download_codes(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[Optional[str], Optional[str], Optional[str]]]:
     """
     Скачивает PDF, CSV и XLS (если доступны) для заказа document_id и сохраняет их в папку:
       Desktop / "pdf-коды км" / <safe_order_name>/
     Файлы сохраняются с общей базой имени, производной от order_name.
+    После скачивания CSV файла автоматически обрабатывает его.
     Возвращает кортеж (pdf_path, csv_path, xls_path). Если файл не скачан — соответствующий элемент = None.
     """
     logger.info(f"Начало скачивания PDF/CSV/XLS для заказа {document_id} ({order_name!r})")
@@ -334,6 +384,14 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                         if chunk:
                             fh.write(chunk)
                 logger.info(f"CSV сохранён: {csv_path}")
+                
+                # АВТОМАТИЧЕСКАЯ ОБРАБОТКА CSV ПОСЛЕ СКАЧИВАНИЯ
+                logger.info(f"Начинаем обработку CSV файла: {csv_path}")
+                if process_csv_file(csv_path):
+                    logger.info(f"CSV файл успешно обработан: {csv_path}")
+                else:
+                    logger.error(f"Ошибка при обработке CSV файла: {csv_path}")
+                
             except Exception as e:
                 logger.error(f"Ошибка скачивания CSV (requests) {download_csv_url}: {e}", exc_info=True)
                 csv_path = None
@@ -395,7 +453,6 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
 
     # Вернуть кортеж путей (возможно некоторые элементы None)
     return pdf_path, csv_path, xls_path
-
 
 
 
