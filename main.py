@@ -1,3 +1,4 @@
+import csv
 import os
 import copy
 import uuid
@@ -213,7 +214,17 @@ class App(ctk.CTk):
         self.df = df
         self.collected: List[OrderItem] = []
         self.download_list: List[dict] = []
-
+        
+        # Инициализируем атрибуты ДО создания UI
+        self.agg_mode_var = None
+        self.count_entry = None
+        self.comment_entry = None
+        self.download_agg_btn = None
+        self.agg_progress = None
+        self.agg_log_text = None
+        
+        self._setup_ui()  # здесь создается весь интерфейс, включая таб агрегации
+        
         # TSD status check
         self.sent_to_tsd_items = set()
 
@@ -233,7 +244,6 @@ class App(ctk.CTk):
         self.intro_executor = ThreadPoolExecutor(max_workers=3)
         self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)
         
-        self._setup_ui()
         self.start_auto_status_check()
         
         # Atributes for linter
@@ -242,7 +252,43 @@ class App(ctk.CTk):
         self.intro_number_entry: ctk.CTkEntry | None = None
         self.batch_entry: ctk.CTkEntry | None = None
 
-    
+    def _setup_ui(self):
+        """Настройка основного интерфейса с использованием кастомных шрифтов"""
+        # Главный контейнер
+        self.main_container = ctk.CTkFrame(self)
+        self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Заголовок с кастомным шрифтом
+        self.header_frame = ctk.CTkFrame(self.main_container, height=70)
+        self.header_frame.pack(fill="x", pady=(0, 20))
+        self.header_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(
+            self.header_frame, 
+            text="Kontur Marking System", 
+            font=self.fonts["title"]  # Используем кастомный шрифт
+        ).pack(side="left", padx=25, pady=20)
+        
+        # Tabview
+        self.tabview = ctk.CTkTabview(self.main_container)
+        self.tabview.pack(fill="both", expand=True)
+        
+        # Создаем все табы
+        self._setup_create_tab()
+        self._setup_download_tab()
+        self._setup_introduction_tab()
+        self._setup_introduction_tsd_tab()
+        self._setup_aggregation_tab()
+        
+        # Статус бар с малым шрифтом
+        self.status_bar = ctk.CTkLabel(
+            self.main_container, 
+            text="Готов к работе", 
+            anchor="w",
+            font=self.fonts["small"]
+        )
+        self.status_bar.pack(fill="x", pady=(10, 0))
+
     def cleanup_before_update(self):
         """Очистка ресурсов перед обновлением."""
         try:
@@ -348,42 +394,321 @@ class App(ctk.CTk):
             
         except Exception as e:
             logger.error(f"Ошибка при установке шрифтов: {e}")
+
+    def _setup_aggregation_tab(self):
+        """Таб для скачивания кодов агрегации"""
+        try:
+            # Создаем таб
+            tab_aggregation = self.tabview.add("📥 Скачивание кодов агрегации")
             
-    def _setup_ui(self):
-        """Настройка основного интерфейса с использованием кастомных шрифтов"""
-        # Главный контейнер
-        self.main_container = ctk.CTkFrame(self)
-        self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
-        
-        # Заголовок с кастомным шрифтом
-        self.header_frame = ctk.CTkFrame(self.main_container, height=70)
-        self.header_frame.pack(fill="x", pady=(0, 20))
-        self.header_frame.pack_propagate(False)
-        
-        ctk.CTkLabel(
-            self.header_frame, 
-            text="Kontur Marking System", 
-            font=self.fonts["title"]  # Используем кастомный шрифт
-        ).pack(side="left", padx=25, pady=20)
-        
-        # Tabview
-        self.tabview = ctk.CTkTabview(self.main_container)
-        self.tabview.pack(fill="both", expand=True)
-        
-        # Создаем все табы
-        self._setup_create_tab()
-        self._setup_download_tab()
-        self._setup_introduction_tab()
-        self._setup_introduction_tsd_tab()
-        
-        # Статус бар с малым шрифтом
-        self.status_bar = ctk.CTkLabel(
-            self.main_container, 
-            text="Готов к работе", 
-            anchor="w",
-            font=self.fonts["small"]
-        )
-        self.status_bar.pack(fill="x", pady=(10, 0))
+            # Основной контейнер
+            main_frame = ctk.CTkFrame(tab_aggregation)
+            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            # Заголовок
+            ctk.CTkLabel(
+                main_frame, 
+                text="Скачивание кодов агрегации", 
+                font=self.fonts["title"]
+            ).pack(pady=(0, 20))
+            
+            # Фрейм с настройками
+            settings_frame = ctk.CTkFrame(main_frame)
+            settings_frame.pack(fill="x", pady=(0, 20))
+            
+            # Переключатель режимов
+            mode_frame = ctk.CTkFrame(settings_frame)
+            mode_frame.pack(fill="x", padx=10, pady=10)
+            
+            ctk.CTkLabel(
+                mode_frame, 
+                text="Режим поиска:", 
+                font=self.fonts["normal"]
+            ).pack(side="left", padx=(0, 10))
+            
+            # Инициализируем переменную
+            self.agg_mode_var = ctk.StringVar(value="count")
+            
+            count_radio = ctk.CTkRadioButton(
+                mode_frame, 
+                text="По количеству", 
+                variable=self.agg_mode_var, 
+                value="count",
+                command=self.toggle_aggregation_mode,
+                font=self.fonts["normal"]
+            )
+            count_radio.pack(side="left", padx=(0, 10))
+            
+            comment_radio = ctk.CTkRadioButton(
+                mode_frame, 
+                text="По наименованию", 
+                variable=self.agg_mode_var, 
+                value="comment",
+                command=self.toggle_aggregation_mode,
+                font=self.fonts["normal"]
+            )
+            comment_radio.pack(side="left")
+            
+            # Поле ввода количества
+            self.count_frame = ctk.CTkFrame(settings_frame)
+            self.count_frame.pack(fill="x", padx=10, pady=10)
+            
+            ctk.CTkLabel(
+                self.count_frame, 
+                text="Количество кодов:", 
+                font=self.fonts["normal"]
+            ).pack(side="left", padx=(0, 10))
+            
+            self.count_entry = ctk.CTkEntry(
+                self.count_frame, 
+                width=200,
+                placeholder_text="Введите количество",
+                font=self.fonts["normal"]
+            )
+            self.count_entry.pack(side="left")
+            
+            # Поле ввода наименования (изначально скрыто)
+            self.comment_frame = ctk.CTkFrame(settings_frame)
+            self.comment_frame.pack(fill="x", padx=10, pady=10)
+            self.comment_frame.pack_forget()  # Скрываем изначально
+            
+            ctk.CTkLabel(
+                self.comment_frame, 
+                text="Наименование товара:", 
+                font=self.fonts["normal"]
+            ).pack(side="left", padx=(0, 10))
+            
+            self.comment_entry = ctk.CTkEntry(
+                self.comment_frame, 
+                width=300,
+                placeholder_text="Введите наименование товара",
+                font=self.fonts["normal"]
+            )
+            self.comment_entry.pack(side="left")
+            
+            # Кнопка загрузки
+            self.download_agg_btn = ctk.CTkButton(
+                main_frame,
+                text="🚀 Загрузить коды агрегации",
+                command=self.start_aggregation_download,
+                height=40,
+                fg_color="#2E86C1",
+                hover_color="#2874A6",
+                font=self.fonts["button"]
+            )
+            self.download_agg_btn.pack(pady=(0, 20))
+            
+            # Прогресс-бар
+            self.agg_progress = ctk.CTkProgressBar(main_frame)
+            self.agg_progress.pack(fill="x", pady=(0, 10))
+            self.agg_progress.set(0)
+            
+            # Лог для агрегации
+            log_frame = ctk.CTkFrame(main_frame)
+            log_frame.pack(fill="both", expand=True)
+            
+            ctk.CTkLabel(
+                log_frame, 
+                text="Лог операций:", 
+                font=self.fonts["subheading"]
+            ).pack(anchor="w", pady=(10, 5))
+            
+            self.agg_log_text = ctk.CTkTextbox(log_frame, height=200, font=self.fonts["normal"])
+            self.agg_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+            self.agg_log_text.configure(state="disabled")
+            
+            print("DEBUG: Таб агрегации успешно создан и инициализирован")
+            
+        except Exception as e:
+            print(f"Ошибка при создании таба агрегации: {e}")
+
+    def toggle_aggregation_mode(self):
+        """Переключение между режимами поиска кодов агрегации"""
+        if self.agg_mode_var.get() == "count":
+            self.count_frame.pack(fill="x", padx=10, pady=10)
+            self.comment_frame.pack_forget()
+        else:
+            self.count_frame.pack_forget()
+            self.comment_frame.pack(fill="x", padx=10, pady=10)
+
+    def log_aggregation_message(self, message):
+        """Добавление сообщения в лог агрегации"""
+        try:
+            # Проверяем, что лог инициализирован
+            if hasattr(self, 'agg_log_text') and self.agg_log_text is not None:
+                self.agg_log_text.configure(state="normal")
+                self.agg_log_text.insert("end", f"{message}\n")
+                self.agg_log_text.see("end")
+                self.agg_log_text.configure(state="disabled")
+                self.update_idletasks()
+            else:
+                # Если лог не инициализирован, выводим в консоль
+                print(f"AGG LOG: {message}")
+        except Exception as e:
+            print(f"Ошибка при логировании в агрегационном табе: {e}")
+
+    def update_aggregation_progress(self, value):
+        """Обновление прогресс-бара агрегации"""
+        self.agg_progress.set(value)
+        self.update_idletasks()
+
+    def start_aggregation_download(self):
+        """Запуск процесса скачивания кодов агрегации в отдельном потоке"""
+        try:
+            # Проверяем инициализацию
+            if (self.agg_mode_var is None or self.count_entry is None or 
+                self.comment_entry is None or self.download_agg_btn is None):
+                self.log_aggregation_message("❌ Ошибка: интерфейс не инициализирован")
+                return
+            
+            # Получаем значения
+            mode = self.agg_mode_var.get()
+            
+            if mode == "count":
+                count_text = self.count_entry.get().strip()
+                if not count_text or not count_text.isdigit():
+                    self.log_aggregation_message("❌ Ошибка: введите корректное количество")
+                    return
+                if int(count_text) <= 0:
+                    self.log_aggregation_message("❌ Ошибка: количество должно быть больше 0")
+                    return
+                target_value = count_text
+            else:
+                comment_text = self.comment_entry.get().strip()
+                if not comment_text:
+                    self.log_aggregation_message("❌ Ошибка: введите наименование товара")
+                    return
+                target_value = comment_text
+            
+            # Блокируем кнопку на время загрузки
+            self.download_agg_btn.configure(state="disabled", text="Загрузка...")
+            
+            # Запускаем в отдельном потоке
+            self.download_executor.submit(
+                self.download_aggregation_process, 
+                mode, 
+                target_value
+            )
+            
+        except Exception as e:
+            print(f"Критическая ошибка в start_aggregation_download: {e}")
+            self.log_aggregation_message(f"❌ Критическая ошибка: {str(e)}")
+
+    def _initialize_aggregation_widgets(self):
+        """Инициализирует виджеты агрегационного таба, если таб уже существует"""
+        try:
+            # Получаем существующий таб
+            tab_name = "📥 Скачивание кодов агрегации"
+            if tab_name not in self.tabview._tab_dict:
+                print(f"Таб {tab_name} не найден")
+                return
+            
+            # Получаем фрейм таба
+            tab_frame = self.tabview._tab_dict[tab_name]
+            
+            # Ищем виджеты в дочерних элементах
+            for child in tab_frame.winfo_children():
+                if isinstance(child, ctk.CTkFrame):
+                    for widget in child.winfo_children():
+                        # Ищем переключатели режимов
+                        if isinstance(widget, ctk.CTkFrame):
+                            for sub_widget in widget.winfo_children():
+                                if isinstance(sub_widget, ctk.CTkRadioButton):
+                                    if sub_widget.cget("text") == "По количеству" and sub_widget.cget("variable"):
+                                        self.agg_mode_var = sub_widget.cget("variable")
+                                        break
+                        
+                        # Ищем поле ввода количества
+                        if isinstance(widget, ctk.CTkFrame) and hasattr(widget, 'winfo_children'):
+                            for sub_widget in widget.winfo_children():
+                                if isinstance(sub_widget, ctk.CTkEntry) and sub_widget.cget("placeholder_text") == "Введите количество":
+                                    self.count_entry = sub_widget
+                                
+                        # Ищем поле ввода комментария
+                        if isinstance(widget, ctk.CTkFrame) and hasattr(widget, 'winfo_children'):
+                            for sub_widget in widget.winfo_children():
+                                if isinstance(sub_widget, ctk.CTkEntry) and sub_widget.cget("placeholder_text") == "Введите наименование товара":
+                                    self.comment_entry = sub_widget
+                        
+                        # Ищем кнопку загрузки
+                        if isinstance(widget, ctk.CTkButton) and "Загрузить коды агрегации" in widget.cget("text"):
+                            self.download_agg_btn = widget
+                        
+                        # Ищем прогресс-бар
+                        if isinstance(widget, ctk.CTkProgressBar):
+                            self.agg_progress = widget
+                        
+                        # Ищем текстовое поле лога
+                        if isinstance(widget, ctk.CTkTextbox):
+                            self.agg_log_text = widget
+            
+            # Если не нашли переменную, создаем новую
+            if not hasattr(self, 'agg_mode_var') or self.agg_mode_var is None:
+                self.agg_mode_var = ctk.StringVar(value="count")
+                
+            print("Виджеты агрегационного таба инициализированы")
+            
+        except Exception as e:
+            print(f"Ошибка при инициализации виджетов агрегации: {e}")
+
+    def download_aggregation_process(self, mode, target_value):
+        """Процесс скачивания кодов агрегации с использованием SessionManager"""
+        try:
+            self.log_aggregation_message("Начинаем загрузку...")
+            self.update_aggregation_progress(0.1)
+            
+            # Получаем сессию через SessionManager
+            self.log_aggregation_message("🔐 Получаем сессию...")
+            session = SessionManager.get_session()
+            self.update_aggregation_progress(0.3)
+            
+            if not session:
+                self.log_aggregation_message("❌ Не удалось получить сессию")
+                return
+            
+            self.log_aggregation_message("✅ Сессия успешно получена")
+            self.update_aggregation_progress(0.5)
+            
+            # Загружаем данные - ИСПРАВЛЕННЫЙ ВЫЗОВ
+            self.log_aggregation_message("🚀 Загружаем коды агрегации...")
+            limit = int(target_value) if mode == "count" else 100
+            codes = self.download_aggregate_codes(
+                session=session,  # передаем session как позиционный аргумент
+                mode=mode,
+                target_value=target_value,
+                limit=limit
+            )
+            self.update_aggregation_progress(0.8)
+            
+            if codes:
+                # Сохраняем файл
+                if mode == "count":
+                    filename = f"Коды_агрегации_{target_value}_шт.csv"
+                else:
+                    safe_comment = "".join(c for c in target_value if c.isalnum() or c in (' ', '-', '_')).rstrip()
+                    safe_comment = safe_comment.replace(' ', '_')[:30]
+                    filename = f"{safe_comment}_{len(codes)}.csv"
+                
+                save_path = self.save_simple_csv(codes, filename)
+                self.update_aggregation_progress(1.0)
+                
+                self.log_aggregation_message(f"✅ Успешно загружено {len(codes)} кодов агрегации")
+                self.log_aggregation_message(f"💾 Файл сохранен: {save_path}")
+                
+                # Показываем уведомление в статус баре
+                self.status_bar.configure(text=f"Загружено {len(codes)} кодов агрегации")
+            else:
+                self.log_aggregation_message("❌ Не удалось загрузить данные")
+                
+        except Exception as e:
+            self.log_aggregation_message(f"❌ Ошибка: {str(e)}")
+            import traceback
+            self.log_aggregation_message(f"Подробности: {traceback.format_exc()}")
+        finally:
+            # Разблокируем кнопку
+            if hasattr(self, 'download_agg_btn') and self.download_agg_btn:
+                self.download_agg_btn.configure(state="normal", text="🚀 Загрузить коды агрегации")
+            self.update_aggregation_progress(0)
 
     def _setup_create_tab(self):
         """Таб создания заказов с кастомными шрифтами"""
@@ -2599,6 +2924,113 @@ class App(ctk.CTk):
             
         except Exception as e:
             self.tsd_log_insert(f"❌ Ошибка при извлечении GTIN: {e}")
+            return None
+
+    def download_aggregate_codes(self, session, mode, target_value, status_filter="tsdProcessStart", limit=100):
+        """Загружает aggregate codes в зависимости от выбранного режима"""
+        base_url = "https://mk.kontur.ru/api/v1/aggregates"
+        warehouse_id = "59739360-7d62-434b-ad13-4617c87a6d13"
+        
+        all_codes = []
+        page_limit = 100
+        offset = 0
+        
+        try:
+            while True:
+                params = {
+                    'warehouseId': warehouse_id,
+                    'limit': page_limit,
+                    'offset': offset,
+                    'statuses': status_filter,
+                    'sortField': 'createDate',
+                    'sortOrder': 'descending'
+                }
+                
+                try:
+                    response = session.get(base_url, params=params)
+                    response.raise_for_status()
+                    
+                    data = response.json()
+                    items = data.get('items', [])
+                    
+                    if not items:
+                        break
+                    
+                    # Фильтрация в зависимости от режима
+                    filtered_items = []
+                    if mode == "comment":
+                        filtered_items = [item for item in items if item.get('comment') == target_value]
+                    elif mode == "count":
+                        filtered_items = items
+                    
+                    # Добавляем отфильтрованные записи
+                    for item in filtered_items:
+                        aggregate_code = item.get('aggregateCode')
+                        if aggregate_code and aggregate_code not in [c['aggregateCode'] for c in all_codes]:
+                            all_codes.append({
+                                'aggregateCode': aggregate_code,
+                                'documentId': item.get('documentId'),
+                                'createdDate': item.get('createdDate'),
+                                'status': item.get('status'),
+                                'updatedDate': item.get('updatedDate'),
+                                'includesUnitsCount': item.get('includesUnitsCount'),
+                                'comment': item.get('comment', ''),
+                                'productGroup': item.get('productGroup'),
+                                'aggregationType': item.get('aggregationType'),
+                                'codesChecked': item.get('codesChecked'),
+                                'codesCheckErrorsCount': item.get('codesCheckErrorsCount'),
+                                'allowDelete': item.get('allowDelete')
+                            })
+                    
+                    # Проверяем условия остановки
+                    if mode == "count" and len(all_codes) >= int(target_value):
+                        break
+                    elif mode == "comment" and len(all_codes) >= limit:
+                        break
+                    
+                    if len(items) < page_limit:
+                        break
+                    
+                    offset += page_limit
+                    time.sleep(0.3)
+                    
+                except Exception as e:
+                    self.log_aggregation_message(f"❌ Ошибка при запросе: {str(e)}")
+                    break
+            
+            # Обрезаем до нужного количества
+            if mode == "count" and len(all_codes) > int(target_value):
+                all_codes = all_codes[:int(target_value)]
+            elif mode == "comment" and len(all_codes) > limit:
+                all_codes = all_codes[:limit]
+            
+            return all_codes
+            
+        except Exception as e:
+            self.log_aggregation_message(f"❌ Критическая ошибка при загрузке кодов: {str(e)}")
+            return []
+
+    def save_simple_csv(self, codes, filename):
+        """Сохраняет только коды в простом CSV"""
+        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        parent_dir = os.path.join(desktop, "Агрег коды км")
+        target_dir = os.path.join(parent_dir, filename)
+        os.makedirs(target_dir, exist_ok=True)
+
+        target_path = os.path.join(target_dir, filename)
+        if not codes:
+            return None
+        
+        try:
+            with open(target_path, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.writer(csvfile)
+                # УБРАТЬ эту строку: writer.writerow(['aggregateCode'])
+                for code in codes:
+                    writer.writerow([code['aggregateCode']])
+            
+            return target_dir
+        except Exception as e:
+            print(f"Ошибка при сохранении CSV: {e}")
             return None
 
 if __name__ == "__main__":
