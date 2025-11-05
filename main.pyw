@@ -2120,6 +2120,7 @@ class App(ctk.CTk):
         """Ручное скачивание заказа из истории"""
         try:
             # Определяем тип аргумента
+            history_window = None
             if isinstance(history_tree_or_document_id, str):
                 # Если передан document_id
                 document_id = history_tree_or_document_id
@@ -2138,6 +2139,9 @@ class App(ctk.CTk):
                 item = selected_items[0]
                 item_values = history_tree.item(item, 'values')
                 document_id = item_values[1]
+                
+                # Сохраняем ссылку на окно истории для последующего закрытия
+                history_window = history_tree.winfo_toplevel()
             
             # Дальше общая логика
             order_data = self.history_db.get_order_by_document_id(document_id)
@@ -2154,7 +2158,7 @@ class App(ctk.CTk):
             
             if not existing_order:
                 # Добавляем в download_list
-                self.download_list.append({
+                new_order = {
                     "order_name": order_data.get("order_name"),
                     "document_id": document_id,
                     "status": "Из истории",
@@ -2163,13 +2167,19 @@ class App(ctk.CTk):
                     "full_name": order_data.get("full_name"),
                     "gtin": order_data.get("gtin"),
                     "from_history": True,
-                    "downloading": False
-                })
-                existing_order = self.download_list[-1]
+                    "downloading": False,
+                    "history_data": order_data  # Сохраняем полные данные
+                }
+                self.download_list.append(new_order)
+                existing_order = new_order
+                self.download_log_insert(f"✅ Добавлен заказ из истории: {order_data.get('order_name')}")
             
             # Проверяем, не скачивается ли уже
             if existing_order.get('downloading'):
                 self.download_log_insert(f"⚠️ Заказ {existing_order.get('order_name')} уже скачивается")
+                # Закрываем окно истории если нужно
+                if history_window:
+                    history_window.destroy()
                 return
             
             # Меняем статус и запускаем скачивание
@@ -2183,16 +2193,32 @@ class App(ctk.CTk):
             # Запускаем скачивание
             self.download_executor.submit(self._download_order, existing_order)
             
-            # Если это вызов из диалога истории, закрываем его
-            if not isinstance(history_tree_or_document_id, str):
-                history_window = history_tree_or_document_id.winfo_toplevel()
+            # Закрываем окно истории если нужно
+            if history_window:
                 history_window.destroy()
-                self.tabview.set("📥 Скачивание кодов")
+                
+                # БЕЗОПАСНОЕ переключение на вкладку скачивания
+                try:
+                    # Проверяем существует ли tabview
+                    if hasattr(self, 'tabview') and self.tabview:
+                        # Используем after для безопасного вызова в главном потоке
+                        self.after(100, lambda: self.tabview.set("📥 Скачивание кодов"))
+                
+                except Exception as e:
+                    self.download_log_insert(f"⚠️ Ошибка переключения вкладки: {e}")
             
         except Exception as e:
             error_msg = f"❌ Ошибка ручного скачивания заказа из истории: {e}"
             self.download_log_insert(error_msg)
             tk.messagebox.showerror("Ошибка", error_msg)
+            
+            # Всегда пытаемся закрыть окно истории при ошибке
+            try:
+                if not isinstance(history_tree_or_document_id, str):
+                    history_window = history_tree_or_document_id.winfo_toplevel()
+                    history_window.destroy()
+            except:
+                pass
 
     def download_log_insert(self, msg: str):
         """Добавляет сообщение в лог скачиваний"""
