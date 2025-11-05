@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-
+from logger import logger
 class OrderHistoryDB:
     def __init__(self, db_file: str = "orders_history.json"):
         self.db_file = db_file
@@ -28,6 +28,18 @@ class OrderHistoryDB:
         with open(self.db_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
     
+    def get_order_by_document_id(self, document_id):
+        """Получает заказ по document_id из истории"""
+        try:
+            self.cursor.execute("SELECT * FROM orders WHERE document_id = ?", (document_id,))
+            row = self.cursor.fetchone()
+            if row:
+                return self._row_to_dict(row)
+            return None
+        except Exception as e:
+            logger.error(f"Ошибка при получении заказа по document_id {document_id}: {e}")
+            return None
+        
     def add_order(self, order_data: Dict[str, Any]):
         """Добавляет новый заказ в историю"""
         data = self._load_data()

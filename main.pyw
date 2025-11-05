@@ -18,6 +18,7 @@ from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
 import update
 import customtkinter as ctk
+from customtkinter import CTkScrollableFrame
 import tkinter as tk
 import tkinter.messagebox as mbox
 from tkinter import ttk, font
@@ -200,44 +201,65 @@ class App(ctk.CTk):
     def __init__(self, df):
         super().__init__()
         
-        # Настройка темы и внешнего вида
-        self.current_theme = "dark"  # Добавляем атрибут для хранения текущей темы
+        # Расширенные настройки темы
+        self.current_theme = "dark"
+        self.color_themes = {
+            "dark": {
+                "primary": "#2E86C1",
+                "secondary": "#1E3A5F", 
+                "accent": "#FF6B35",
+                "success": "#27AE60",
+                "warning": "#F39C12",
+                "error": "#E74C3C",
+                "bg_primary": "#1A1A2E",
+                "bg_secondary": "#16213E",
+                "text_primary": "#FFFFFF",
+                "text_secondary": "#B0B0B0"
+            },
+            "light": {
+                "primary": "#3498DB",
+                "secondary": "#EBF5FB",
+                "accent": "#E67E22",
+                "success": "#2ECC71",
+                "warning": "#F1C40F",
+                "error": "#E74C3C",
+                "bg_primary": "#F8F9FA",
+                "bg_secondary": "#FFFFFF",
+                "text_primary": "#2C3E50",
+                "text_secondary": "#566573"
+            }
+        }
+        
+        # Применяем тему
         ctk.set_appearance_mode(self.current_theme)
         ctk.set_default_color_theme("blue")
-        repo_dir = os.path.abspath(os.path.dirname(__file__))
-        update.check_for_updates(repo_dir=repo_dir, pre_update_cleanup=self.cleanup_before_update, auto_restart=True)
         
-        self.title("Kontur Marking")
-        self.geometry("1400x800")
-        self.minsize(900, 700)
-        self._setup_fonts()
-
+        # Настройка окна
+        self.title("Kontur Marking System")
+        self.attributes('-fullscreen', True)
+        self.minsize(1000, 700)
+        
+        # Современные шрифты
+        self._setup_modern_fonts()
+        
+        # Инициализация данных
         self.df = df
         self.collected: List[OrderItem] = []
         self.download_list: List[dict] = []
         
-        # Инициализируем атрибуты ДО создания UI
-        self.agg_mode_var = None
-        self.count_entry = None
-        self.comment_entry = None
-        self.download_agg_btn = None
-        self.agg_progress = None
-        self.agg_log_text = None
+        # Инициализация атрибутов UI
+        self._init_ui_attributes()
         
-        self._setup_ui()  # здесь создается весь интерфейс, включая таб агрегации
+        # Создание интерфейса
+        self._setup_modern_ui()
         
-        # TSD status check
+        # Остальная инициализация...
         self.sent_to_tsd_items = set()
-
-        # ИСТОРИЯ ЗАКАЗОВ
         self.history_db = OrderHistoryDB()
-        self._load_history_to_download_list()
-
-        
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         SessionManager.initialize()
         
-        # THREADING
+        # Threading
         self.download_executor = ThreadPoolExecutor(max_workers=2)
         self.status_check_executor = ThreadPoolExecutor(max_workers=1)
         self.auto_download_active = False
@@ -253,71 +275,403 @@ class App(ctk.CTk):
         self.intro_number_entry: ctk.CTkEntry | None = None
         self.batch_entry: ctk.CTkEntry | None = None
 
-    def _setup_ui(self):
-        """Настройка основного интерфейса с использованием кастомных шрифтов"""
-        # Главный контейнер
-        self.main_container = ctk.CTkFrame(self)
-        self.main_container.pack(fill="both", expand=True, padx=20, pady=20)
+    def toggle_fullscreen(self, event=None):
+        """Переключение полноэкранного режима"""
+        self.is_fullscreen = not self.is_fullscreen
+        self.attributes('-fullscreen', self.is_fullscreen)
         
-        # Заголовок с кастомным шрифтом
-        self.header_frame = ctk.CTkFrame(self.main_container, height=70)
-        self.header_frame.pack(fill="x", pady=(0, 20))
-        self.header_frame.pack_propagate(False)
-        
-        # Заголовок приложения слева
-        ctk.CTkLabel(
-            self.header_frame, 
-            text="Kontur Marking System", 
-            font=self.fonts["title"]
-        ).pack(side="left", padx=25, pady=20)
-        
-        # Кнопка смены темы справа
-        self.theme_button = ctk.CTkButton(
-            self.header_frame,
-            text="🌙" if self.current_theme == "dark" else "☀️",
-            command=self.toggle_theme,
-            width=50,
-            height=35,
-            font=self.fonts["button"]
-        )
-        self.theme_button.pack(side="right", padx=25, pady=20)
-        
-        # Tabview
-        self.tabview = ctk.CTkTabview(self.main_container)
-        self.tabview.pack(fill="both", expand=True)
-        
-        # Создаем все табы
-        self._setup_create_tab()
-        self._setup_download_tab()
-        self._setup_introduction_tab()
-        self._setup_introduction_tsd_tab()
-        self._setup_aggregation_tab()
-        
-        # Статус бар с малым шрифтом
-        self.status_bar = ctk.CTkLabel(
-            self.main_container, 
-            text="Готов к работе", 
-            anchor="w",
-            font=self.fonts["small"]
-        )
-        self.status_bar.pack(fill="x", pady=(10, 0))
+        # Обновляем текст кнопки
+        if hasattr(self, 'fullscreen_button') and self.fullscreen_button:
+            if self.is_fullscreen:
+                self.fullscreen_button.configure(text="⛶ Оконный режим")
+            else:
+                self.fullscreen_button.configure(text="⛶ Полный экран")
+                
+        # Обновляем статус бар (если он уже создан)
+        if hasattr(self, 'status_bar') and self.status_bar:
+            self.status_bar.configure(
+                text=f"Режим: {'полноэкранный' if self.is_fullscreen else 'оконный'}"
+            )
+            self.after(3000, lambda: self._reset_status_bar())
 
-    def toggle_theme(self):
-        """Переключение между светлой и темной темой"""
-        if self.current_theme == "dark":
-            self.current_theme = "light"
-            self.theme_button.configure(text="☀️")
+    def _reset_status_bar(self):
+        """Сброс статус бара к стандартному сообщению"""
+        if hasattr(self, 'status_bar') and self.status_bar:
+            self.status_bar.configure(text="Готов к работе")
+    
+    def center_window(self):
+        """Центрирование окна на экране"""
+        self.update_idletasks()
+        width = self.winfo_width()
+        height = self.winfo_height()
+        x = (self.winfo_screenwidth() // 2) - (width // 2)
+        y = (self.winfo_screenheight() // 2) - (height // 2)
+        self.geometry(f'{width}x{height}+{x}+{y}')
+
+    def _setup_modern_fonts(self):
+        """Современные шрифты для приложения"""
+        self.fonts = {
+            "title": ctk.CTkFont(family="Segoe UI", size=20, weight="bold"),
+            "subheading": ctk.CTkFont(family="Segoe UI", size=14, weight="bold"),
+            "normal": ctk.CTkFont(family="Segoe UI", size=12, weight="normal"),
+            "small": ctk.CTkFont(family="Segoe UI", size=10, weight="normal"),
+            "button": ctk.CTkFont(family="Segoe UI", size=12, weight="bold"),
+            "monospace": ctk.CTkFont(family="Cascadia Code", size=11, weight="normal"),
+            "nav": ctk.CTkFont(family="Segoe UI", size=13, weight="normal"),
+            "nav_bold": ctk.CTkFont(family="Segoe UI", size=13, weight="bold")
+        }
+
+    def _init_ui_attributes(self):
+        """Инициализация атрибутов UI"""
+        # Атрибуты для агрегации
+        self.agg_mode_var = None
+        self.count_entry = None
+        self.comment_entry = None
+        self.download_agg_btn = None
+        self.agg_progress = None
+        self.agg_log_text = None
+        
+        # Атрибуты для навигации
+        self.sidebar_frame = None
+        self.main_content = None
+        self.theme_button = None
+        self.nav_buttons = {}
+        self.content_frames = {}
+        
+        # Атрибут для управления полноэкранным режимом
+        self.is_fullscreen = True
+
+    def _setup_modern_ui(self):
+        """Создание современного интерфейса с боковой панелью"""
+        # Главный контейнер
+        self.main_container = ctk.CTkFrame(self, corner_radius=0)
+        self.main_container.pack(fill="both", expand=True)
+        
+        # Создаем layout с боковой панелью и основным контентом
+        self._create_sidebar()
+        self._create_main_content()
+        
+        # Статус бар внизу
+        self._create_status_bar()
+        
+        # Добавляем обработчик клавиши ESC для выхода из полноэкранного режима
+        self.bind('<Escape>', self.toggle_fullscreen)
+        self.bind('<F11>', self.toggle_fullscreen)
+
+    def _create_sidebar(self):
+        """Создание современной боковой панели с улучшенным дизайном"""
+        self.sidebar_frame = ctk.CTkFrame(
+            self.main_container, 
+            width=280,
+            corner_radius=0,
+            fg_color=self._get_color("bg_secondary")
+        )
+        self.sidebar_frame.pack(side="left", fill="y")
+        self.sidebar_frame.pack_propagate(False)
+        
+        # Логотип и заголовок с улучшенным дизайном
+        logo_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        logo_frame.pack(pady=(30, 25), padx=25, fill="x")
+        
+        # Современный логотип
+        logo_container = ctk.CTkFrame(logo_frame, fg_color="transparent")
+        logo_container.pack(fill="x")
+        
+        # Иконка логотипа в круге
+        logo_icon_frame = ctk.CTkFrame(
+            logo_container, 
+            width=50, 
+            height=50,
+            corner_radius=25,
+            fg_color=self._get_color("primary"),
+            bg_color="transparent"
+        )
+        logo_icon_frame.pack()
+        logo_icon_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(
+            logo_icon_frame,
+            text="⚡",
+            font=("Segoe UI", 20),
+            text_color="white"
+        ).pack(expand=True)
+        
+        ctk.CTkLabel(
+            logo_container,
+            text="Kontur Marking",
+            font=ctk.CTkFont(family="Segoe UI", size=18, weight="bold"),
+            text_color=self._get_color("text_primary")
+        ).pack(pady=(12, 0))
+        
+        ctk.CTkLabel(
+            logo_container,
+            text="Management System",
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="normal"),
+            text_color=self._get_color("text_secondary")
+        ).pack(pady=(2, 0))
+        
+        # Разделитель
+        separator = ctk.CTkFrame(
+            logo_frame, 
+            height=1, 
+            fg_color=self._get_color("secondary")
+        )
+        separator.pack(fill="x", pady=(20, 0))
+        
+        # Навигация с современными иконками
+        nav_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        nav_frame.pack(pady=15, padx=20, fill="x")
+        
+        # ИНИЦИАЛИЗИРУЕМ nav_buttons как пустой словарь ПЕРЕД созданием кнопок
+        self.nav_buttons = {}
+        
+        # Современные иконки и названия разделов
+        nav_items = [
+            ("create", "📋 Заказ кодов", self.show_create_frame),
+            ("download", "⏬ Загрузка кодов", self.show_download_frame),
+            ("intro", "🔄 Ввод в оборот", self.show_intro_frame),
+            ("intro_tsd", "📲 Задание на ТСД", self.show_intro_tsd_frame),
+            ("aggregation", "📦 Коды агрегации", self.show_aggregation_frame)
+        ]
+        
+        nav_font = ctk.CTkFont(family="Segoe UI", size=13, weight="normal")
+        nav_font_bold = ctk.CTkFont(family="Segoe UI", size=13, weight="bold")
+        
+        for nav_id, text, command in nav_items:
+            # Контейнер для кнопки навигации
+            nav_item_frame = ctk.CTkFrame(nav_frame, fg_color="transparent", height=48)
+            nav_item_frame.pack(fill="x", pady=2)
+            nav_item_frame.pack_propagate(False)
+            
+            # Индикатор активного состояния (изначально скрыт)
+            active_indicator = ctk.CTkFrame(
+                nav_item_frame, 
+                width=4, 
+                fg_color="transparent",
+                corner_radius=2
+            )
+            active_indicator.pack(side="left", fill="y", padx=(2, 0))
+            
+            # Кнопка навигации
+            btn = ctk.CTkButton(
+                nav_item_frame,
+                text=text,
+                command=command,
+                anchor="w",
+                height=44,
+                font=nav_font,
+                fg_color="transparent",
+                hover_color=self._get_color("secondary"),
+                text_color=self._get_color("text_primary"),
+                corner_radius=8,
+                border_spacing=15
+            )
+            btn.pack(side="left", fill="x", expand=True, padx=(8, 0))
+            
+            # Сохраняем ссылки на элементы для управления состоянием
+            self.nav_buttons[nav_id] = {
+                'button': btn,
+                'indicator': active_indicator,
+                'frame': nav_item_frame,
+                'font_normal': nav_font,
+                'font_bold': nav_font_bold
+            }
+        
+        # Гибкое пространство между навигацией и нижней частью
+        spacer = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent", height=0)
+        spacer.pack(fill="both", expand=True)
+        
+        # Нижняя часть сайдбара с улучшенным дизайном
+        bottom_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        bottom_frame.pack(side="bottom", fill="x", padx=20, pady=20)
+        
+        # Разделитель
+        bottom_separator = ctk.CTkFrame(
+            bottom_frame, 
+            height=1, 
+            fg_color=self._get_color("secondary")
+        )
+        bottom_separator.pack(fill="x", pady=(0, 15))
+
+        
+        # Кнопка выхода из полноэкранного режима
+        self.fullscreen_button = ctk.CTkButton(
+            bottom_frame,
+            text="⛶ Оконный режим",
+            command=self.toggle_fullscreen,
+            height=38,
+            font=ctk.CTkFont(family="Segoe UI", size=11, weight="normal"),
+            fg_color="transparent",
+            hover_color=self._get_color("secondary"),
+            text_color=self._get_color("text_secondary"),
+            corner_radius=6
+        )
+        self.fullscreen_button.pack(fill="x")
+    
+    def _setup_navigation_animations(self):
+        """Настройка анимаций для навигации"""
+        for nav_id, elements in self.nav_buttons.items():
+            elements['button'].bind('<Enter>', lambda e, btn=elements['button']: self._animate_nav_hover(btn, True))
+            elements['button'].bind('<Leave>', lambda e, btn=elements['button']: self._animate_nav_hover(btn, False))
+
+    def _animate_nav_hover(self, button, is_hover):
+        """Анимация при наведении на элемент навигации"""
+        if is_hover:
+            # Плавное изменение цвета при наведении
+            button.configure(fg_color=self._get_color("secondary"))
         else:
-            self.current_theme = "dark"
-            self.theme_button.configure(text="🌙")
+            # Возврат к исходному цвету
+            current_bg = button.cget("fg_color")
+            if current_bg != self._get_color("primary"):  # Если не активный элемент
+                button.configure(fg_color="transparent")
+
+    def _get_theme_icon(self, theme):
+        """Возвращает иконку для кнопки темы"""
+        # В реальном приложении здесь должны быть пути к файлам иконок
+        # Для примера используем текстовые символы
+        if theme == "light":
+            return "☀️"
+        else:
+            return "🌙"
+
+    def _get_fullscreen_icon(self, mode):
+        """Возвращает иконку для кнопки полноэкранного режима"""
+        if mode == "fullscreen":
+            return "⛶"
+        else:
+            return "⛶"
+
+    def _update_navigation_style(self, active_frame):
+        """Обновление стиля навигации с современными эффектами"""
+        frame_to_nav_id = {
+            "create": "create",
+            "download": "download", 
+            "intro": "intro",
+            "intro_tsd": "intro_tsd",
+            "aggregation": "aggregation"
+        }
         
-        ctk.set_appearance_mode(self.current_theme)
+        active_nav_id = frame_to_nav_id.get(active_frame, "")
         
-        # Обновляем статус бар с информацией о текущей теме
-        self.status_bar.configure(text=f"Тема изменена на {'светлую' if self.current_theme == 'light' else 'темную'}")
+        for nav_id, elements in self.nav_buttons.items():
+            if nav_id == active_nav_id:
+                # Активное состояние
+                elements['button'].configure(
+                    fg_color=self._get_color("primary"),
+                    text_color="white",
+                    font=elements['font_bold'],
+                    hover_color=self._get_color("primary")
+                )
+                elements['indicator'].configure(
+                    fg_color=self._get_color("accent")
+                )
+            else:
+                # Неактивное состояние
+                elements['button'].configure(
+                    fg_color="transparent",
+                    text_color=self._get_color("text_primary"),
+                    font=elements['font_normal'],
+                    hover_color=self._get_color("secondary")
+                )
+                elements['indicator'].configure(
+                    fg_color="transparent"
+                )
+
+    def _create_main_content(self):
+        """Создание основного контента с переключаемыми фреймами"""
+        self.main_content = ctk.CTkFrame(self.main_container, corner_radius=0)
+        self.main_content.pack(side="right", fill="both", expand=True)
         
-        # Через 2 секунды возвращаем обычный статус
-        self.after(2000, lambda: self.status_bar.configure(text="Готов к работе"))
+        # Создаем фреймы для каждого раздела
+        self.content_frames = {}
+        
+        # Создаем все фреймы
+        self._setup_create_frame()
+        self._setup_download_frame()
+        self._setup_introduction_frame()
+        self._setup_introduction_tsd_frame()
+        self._setup_aggregation_frame()
+        
+        # Показываем первый фрейм по умолчанию
+        self.show_content_frame("create")
+
+    def _create_status_bar(self):
+        """Создание современного статус-бара"""
+        status_frame = ctk.CTkFrame(
+            self.main_container,
+            height=30,
+            corner_radius=0,
+            fg_color=self._get_color("bg_secondary")
+        )
+        status_frame.pack(side="bottom", fill="x")
+        status_frame.pack_propagate(False)
+        
+        
+        # Индикатор подключения
+        self.connection_indicator = ctk.CTkLabel(
+            status_frame,
+            text="● Онлайн",
+            font=self.fonts["small"],
+            text_color=self._get_color("success")
+        )
+        self.connection_indicator.pack(side="right", padx=20, pady=5)
+
+    def show_content_frame(self, frame_name):
+        """Показывает указанный фрейм и скрывает остальные"""
+        for name, frame in self.content_frames.items():
+            if name == frame_name:
+                frame.pack(fill="both", expand=True)
+            else:
+                frame.pack_forget()
+        self._update_navigation_style(frame_name)
+
+    def show_create_frame(self):
+        """Показать раздел создания заказов"""
+        self.show_content_frame("create")
+
+    def show_download_frame(self):
+        """Показать раздел загрузки кодов"""
+        self.show_content_frame("download")
+
+    def show_intro_frame(self):
+        """Показать раздел введения в оборот"""
+        self.show_content_frame("intro")
+
+    def show_intro_tsd_frame(self):
+        """Показать раздел введения TSD"""
+        self.show_content_frame("intro_tsd")
+
+    def show_aggregation_frame(self):
+        """Показать раздел кодов агрегации"""
+        self.show_content_frame("aggregation")
+
+    
+
+    def _get_color(self, color_name):
+        """Получение цвета из текущей темы"""
+        theme = self.color_themes[self.current_theme]
+        return theme.get(color_name, "#FFFFFF")
+
+
+    def _update_theme_colors(self):
+        """Обновление цветов интерфейса при смене темы"""
+        if hasattr(self, 'sidebar_frame') and self.sidebar_frame:
+            self.sidebar_frame.configure(fg_color=self._get_color("bg_secondary"))
+        
+        if hasattr(self, 'status_bar') and self.status_bar:
+            status_frame = self.status_bar.master
+            if status_frame:
+                status_frame.configure(fg_color=self._get_color("bg_secondary"))
+            self.status_bar.configure(text_color=self._get_color("text_secondary"))
+        
+        # Обновляем навигацию с новой структурой
+        if hasattr(self, 'nav_buttons') and self.nav_buttons:
+            for nav_id, elements in self.nav_buttons.items():
+                if 'button' in elements and elements['button']:
+                    elements['button'].configure(
+                        hover_color=self._get_color("secondary"),
+                        text_color=self._get_color("text_primary")
+                    )
 
     def cleanup_before_update(self):
         """Очистка ресурсов перед обновлением."""
@@ -425,132 +779,195 @@ class App(ctk.CTk):
         except Exception as e:
             logger.error(f"Ошибка при установке шрифтов: {e}")
 
-    def _setup_aggregation_tab(self):
-        """Таб для скачивания кодов агрегации"""
-        try:
-            # Создаем таб
-            tab_aggregation = self.tabview.add("📥 Скачивание кодов агрегации")
-            
-            # Основной контейнер
-            main_frame = ctk.CTkFrame(tab_aggregation)
-            main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-            
-            # Заголовок
-            ctk.CTkLabel(
-                main_frame, 
-                text="Скачивание кодов агрегации", 
-                font=self.fonts["title"]
-            ).pack(pady=(0, 20))
-            
-            # Фрейм с настройками
-            settings_frame = ctk.CTkFrame(main_frame)
-            settings_frame.pack(fill="x", pady=(0, 20))
-            
-            # Переключатель режимов
-            mode_frame = ctk.CTkFrame(settings_frame)
-            mode_frame.pack(fill="x", padx=10, pady=10)
-            
-            ctk.CTkLabel(
-                mode_frame, 
-                text="Режим поиска:", 
-                font=self.fonts["normal"]
-            ).pack(side="left", padx=(0, 10))
-            
-            # Инициализируем переменную
-            self.agg_mode_var = ctk.StringVar(value="count")
-            
-            count_radio = ctk.CTkRadioButton(
-                mode_frame, 
-                text="По количеству", 
-                variable=self.agg_mode_var, 
-                value="count",
-                command=self.toggle_aggregation_mode,
-                font=self.fonts["normal"]
-            )
-            count_radio.pack(side="left", padx=(0, 10))
-            
-            comment_radio = ctk.CTkRadioButton(
-                mode_frame, 
-                text="По наименованию", 
-                variable=self.agg_mode_var, 
-                value="comment",
-                command=self.toggle_aggregation_mode,
-                font=self.fonts["normal"]
-            )
-            comment_radio.pack(side="left")
-            
-            # Поле ввода количества
-            self.count_frame = ctk.CTkFrame(settings_frame)
-            self.count_frame.pack(fill="x", padx=10, pady=10)
-            
-            ctk.CTkLabel(
-                self.count_frame, 
-                text="Количество кодов:", 
-                font=self.fonts["normal"]
-            ).pack(side="left", padx=(0, 10))
-            
-            self.count_entry = ctk.CTkEntry(
-                self.count_frame, 
-                width=200,
-                placeholder_text="Введите количество",
-                font=self.fonts["normal"]
-            )
-            self.count_entry.pack(side="left")
-            
-            # Поле ввода наименования (изначально скрыто)
-            self.comment_frame = ctk.CTkFrame(settings_frame)
-            self.comment_frame.pack(fill="x", padx=10, pady=10)
-            self.comment_frame.pack_forget()  # Скрываем изначально
-            
-            ctk.CTkLabel(
-                self.comment_frame, 
-                text="Наименование товара:", 
-                font=self.fonts["normal"]
-            ).pack(side="left", padx=(0, 10))
-            
-            self.comment_entry = ctk.CTkEntry(
-                self.comment_frame, 
-                width=300,
-                placeholder_text="Введите наименование товара",
-                font=self.fonts["normal"]
-            )
-            self.comment_entry.pack(side="left")
-            
-            # Кнопка загрузки
-            self.download_agg_btn = ctk.CTkButton(
-                main_frame,
-                text="🚀 Загрузить коды агрегации",
-                command=self.start_aggregation_download,
-                height=40,
-                fg_color="#2E86C1",
-                hover_color="#2874A6",
-                font=self.fonts["button"]
-            )
-            self.download_agg_btn.pack(pady=(0, 20))
-            
-            # Прогресс-бар
-            self.agg_progress = ctk.CTkProgressBar(main_frame)
-            self.agg_progress.pack(fill="x", pady=(0, 10))
-            self.agg_progress.set(0)
-            
-            # Лог для агрегации
-            log_frame = ctk.CTkFrame(main_frame)
-            log_frame.pack(fill="both", expand=True)
-            
-            ctk.CTkLabel(
-                log_frame, 
-                text="Лог операций:", 
-                font=self.fonts["subheading"]
-            ).pack(anchor="w", pady=(10, 5))
-            
-            self.agg_log_text = ctk.CTkTextbox(log_frame, height=200, font=self.fonts["normal"])
-            self.agg_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
-            self.agg_log_text.configure(state="disabled")
-            
-            print("DEBUG: Таб агрегации успешно создан и инициализирован")
-            
-        except Exception as e:
-            print(f"Ошибка при создании таба агрегации: {e}")
+    def _setup_aggregation_frame(self):
+        """Современный фрейм кодов агрегации"""
+        self.content_frames["aggregation"] = CTkScrollableFrame(self.main_content, corner_radius=0)
+        
+        # Основной контейнер
+        main_frame = ctk.CTkFrame(self.content_frames["aggregation"], corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Заголовок с иконкой
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 30))
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="📊",
+            font=("Segoe UI", 48),
+            text_color=self._get_color("primary")
+        ).pack(side="left", padx=(0, 15))
+        
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left", fill="y")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Коды агрегации",
+            font=self.fonts["title"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Загрузка и управление агрегационными кодами",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(anchor="w")
+        
+        # Карточка с настройками
+        settings_card = ctk.CTkFrame(main_frame, corner_radius=12)
+        settings_card.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            settings_card,
+            text="Настройки поиска",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+        
+        # Переключатель режимов в современном стиле
+        mode_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        mode_frame.pack(fill="x", padx=20, pady=10)
+        
+        ctk.CTkLabel(
+            mode_frame,
+            text="Режим поиска:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary")
+        ).pack(side="left", padx=(0, 15))
+        
+        self.agg_mode_var = ctk.StringVar(value="count")
+        
+        # Стилизованные радиокнопки
+        mode_options_frame = ctk.CTkFrame(mode_frame, fg_color="transparent")
+        mode_options_frame.pack(side="left", fill="x", expand=True)
+        
+        count_radio = ctk.CTkRadioButton(
+            mode_options_frame,
+            text="🔢 По количеству",
+            variable=self.agg_mode_var,
+            value="count",
+            command=self.toggle_aggregation_mode,
+            font=self.fonts["normal"],
+            border_color=self._get_color("primary"),
+            hover_color=self._get_color("accent")
+        )
+        count_radio.pack(side="left", padx=(0, 20))
+        
+        comment_radio = ctk.CTkRadioButton(
+            mode_options_frame,
+            text="📝 По наименованию", 
+            variable=self.agg_mode_var,
+            value="comment",
+            command=self.toggle_aggregation_mode,
+            font=self.fonts["normal"],
+            border_color=self._get_color("primary"),
+            hover_color=self._get_color("accent")
+        )
+        comment_radio.pack(side="left")
+        
+        # Поля ввода в современном стиле
+        input_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        input_frame.pack(fill="x", padx=20, pady=10)
+        
+        self.count_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        self.count_frame.pack(fill="x")
+        
+        ctk.CTkLabel(
+            self.count_frame,
+            text="Количество кодов:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary")
+        ).pack(side="left", padx=(0, 15))
+        
+        self.count_entry = ctk.CTkEntry(
+            self.count_frame,
+            width=200,
+            placeholder_text="Введите количество...",
+            font=self.fonts["normal"],
+            height=40,
+            corner_radius=8,
+            border_color=self._get_color("secondary")
+        )
+        self.count_entry.pack(side="left")
+        
+        # Поле комментария (изначально скрыто)
+        self.comment_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        
+        ctk.CTkLabel(
+            self.comment_frame,
+            text="Наименование товара:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary")
+        ).pack(side="left", padx=(0, 15))
+        
+        self.comment_entry = ctk.CTkEntry(
+            self.comment_frame,
+            width=300,
+            placeholder_text="Введите наименование...",
+            font=self.fonts["normal"],
+            height=40,
+            corner_radius=8,
+            border_color=self._get_color("secondary")
+        )
+        self.comment_entry.pack(side="left")
+        
+        # Стилизованная кнопка загрузки
+        self.download_agg_btn = ctk.CTkButton(
+            settings_card,
+            text="🚀 Начать загрузку кодов",
+            command=self.start_aggregation_download,
+            height=45,
+            font=self.fonts["button"],
+            fg_color=self._get_color("primary"),
+            hover_color=self._get_color("accent"),
+            corner_radius=8,
+            border_width=0
+        )
+        self.download_agg_btn.pack(pady=20)
+        
+        # Прогресс-бар в современном стиле
+        progress_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        progress_frame.pack(fill="x", padx=20, pady=(0, 20))
+        
+        ctk.CTkLabel(
+            progress_frame,
+            text="Прогресс загрузки:",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(anchor="w")
+        
+        self.agg_progress = ctk.CTkProgressBar(
+            progress_frame,
+            height=6,
+            corner_radius=3,
+            progress_color=self._get_color("success")
+        )
+        self.agg_progress.pack(fill="x", pady=(5, 0))
+        self.agg_progress.set(0)
+        
+        # Карточка лога
+        log_card = ctk.CTkFrame(main_frame, corner_radius=12)
+        log_card.pack(fill="both", expand=True, pady=(0, 20))
+        
+        ctk.CTkLabel(
+            log_card,
+            text="📋 Лог операций",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+        
+        # Современное текстовое поле лога
+        self.agg_log_text = ctk.CTkTextbox(
+            log_card,
+            height=200,
+            font=self.fonts["monospace"],
+            corner_radius=8,
+            border_color=self._get_color("secondary")
+        )
+        self.agg_log_text.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.agg_log_text.configure(state="disabled")
 
     def toggle_aggregation_mode(self):
         """Переключение между режимами поиска кодов агрегации"""
@@ -564,7 +981,6 @@ class App(ctk.CTk):
     def log_aggregation_message(self, message):
         """Добавление сообщения в лог агрегации"""
         try:
-            # Проверяем, что лог инициализирован
             if hasattr(self, 'agg_log_text') and self.agg_log_text is not None:
                 self.agg_log_text.configure(state="normal")
                 self.agg_log_text.insert("end", f"{message}\n")
@@ -572,7 +988,6 @@ class App(ctk.CTk):
                 self.agg_log_text.configure(state="disabled")
                 self.update_idletasks()
             else:
-                # Если лог не инициализирован, выводим в консоль
                 print(f"AGG LOG: {message}")
         except Exception as e:
             print(f"Ошибка при логировании в агрегационном табе: {e}")
@@ -688,22 +1103,22 @@ class App(ctk.CTk):
             self.update_aggregation_progress(0.1)
             
             # Получаем сессию через SessionManager
-            self.log_aggregation_message("🔐 Получаем сессию...")
+            logger.info("🔐 Получаем сессию...")
             session = SessionManager.get_session()
             self.update_aggregation_progress(0.3)
             
             if not session:
-                self.log_aggregation_message("❌ Не удалось получить сессию")
+                logger.error("❌ Не удалось получить сессию")
                 return
             
-            self.log_aggregation_message("✅ Сессия успешно получена")
+            logger.info("✅ Сессия успешно получена")
             self.update_aggregation_progress(0.5)
             
-            # Загружаем данные - ИСПРАВЛЕННЫЙ ВЫЗОВ
+            # Загружаем данные
             self.log_aggregation_message("🚀 Загружаем коды агрегации...")
             limit = int(target_value) if mode == "count" else 100
             codes = self.download_aggregate_codes(
-                session=session,  # передаем session как позиционный аргумент
+                session=session,
                 mode=mode,
                 target_value=target_value,
                 limit=limit
@@ -728,40 +1143,76 @@ class App(ctk.CTk):
                 # Показываем уведомление в статус баре
                 self.status_bar.configure(text=f"Загружено {len(codes)} кодов агрегации")
             else:
-                self.log_aggregation_message("❌ Не удалось загрузить данные")
+                logger.error("❌ Не удалось загрузить данные")
                 
         except Exception as e:
-            self.log_aggregation_message(f"❌ Ошибка: {str(e)}")
-            import traceback
-            self.log_aggregation_message(f"Подробности: {traceback.format_exc()}")
+            logger.error(f"❌ Ошибка: {str(e)}")
         finally:
             # Разблокируем кнопку
-            if hasattr(self, 'download_agg_btn') and self.download_agg_btn:
-                self.download_agg_btn.configure(state="normal", text="🚀 Загрузить коды агрегации")
+            self.download_agg_btn.configure(state="normal", text="🚀 Загрузить коды агрегации")
             self.update_aggregation_progress(0)
 
-    def _setup_create_tab(self):
-        """Таб создания заказов с кастомными шрифтами"""
-        tab_create = self.tabview.add("📦 Создание заказов")
+    def _setup_create_frame(self):
+        """Современный фрейм создания заказов"""
+        self.content_frames["create"] = CTkScrollableFrame(self.main_content, corner_radius=0)
         
-        # Основной контейнер с сеткой
-        main_frame = ctk.CTkFrame(tab_create)
-        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # Основной контейнер
+        main_frame = ctk.CTkFrame(self.content_frames["create"], corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Левая панель - форма ввода
-        input_frame = ctk.CTkFrame(main_frame)
-        input_frame.pack(side="left", fill="y", padx=(0, 10))
+        # Заголовок с иконкой
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 30))
         
-        # Заголовок формы с подзаголовочным шрифтом
         ctk.CTkLabel(
-            input_frame, 
+            header_frame,
+            text="📦",
+            font=("Segoe UI", 48),
+            text_color=self._get_color("primary")
+        ).pack(side="left", padx=(0, 15))
+        
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left", fill="y")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Создание заказов",
+            font=self.fonts["title"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Добавление и управление позициями заказов",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(anchor="w")
+        
+        # Две колонки
+        columns_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        columns_frame.pack(fill="both", expand=True)
+        columns_frame.grid_columnconfigure(0, weight=1)
+        columns_frame.grid_columnconfigure(1, weight=1)
+        columns_frame.grid_rowconfigure(0, weight=1)
+        
+        # Левая колонка - форма
+        left_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        
+        # Правая колонка - таблица и лог
+        right_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        right_column.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        
+        # Левая панель - форма ввода (адаптированный код из _setup_create_tab)
+        ctk.CTkLabel(
+            left_column, 
             text="Добавление позиции", 
             font=self.fonts["subheading"]
-        ).pack(pady=(15, 15))
+        ).pack(pady=(20, 15), padx=20, anchor="w")
         
         # Поля ввода
-        form_frame = ctk.CTkFrame(input_frame)
-        form_frame.pack(fill="x", padx=15, pady=10)
+        form_frame = ctk.CTkFrame(left_column, fg_color="transparent")
+        form_frame.pack(fill="x", padx=20, pady=10)
         
         # Заявка №
         ctk.CTkLabel(form_frame, text="Заявка №:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
@@ -770,7 +1221,7 @@ class App(ctk.CTk):
         
         # Режим поиска
         ctk.CTkLabel(form_frame, text="Режим поиска:", font=self.fonts["normal"]).grid(row=1, column=0, sticky="w", pady=10)
-        mode_frame = ctk.CTkFrame(form_frame)
+        mode_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         mode_frame.grid(row=1, column=1, sticky="w", pady=10, padx=(10, 0))
         
         self.gtin_var = ctk.StringVar(value="No")
@@ -780,14 +1231,14 @@ class App(ctk.CTk):
                         command=self.toggle_mode, font=self.fonts["normal"]).pack(side="left")
         
         # GTIN frame (изначально скрыт)
-        self.gtin_frame = ctk.CTkFrame(form_frame)
+        self.gtin_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         ctk.CTkLabel(self.gtin_frame, text="GTIN:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
         self.gtin_entry = ctk.CTkEntry(self.gtin_frame, width=250, placeholder_text="Введите GTIN", font=self.fonts["normal"])
         self.gtin_entry.grid(row=0, column=1, pady=10, padx=(10, 0))
         self._add_entry_context_menu(self.gtin_entry)
         
         # Select frame
-        self.select_frame = ctk.CTkFrame(form_frame)
+        self.select_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         
         # Вид товара
         ctk.CTkLabel(self.select_frame, text="Вид товара:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
@@ -824,31 +1275,34 @@ class App(ctk.CTk):
             text="➕ Добавить позицию", 
             command=self.add_item,
             height=35,
-            fg_color="#2AA876",
+            fg_color=self._get_color("success"),
             hover_color="#228B69",
-            font=self.fonts["button"]
+            font=self.fonts["button"],
+            corner_radius=8
         )
         add_btn.grid(row=7, column=0, columnspan=2, pady=20)
         
         self.toggle_mode()
         
-        # Правая панель - таблица и лог
-        right_frame = ctk.CTkFrame(main_frame)
-        right_frame.pack(side="right", fill="both", expand=True)
+        # Правая колонка - таблица и лог
+        right_column.grid_rowconfigure(0, weight=1)  # Таблица
+        right_column.grid_rowconfigure(1, weight=1)  # Лог
         
         # Таблица
-        table_frame = ctk.CTkFrame(right_frame)
-        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        table_container = ctk.CTkFrame(right_column, corner_radius=8)
+        table_container.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
         
-        # Заголовок таблицы
         ctk.CTkLabel(
-            table_frame, 
+            table_container, 
             text="Список позиций", 
             font=self.fonts["subheading"]
-        ).pack(anchor="w", pady=(10, 5))
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        table_inner_frame = ctk.CTkFrame(table_container, fg_color="transparent")
+        table_inner_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
         columns = ("idx", "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name", "uid")
-        self.tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=12)
+        self.tree = ttk.Treeview(table_inner_frame, columns=columns, show="headings", height=8)
         
         # Заголовки
         headers = {
@@ -862,21 +1316,23 @@ class App(ctk.CTk):
             self.tree.column(col, width=80 if col == "idx" else 120)
         
         # Scrollbar для таблицы
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
+        scrollbar = ttk.Scrollbar(table_inner_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Кнопки управления
-        btn_frame = ctk.CTkFrame(right_frame)
-        btn_frame.pack(fill="x", pady=(0, 10))
+        # Кнопки управления под таблицей
+        btn_frame = ctk.CTkFrame(table_container, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=10, pady=10)
         
         delete_btn = ctk.CTkButton(
             btn_frame, 
             text="🗑️ Удалить", 
             command=self.delete_item, 
             width=120,
-            font=self.fonts["button"]
+            font=self.fonts["button"],
+            fg_color=self._get_color("error"),
+            corner_radius=6
         )
         delete_btn.pack(side="left", padx=5)
         
@@ -885,9 +1341,10 @@ class App(ctk.CTk):
             text="⚡ Выполнить все", 
             command=self.execute_all,
             width=120,
-            fg_color="#2E86C1",
+            fg_color=self._get_color("primary"),
             hover_color="#2874A6",
-            font=self.fonts["button"]
+            font=self.fonts["button"],
+            corner_radius=6
         )
         self.execute_btn.pack(side="left", padx=5)
         
@@ -896,26 +1353,25 @@ class App(ctk.CTk):
             text="🧹 Очистить", 
             command=self.clear_all, 
             width=120,
-            font=self.fonts["button"]
+            font=self.fonts["button"],
+            corner_radius=6
         )
         clear_btn.pack(side="left", padx=5)
         
         # Лог
-        log_frame = ctk.CTkFrame(right_frame)
-        log_frame.pack(fill="both", expand=True, pady=(5, 10))  # добавил немного отступа сверху/снизу
-
+        log_container = ctk.CTkFrame(right_column, corner_radius=8)
+        log_container.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
+        
         ctk.CTkLabel(
-            log_frame, 
-            text="Лог операций:", 
+            log_container, 
+            text="Лог операций", 
             font=self.fonts["subheading"]
-        ).pack(anchor="w", pady=(10, 5))
+        ).pack(anchor="w", pady=(15, 10), padx=15)
 
-        # Увеличиваем высоту поля лога
-        self.log_text = ctk.CTkTextbox(log_frame, height=250, font=self.fonts["normal"])  # было 150, стало 250
-        self.log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.log_text = ctk.CTkTextbox(log_container, height=200, font=self.fonts["normal"])
+        self.log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         self.log_text.configure(state="disabled")
 
-        
         # Контекстное меню для лога
         self.log_text.bind("<Button-3>", self._show_log_context_menu)
         self.log_text.bind("<Control-c>", lambda e: self._copy_log_text())
@@ -923,23 +1379,63 @@ class App(ctk.CTk):
         
         # Стиль для таблицы
         self._configure_treeview_style()
+
     
-    def _setup_download_tab(self):
-        """Таб скачивания кодов"""
-        tab_download = self.tabview.add("📥 Скачивание кодов")
+    def _setup_download_frame(self):
+        """Современный фрейм загрузки кодов"""
+        self.content_frames["download"] = CTkScrollableFrame(self.main_content, corner_radius=0)
         
-        main_frame = ctk.CTkFrame(tab_download)
-        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # Основной контейнер
+        main_frame = ctk.CTkFrame(self.content_frames["download"], corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Заголовок
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="📥",
+            font=("Segoe UI", 48),
+            text_color=self._get_color("primary")
+        ).pack(side="left", padx=(0, 15))
+        
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left", fill="y")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Загрузка кодов",
+            font=self.fonts["title"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Скачивание и управление кодами маркировки",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(anchor="w")
+        
+        # Две колонки
+        columns_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        columns_frame.pack(fill="both", expand=True)
         
         # Верхняя часть - таблица
-        table_frame = ctk.CTkFrame(main_frame)
-        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+        table_container = ctk.CTkFrame(columns_frame, corner_radius=8)
+        table_container.pack(fill="both", expand=True, pady=(0, 10))
         
-        ctk.CTkLabel(table_frame, text="Список заказов для скачивания:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        ctk.CTkLabel(
+            table_container, 
+            text="Список заказов для скачивания", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        table_inner_frame = ctk.CTkFrame(table_container, fg_color="transparent")
+        table_inner_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
         download_columns = ("order_name", "status", "filename", "document_id")
-        self.download_tree = ttk.Treeview(table_frame, columns=download_columns, show="headings", height=12)
+        self.download_tree = ttk.Treeview(table_inner_frame, columns=download_columns, show="headings", height=12)
         
         headers = {
             "order_name": "Заявка", "status": "Статус", 
@@ -950,21 +1446,23 @@ class App(ctk.CTk):
             self.download_tree.heading(col, text=text)
             self.download_tree.column(col, width=150)
         
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.download_tree.yview)
+        scrollbar = ttk.Scrollbar(table_inner_frame, orient="vertical", command=self.download_tree.yview)
         self.download_tree.configure(yscrollcommand=scrollbar.set)
         self.download_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
         # Нижняя часть - лог
-        log_frame = ctk.CTkFrame(main_frame)
-        log_frame.pack(fill="both", expand=True)
+        log_container = ctk.CTkFrame(columns_frame, corner_radius=8)
+        log_container.pack(fill="both", expand=True, pady=(10, 0))
         
-        ctk.CTkLabel(log_frame, text="Лог скачивания:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        ctk.CTkLabel(
+            log_container, 
+            text="Лог скачивания", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
         
-        self.download_log_text = ctk.CTkTextbox(log_frame, height=150)
-        self.download_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
-        self.download_log_text.configure(state="disabled")
+        self.download_log_text = ctk.CTkTextbox(log_container, height=150)
+        self.download_log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
 
 
     def _add_entry_context_menu(self, entry: ctk.CTkEntry):
@@ -1709,128 +2207,181 @@ class App(ctk.CTk):
             executor.shutdown(wait=False, cancel_futures=True)
         self.destroy()
         
-    def _setup_introduction_tab(self):
-        """Таб ввода в оборот"""
-        try:
-            tab_intro = self.tabview.add("🔄 Ввод в оборот")
-            self.intro_tab = tab_intro
-            
-            main_frame = ctk.CTkFrame(tab_intro)
-            main_frame.pack(fill="both", expand=True, padx=10, pady=10)
-            
-            # Левая часть
-            left_frame = ctk.CTkFrame(main_frame)
-            left_frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
-            
-            # Верхняя часть - форма ввода
-            form_frame = ctk.CTkFrame(left_frame)
-            form_frame.pack(fill="x", pady=(0, 10))
-            
-            ctk.CTkLabel(form_frame, text="Параметры ввода:", 
-                        font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
-            
-            # Явно инициализируем поля ввода как None
-            self.prod_date_intro_entry = None
-            self.exp_date_intro_entry = None
-            self.batch_intro_entry = None
-            
-            # Сетка для полей ввода с гарантированной инициализацией
-            labels = [
-                ("Дата производства (ДД-ММ-ГГГГ):", "prod_date_intro_entry"),
-                ("Дата окончания (ДД-ММ-ГГГГ):", "exp_date_intro_entry"),
-                ("Номер партии:", "batch_intro_entry")
-            ]
-            
-            for i, (label_text, attr_name) in enumerate(labels):
-                ctk.CTkLabel(form_frame, text=label_text).grid(row=i+1, column=0, sticky="w", pady=8, padx=5)
-                entry = ctk.CTkEntry(form_frame, width=200)
-                entry.grid(row=i+1, column=1, pady=8, padx=5)
-                setattr(self, attr_name, entry)
-            
-            # Проверяем, что все поля были созданы
-            if not all([self.prod_date_intro_entry, self.exp_date_intro_entry, self.batch_intro_entry]):
-                self._show_error("Ошибка инициализации полей ввода")
-                return
-                
-            # Заполнение дат по умолчанию
-            today = datetime.now().strftime("%d-%m-%Y")
-            future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
-            
+    def _setup_introduction_frame(self):
+        """Современный фрейм введения в оборот"""
+        self.content_frames["intro"] = CTkScrollableFrame(self.main_content, corner_radius=0)
+        
+        # Основной контейнер
+        main_frame = ctk.CTkFrame(self.content_frames["intro"], corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Заголовок
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
+        
+        ctk.CTkLabel(
+            header_frame,
+            text="🚚",
+            font=("Segoe UI", 48),
+            text_color=self._get_color("primary")
+        ).pack(side="left", padx=(0, 15))
+        
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left", fill="y")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Ввод в оборот",
+            font=self.fonts["title"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Управление вводом товаров в оборот",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(anchor="w")
+        
+        # Две колонки
+        columns_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        columns_frame.pack(fill="both", expand=True)
+        columns_frame.grid_columnconfigure(0, weight=1)
+        columns_frame.grid_columnconfigure(1, weight=1)
+        columns_frame.grid_rowconfigure(0, weight=1)
+        
+        # Левая колонка - форма и таблица
+        left_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        
+        # Правая колонка - лог
+        right_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        right_column.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        
+        # Форма ввода
+        form_container = ctk.CTkFrame(left_column, corner_radius=8)
+        form_container.pack(fill="x", pady=(0, 10))
+        
+        ctk.CTkLabel(
+            form_container, 
+            text="Параметры ввода", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        form_frame = ctk.CTkFrame(form_container, fg_color="transparent")
+        form_frame.pack(fill="x", padx=15, pady=10)
+        
+        # Явно инициализируем поля ввода как None
+        self.prod_date_intro_entry = None
+        self.exp_date_intro_entry = None
+        self.batch_intro_entry = None
+        
+        # Сетка для полей ввода с гарантированной инициализацией
+        labels = [
+            ("Дата производства (ДД-ММ-ГГГГ):", "prod_date_intro_entry"),
+            ("Дата окончания (ДД-ММ-ГГГГ):", "exp_date_intro_entry"),
+            ("Номер партии:", "batch_intro_entry")
+        ]
+        
+        for i, (label_text, attr_name) in enumerate(labels):
+            ctk.CTkLabel(form_frame, text=label_text, font=self.fonts["normal"]).grid(row=i, column=0, sticky="w", pady=8, padx=5)
+            entry = ctk.CTkEntry(form_frame, width=200, font=self.fonts["normal"])
+            entry.grid(row=i, column=1, pady=8, padx=5)
+            setattr(self, attr_name, entry)
+        
+        # Заполнение дат по умолчанию
+        today = datetime.now().strftime("%d-%m-%Y")
+        future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
+        
+        if self.prod_date_intro_entry:
             self.prod_date_intro_entry.insert(0, today)
+        if self.exp_date_intro_entry:
             self.exp_date_intro_entry.insert(0, future_date)
-            
-            # Кнопки
-            btn_frame = ctk.CTkFrame(left_frame)
-            btn_frame.pack(fill="x", pady=(0, 10))
-            
-            self.intro_btn = ctk.CTkButton(
-                btn_frame, 
-                text="🔄 Ввести в оборот", 
-                command=self.on_introduce_clicked,
-                fg_color="#2AA876",
-                hover_color="#228B69"
-            )
-            self.intro_btn.pack(side="left", padx=5)
-            
-            self.intro_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_introduction_tree)
-            self.intro_refresh_btn.pack(side="left", padx=5)
-            
-            self.intro_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_intro_log)
-            self.intro_clear_btn.pack(side="left", padx=5)
-            
-            # Нижняя часть - таблица заказов
-            table_frame = ctk.CTkFrame(left_frame)
-            table_frame.pack(fill="both", expand=True, pady=(10, 0))
-            
-            ctk.CTkLabel(table_frame, text="Доступные заказы:", 
-                        font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
-            
-            intro_columns = ("order_name", "document_id", "status", "filename")
-            self.intro_tree = ttk.Treeview(table_frame, columns=intro_columns, show="headings", 
-                                        height=10, selectmode="extended")
-            
-            headers = {
-                "order_name": "Заявка", "document_id": "ID заказа",
-                "status": "Статус", "filename": "Файл"
-            }
-            
-            for col, text in headers.items():
-                self.intro_tree.heading(col, text=text)
-                self.intro_tree.column(col, width=150)
-            
-            scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.intro_tree.yview)
-            self.intro_tree.configure(yscrollcommand=scrollbar.set)
-            self.intro_tree.pack(side="left", fill="both", expand=True)
-            scrollbar.pack(side="right", fill="y")
-            
-            # Правая часть - лог
-            right_frame = ctk.CTkFrame(main_frame)
-            right_frame.pack(side="right", fill="both", expand=True, padx=(5, 0))
-            
-            log_frame = ctk.CTkFrame(right_frame)
-            log_frame.pack(fill="both", expand=True)
-            
-            ctk.CTkLabel(log_frame, text="Лог операций:", 
-                        font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
-            
-            self.intro_log_text = ctk.CTkTextbox(log_frame)
-            self.intro_log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
-            self.intro_log_text.configure(state="disabled")
-            
-            self.update_introduction_tree()
-            
-            # Подтверждаем успешную инициализацию
-            logger.info("✅ Таб ввода в оборот успешно инициализирован")
-            
-        except Exception as e:
-            logger.error(f"❌ Ошибка при создании таба ввода в оборот: {e}")
-            import traceback
-            traceback.print_exc()
+        
+        # Кнопки
+        btn_frame = ctk.CTkFrame(form_container, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=15, pady=(0, 15))
+        
+        self.intro_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🔄 Ввести в оборот", 
+            command=self.on_introduce_clicked,
+            fg_color=self._get_color("success"),
+            hover_color="#228B69",
+            font=self.fonts["button"],
+            corner_radius=6
+        )
+        self.intro_btn.pack(side="left", padx=5)
+        
+        self.intro_refresh_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🔄 Обновить", 
+            command=self.update_introduction_tree,
+            font=self.fonts["button"],
+            corner_radius=6
+        )
+        self.intro_refresh_btn.pack(side="left", padx=5)
+        
+        self.intro_clear_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🧹 Очистить лог", 
+            command=self.clear_intro_log,
+            font=self.fonts["button"],
+            corner_radius=6
+        )
+        self.intro_clear_btn.pack(side="left", padx=5)
+        
+        # Таблица заказов
+        table_container = ctk.CTkFrame(left_column, corner_radius=8)
+        table_container.pack(fill="both", expand=True, pady=(10, 0))
+        
+        ctk.CTkLabel(
+            table_container, 
+            text="Доступные заказы", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        table_inner_frame = ctk.CTkFrame(table_container, fg_color="transparent")
+        table_inner_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
+        intro_columns = ("order_name", "document_id", "status", "filename")
+        self.intro_tree = ttk.Treeview(table_inner_frame, columns=intro_columns, show="headings", 
+                                    height=10, selectmode="extended")
+        
+        headers = {
+            "order_name": "Заявка", "document_id": "ID заказа",
+            "status": "Статус", "filename": "Файл"
+        }
+        
+        for col, text in headers.items():
+            self.intro_tree.heading(col, text=text)
+            self.intro_tree.column(col, width=150)
+        
+        scrollbar = ttk.Scrollbar(table_inner_frame, orient="vertical", command=self.intro_tree.yview)
+        self.intro_tree.configure(yscrollcommand=scrollbar.set)
+        self.intro_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Лог
+        log_container = ctk.CTkFrame(right_column, corner_radius=8)
+        log_container.pack(fill="both", expand=True)
+        
+        ctk.CTkLabel(
+            log_container, 
+            text="Лог операций", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        self.intro_log_text = ctk.CTkTextbox(log_container, font=self.fonts["normal"])
+        self.intro_log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.intro_log_text.configure(state="disabled")
+        
+        self.update_introduction_tree()
 
     def show_order_history(self):
         """Показывает диалог с историей всех заказов"""
         history_window = ctk.CTkToplevel(self)
-        history_window.title("📚История заказов")
+        history_window.title("📚 История заказов")
         history_window.geometry("1000x600")
         history_window.transient(self)
         history_window.grab_set()
@@ -1841,7 +2392,7 @@ class App(ctk.CTk):
         ctk.CTkLabel(
             main_frame,
             text="История всех заказов",
-            font = ctk.CTkFont(size=16, weight="bold")
+            font=ctk.CTkFont(size=16, weight="bold")
         ).pack(pady=(0, 10))
 
         filter_frame = ctk.CTkFrame(main_frame)
@@ -1878,8 +2429,8 @@ class App(ctk.CTk):
         table_frame = ctk.CTkFrame(main_frame)
         table_frame.pack(fill="both", expand=True, pady=(0, 10))
 
-        colums = ("order_name", "document_id", "status", "tsd_status", "created_at")
-        history_tree = ttk.Treeview(table_frame, columns=colums, show="headings", height=15)
+        columns = ("order_name", "document_id", "status", "tsd_status", "created_at")
+        history_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=15)
 
         headers = {
             "order_name": "Заявка",
@@ -1917,7 +2468,7 @@ class App(ctk.CTk):
         ctk.CTkButton(
             button_frame,
             text="📋 Добавить в ТСД",
-            command=lambda: self._add_history_to_tsd(history_tree, history_window),
+            command=lambda: self._add_history_to_tsd(history_tree, history_window),  # Используем исправленный метод
             fg_color="#E67E22",
             hover_color="#D35400"
         ).pack(side="left", padx=5)
@@ -1946,7 +2497,7 @@ class App(ctk.CTk):
         for item in history_tree.get_children():
             history_tree.delete(item)
         
-        # Загружаем заказы из истории
+        # Загружаем заказы из истории БД (НЕ из download_list!)
         if filter_type == "all":
             history_orders = self.history_db.get_all_orders()
         elif filter_type == "without_tsd":
@@ -1984,66 +2535,96 @@ class App(ctk.CTk):
 
     def _add_history_to_tsd(self, history_tree, history_window):
         """Добавляет выбранные в истории заказы в download_list для ТСД"""
-        selected_items = history_tree.selection()
-        if not selected_items:
-            tk.messagebox.showwarning("Выбор заказов", "Выберите заказы для добавления в ТСД")
-            return
-        
-        # Получаем все заказы из истории для поиска по ID
-        all_orders = self.history_db.get_all_orders()
-        order_dict = {order['document_id']: order for order in all_orders}
-        
-        added_count = 0
-        skipped_count = 0
-        
-        for item in history_tree.selection():
-            item_values = history_tree.item(item, 'values')
-            document_id = item_values[1]  # document_id находится во второй колонке
+        try:
+            selected_items = history_tree.selection()
+            if not selected_items:
+                tk.messagebox.showwarning("Выбор заказов", "Выберите заказы для добавления в ТСД")
+                return
             
-            order_data = order_dict.get(document_id)
-            if not order_data:
-                continue
+            # Получаем все заказы из истории для поиска по ID
+            all_orders = self.history_db.get_all_orders()
+            order_dict = {order['document_id']: order for order in all_orders}
             
-            # ПРОВЕРЯЕМ, НЕ ОТПРАВЛЕН ЛИ УЖЕ ЗАКАЗ НА ТСД
-            if order_data.get('tsd_created'):
-                skipped_count += 1
-                continue
+            added_count = 0
+            skipped_count = 0
+            
+            for item_id in selected_items:
+                try:
+                    item_values = history_tree.item(item_id, 'values')
+                    document_id = item_values[1]  # document_id находится во второй колонке
+                    
+                    order_data = order_dict.get(document_id)
+                    if not order_data:
+                        continue
+                    
+                    # ПРОВЕРЯЕМ, НЕ ОТПРАВЛЕН ЛИ УЖЕ ЗАКАЗ НА ТСД
+                    if order_data.get('tsd_created'):
+                        skipped_count += 1
+                        continue
+                    
+                    # ДЕТАЛЬНАЯ ПРОВЕРКА ДАННЫХ ИЗ ИСТОРИИ
+                    print(f"🔍 DEBUG: Данные из истории для {document_id}:")
+                    print(f"   - order_name: {order_data.get('order_name')}")
+                    print(f"   - gtin: {order_data.get('gtin')}")
+                    print(f"   - simpl: {order_data.get('simpl')}")
+                    print(f"   - full_name: {order_data.get('full_name')}")
+                        
+                    # Проверяем, не добавлен ли уже заказ в текущей сессии
+                    existing_item = next((item for item in self.download_list if item.get("document_id") == document_id), None)
+                    if not existing_item:
+                        new_item = {
+                            "order_name": order_data.get("order_name"),
+                            "document_id": document_id,
+                            "status": "Готов для ТСД",
+                            "filename": order_data.get("filename"),
+                            "simpl": order_data.get("simpl"),
+                            "full_name": order_data.get("full_name"),
+                            "gtin": order_data.get("gtin"),  # ВАЖНО: копируем GTIN из истории
+                            "from_history": True,
+                            "downloading": False,
+                            "history_data": order_data  # Сохраняем полные данные из истории
+                        }
+                        self.download_list.append(new_item)
+                        added_count += 1
+                        print(f"✅ DEBUG: Добавлен заказ из истории с GTIN: {order_data.get('gtin')}")
+                    else:
+                        # Обновляем существующий заказ
+                        existing_item["status"] = "Готов для ТСД"
+                        existing_item["from_history"] = True
+                        existing_item["gtin"] = order_data.get("gtin")  # Обновляем GTIN
+                        existing_item["history_data"] = order_data
+                        added_count += 1
+                        print(f"✅ DEBUG: Обновлен заказ с GTIN: {order_data.get('gtin')}")
+                        
+                except Exception as e:
+                    print(f"❌ DEBUG: Ошибка обработки элемента: {e}")
+                    continue
+            
+            # Обновляем таблицу ТСД и закрываем диалог
+            self.update_tsd_tree()
+            history_window.destroy()
+            
+            # Показываем информативное сообщение
+            if added_count > 0:
+                message = f"Добавлено заказов в ТСД: {added_count}"
+                if skipped_count > 0:
+                    message += f"\nПропущено (уже отправлены на ТСД): {skipped_count}"
+                tk.messagebox.showinfo("Добавление в ТСД", message)
+            else:
+                tk.messagebox.showwarning("Добавление в ТСД", "Не удалось добавить заказы. Возможно, они уже были отправлены на ТСД.")
                 
-            # Проверяем, не добавлен ли уже заказ в текущей сессии
-            if not any(item.get("document_id") == document_id for item in self.download_list):
-                self.download_list.append({
-                    "order_name": order_data.get("order_name"),
-                    "document_id": document_id,
-                    "status": "Из истории",  # Статус для заказов из истории
-                    "filename": order_data.get("filename"),
-                    "simpl": order_data.get("simpl"),
-                    "full_name": order_data.get("full_name"),
-                    "gtin": order_data.get("gtin"),
-                    "from_history": True,    # Флаг, что это заказ из истории
-                    "downloading": False     # Не скачиваем автоматически
-                })
-                added_count += 1
-        
-        # Обновляем таблицу ТСД и закрываем диалог
-        self.update_tsd_tree()
-        history_window.destroy()
-        
-        # Переключаемся на вкладку ТСД
-        self.tabview.set("📱 Ввод в оборот (ТСД)")
-        
-        # Показываем информативное сообщение
-        if added_count > 0:
-            message = f"Добавлено заказов: {added_count}"
-            if skipped_count > 0:
-                message += f"\nПропущено (уже отправлены): {skipped_count}"
-            tk.messagebox.showinfo("Добавление в ТСД", message)
-            
-            # Логируем в ТСД таб
-            self.tsd_log_insert(f"📋 Добавлено {added_count} заказов из истории")
-            if skipped_count > 0:
-                self.tsd_log_insert(f"⚠️ Пропущено {skipped_count} заказов (уже отправлены на ТСД)")
-        else:
-            tk.messagebox.showwarning("Добавление в ТСД", "Не удалось добавить заказы. Возможно, они уже были отправлены на ТСД.")
+        except Exception as e:
+            print(f"💥 DEBUG: Критическая ошибка в _add_history_to_tsd: {e}")
+            import traceback
+            print(f"🔍 DEBUG: Детали ошибки: {traceback.format_exc()}")
+
+    def load_history_for_dialog(self):
+        """Загружает заказы из истории ТОЛЬКО для отображения в диалоге истории"""
+        try:
+            return self.history_db.get_all_orders()
+        except Exception as e:
+            logger.error(f"Ошибка загрузки истории для диалога: {e}")
+            return []
 
     def _show_error(self, message):
         """Вспомогательный метод для показа ошибок"""
@@ -2117,7 +2698,6 @@ class App(ctk.CTk):
             # Отключаем кнопку пока выполняется
             self.intro_btn.configure(state="disabled")
             self.intro_log_insert(f"🚀 Запуск ввода в оборот для {len(selected_items)} заказа(ов)...")
-            self.intro_log_insert(f"📅 Дата производства: {prod_date}, Окончание: {exp_date}, Партия: {batch_num}")
 
             # Запускаем задачи
             futures = []
@@ -2129,7 +2709,6 @@ class App(ctk.CTk):
                 docid = it["document_id"]
                 order_name = it.get("order_name", "Unknown")
                 simpl_name = it.get("simpl")
-                self.intro_log_insert(f"⏳ Добавлен в очередь: {order_name} (ID: {docid})")
                 tnved_code = get_tnved_code(simpl_name) if simpl_name else ""
                 
                 # Формируем production_patch
@@ -2218,7 +2797,6 @@ class App(ctk.CTk):
             self.intro_log_text.configure(state="normal")
             self.intro_log_text.insert("end", msg + "\n")
             self.intro_log_text.see("end")
-            self.intro_log_text.configure(state="disabled")
         except Exception as e:
             logger.error(f"Ошибка записи в лог: {e}")
 
@@ -2327,29 +2905,69 @@ class App(ctk.CTk):
         except Exception as e:
             self.intro_log_insert(f"❌ Ошибка при обработке результата: {e}")
 
-    def _setup_introduction_tsd_tab(self):
-        """Таб ввода в оборот (ТСД)"""
-        tab_tsd = self.tabview.add("📱 Ввод в оборот (ТСД)")
-        self.tsd_tab = tab_tsd
+    def _setup_introduction_tsd_frame(self):
+        """Современный фрейм введения TSD"""
+        self.content_frames["intro_tsd"] = CTkScrollableFrame(self.main_content, corner_radius=0)
         
-        main_frame = ctk.CTkFrame(tab_tsd)
-        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # Основной контейнер
+        main_frame = ctk.CTkFrame(self.content_frames["intro_tsd"], corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Используем grid для разделения на левую и правую части
-        main_frame.grid_columnconfigure(0, weight=1)  # Левая колонка - таблица и форма
-        main_frame.grid_columnconfigure(1, weight=1)  # Правая колонка - лог
-        main_frame.grid_rowconfigure(1, weight=1)     # Вторая строка - растягиваемая
+        # Заголовок
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
         
-        # Левая часть - таблица и форма
-        left_frame = ctk.CTkFrame(main_frame)
-        left_frame.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(0, 5))
+        ctk.CTkLabel(
+            header_frame,
+            text="🏷️",
+            font=("Segoe UI", 48),
+            text_color=self._get_color("primary")
+        ).pack(side="left", padx=(0, 15))
         
-        # Форма ввода в левой части (теперь сверху)
-        form_frame = ctk.CTkFrame(left_frame)
-        form_frame.pack(fill="x", pady=(0, 10))
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left", fill="y")
         
-        ctk.CTkLabel(form_frame, text="Параметры ТСД:", 
-                    font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=10, columnspan=4)
+        ctk.CTkLabel(
+            title_frame,
+            text="Ввод в оборот (ТСД)",
+            font=self.fonts["title"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="Управление вводом товаров через ТСД",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(anchor="w")
+        
+        # Две колонки
+        columns_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        columns_frame.pack(fill="both", expand=True)
+        columns_frame.grid_columnconfigure(0, weight=1)
+        columns_frame.grid_columnconfigure(1, weight=1)
+        columns_frame.grid_rowconfigure(0, weight=1)
+        
+        # Левая колонка - форма и таблица
+        left_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        
+        # Правая колонка - лог
+        right_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        right_column.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        
+        # Форма ввода TSD
+        form_container = ctk.CTkFrame(left_column, corner_radius=8)
+        form_container.pack(fill="x", pady=(0, 10))
+        
+        ctk.CTkLabel(
+            form_container, 
+            text="Параметры ТСД", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        form_frame = ctk.CTkFrame(form_container, fg_color="transparent")
+        form_frame.pack(fill="x", padx=15, pady=10)
         
         # Сетка для полей ввода
         tsd_labels = [
@@ -2360,54 +2978,78 @@ class App(ctk.CTk):
         ]
         
         for i, (label_text, attr_name) in enumerate(tsd_labels):
-            ctk.CTkLabel(form_frame, text=label_text).grid(row=i+1, column=0, sticky="w", pady=8, padx=5)
-            entry = ctk.CTkEntry(form_frame, width=200)
-            entry.grid(row=i+1, column=1, pady=8, padx=5)
+            ctk.CTkLabel(form_frame, text=label_text, font=self.fonts["normal"]).grid(row=i, column=0, sticky="w", pady=8, padx=5)
+            entry = ctk.CTkEntry(form_frame, width=200, font=self.fonts["normal"])
+            entry.grid(row=i, column=1, pady=8, padx=5)
             setattr(self, attr_name, entry)
         
         # Заполнение дат по умолчанию
         today = datetime.now().strftime("%d-%m-%Y")
         future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
-        self.tsd_prod_date_entry.insert(0, today) # type: ignore
-        self.tsd_exp_date_entry.insert(0, future_date) # type: ignore
+        if self.tsd_prod_date_entry:
+            self.tsd_prod_date_entry.insert(0, today)
+        if self.tsd_exp_date_entry:
+            self.tsd_exp_date_entry.insert(0, future_date)
         
-        # Кнопки в левой части (теперь после формы)
-        btn_frame = ctk.CTkFrame(left_frame)
-        btn_frame.pack(fill="x", pady=(0, 10))
+        # Кнопки
+        btn_frame = ctk.CTkFrame(form_container, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=15, pady=(0, 15))
         
         self.tsd_btn = ctk.CTkButton(
             btn_frame, 
             text="📱 Отправить на ТСД", 
             command=self.on_tsd_clicked,
-            fg_color="#E67E22",
-            hover_color="#D35400"
+            fg_color=self._get_color("warning"),
+            hover_color="#D35400",
+            font=self.fonts["button"],
+            corner_radius=6
         )
         self.tsd_btn.pack(side="left", padx=5)
         
-        self.tsd_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_tsd_tree)
+        self.tsd_refresh_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🔄 Обновить", 
+            command=self.update_tsd_tree,
+            font=self.fonts["button"],
+            corner_radius=6
+        )
         self.tsd_refresh_btn.pack(side="left", padx=5)
 
         self.history_btn = ctk.CTkButton(
-                btn_frame,
-                text="📚 История заказов",
-                command=self.show_order_history,
-                fg_color="#27AE60",
-                hover_color="#219A52"
-            )
+            btn_frame,
+            text="📚 История заказов",
+            command=self.show_order_history,
+            fg_color=self._get_color("success"),
+            hover_color="#219A52",
+            font=self.fonts["button"],
+            corner_radius=6
+        )
         self.history_btn.pack(side="left", padx=5)
         
-        self.tsd_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_tsd_log)
+        self.tsd_clear_btn = ctk.CTkButton(
+            btn_frame, 
+            text="🧹 Очистить лог", 
+            command=self.clear_tsd_log,
+            font=self.fonts["button"],
+            corner_radius=6
+        )
         self.tsd_clear_btn.pack(side="left", padx=5)
         
-        # Таблица в левой части (теперь снизу)
-        table_frame = ctk.CTkFrame(left_frame)
-        table_frame.pack(fill="both", expand=True, pady=(10, 0))
+        # Таблица
+        table_container = ctk.CTkFrame(left_column, corner_radius=8)
+        table_container.pack(fill="both", expand=True, pady=(10, 0))
         
-        ctk.CTkLabel(table_frame, text="Доступные заказы:", 
-                    font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(10, 5))
+        ctk.CTkLabel(
+            table_container, 
+            text="Доступные заказы", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        table_inner_frame = ctk.CTkFrame(table_container, fg_color="transparent")
+        table_inner_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
         tsd_columns = ("order_name", "document_id", "status", "filename")
-        self.tsd_tree = ttk.Treeview(table_frame, columns=tsd_columns, show="headings", 
+        self.tsd_tree = ttk.Treeview(table_inner_frame, columns=tsd_columns, show="headings", 
                                 height=12, selectmode="extended")
         
         headers = {
@@ -2419,25 +3061,24 @@ class App(ctk.CTk):
             self.tsd_tree.heading(col, text=text)
             self.tsd_tree.column(col, width=150)
         
-        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tsd_tree.yview)
+        scrollbar = ttk.Scrollbar(table_inner_frame, orient="vertical", command=self.tsd_tree.yview)
         self.tsd_tree.configure(yscrollcommand=scrollbar.set)
         self.tsd_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         
-        # Правая часть - только лог
-        right_frame = ctk.CTkFrame(main_frame)
-        right_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(5, 0))
-        right_frame.grid_rowconfigure(1, weight=1)  # Лог будет растягиваться
-        right_frame.grid_columnconfigure(0, weight=1)
-
-        # Заголовок лога
-        ctk.CTkLabel(right_frame, text="Лог ТСД:", 
-                    font=ctk.CTkFont(weight="bold")).grid(row=0, column=0, sticky="w", pady=(10, 5), padx=10)
-
-        # Большое поле для лога - занимает всю правую часть
-        self.tsd_log_text = ctk.CTkTextbox(right_frame, font=ctk.CTkFont(size=13))
-        self.tsd_log_text.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 10))
-        self.tsd_log_text.configure()
+        # Лог
+        log_container = ctk.CTkFrame(right_column, corner_radius=8)
+        log_container.pack(fill="both", expand=True)
+        
+        ctk.CTkLabel(
+            log_container, 
+            text="Лог ТСД", 
+            font=self.fonts["subheading"]
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+        
+        self.tsd_log_text = ctk.CTkTextbox(log_container, font=self.fonts["normal"])
+        self.tsd_log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        
         
         self.update_tsd_tree()
 
@@ -2498,7 +3139,7 @@ class App(ctk.CTk):
             pass
 
     def update_tsd_tree(self):
-        """Наполнить дерево заказами, у которых status == 'Скачан' или filename != None, но не отправлены на ТСД"""
+        """Наполнить дерево заказами, которые готовы для отправки на ТСД"""
         # Очистить дерево
         for i in self.tsd_tree.get_children():
             self.tsd_tree.delete(i)
@@ -2506,8 +3147,12 @@ class App(ctk.CTk):
         # Добавить записи из self.download_list, которые не были отправлены на ТСД
         for item in self.download_list:
             document_id = item.get("document_id")
-            # Показываем только если статус подходящий И заказ еще не отправлялся на ТСД
-            if (item.get("status") in ("Скачан", "Скачивается", "Downloaded", "Ожидает", "Из истории") or item.get("filename")) and document_id not in self.sent_to_tsd_items:
+            
+            # ВАЖНО: Показываем заказы, которые готовы для ТСД (включая из истории)
+            if (document_id not in self.sent_to_tsd_items and 
+                item.get("status") in ("Скачан", "Downloaded", "Ожидает", "Скачивается", "Готов для ТСД") or 
+                item.get("filename")):
+                
                 vals = (
                     item.get("order_name"), 
                     document_id, 
@@ -2515,49 +3160,37 @@ class App(ctk.CTk):
                     item.get("filename") or ""
                 )
                 self.tsd_tree.insert("", "end", iid=document_id, values=vals)
+                print(f"✅ DEBUG: Заказ {document_id} добавлен в таблицу ТСД со статусом: {item.get('status')}")
 
     def get_selected_tsd_items(self):
         """Возвращает список объектов download_list, соответствующих выбранным строкам в tsd_tree."""
         try:
             sel = self.tsd_tree.selection()
-            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Выбрано строк в дереве: {len(sel)}")
-            self.tsd_log_insert(f"🔍 get_selected_tsd_items: IDs выбранных строк: {sel}")
             
             selected = []
-            id_to_item = {it['document_id']: it for it in self.download_list}
-            
-            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Всего заказов в download_list: {len(self.download_list)}")
-            self.tsd_log_insert(f"🔍 get_selected_tsd_items: ID в download_list: {list(id_to_item.keys())}")
             
             for iid in sel:
-                docid = iid
-                it = id_to_item.get(docid)
-                if it:
-                    selected.append(it)
-                    self.tsd_log_insert(f"🔍 get_selected_tsd_items: Найден заказ для ID {docid}: {it.get('order_name', 'Unknown')}")
+                # Получаем данные из дерева
+                item_values = self.tsd_tree.item(iid, 'values')
+                docid = iid  # или item_values[1] в зависимости от структуры
+                
+                # Ищем в download_list
+                found_item = None
+                for item in self.download_list:
+                    if item.get("document_id") == docid:
+                        found_item = item
+                        break
+                
+                if found_item:
+                    selected.append(found_item)
                 else:
-                    self.tsd_log_insert(f"❌ get_selected_tsd_items: Заказ с ID {docid} не найден в download_list!")
+                    self.tsd_log_insert(f"❌ Заказ с ID {docid} не найден в download_list!")
             
-            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Итоговый список выбранных: {len(selected)} заказов")
             return selected
-            
+                
         except Exception as e:
             self.tsd_log_insert(f"❌ get_selected_tsd_items: Ошибка: {e}")
-            import traceback
-            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Детали ошибки: {traceback.format_exc()}")
             return []
-    def debug_download_list(self):
-        """Метод для отладки состояния download_list"""
-        try:
-            self.tsd_log_insert("=== ДИАГНОСТИКА DOWNLOAD_LIST ===")
-            self.tsd_log_insert(f"Всего заказов в download_list: {len(self.download_list)}")
-            
-            for i, item in enumerate(self.download_list):
-                self.tsd_log_insert(f"Заказ {i}: {item.get('order_name', 'Unknown')} | ID: {item.get('document_id', 'Unknown')} | Статус: {item.get('status', 'Unknown')}")
-                
-            self.tsd_log_insert("=== КОНЕЦ ДИАГНОСТИКИ ===")
-        except Exception as e:
-            self.tsd_log_insert(f"❌ Ошибка диагностики download_list: {e}")
             
     def on_tsd_clicked(self):
         """Обработчик кнопки — собирает данные, запускает threads для выбранных заказов."""
@@ -2566,10 +3199,6 @@ class App(ctk.CTk):
             
             # Получаем выбранные элементы
             selected_items = self.get_selected_tsd_items()
-            self.tsd_log_insert(f"📋 Выбрано элементов в таблице ТСД: {len(selected_items)}")
-            
-            for item in selected_items:
-                self.tsd_log_insert(f"   - {item.get('order_name', 'Unknown')} (ID: {item.get('document_id', 'Unknown')})")
             
             if not selected_items:
                 self.tsd_log_insert("❌ ОШИБКА: Не выбрано ни одного заказа в таблице ТСД")
@@ -2581,18 +3210,17 @@ class App(ctk.CTk):
             exp_date_raw = self.tsd_exp_date_entry.get().strip()
             batch_num = self.tsd_batch_entry.get().strip()
             
-            self.tsd_log_insert(f"📅 Данные из полей ввода: номер='{intro_number}', прод='{prod_date_raw}', эксп='{exp_date_raw}', партия='{batch_num}'")
+    
 
             # Преобразуем даты
             try:
                 prod_date = self.convert_date_format(prod_date_raw)
                 exp_date = self.convert_date_format(exp_date_raw)
-                self.tsd_log_insert(f"📅 Преобразованные даты: прод='{prod_date}', эксп='{exp_date}'")
             except Exception as e:
                 self.tsd_log_insert(f"❌ ОШИБКА преобразования дат: {e}")
                 return
 
-            # Валидация
+            # Валидация полей формы
             errors = []
             if not intro_number:
                 errors.append("Введите номер ввода в оборот.")
@@ -2615,50 +3243,69 @@ class App(ctk.CTk):
 
             # Запускаем задачи
             futures = []
+            skipped_items = []  # Для отслеживания пропущенных заказов
+            
             for it in selected_items:
                 try:
                     docid = it["document_id"]
-                    self.tsd_log_insert(f"🔍 Обработка заказа: ID={docid}")
-                    
-                    # ДЕТАЛЬНАЯ ИНФОРМАЦИЯ О ЗАКАЗЕ
-                    self.tsd_log_insert(f"   📝 Данные заказа: {it}")
+                    order_name = it.get("order_name", "Unknown")
                     
                     simpl_name = it.get("simpl", "")
                     full_name = it.get("full_name", "Неизвестно")
-                    self.tsd_log_insert(f"   🏷️ simpl='{simpl_name}', full_name='{full_name}'")
+                    self.tsd_log_insert(f"🏷️ simpl='{simpl_name}', full_name='{full_name}'")
 
-                    # Получаем GTIN из исходных данных заказа
-                    gtin = self._get_gtin_for_order(docid)
-                    self.tsd_log_insert(f"   🔍 Поиск GTIN для document_id={docid}")
-                    self.tsd_log_insert(f"   📦 Найден GTIN: {gtin}")
+                    # ПОЛУЧАЕМ GTIN - КРИТИЧЕСКИ ВАЖНЫЙ ЭТАП
+                    gtin = None
                     
+                    # Способ 1: Ищем напрямую в данных заказа
+                    gtin = it.get("gtin")
+                    
+                    # Способ 2: Ищем через метод поиска по document_id
                     if not gtin:
-                        self.tsd_log_insert(f"🔍 Основной метод не нашел GTIN, пробуем альтернативный...")
+                        gtin = self._get_gtin_for_order(docid)
+                       
+                    
+                    # Способ 3: Извлекаем из структуры данных
+                    if not gtin:
                         gtin = self._extract_gtin_from_order_data(it)
+                       
+                    
+                    # Способ 4: Ищем в истории БД напрямую
+                    if not gtin and hasattr(self, 'history_db'):
+                        try:
+                            history_order = self.history_db.get_order_by_document_id(docid)
+                            if history_order and history_order.get('gtin'):
+                                gtin = history_order.get('gtin')
+                              
+                        except Exception as e:
+                            self.tsd_log_insert(f"⚠️ Ошибка при поиске GTIN в истории БД: {e}")
 
-                    self.tsd_log_insert(f"   📦 Итоговый GTIN: {gtin}")
-
+                    # КРИТИЧЕСКАЯ ПРОВЕРКА: если GTIN не найден, ПРЕКРАЩАЕМ обработку
                     if not gtin:
-                        self.tsd_log_insert(f"⚠️ Не найден GTIN для заказа {docid}, пропускаем")
-                        
-                        # ДОБАВИМ ДИАГНОСТИКУ ДАННЫХ ЗАКАЗА
-                        self.tsd_log_insert(f"🔍 ДИАГНОСТИКА ДАННЫХ ЗАКАЗА:")
-                        self.tsd_log_insert(f"   - order_name: {it.get('order_name')}")
-                        self.tsd_log_insert(f"   - document_id: {it.get('document_id')}")
-                        self.tsd_log_insert(f"   - simpl: {it.get('simpl')}")
-                        self.tsd_log_insert(f"   - full_name: {it.get('full_name')}")
-                        self.tsd_log_insert(f"   - history_entry: {bool(it.get('history_entry'))}")
+                        error_msg = f"❌ КРИТИЧЕСКАЯ ОШИБКА: Не найден GTIN для заказа '{order_name}' (ID: {docid})"
+                        self.tsd_log_insert(error_msg)
+                        skipped_items.append({"item": it, "reason": "GTIN не найден"})
+                        continue  # Пропускаем этот заказ
+
+                    # Проверяем валидность GTIN
+                    if not gtin.isdigit() or len(gtin) < 10:
+                        error_msg = f"❌ КРИТИЧЕСКАЯ ОШИБКА: Невалидный GTIN '{gtin}' для заказа '{order_name}'"
+                        self.tsd_log_insert(error_msg)
+                        skipped_items.append({"item": it, "reason": f"Невалидный GTIN: {gtin}"})
+                        continue
+
+
 
                     # Получаем TNVED код
                     tnved_code = get_tnved_code(simpl_name)
-                    self.tsd_log_insert(f"   📋 TNVED код: {tnved_code}")
-                    
+                    self.tsd_log_insert(f"📋 TNVED код: {tnved_code}")
+
                     # Формируем данные позиций
                     positions_data = [{
                         "name": full_name, 
-                        "gtin": f"0{gtin}"
+                        "gtin": f"0{gtin}"  # Добавляем ведущий ноль
                     }]
-                    self.tsd_log_insert(f"   📦 Данные позиций: {positions_data}")
+              
                     
                     # Формируем production_patch
                     production_patch = {
@@ -2668,26 +3315,51 @@ class App(ctk.CTk):
                         "batchNumber": batch_num,
                         "TnvedCode": tnved_code
                     }
+            
                     
-                    self.tsd_log_insert(f"   🏭 Production patch: {production_patch}")
-                    
-                    # Запускаем задачу
-                    self.tsd_log_insert("   🔄 Получение сессии...")
+             
                     session = SessionManager.get_session()
-                    self.tsd_log_insert("   🚀 Запуск фоновой задачи _tsd_worker...")
                     
-                    fut = self.intro_tsd_executor.submit(self._tsd_worker, it, positions_data, production_patch, session)
+                 
+                    fut = self.intro_tsd_executor.submit(
+                        self._tsd_worker, 
+                        it, 
+                        positions_data, 
+                        production_patch, 
+                        session
+                    )
                     futures.append((fut, it))
-                    self.tsd_log_insert(f"   ✅ Задача для заказа {docid} добавлена в очередь ThreadPoolExecutor")
                     
                 except Exception as e:
-                    self.tsd_log_insert(f"❌ КРИТИЧЕСКАЯ ОШИБКА при подготовке заказа {it.get('order_name', 'Unknown')}: {e}")
+                    error_msg = f"❌ КРИТИЧЕСКАЯ ОШИБКА при подготовке заказа '{it.get('order_name', 'Unknown')}': {e}"
+                    self.tsd_log_insert(error_msg)
                     import traceback
                     self.tsd_log_insert(f"🔍 Детали ошибки: {traceback.format_exc()}")
+                    skipped_items.append({"item": it, "reason": f"Ошибка подготовки: {e}"})
 
+            # Логируем информацию о пропущенных заказах
+            if skipped_items:
+                self.tsd_log_insert(f"⚠️ Пропущено заказов: {len(skipped_items)}")
+                for skipped in skipped_items:
+                    item = skipped["item"]
+                    reason = skipped["reason"]
+                    self.tsd_log_insert(f"   - '{item.get('order_name', 'Unknown')}' (ID: {item.get('document_id', 'Unknown')}): {reason}")
+
+            # Проверяем, остались ли задачи для выполнения
             if not futures:
-                self.tsd_log_insert("❌ ОШИБКА: Нет задач для выполнения после подготовки")
+                error_msg = "❌ ОШИБКА: Нет задач для выполнения после подготовки"
+                if skipped_items:
+                    error_msg += f" (все {len(skipped_items)} заказов пропущены)"
+                self.tsd_log_insert(error_msg)
                 self.tsd_btn.configure(state="normal")
+                
+                # Показываем пользователю информативное сообщение
+                if skipped_items:
+                    reasons = "\n".join([f"- {s['item'].get('order_name', 'Unknown')}: {s['reason']}" for s in skipped_items])
+                    tk.messagebox.showwarning(
+                        "Не удалось отправить заказы", 
+                        f"Не удалось отправить {len(skipped_items)} заказов:\n{reasons}"
+                    )
                 return
 
             self.tsd_log_insert(f"📊 Успешно подготовлено задач: {len(futures)}")
@@ -2698,24 +3370,27 @@ class App(ctk.CTk):
                     self.tsd_log_insert("👀 МОНИТОРИНГ: Запуск отслеживания выполнения задач...")
                     completed = 0
                     total = len(futures)
+                    successful = 0
+                    failed = 0
                     
                     for i, (fut, it) in enumerate(futures):
                         try:
                             docid = it.get("document_id", "Unknown")
-                            self.tsd_log_insert(f"⏳ МОНИТОРИНГ: Ожидание задачи {i+1}/{total} (ID: {docid})...")
+                            order_name = it.get("order_name", "Unknown")
                             
-                            # Увеличиваем таймаут для отладки
-                            ok, result = fut.result(timeout=300)  # 5 минут вместо 15 секунд
+                            # Ждем завершения задачи с таймаутом
+                            ok, result = fut.result(timeout=300)  # 5 минут
                             
                             # Формируем сообщение
                             if ok:
                                 intro_id = result.get('introduction_id', 'unknown')
                                 msg = f"Успех: introduction_id = {intro_id}"
-                                self.tsd_log_insert(f"✅ МОНИТОРИНГ: Задача {i+1}/{total} УСПЕШНА: {msg}")
+                                successful += 1
                             else:
                                 errors = result.get('errors', ['unknown error'])
                                 msg = f"Ошибка: {'; '.join(errors)}"
                                 self.tsd_log_insert(f"❌ МОНИТОРИНГ: Задача {i+1}/{total} ОШИБКА: {msg}")
+                                failed += 1
                             
                             self.after(0, self._on_tsd_finished, it, ok, msg)
                             completed += 1
@@ -2728,8 +3403,9 @@ class App(ctk.CTk):
                             
                             self.after(0, self._on_tsd_finished, it, False, error_msg)
                             completed += 1
+                            failed += 1
                     
-                    self.tsd_log_insert(f"🎉 МОНИТОРИНГ: Все задачи завершены ({completed}/{total})")
+                    self.tsd_log_insert(f"📊 Статистика: Успешно: {successful}, Ошибки: {failed}, Всего: {total}")
                     
                 except Exception as e:
                     self.tsd_log_insert(f"💥 КРИТИЧЕСКАЯ ОШИБКА в мониторе: {e}")
@@ -2739,12 +3415,18 @@ class App(ctk.CTk):
                     # Всегда разблокируем кнопку
                     self.after(0, lambda: self.tsd_btn.configure(state="normal"))
                     self.after(0, lambda: self.tsd_log_insert("🔓 Кнопка ТСД разблокирована"))
+                    
+                    # Показываем итоговое сообщение пользователю
+                    if hasattr(self, 'successful') and hasattr(self, 'failed'):
+                        success_count = getattr(self, 'successful', 0)
+                        fail_count = getattr(self, 'failed', 0)
+                        if success_count > 0 or fail_count > 0:
+                            message = f"Обработка завершена:\nУспешно: {success_count}\nОшибки: {fail_count}"
+                            self.after(0, lambda: tk.messagebox.showinfo("Результат", message))
 
-            # Запускаем мониторинг в отдельном потоке
-            self.tsd_log_insert("🚀 Запуск потока мониторинга...")
+
             monitor_thread = threading.Thread(target=tsd_monitor, daemon=True)
             monitor_thread.start()
-            self.tsd_log_insert("📊 Мониторинг задач запущен в фоновом потоке")
 
         except Exception as e:
             self.tsd_log_insert(f"💥 КРИТИЧЕСКАЯ ОШИБКА в on_tsd_clicked: {e}")
@@ -2760,11 +3442,9 @@ class App(ctk.CTk):
             document_id = item["document_id"]
             order_name = item.get('order_name', 'Unknown')
             
-            self.tsd_log_insert(f"🔧 _tsd_worker: НАЧАЛО работы для заказа '{order_name}' (ID: {document_id})")
 
             # ВЫЗОВ API
             try:
-                self.tsd_log_insert(f"📡 _tsd_worker: Вызов API make_task_on_tsd для {document_id}")
                 
                 ok, result = make_task_on_tsd(
                     session=session,
@@ -2773,11 +3453,9 @@ class App(ctk.CTk):
                     production_patch=production_patch
                 )
                 
-                self.tsd_log_insert(f"📡 _tsd_worker: Результат API для {document_id}: {'УСПЕХ' if ok else 'ОШИБКА'}")
                 
                 if ok:
                     intro_id = result.get('introduction_id', 'unknown')
-                    self.tsd_log_insert(f"✅ _tsd_worker: УСПЕХ - introduction_id = {intro_id}")
                     
                     # ПОМЕЧАЕМ ЗАКАЗ КАК ОБРАБОТАННЫЙ В ИСТОРИИ
                     from api import mark_order_as_tsd_created
@@ -2812,6 +3490,9 @@ class App(ctk.CTk):
         except Exception as e:
             logger.error(f"Ошибка при очистке формы ТСД: {e}")
 
+    def show_info(self, message):
+        """Показывает информационное сообщение"""
+        tk.messagebox.showinfo("Информация", message)
 
     # И добавим вызов в _on_tsd_finished при успехе:
     def _on_tsd_finished(self, item: dict, ok: bool, msg: str):
@@ -2831,7 +3512,6 @@ class App(ctk.CTk):
                 if "introduction_id =" in msg:
                     intro_id = msg.split("introduction_id =")[1].strip()
                     self.history_db.mark_tsd_created(docid, intro_id)
-                    self.tsd_log_insert(f"✅ Заказ {order_name} помечен как обработанный в истории")
             except Exception as e:
                 self.tsd_log_insert(f"❌ Ошибка пометки заказа в истории: {e}")
             
@@ -2844,112 +3524,71 @@ class App(ctk.CTk):
         self.update_tsd_tree()
     
         
-    def _get_gtin_for_order(self, document_id: str) -> str | None:
-        """Получает GTIN для заказа из collected или из истории."""
+    def _get_gtin_for_order(self, document_id):
+        """Получает GTIN для заказа с детальной диагностикой"""
         try:
             self.tsd_log_insert(f"🔍 Поиск GTIN для document_id: {document_id}")
             
-            # Сначала ищем в collected (для текущих заказов)
-            for item in self.collected:
-                if hasattr(item, 'document_id') and item.document_id == document_id:
-                    gtin = getattr(item, 'gtin', None)
-                    if gtin:
-                        self.tsd_log_insert(f"✅ Найден GTIN в collected: {gtin}")
-                        return gtin
-            
-            # Если в collected не нашли, ищем в download_list
+            # Сначала ищем в download_list
             for item in self.download_list:
-                if item.get("document_id") == document_id:
-                    self.tsd_log_insert(f"🔍 Найден заказ в download_list: {item.get('order_name')}")
-                    
-                    # Пробуем получить GTIN напрямую из полей заказа
-                    gtin = item.get("gtin")
+                if item.get('document_id') == document_id:
+                    gtin = item.get('gtin')
                     if gtin:
-                        self.tsd_log_insert(f"✅ Найден GTIN в поле заказа: {gtin}")
+                        self.tsd_log_insert(f"✅ GTIN найден в download_list: {gtin}")
                         return gtin
-                    
-                    # Если нет прямого поля gtin, ищем в history_entry
-                    history_entry = item.get("history_entry")
-                    if history_entry:
-                        self.tsd_log_insert(f"🔍 Ищем в history_entry...")
-                        
-                        # Ищем поле gtin в корне history_entry
-                        gtin = history_entry.get("gtin")
-                        if gtin:
-                            self.tsd_log_insert(f"✅ Найден GTIN в корне history_entry: {gtin}")
-                            return gtin
-                        
-                        # Ищем в order_data -> positions
-                        order_data = history_entry.get("order_data", {})
-                        positions = order_data.get("positions", [])
-                        
-                        if not positions:
-                            # Ищем в корне history_entry -> positions
-                            positions = history_entry.get("positions", [])
-                        
-                        if positions and len(positions) > 0:
-                            gtin = positions[0].get("gtin")
-                            self.tsd_log_insert(f"🔍 Найден GTIN в позициях: {gtin}")
-                            if gtin:
-                                return gtin
-                    
-                    self.tsd_log_insert("❌ GTIN не найден в данных заказа")
-                    break
+                    else:
+                        self.tsd_log_insert(f"❌ GTIN не найден в download_list для заказа {document_id}")
             
-            self.tsd_log_insert("❌ GTIN не найден ни в collected, ни в download_list")
+            # Если не нашли в download_list, ищем в истории БД
+            try:
+                history_order = self.history_db.get_order_by_document_id(document_id)
+                if history_order and history_order.get('gtin'):
+                    gtin = history_order.get('gtin')
+                    self.tsd_log_insert(f"✅ GTIN найден в истории БД: {gtin}")
+                    return gtin
+            except Exception as e:
+                self.tsd_log_insert(f"⚠️ Ошибка при поиске GTIN в истории БД: {e}")
+            
+            self.tsd_log_insert(f"❌ GTIN не найден ни в download_list, ни в истории БД")
             return None
             
         except Exception as e:
             self.tsd_log_insert(f"❌ Ошибка при поиске GTIN: {e}")
-            import traceback
-            self.tsd_log_insert(f"🔍 Детали ошибки: {traceback.format_exc()}")
             return None
-        
-    def _extract_gtin_from_order_data(self, item: dict) -> str | None:
-        """Извлекает GTIN из данных заказа разными способами"""
+
+    def _extract_gtin_from_order_data(self, item):
+        """Извлекает GTIN из данных заказа с детальной диагностикой"""
         try:
-            document_id = item.get("document_id")
-            self.tsd_log_insert(f"🔍 Извлечение GTIN для заказа {document_id}")
+            self.tsd_log_insert(f"🔍 Попытка извлечь GTIN из данных заказа: {item.get('order_name', 'Unknown')}")
             
-            # 1. Пробуем получить из history_entry -> order_data -> positions
-            history_entry = item.get("history_entry")
-            if history_entry:
-                self.tsd_log_insert(f"🔍 Анализ history_entry...")
+            # Проверяем различные возможные места хранения GTIN
+            gtin = item.get('gtin')
+            if gtin:
+                self.tsd_log_insert(f"✅ GTIN найден непосредственно в item: {gtin}")
+                return gtin
                 
-                # Способ 1: из order_data -> positions
-                order_data = history_entry.get("order_data", {})
-                positions = order_data.get("positions", [])
-                
-                # Способ 2: из корня history_entry -> positions
-                if not positions:
-                    positions = history_entry.get("positions", [])
-                
-                # Способ 3: из result -> positions
-                if not positions:
-                    result_data = history_entry.get("result", {})
-                    positions = result_data.get("positions", [])
-                
-                if positions and len(positions) > 0:
-                    gtin = positions[0].get("gtin")
-                    self.tsd_log_insert(f"🔍 Найден GTIN в позициях: {gtin}")
-                    if gtin:
-                        # Убираем лидирующий ноль если есть
-                        if gtin.startswith('0'):
-                            gtin = gtin[1:]
-                        return gtin
-            
-            # 2. Пробуем получить из полей заказа
-            simpl = item.get("simpl", "")
-            if simpl and "gtin" in simpl.lower():
-                # Парсим GTIN из simpl поля
-                import re
-                gtin_match = re.search(r'\d{13,14}', simpl)
-                if gtin_match:
-                    gtin = gtin_match.group()
-                    self.tsd_log_insert(f"🔍 Найден GTIN в simpl поле: {gtin}")
+            # Проверяем history_data (данные из истории)
+            if 'history_data' in item and item['history_data']:
+                gtin = item['history_data'].get('gtin')
+                if gtin:
+                    self.tsd_log_insert(f"✅ GTIN найден в history_data: {gtin}")
                     return gtin
             
-            self.tsd_log_insert("❌ Не удалось извлечь GTIN из данных заказа")
+            # Проверяем вложенные структуры
+            if 'history_entry' in item and item['history_entry']:
+                gtin = item['history_entry'].get('gtin')
+                if gtin:
+                    self.tsd_log_insert(f"✅ GTIN найден в history_entry: {gtin}")
+                    return gtin
+            
+            # Проверяем данные из API
+            if 'api_data' in item:
+                gtin = item['api_data'].get('gtin')
+                if gtin:
+                    self.tsd_log_insert(f"✅ GTIN найден в api_data: {gtin}")
+                    return gtin
+            
+            self.tsd_log_insert(f"❌ Не удалось извлечь GTIN из данных заказа")
             return None
             
         except Exception as e:
