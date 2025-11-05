@@ -3195,8 +3195,6 @@ class App(ctk.CTk):
     def on_tsd_clicked(self):
         """Обработчик кнопки — собирает данные, запускает threads для выбранных заказов."""
         try:
-            self.tsd_log_insert("🔍 НАЧАЛО: Обработка нажатия кнопки ТСД")
-            
             # Получаем выбранные элементы
             selected_items = self.get_selected_tsd_items()
             
@@ -3252,7 +3250,6 @@ class App(ctk.CTk):
                     
                     simpl_name = it.get("simpl", "")
                     full_name = it.get("full_name", "Неизвестно")
-                    self.tsd_log_insert(f"🏷️ simpl='{simpl_name}', full_name='{full_name}'")
 
                     # ПОЛУЧАЕМ GTIN - КРИТИЧЕСКИ ВАЖНЫЙ ЭТАП
                     gtin = None
@@ -3298,7 +3295,6 @@ class App(ctk.CTk):
 
                     # Получаем TNVED код
                     tnved_code = get_tnved_code(simpl_name)
-                    self.tsd_log_insert(f"📋 TNVED код: {tnved_code}")
 
                     # Формируем данные позиций
                     positions_data = [{
@@ -3362,12 +3358,9 @@ class App(ctk.CTk):
                     )
                 return
 
-            self.tsd_log_insert(f"📊 Успешно подготовлено задач: {len(futures)}")
-
             # Создаём нитку-отслеживатель
             def tsd_monitor():
                 try:
-                    self.tsd_log_insert("👀 МОНИТОРИНГ: Запуск отслеживания выполнения задач...")
                     completed = 0
                     total = len(futures)
                     successful = 0
@@ -3405,7 +3398,7 @@ class App(ctk.CTk):
                             completed += 1
                             failed += 1
                     
-                    self.tsd_log_insert(f"📊 Статистика: Успешно: {successful}, Ошибки: {failed}, Всего: {total}")
+                    self.tsd_log_insert(f"📊 СТАТИСТИКА: Успешно: {successful}, Ошибки: {failed}, Всего: {total}")
                     
                 except Exception as e:
                     self.tsd_log_insert(f"💥 КРИТИЧЕСКАЯ ОШИБКА в мониторе: {e}")
@@ -3414,7 +3407,6 @@ class App(ctk.CTk):
                 finally:
                     # Всегда разблокируем кнопку
                     self.after(0, lambda: self.tsd_btn.configure(state="normal"))
-                    self.after(0, lambda: self.tsd_log_insert("🔓 Кнопка ТСД разблокирована"))
                     
                     # Показываем итоговое сообщение пользователю
                     if hasattr(self, 'successful') and hasattr(self, 'failed'):
@@ -3501,7 +3493,7 @@ class App(ctk.CTk):
         order_name = item.get("order_name", "Unknown")
         
         if ok:
-            self.tsd_log_insert(f"🎉 [УСПЕХ] {order_name} (ID: {docid}) — {msg}")
+            self.tsd_log_insert(f"🎉 ЗАДАНИЕ УСПЕШНО СОЗДАНО!")
             self.sent_to_tsd_items.add(docid)
             item["status"] = "Отправлено на ТСД"
             self.show_info(f"Задание на ТСД для заказа '{order_name}' успешно создано!")
