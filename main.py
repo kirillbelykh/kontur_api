@@ -201,7 +201,8 @@ class App(ctk.CTk):
         super().__init__()
         
         # Настройка темы и внешнего вида
-        ctk.set_appearance_mode("dark")
+        self.current_theme = "dark"  # Добавляем атрибут для хранения текущей темы
+        ctk.set_appearance_mode(self.current_theme)
         ctk.set_default_color_theme("blue")
         repo_dir = os.path.abspath(os.path.dirname(__file__))
         update.check_for_updates(repo_dir=repo_dir, pre_update_cleanup=self.cleanup_before_update, auto_restart=True)
@@ -263,11 +264,23 @@ class App(ctk.CTk):
         self.header_frame.pack(fill="x", pady=(0, 20))
         self.header_frame.pack_propagate(False)
         
+        # Заголовок приложения слева
         ctk.CTkLabel(
             self.header_frame, 
             text="Kontur Marking System", 
-            font=self.fonts["title"]  # Используем кастомный шрифт
+            font=self.fonts["title"]
         ).pack(side="left", padx=25, pady=20)
+        
+        # Кнопка смены темы справа
+        self.theme_button = ctk.CTkButton(
+            self.header_frame,
+            text="🌙" if self.current_theme == "dark" else "☀️",
+            command=self.toggle_theme,
+            width=50,
+            height=35,
+            font=self.fonts["button"]
+        )
+        self.theme_button.pack(side="right", padx=25, pady=20)
         
         # Tabview
         self.tabview = ctk.CTkTabview(self.main_container)
@@ -288,6 +301,23 @@ class App(ctk.CTk):
             font=self.fonts["small"]
         )
         self.status_bar.pack(fill="x", pady=(10, 0))
+
+    def toggle_theme(self):
+        """Переключение между светлой и темной темой"""
+        if self.current_theme == "dark":
+            self.current_theme = "light"
+            self.theme_button.configure(text="☀️")
+        else:
+            self.current_theme = "dark"
+            self.theme_button.configure(text="🌙")
+        
+        ctk.set_appearance_mode(self.current_theme)
+        
+        # Обновляем статус бар с информацией о текущей теме
+        self.status_bar.configure(text=f"Тема изменена на {'светлую' if self.current_theme == 'light' else 'темную'}")
+        
+        # Через 2 секунды возвращаем обычный статус
+        self.after(2000, lambda: self.status_bar.configure(text="Готов к работе"))
 
     def cleanup_before_update(self):
         """Очистка ресурсов перед обновлением."""
