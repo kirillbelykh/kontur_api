@@ -234,6 +234,8 @@ class App(ctk.CTk):
         ctk.set_appearance_mode(self.current_theme)
         ctk.set_default_color_theme("blue")
         
+        repo_dir = os.path.abspath(os.path.dirname(__file__))
+        update.check_for_updates(repo_dir=repo_dir, pre_update_cleanup=self.cleanup_before_update, auto_restart=True)
         # Настройка окна
         self.title("Kontur Marking System")
         self.attributes('-fullscreen', True)
