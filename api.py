@@ -1,8 +1,6 @@
 import os
-import json
 import socket
 import time
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -11,16 +9,16 @@ from dotenv import load_dotenv
 from logger import logger
 from cryptopro import find_certificate_by_thumbprint, sign_data
 
+from history_db import OrderHistoryDB
 
 
 # ------------------- Инициализация окружения -------------------
 load_dotenv()
-
+history_db = OrderHistoryDB()
 
 # ------------------- Константы конфигурации -------------------
 BASE: str = os.getenv("BASE_URL", "")
 ORGANIZATION_ID: str = os.getenv("ORGANIZATION_ID", "")
-OMS_ID: str = os.getenv("OMS_ID", "")
 WAREHOUSE_ID: str = os.getenv("WAREHOUSE_ID", "")
 PRODUCT_GROUP: str = os.getenv("PRODUCT_GROUP", "")
 RELEASE_METHOD_TYPE: str = os.getenv("RELEASE_METHOD_TYPE", "")
@@ -28,17 +26,10 @@ CIS_TYPE: str = os.getenv("CIS_TYPE", "")
 FILLING_METHOD: str = os.getenv("FILLING_METHOD", "")
 
 
-# ------------------- Пути к отладочным JSON-файлам -------------------
-DEBUG_DIR = Path(__file__).resolve().parent
-LAST_SINGLE_REQ = DEBUG_DIR / "last_single_request.json"
-LAST_SINGLE_RESP = DEBUG_DIR / "last_single_response.json"
-LAST_MULTI_LOG = DEBUG_DIR / "last_multistep_log.json"
-
-# ---------------- API flows ----------------
 def codes_order(session: requests.Session, document_number: str,
-                    product_group: str, release_method_type: str,
-                    positions: list[dict],
-                    filling_method: str = "productsCatalog", thumbprint: str | None = None) -> dict | None:
+                product_group: str, release_method_type: str,
+                positions: list[dict],
+                filling_method: str = FILLING_METHOD, thumbprint: str | None = None) -> dict | None:
 
     signed_orders_payload: list[dict] = []
 
@@ -122,7 +113,7 @@ def codes_order(session: requests.Session, document_number: str,
         b64content = o["base64Content"]
         logger.info(f"Подписываем order id={oid} (base64Content length={len(b64content)})")
         try:
-            signature_b64 = sign_data(cert, b64content, b_detached=True)  # detached для orders
+            signature_b64 = sign_data(cert, b64content, b_detached=True)
             signed_orders_payload.append({"id": oid, "base64Content": signature_b64})
         except Exception as e:
             logger.error(f"Ошибка подписи order {oid}: {e}")
@@ -145,7 +136,34 @@ def codes_order(session: requests.Session, document_number: str,
         r_fin.raise_for_status()
         doc = r_fin.json()
         logger.info(f"Финальный статус документа: {doc.get('status')}")
+        
+        # СОХРАНЕНИЕ В ИСТОРИЮ ПРИ УСПЕШНОМ ВЫПОЛНЕНИИ
+        try:
+            # Извлекаем данные для истории
+            product_name = positions[0].get("name", "Неизвестно") if positions else "Неизвестно"
+            gtin = positions[0].get("gtin", "") if positions else ""
+            
+            # Создаем запись для истории
+            history_entry = {
+                "order_name": document_number,
+                "document_id": document_id,
+                "status": "Выполнен",  # или другой статус, который вы используете
+                "filename": None,  # заполнится при скачивании
+                "simpl": product_group,
+                "full_name": product_name,
+                "gtin": gtin,
+                "positions": positions
+            }
+            
+            # Сохраняем в историю
+            self.history_db.add_order(history_entry)
+            logger.info(f"✅ Заказ {document_number} сохранен в историю")
+            
+        except Exception as history_error:
+            logger.error(f"❌ Ошибка сохранения в историю: {history_error}")
+        
         return doc
+        
     except Exception as e:
         logger.error(f"Получение финального статуса: {e}")
         return None
@@ -814,3 +832,58 @@ def make_task_on_tsd(
         logger.error(error_msg)
         result["errors"].append(error_msg)
         return False, result
+    
+def mark_order_as_tsd_created(document_id: str, intro_number: str = ""):
+    """
+    Помечает заказ как обработанный (задание на ТСД создано)
+    """
+    try:
+        history_db.mark_tsd_created(document_id, intro_number)
+        logger.info(f"✅ Заказ {document_id} помечен как обработанный для ТСД")
+    except Exception as e:
+        logger.error(f"❌ Ошибка обновления истории: {e}")
+
+def save_codes_order_to_history(order_data: Dict[str, Any], result: Dict[str, Any], success: bool):
+    """
+    Сохраняет данные о выполненном заказе кодов в историю
+    """
+    try:
+        # Получаем document_id из результата
+        document_id = None
+        if success and isinstance(result, dict):
+            document_id = result.get("documentId") or result.get("id")
+        
+        # Формируем данные для сохранения
+        history_entry = {
+            "order_name": order_data.get("document_number", "Unknown"),
+            "document_id": document_id,
+            "status": "Выполнен" if success else "Ошибка",
+            "filename": None,
+            "simpl": order_data.get("product_group", ""),
+            "full_name": _get_product_name_from_order_data(order_data),
+            "gtin": _get_gtin_from_order_data(order_data),
+            "positions": order_data.get("positions", [])
+        }
+        
+        if success:
+            history_db.add_order(history_entry)
+            logger.info(f"✅ Заказ {order_data.get('document_number', 'Unknown')} сохранен в историю")
+        else:
+            logger.warning(f"⚠️ Заказ не сохранен в историю из-за ошибки")
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка сохранения истории заказов кодов: {e}")
+
+def _get_product_name_from_order_data(order_data: Dict[str, Any]) -> str:
+    """Извлекает название товара из данных заказа"""
+    positions = order_data.get("positions", [])
+    if positions and len(positions) > 0:
+        return positions[0].get("name", "Неизвестно")
+    return "Неизвестно"
+
+def _get_gtin_from_order_data(order_data: Dict[str, Any]) -> str:
+    """Извлекает GTIN из данных заказа"""
+    positions = order_data.get("positions", [])
+    if positions and len(positions) > 0:
+        return positions[0].get("gtin", "")
+    return ""

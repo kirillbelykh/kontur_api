@@ -14,6 +14,7 @@ from api import codes_order, download_codes, make_task_on_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 from get_thumb import get_thumbprint
+from history_db import OrderHistoryDB
 import update
 import customtkinter as ctk
 import tkinter as tk
@@ -80,7 +81,6 @@ class SessionManager:
                 name="SessionUpdater"
             )
             cls._update_thread.start()
-            print("✅ Фоновое обновление cookies запущено")
 
     @classmethod
     def _background_update_worker(cls):
@@ -213,6 +213,14 @@ class App(ctk.CTk):
         self.df = df
         self.collected: List[OrderItem] = []
         self.download_list: List[dict] = []
+
+        # TSD status check
+        self.sent_to_tsd_items = set()
+
+        # ИСТОРИЯ ЗАКАЗОВ
+        self.history_db = OrderHistoryDB()
+        self._load_history_to_download_list()
+
         
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
         SessionManager.initialize()
@@ -234,8 +242,6 @@ class App(ctk.CTk):
         self.intro_number_entry: ctk.CTkEntry | None = None
         self.batch_entry: ctk.CTkEntry | None = None
 
-        # TSD status check
-        self.sent_to_tsd_items = set()
     
     def cleanup_before_update(self):
         """Очистка ресурсов перед обновлением."""
@@ -247,9 +253,45 @@ class App(ctk.CTk):
             self.execute_all_executor.shutdown(wait=False)
             self.intro_executor.shutdown(wait=False)
             self.intro_tsd_executor.shutdown(wait=False)
-            print("✅ Потоки остановлены перед обновлением.")
         except Exception as e:
-            print(f"⚠️ Ошибка при очистке перед обновлением: {e}")
+            logger.error(f"⚠️ Ошибка при очистке перед обновлением: {e}")
+
+    def _load_history_to_download_list(self):
+        """Загружает заказы без заданий на ТСД из истории в download_list"""
+        try:
+            history_orders = self.history_db.get_orders_without_tsd()
+
+            existing_ids = {item.get("document_id") for item in self.download_list}
+
+            loaded_count = 0
+            for order in history_orders:
+                if order.get("document_id") not in existing_ids:
+                    # Приводим к формату download_list с флагом from_history
+                    download_item = {
+                        "order_name": order.get("order_name"),
+                        "document_id": order.get("document_id"),
+                        "status": "Из истории",  # Специальный статус для заказов из истории
+                        "filename": order.get("filename"),
+                        "simpl": order.get("simpl"),
+                        "full_name": order.get("full_name"),
+                        "gtin": order.get("gtin"),
+                        "history_entry": order,
+                        "from_history": True,  # Флаг, что это заказ из истории
+                        "downloading": False   # Не скачиваем автоматически
+                    }
+                    self.download_list.append(download_item)
+                    loaded_count += 1
+                    print(f"📥 Загружен заказ из истории: {order.get('order_name')} (GTIN: {order.get('gtin')})")
+
+            if hasattr(self, 'tsd_tree'):
+                self.update_tsd_tree()
+                
+            print(f"📚 Всего загружено {loaded_count} заказов из истории (автоскачивание отключено)")
+            
+        except Exception as e:
+            logger.error(f"Ошибка загрузки истории: {e}")
+            print(f"❌ Ошибка загрузки истории в download_list: {e}")
+
 
     def _setup_fonts(self):
         """Настройка системы шрифтов"""
@@ -274,8 +316,6 @@ class App(ctk.CTk):
             if font_name in available_fonts:
                 self.font_family = font_name
                 break
-        
-        print(f"Используется шрифт: {self.font_family}")
         
         # Создаем систему шрифтов
         self.fonts = {
@@ -307,7 +347,7 @@ class App(ctk.CTk):
             # или через конфигурацию отдельных виджетов
             
         except Exception as e:
-            print(f"Ошибка при установке шрифтов: {e}")
+            logger.error(f"Ошибка при установке шрифтов: {e}")
             
     def _setup_ui(self):
         """Настройка основного интерфейса с использованием кастомных шрифтов"""
@@ -939,19 +979,27 @@ class App(ctk.CTk):
             try:
                 # Парсим document_id из сообщения
                 document_id = msg.split("id: ")[1].strip()
-                self.download_list.append({
-                    'order_name': order_item.order_name,
+                
+                download_item = {
+                    'order_name': order_item.order_name, 
                     'document_id': document_id,
                     'status': 'Ожидает',
                     'filename': None,
                     'simpl': order_item.simpl_name,
                     'full_name': order_item.full_name
-                })
+                }
+                self.download_list.append(download_item)
+
+                #Сохраняем в историю
+                history_item = download_item.copy()
+                history_item['gtin'] = order_item.gtin
+                self.history_db.add_order(history_item)
+
                 self.update_download_tree()
             except Exception as e:
-                self.log_insert(f"⚠️ Не удалось извлечь document_id из: {msg} - {e}")
+                self.log_insert(f"Не удалось извлечь document_id из: {msg} - {e}")
         else:
-            self.log_insert(f"❌ Ошибка: {order_item.simpl_name} | заявка '{order_item.order_name}' => {msg}")
+            self.log_insert(f"Ошибка: {order_item.simpl_name} | Заявка {order_item.order_name} => {msg}")
 
     def _on_all_execute_finished(self, success_count, fail_count, results):
         """Обработчик завершения всех задач"""
@@ -981,7 +1029,7 @@ class App(ctk.CTk):
             # self.order_entry.delete(0, "end")
                 
         except Exception as e:
-            print(f"Ошибка при сбросе полей ввода: {e}")
+            logger.error(f"Ошибка при сбросе полей ввода: {e}")
 
     
 
@@ -993,7 +1041,7 @@ class App(ctk.CTk):
             self.log_text.see("end")  # Автопрокрутка к новому сообщению
             self.log_text.configure(state="disabled")
         except Exception as e:
-            print(f"Ошибка при записи в лог: {e}")
+            logger.error(f"Ошибка при записи в лог: {e}")
 
     def _show_log_context_menu(self, event):
         """Показывает контекстное меню для текстового поля лога"""
@@ -1043,7 +1091,7 @@ class App(ctk.CTk):
 
 
     def start_auto_status_check(self):
-        """Запускает автоматическую проверку статусов заказов"""
+        """Запускает автоматическую проверку статусов заказов (только для новых заказов, не из истории)"""
         if self.auto_download_active:
             return
             
@@ -1053,15 +1101,18 @@ class App(ctk.CTk):
         def status_check_worker():
             while self.auto_download_active:
                 try:
-                    # Проверяем каждые 10 секунд (увеличили для снижения нагрузки на API)
+                    # Проверяем каждые 10 секунд
                     time.sleep(10)
                     
-                    # Получаем заказы, которые ожидают скачивания
+                    # Получаем заказы, которые ожидают скачивания и НЕ являются заказами из истории
                     pending_orders = [item for item in self.download_list 
-                                    if item['status'] not in ['Скачивается', 'Скачан', 'Ошибка генерации']]
+                                    if item['status'] not in ['Скачивается', 'Скачан', 'Ошибка генерации', 'Из истории']
+                                    and not item.get('from_history', False)]  # Исключаем заказы из истории
+                    
                     if not pending_orders:
                         continue
                     
+                    self.download_log_insert(f"🔍 Проверка статусов для {len(pending_orders)} заказов (исключая историю)")
                     
                     # Проверяем статусы и запускаем скачивание для готовых
                     for item in pending_orders:
@@ -1156,7 +1207,7 @@ class App(ctk.CTk):
             # Принудительно обновляем интерфейс
             self.update_idletasks()
         except Exception as e:
-            print(f"Ошибка обновления статуса: {e}")
+            logger.error(f"Ошибка обновления статуса: {e}")
 
     def _finish_download(self, item, filename):
         """Завершает скачивание"""
@@ -1168,7 +1219,7 @@ class App(ctk.CTk):
             # Принудительно обновляем интерфейс
             self.update_idletasks()
         except Exception as e:
-            print(f"Ошибка завершения скачивания: {e}")
+            logger.error(f"Ошибка завершения скачивания: {e}")
 
 
     def _add_to_download_list(self, order_item, document_id):
@@ -1191,17 +1242,104 @@ class App(ctk.CTk):
         self.download_log_insert(f"📝 Добавлен в очередь скачивания: {order_item.order_name}")
 
     def update_download_tree(self):
-        """Обновляет таблицу скачиваний"""
-        for item in self.download_tree.get_children():
-            self.download_tree.delete(item)
-            
+        """Обновляет дерево заказов для скачивания"""
+        # Очищаем дерево
+        for i in self.download_tree.get_children():
+            self.download_tree.delete(i)
+        
+        # Добавляем записи из download_list
         for item in self.download_list:
-            self.download_tree.insert("", "end", values=(
-                item['order_name'],
-                item['status'],
-                item['filename'] or "-",
-                item['document_id']
-            ))
+            status = item.get("status", "Неизвестно")
+            
+            # Добавляем иконку для заказов из истории
+            if item.get('from_history'):
+                status = "📜 " + status  # Добавляем иконку истории
+            
+            vals = (
+                item.get("order_name"), 
+                item.get("document_id"), 
+                status, 
+                item.get("filename") or ""
+            )
+            self.download_tree.insert("", "end", values=vals)
+
+    def download_history_order_manual(self, history_tree_or_document_id):
+        """Ручное скачивание заказа из истории"""
+        try:
+            # Определяем тип аргумента
+            if isinstance(history_tree_or_document_id, str):
+                # Если передан document_id
+                document_id = history_tree_or_document_id
+            else:
+                # Если передан history_tree
+                history_tree = history_tree_or_document_id
+                selected_items = history_tree.selection()
+                if not selected_items:
+                    tk.messagebox.showwarning("Выбор заказа", "Выберите заказ для ручного скачивания")
+                    return
+                
+                if len(selected_items) > 1:
+                    tk.messagebox.showwarning("Выбор заказа", "Выберите только один заказ для скачивания")
+                    return
+                
+                item = selected_items[0]
+                item_values = history_tree.item(item, 'values')
+                document_id = item_values[1]
+            
+            # Дальше общая логика
+            order_data = self.history_db.get_order_by_document_id(document_id)
+            if not order_data:
+                tk.messagebox.showerror("Ошибка", f"Заказ не найден в истории")
+                return
+            
+            # Проверяем, не добавлен ли уже заказ в download_list
+            existing_order = None
+            for item in self.download_list:
+                if item.get("document_id") == document_id:
+                    existing_order = item
+                    break
+            
+            if not existing_order:
+                # Добавляем в download_list
+                self.download_list.append({
+                    "order_name": order_data.get("order_name"),
+                    "document_id": document_id,
+                    "status": "Из истории",
+                    "filename": order_data.get("filename"),
+                    "simpl": order_data.get("simpl"),
+                    "full_name": order_data.get("full_name"),
+                    "gtin": order_data.get("gtin"),
+                    "from_history": True,
+                    "downloading": False
+                })
+                existing_order = self.download_list[-1]
+            
+            # Проверяем, не скачивается ли уже
+            if existing_order.get('downloading'):
+                self.download_log_insert(f"⚠️ Заказ {existing_order.get('order_name')} уже скачивается")
+                return
+            
+            # Меняем статус и запускаем скачивание
+            existing_order['status'] = 'Скачивается'
+            existing_order['downloading'] = True
+            self.update_download_tree()
+            
+            order_name = existing_order.get('order_name', 'Unknown')
+            self.download_log_insert(f"🔄 Ручное скачивание заказа из истории: {order_name}")
+            
+            # Запускаем скачивание
+            self.download_executor.submit(self._download_order, existing_order)
+            
+            # Если это вызов из диалога истории, закрываем его
+            if not isinstance(history_tree_or_document_id, str):
+                history_window = history_tree_or_document_id.winfo_toplevel()
+                history_window.destroy()
+                self.tabview.set("📥 Скачивание кодов")
+            
+        except Exception as e:
+            error_msg = f"❌ Ошибка ручного скачивания заказа из истории: {e}"
+            self.download_log_insert(error_msg)
+            tk.messagebox.showerror("Ошибка", error_msg)
 
     def download_log_insert(self, msg: str):
         """Добавляет сообщение в лог скачиваний"""
@@ -1327,16 +1465,234 @@ class App(ctk.CTk):
             self.update_introduction_tree()
             
             # Подтверждаем успешную инициализацию
-            print("✅ Таб ввода в оборот успешно инициализирован")
+            logger.info("✅ Таб ввода в оборот успешно инициализирован")
             
         except Exception as e:
-            print(f"❌ Ошибка при создании таба ввода в оборот: {e}")
+            logger.error(f"❌ Ошибка при создании таба ввода в оборот: {e}")
             import traceback
             traceback.print_exc()
 
+    def show_order_history(self):
+        """Показывает диалог с историей всех заказов"""
+        history_window = ctk.CTkToplevel(self)
+        history_window.title("📚История заказов")
+        history_window.geometry("1000x600")
+        history_window.transient(self)
+        history_window.grab_set()
+
+        main_frame = ctk.CTkFrame(history_window)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        ctk.CTkLabel(
+            main_frame,
+            text="История всех заказов",
+            font = ctk.CTkFont(size=16, weight="bold")
+        ).pack(pady=(0, 10))
+
+        filter_frame = ctk.CTkFrame(main_frame)
+        filter_frame.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(filter_frame, text="Фильтры:").pack(side="left", padx=5)
+
+        filter_var = ctk.StringVar(value="all")
+
+        ctk.CTkRadioButton(
+            filter_frame,
+            text="Все заказы",
+            variable=filter_var,
+            value="all",
+            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+        ).pack(side="left", padx=10)
+
+        ctk.CTkRadioButton(
+            filter_frame,
+            text="Не отправлено",
+            variable=filter_var,
+            value="without_tsd",
+            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+        ).pack(side="left", padx=10)
+
+        ctk.CTkRadioButton(
+            filter_frame,
+            text="Отправлено",
+            variable=filter_var,
+            value="with_tsd",
+            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+        ).pack(side="left", padx=10)
+
+        table_frame = ctk.CTkFrame(main_frame)
+        table_frame.pack(fill="both", expand=True, pady=(0, 10))
+
+        colums = ("order_name", "document_id", "status", "tsd_status", "created_at")
+        history_tree = ttk.Treeview(table_frame, columns=colums, show="headings", height=15)
+
+        headers = {
+            "order_name": "Заявка",
+            "document_id": "ID заказа",
+            "status": "Статус",
+            "tsd_status": "Статус отправки на ТСД",
+            "created_at": "Дата создания"
+        }
+
+        for col, text in headers.items():
+            history_tree.heading(col, text=text)
+            if col == "order_name":
+                history_tree.column(col, width=200)
+            elif col =="document_id":
+                history_tree.column(col, width=150)
+            elif col == "created_at": 
+                history_tree.column(col, width=150)
+            else:
+                history_tree.column(col, width=120)
+        
+        scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=history_tree.yview)
+        history_tree.configure(yscrollcommand=scrollbar.set)
+        history_tree.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        button_frame = ctk.CTkFrame(main_frame)
+        button_frame.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkButton(
+            button_frame,
+            text="🔄 Обновить",
+            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+        ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            button_frame,
+            text="📋 Добавить в ТСД",
+            command=lambda: self._add_history_to_tsd(history_tree, history_window),
+            fg_color="#E67E22",
+            hover_color="#D35400"
+        ).pack(side="left", padx=5)
+
+        # НОВАЯ КНОПКА: Ручное скачивание
+        ctk.CTkButton(
+            button_frame,
+            text="📥 Скачать вручную",
+            command=lambda: self.download_history_order_manual(history_tree),
+            fg_color="#27AE60",
+            hover_color="#219A52"
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkButton(
+            button_frame,
+            text="❌ Закрыть",
+            command=history_window.destroy
+        ).pack(side="right", padx=5)
+        
+        # Первоначальное заполнение таблицы
+        self._update_history_tree(history_tree, "all")
+
+    def _update_history_tree(self, history_tree, filter_type="all"):
+        """Обновляет дерево истории в диалоге согласно фильтру"""
+        # Очищаем дерево
+        for item in history_tree.get_children():
+            history_tree.delete(item)
+        
+        # Загружаем заказы из истории
+        if filter_type == "all":
+            history_orders = self.history_db.get_all_orders()
+        elif filter_type == "without_tsd":
+            history_orders = self.history_db.get_orders_without_tsd()
+        elif filter_type == "with_tsd":
+            history_orders = [order for order in self.history_db.get_all_orders() 
+                            if order.get("tsd_created")]
+        
+        # Заполняем дерево
+        for order in history_orders:
+            # Форматируем дату
+            created_at = order.get('created_at', '')
+            if created_at:
+                try:
+                    created_at = datetime.fromisoformat(created_at).strftime("%d.%m.%Y %H:%M")
+                except:
+                    created_at = created_at
+            
+            # Определяем статус ТСД
+            tsd_status = "✅ Отправлено" if order.get('tsd_created') else "⏳ Не отправлено"
+            
+            # Добавляем информацию о номере ТСД, если есть
+            if order.get('tsd_created') and order.get('tsd_intro_number'):
+                tsd_status += f" (№{order.get('tsd_intro_number')})"
+            
+            values = (
+                order.get('order_name', 'Неизвестно'),
+                order.get('document_id', 'Неизвестно'),
+                order.get('status', 'Неизвестно'),
+                tsd_status,
+                created_at
+            )
+            
+            history_tree.insert("", "end", values=values)
+
+    def _add_history_to_tsd(self, history_tree, history_window):
+        """Добавляет выбранные в истории заказы в download_list для ТСД"""
+        selected_items = history_tree.selection()
+        if not selected_items:
+            tk.messagebox.showwarning("Выбор заказов", "Выберите заказы для добавления в ТСД")
+            return
+        
+        # Получаем все заказы из истории для поиска по ID
+        all_orders = self.history_db.get_all_orders()
+        order_dict = {order['document_id']: order for order in all_orders}
+        
+        added_count = 0
+        skipped_count = 0
+        
+        for item in history_tree.selection():
+            item_values = history_tree.item(item, 'values')
+            document_id = item_values[1]  # document_id находится во второй колонке
+            
+            order_data = order_dict.get(document_id)
+            if not order_data:
+                continue
+            
+            # ПРОВЕРЯЕМ, НЕ ОТПРАВЛЕН ЛИ УЖЕ ЗАКАЗ НА ТСД
+            if order_data.get('tsd_created'):
+                skipped_count += 1
+                continue
+                
+            # Проверяем, не добавлен ли уже заказ в текущей сессии
+            if not any(item.get("document_id") == document_id for item in self.download_list):
+                self.download_list.append({
+                    "order_name": order_data.get("order_name"),
+                    "document_id": document_id,
+                    "status": "Из истории",  # Статус для заказов из истории
+                    "filename": order_data.get("filename"),
+                    "simpl": order_data.get("simpl"),
+                    "full_name": order_data.get("full_name"),
+                    "gtin": order_data.get("gtin"),
+                    "from_history": True,    # Флаг, что это заказ из истории
+                    "downloading": False     # Не скачиваем автоматически
+                })
+                added_count += 1
+        
+        # Обновляем таблицу ТСД и закрываем диалог
+        self.update_tsd_tree()
+        history_window.destroy()
+        
+        # Переключаемся на вкладку ТСД
+        self.tabview.set("📱 Ввод в оборот (ТСД)")
+        
+        # Показываем информативное сообщение
+        if added_count > 0:
+            message = f"Добавлено заказов: {added_count}"
+            if skipped_count > 0:
+                message += f"\nПропущено (уже отправлены): {skipped_count}"
+            tk.messagebox.showinfo("Добавление в ТСД", message)
+            
+            # Логируем в ТСД таб
+            self.tsd_log_insert(f"📋 Добавлено {added_count} заказов из истории")
+            if skipped_count > 0:
+                self.tsd_log_insert(f"⚠️ Пропущено {skipped_count} заказов (уже отправлены на ТСД)")
+        else:
+            tk.messagebox.showwarning("Добавление в ТСД", "Не удалось добавить заказы. Возможно, они уже были отправлены на ТСД.")
+
     def _show_error(self, message):
         """Вспомогательный метод для показа ошибок"""
-        print(f"❌ {message}")
+        logger.error(f"❌ {message}")
         # Если лог уже инициализирован, пишем туда
         if hasattr(self, 'intro_log_text'):
             try:
@@ -1496,7 +1852,7 @@ class App(ctk.CTk):
             self.intro_log_text.delete("1.0", "end")
             self.intro_log_text.configure(state="disabled")
         except Exception as e:
-            print(f"Ошибка очистки лога: {e}")
+            logger.error(f"Ошибка очистки лога: {e}")
 
     def intro_log_insert(self, text: str):
         """Удобная функция логирования в таб 'Ввод' (вызовы только из GUI-потока)."""
@@ -1509,7 +1865,7 @@ class App(ctk.CTk):
             self.intro_log_text.see("end")
             self.intro_log_text.configure(state="disabled")
         except Exception as e:
-            print(f"Ошибка записи в лог: {e}")
+            logger.error(f"Ошибка записи в лог: {e}")
 
     def update_introduction_tree(self):
         """Наполнить дерево заказами, у которых status == 'Скачан'"""
@@ -1675,6 +2031,15 @@ class App(ctk.CTk):
         
         self.tsd_refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Обновить", command=self.update_tsd_tree)
         self.tsd_refresh_btn.pack(side="left", padx=5)
+
+        self.history_btn = ctk.CTkButton(
+                btn_frame,
+                text="📚 История заказов",
+                command=self.show_order_history,
+                fg_color="#27AE60",
+                hover_color="#219A52"
+            )
+        self.history_btn.pack(side="left", padx=5)
         
         self.tsd_clear_btn = ctk.CTkButton(btn_frame, text="🧹 Очистить лог", command=self.clear_tsd_log)
         self.tsd_clear_btn.pack(side="left", padx=5)
@@ -1717,7 +2082,7 @@ class App(ctk.CTk):
         # Большое поле для лога - занимает всю правую часть
         self.tsd_log_text = ctk.CTkTextbox(right_frame, font=ctk.CTkFont(size=13))
         self.tsd_log_text.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 10))
-        self.tsd_log_text.configure(state="disabled")
+        self.tsd_log_text.configure()
         
         self.update_tsd_tree()
 
@@ -1740,7 +2105,7 @@ class App(ctk.CTk):
             self.tsd_log_text.see("end")
             
         except Exception as e:
-            print(f"Ошибка при очистке лога ТСД: {e}")
+            logger.error(f"Ошибка при очистке лога ТСД: {e}")
 
     def _configure_treeview_style(self):
         """Настройка стиля таблиц"""
@@ -1787,7 +2152,7 @@ class App(ctk.CTk):
         for item in self.download_list:
             document_id = item.get("document_id")
             # Показываем только если статус подходящий И заказ еще не отправлялся на ТСД
-            if (item.get("status") in ("Скачан", "Скачивается", "Downloaded", "Ожидает") or item.get("filename")) and document_id not in self.sent_to_tsd_items:
+            if (item.get("status") in ("Скачан", "Скачивается", "Downloaded", "Ожидает", "Из истории") or item.get("filename")) and document_id not in self.sent_to_tsd_items:
                 vals = (
                     item.get("order_name"), 
                     document_id, 
@@ -1798,48 +2163,78 @@ class App(ctk.CTk):
 
     def get_selected_tsd_items(self):
         """Возвращает список объектов download_list, соответствующих выбранным строкам в tsd_tree."""
-        sel = self.tsd_tree.selection()
-        selected = []
-        id_to_item = {it['document_id']: it for it in self.download_list}
-        for iid in sel:
-            docid = iid
-            it = id_to_item.get(docid)
-            if it:
-                selected.append(it)
-        return selected
-
+        try:
+            sel = self.tsd_tree.selection()
+            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Выбрано строк в дереве: {len(sel)}")
+            self.tsd_log_insert(f"🔍 get_selected_tsd_items: IDs выбранных строк: {sel}")
+            
+            selected = []
+            id_to_item = {it['document_id']: it for it in self.download_list}
+            
+            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Всего заказов в download_list: {len(self.download_list)}")
+            self.tsd_log_insert(f"🔍 get_selected_tsd_items: ID в download_list: {list(id_to_item.keys())}")
+            
+            for iid in sel:
+                docid = iid
+                it = id_to_item.get(docid)
+                if it:
+                    selected.append(it)
+                    self.tsd_log_insert(f"🔍 get_selected_tsd_items: Найден заказ для ID {docid}: {it.get('order_name', 'Unknown')}")
+                else:
+                    self.tsd_log_insert(f"❌ get_selected_tsd_items: Заказ с ID {docid} не найден в download_list!")
+            
+            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Итоговый список выбранных: {len(selected)} заказов")
+            return selected
+            
+        except Exception as e:
+            self.tsd_log_insert(f"❌ get_selected_tsd_items: Ошибка: {e}")
+            import traceback
+            self.tsd_log_insert(f"🔍 get_selected_tsd_items: Детали ошибки: {traceback.format_exc()}")
+            return []
+    def debug_download_list(self):
+        """Метод для отладки состояния download_list"""
+        try:
+            self.tsd_log_insert("=== ДИАГНОСТИКА DOWNLOAD_LIST ===")
+            self.tsd_log_insert(f"Всего заказов в download_list: {len(self.download_list)}")
+            
+            for i, item in enumerate(self.download_list):
+                self.tsd_log_insert(f"Заказ {i}: {item.get('order_name', 'Unknown')} | ID: {item.get('document_id', 'Unknown')} | Статус: {item.get('status', 'Unknown')}")
+                
+            self.tsd_log_insert("=== КОНЕЦ ДИАГНОСТИКИ ===")
+        except Exception as e:
+            self.tsd_log_insert(f"❌ Ошибка диагностики download_list: {e}")
+            
     def on_tsd_clicked(self):
         """Обработчик кнопки — собирает данные, запускает threads для выбранных заказов."""
         try:
-            self.tsd_log_insert("🔍 Начало обработки нажатия кнопки ТСД...")
+            self.tsd_log_insert("🔍 НАЧАЛО: Обработка нажатия кнопки ТСД")
             
             # Получаем выбранные элементы
             selected_items = self.get_selected_tsd_items()
-            self.tsd_log_insert(f"📋 Выбрано элементов: {len(selected_items)}")
+            self.tsd_log_insert(f"📋 Выбрано элементов в таблице ТСД: {len(selected_items)}")
             
             for item in selected_items:
                 self.tsd_log_insert(f"   - {item.get('order_name', 'Unknown')} (ID: {item.get('document_id', 'Unknown')})")
             
             if not selected_items:
-                self.tsd_log_insert("❌ Не выбрано ни одного заказа.")
+                self.tsd_log_insert("❌ ОШИБКА: Не выбрано ни одного заказа в таблице ТСД")
                 return
 
             # Получаем данные из полей ввода
-            intro_number = self.tsd_intro_number_entry.get().strip() # type: ignore
-            prod_date_raw = self.tsd_prod_date_entry.get().strip() # type: ignore
-            exp_date_raw = self.tsd_exp_date_entry.get().strip() # type: ignore
-            batch_num = self.tsd_batch_entry.get().strip() # type: ignore
+            intro_number = self.tsd_intro_number_entry.get().strip()
+            prod_date_raw = self.tsd_prod_date_entry.get().strip()
+            exp_date_raw = self.tsd_exp_date_entry.get().strip()
+            batch_num = self.tsd_batch_entry.get().strip()
             
-            
-            self.tsd_log_insert(f"📅 Получены данные из полей: into_num='{intro_number}', prod='{prod_date_raw}', exp='{exp_date_raw}', batch='{batch_num}'")
+            self.tsd_log_insert(f"📅 Данные из полей ввода: номер='{intro_number}', прод='{prod_date_raw}', эксп='{exp_date_raw}', партия='{batch_num}'")
 
             # Преобразуем даты
             try:
                 prod_date = self.convert_date_format(prod_date_raw)
                 exp_date = self.convert_date_format(exp_date_raw)
-                self.tsd_log_insert(f"📅 Преобразованные даты: prod='{prod_date}', exp='{exp_date}'")
+                self.tsd_log_insert(f"📅 Преобразованные даты: прод='{prod_date}', эксп='{exp_date}'")
             except Exception as e:
-                self.tsd_log_insert(f"❌ Ошибка преобразования дат: {e}")
+                self.tsd_log_insert(f"❌ ОШИБКА преобразования дат: {e}")
                 return
 
             # Валидация
@@ -1855,7 +2250,7 @@ class App(ctk.CTk):
 
             if errors:
                 for error in errors:
-                    self.tsd_log_insert(f"❌ {error}")
+                    self.tsd_log_insert(f"❌ ОШИБКА валидации: {error}")
                 return
 
             # Отключаем кнопку пока выполняется
@@ -1868,30 +2263,47 @@ class App(ctk.CTk):
             for it in selected_items:
                 try:
                     docid = it["document_id"]
-                    self.tsd_log_insert(f"Нашли doc_id для поиска gtin: {docid}")
+                    self.tsd_log_insert(f"🔍 Обработка заказа: ID={docid}")
+                    
+                    # ДЕТАЛЬНАЯ ИНФОРМАЦИЯ О ЗАКАЗЕ
+                    self.tsd_log_insert(f"   📝 Данные заказа: {it}")
+                    
                     simpl_name = it.get("simpl", "")
-                    full_name = it.get("full_name")
+                    full_name = it.get("full_name", "Неизвестно")
+                    self.tsd_log_insert(f"   🏷️ simpl='{simpl_name}', full_name='{full_name}'")
 
-                    
-                    self.tsd_log_insert(f"⏳ Подготовка заказа: {intro_number} (ID: {docid})")
-                    
                     # Получаем GTIN из исходных данных заказа
                     gtin = self._get_gtin_for_order(docid)
-                    self.tsd_log_insert(f"   GTIN: {gtin}")
+                    self.tsd_log_insert(f"   🔍 Поиск GTIN для document_id={docid}")
+                    self.tsd_log_insert(f"   📦 Найден GTIN: {gtin}")
                     
                     if not gtin:
-                        self.tsd_log_insert(f"⚠️ Не найден GTIN для заказа {intro_number}, пропускаем")
-                        continue
-                    
+                        self.tsd_log_insert(f"🔍 Основной метод не нашел GTIN, пробуем альтернативный...")
+                        gtin = self._extract_gtin_from_order_data(it)
+
+                    self.tsd_log_insert(f"   📦 Итоговый GTIN: {gtin}")
+
+                    if not gtin:
+                        self.tsd_log_insert(f"⚠️ Не найден GTIN для заказа {docid}, пропускаем")
+                        
+                        # ДОБАВИМ ДИАГНОСТИКУ ДАННЫХ ЗАКАЗА
+                        self.tsd_log_insert(f"🔍 ДИАГНОСТИКА ДАННЫХ ЗАКАЗА:")
+                        self.tsd_log_insert(f"   - order_name: {it.get('order_name')}")
+                        self.tsd_log_insert(f"   - document_id: {it.get('document_id')}")
+                        self.tsd_log_insert(f"   - simpl: {it.get('simpl')}")
+                        self.tsd_log_insert(f"   - full_name: {it.get('full_name')}")
+                        self.tsd_log_insert(f"   - history_entry: {bool(it.get('history_entry'))}")
+
                     # Получаем TNVED код
                     tnved_code = get_tnved_code(simpl_name)
-                    self.tsd_log_insert(f"   TNVED: {tnved_code}")
+                    self.tsd_log_insert(f"   📋 TNVED код: {tnved_code}")
                     
                     # Формируем данные позиций
                     positions_data = [{
                         "name": full_name, 
                         "gtin": f"0{gtin}"
                     }]
+                    self.tsd_log_insert(f"   📦 Данные позиций: {positions_data}")
                     
                     # Формируем production_patch
                     production_patch = {
@@ -1902,152 +2314,292 @@ class App(ctk.CTk):
                         "TnvedCode": tnved_code
                     }
                     
-                    self.tsd_log_insert(f"📦 Данные для API: {production_patch}")
+                    self.tsd_log_insert(f"   🏭 Production patch: {production_patch}")
                     
                     # Запускаем задачу
+                    self.tsd_log_insert("   🔄 Получение сессии...")
                     session = SessionManager.get_session()
+                    self.tsd_log_insert("   🚀 Запуск фоновой задачи _tsd_worker...")
+                    
                     fut = self.intro_tsd_executor.submit(self._tsd_worker, it, positions_data, production_patch, session)
                     futures.append((fut, it))
-                    self.tsd_log_insert(f"✅ Задача для {intro_number} добавлена в очередь")
+                    self.tsd_log_insert(f"   ✅ Задача для заказа {docid} добавлена в очередь ThreadPoolExecutor")
                     
                 except Exception as e:
-                    self.tsd_log_insert(f"❌ Ошибка при подготовке заказа {it.get('order_name', 'Unknown')}: {e}")
+                    self.tsd_log_insert(f"❌ КРИТИЧЕСКАЯ ОШИБКА при подготовке заказа {it.get('order_name', 'Unknown')}: {e}")
                     import traceback
-                    self.tsd_log_insert(f"🔍 Детали: {traceback.format_exc()}")
+                    self.tsd_log_insert(f"🔍 Детали ошибки: {traceback.format_exc()}")
 
             if not futures:
-                self.tsd_log_insert("❌ Нет задач для выполнения")
+                self.tsd_log_insert("❌ ОШИБКА: Нет задач для выполнения после подготовки")
                 self.tsd_btn.configure(state="normal")
                 return
+
+            self.tsd_log_insert(f"📊 Успешно подготовлено задач: {len(futures)}")
 
             # Создаём нитку-отслеживатель
             def tsd_monitor():
                 try:
-                    self.tsd_log_insert("👀 Мониторинг запущен...")
+                    self.tsd_log_insert("👀 МОНИТОРИНГ: Запуск отслеживания выполнения задач...")
                     completed = 0
-                    for fut, it in futures:
+                    total = len(futures)
+                    
+                    for i, (fut, it) in enumerate(futures):
                         try:
-                            self.tsd_log_insert(f"⏳ Ожидание завершения задачи {completed + 1}/{len(futures)}...")
-                            ok, result = fut.result(timeout=15)
+                            docid = it.get("document_id", "Unknown")
+                            self.tsd_log_insert(f"⏳ МОНИТОРИНГ: Ожидание задачи {i+1}/{total} (ID: {docid})...")
+                            
+                            # Увеличиваем таймаут для отладки
+                            ok, result = fut.result(timeout=300)  # 5 минут вместо 15 секунд
                             
                             # Формируем сообщение
                             if ok:
                                 intro_id = result.get('introduction_id', 'unknown')
                                 msg = f"Успех: introduction_id = {intro_id}"
+                                self.tsd_log_insert(f"✅ МОНИТОРИНГ: Задача {i+1}/{total} УСПЕШНА: {msg}")
                             else:
                                 errors = result.get('errors', ['unknown error'])
                                 msg = f"Ошибка: {'; '.join(errors)}"
+                                self.tsd_log_insert(f"❌ МОНИТОРИНГ: Задача {i+1}/{total} ОШИБКА: {msg}")
                             
                             self.after(0, self._on_tsd_finished, it, ok, msg)
                             completed += 1
-                            self.tsd_log_insert(f"✅ Задача {completed}/{len(futures)} завершена: {'УСПЕХ' if ok else 'ОШИБКА'}")
                             
                         except Exception as e:
                             error_msg = f"Исключение при выполнении задачи: {e}"
+                            self.tsd_log_insert(f"❌ МОНИТОРИНГ: Исключение в задаче {i+1}/{total}: {error_msg}")
+                            import traceback
+                            self.tsd_log_insert(f"🔍 Детали исключения: {traceback.format_exc()}")
+                            
                             self.after(0, self._on_tsd_finished, it, False, error_msg)
                             completed += 1
-                            self.tsd_log_insert(f"❌ Задача {completed}/{len(futures)} завершена с ошибкой: {e}")
-                            import traceback
-                            self.tsd_log_insert(f"🔍 Детали ошибки: {traceback.format_exc()}")
                     
-                    self.tsd_log_insert(f"🎉 Все задачи завершены ({completed}/{len(futures)})")
+                    self.tsd_log_insert(f"🎉 МОНИТОРИНГ: Все задачи завершены ({completed}/{total})")
                     
                 except Exception as e:
-                    self.tsd_log_insert(f"💥 Критическая ошибка в мониторе: {e}")
+                    self.tsd_log_insert(f"💥 КРИТИЧЕСКАЯ ОШИБКА в мониторе: {e}")
                     import traceback
-                    self.tsd_log_insert(f"🔍 Детали: {traceback.format_exc()}")
+                    self.tsd_log_insert(f"🔍 Детали критической ошибки: {traceback.format_exc()}")
                 finally:
                     # Всегда разблокируем кнопку
                     self.after(0, lambda: self.tsd_btn.configure(state="normal"))
-                    self.after(0, lambda: self.tsd_log_insert("🔓 Кнопка разблокирована"))
+                    self.after(0, lambda: self.tsd_log_insert("🔓 Кнопка ТСД разблокирована"))
 
             # Запускаем мониторинг в отдельном потоке
+            self.tsd_log_insert("🚀 Запуск потока мониторинга...")
             monitor_thread = threading.Thread(target=tsd_monitor, daemon=True)
             monitor_thread.start()
-            self.tsd_log_insert("📊 Мониторинг задач запущен в фоне")
+            self.tsd_log_insert("📊 Мониторинг задач запущен в фоновом потоке")
 
         except Exception as e:
-            self.tsd_log_insert(f"💥 Критическая ошибка в on_tsd_clicked: {e}")
+            self.tsd_log_insert(f"💥 КРИТИЧЕСКАЯ ОШИБКА в on_tsd_clicked: {e}")
             import traceback
-            self.tsd_log_insert(f"🔍 Детали: {traceback.format_exc()}")
+            self.tsd_log_insert(f"🔍 Детали критической ошибки: {traceback.format_exc()}")
             self.tsd_btn.configure(state="normal")
 
     def _tsd_worker(self, item: dict, positions_data: List[Dict[str, str]], production_patch: dict, session) -> Tuple[bool, Dict[str, Any]]:
         """
         Фоновая задача — производит ввод в оборот для одного заказа item.
-        Возвращает (ok, result: dict).
         """
         try:
-            self.tsd_log_insert(f"🔧 Начало работы _tsd_worker для {item.get('order_name', 'Unknown')}")
-
             document_id = item["document_id"]
-            self.tsd_log_insert(f"📄 Document ID: {document_id}")
+            order_name = item.get('order_name', 'Unknown')
+            
+            self.tsd_log_insert(f"🔧 _tsd_worker: НАЧАЛО работы для заказа '{order_name}' (ID: {document_id})")
 
             # ВЫЗОВ API
             try:
-                self.tsd_log_insert("📡 Вызов API make_task_on_tsd...")
+                self.tsd_log_insert(f"📡 _tsd_worker: Вызов API make_task_on_tsd для {document_id}")
                 
                 ok, result = make_task_on_tsd(
                     session=session,
                     codes_order_id=document_id,
                     positions_data=positions_data,
-                    production_patch=production_patch,
+                    production_patch=production_patch
                 )
-                self.tsd_log_insert(f"📡 Результат API: {'УСПЕХ' if ok else 'ОШИБКА'}")
+                
+                self.tsd_log_insert(f"📡 _tsd_worker: Результат API для {document_id}: {'УСПЕХ' if ok else 'ОШИБКА'}")
+                
+                if ok:
+                    intro_id = result.get('introduction_id', 'unknown')
+                    self.tsd_log_insert(f"✅ _tsd_worker: УСПЕХ - introduction_id = {intro_id}")
+                    
+                    # ПОМЕЧАЕМ ЗАКАЗ КАК ОБРАБОТАННЫЙ В ИСТОРИИ
+                    from api import mark_order_as_tsd_created
+                    mark_order_as_tsd_created(document_id, intro_id)
+                else:
+                    errors = result.get('errors', [])
+                    self.tsd_log_insert(f"❌ _tsd_worker: ОШИБКА - {errors}")
+                
                 return ok, result
                 
             except Exception as e:
                 error_msg = f"Ошибка при вызове API: {e}"
-                self.tsd_log_insert(f"❌ {error_msg}")
+                self.tsd_log_insert(f"❌ _tsd_worker: Исключение при вызове API: {error_msg}")
                 import traceback
-                self.tsd_log_insert(f"🔍 Детали API ошибки: {traceback.format_exc()}")
+                self.tsd_log_insert(f"🔍 _tsd_worker: Детали исключения API: {traceback.format_exc()}")
                 return False, {"errors": [error_msg]}
                 
         except Exception as e:
             error_msg = f"Общая ошибка в _tsd_worker: {e}"
-            self.tsd_log_insert(f"❌ {error_msg}")
+            self.tsd_log_insert(f"❌ _tsd_worker: Общая ошибка: {error_msg}")
             import traceback
-            self.tsd_log_insert(f"🔍 Детали общей ошибки: {traceback.format_exc()}")
+            self.tsd_log_insert(f"🔍 _tsd_worker: Детали общей ошибки: {traceback.format_exc()}")
             return False, {"errors": [error_msg]}
 
+
+    def clear_tsd_form(self):
+        """Очищает поля формы ТСД после успешной отправки"""
+        try:
+            self.tsd_intro_number_entry.delete(0, 'end')
+            self.tsd_batch_entry.delete(0, 'end')
+            # Даты можно не очищать, так как они часто повторяются
+        except Exception as e:
+            logger.error(f"Ошибка при очистке формы ТСД: {e}")
+
+
+    # И добавим вызов в _on_tsd_finished при успехе:
     def _on_tsd_finished(self, item: dict, ok: bool, msg: str):
         """Обновление GUI после завершения одного задания (в главном потоке)."""
         docid = item.get("document_id")
-        if ok:
-            self.tsd_log_insert(f"[OK] {docid} — {msg}")
-            # Добавляем в множество отправленных заказов
-            self.sent_to_tsd_items.add(docid)
-            # пометим заказ как введённый
-            item["status"] = "Отправлено на ТСД"
-        else:
-            self.tsd_log_insert(f"[ERR] {docid} — {msg}")
-            item["status"] = "Ошибка ТСД"
-            # Не добавляем в sent_to_tsd_items при ошибке
-
-        # обновить таблицы
-        self.update_tsd_tree()
+        order_name = item.get("order_name", "Unknown")
         
-    def _get_gtin_for_order(self, document_id: str) -> str:
-        """Получает GTIN для заказа по document_id"""
-        try:
-            # Ищем в download_list по связанным данным
-            for dl_item in self.download_list:
-                if dl_item.get('document_id') == document_id:
-                    order_name = dl_item.get('order_name', '')
-                    self.tsd_log_insert(f"🔍 Поиск в collected по order_name: {order_name}")
-                    
-                    # Ищем в collected по order_name
-                    for collected_item in self.collected:
-                        if getattr(collected_item, 'order_name', '') == order_name:
-                            gtin = getattr(collected_item, 'gtin', '')
-                            self.tsd_log_insert(f"✅ Найден GTIN по order_name: {gtin}")
-                            return gtin
+        if ok:
+            self.tsd_log_insert(f"🎉 [УСПЕХ] {order_name} (ID: {docid}) — {msg}")
+            self.sent_to_tsd_items.add(docid)
+            item["status"] = "Отправлено на ТСД"
+            self.show_info(f"Задание на ТСД для заказа '{order_name}' успешно создано!")
             
-            self.tsd_log_insert("❌ GTIN не найден")
-            return ""
+            # ВАЖНО: ДОБАВЛЯЕМ ПОМЕТКУ В ИСТОРИЮ
+            try:
+                # Извлекаем introduction_id из сообщения (пример: "Успех: introduction_id = 12345")
+                if "introduction_id =" in msg:
+                    intro_id = msg.split("introduction_id =")[1].strip()
+                    self.history_db.mark_tsd_created(docid, intro_id)
+                    self.tsd_log_insert(f"✅ Заказ {order_name} помечен как обработанный в истории")
+            except Exception as e:
+                self.tsd_log_insert(f"❌ Ошибка пометки заказа в истории: {e}")
+            
+            # ОЧИЩАЕМ ФОРМУ ПОСЛЕ УСПЕШНОЙ ОТПРАВКИ
+            self.clear_tsd_form()
+        else:
+            self.tsd_log_insert(f"❌ [ОШИБКА] {order_name} (ID: {docid}) — {msg}")
+            item["status"] = "Ошибка ТСД"
+
+        self.update_tsd_tree()
+    
+        
+    def _get_gtin_for_order(self, document_id: str) -> str | None:
+        """Получает GTIN для заказа из collected или из истории."""
+        try:
+            self.tsd_log_insert(f"🔍 Поиск GTIN для document_id: {document_id}")
+            
+            # Сначала ищем в collected (для текущих заказов)
+            for item in self.collected:
+                if hasattr(item, 'document_id') and item.document_id == document_id:
+                    gtin = getattr(item, 'gtin', None)
+                    if gtin:
+                        self.tsd_log_insert(f"✅ Найден GTIN в collected: {gtin}")
+                        return gtin
+            
+            # Если в collected не нашли, ищем в download_list
+            for item in self.download_list:
+                if item.get("document_id") == document_id:
+                    self.tsd_log_insert(f"🔍 Найден заказ в download_list: {item.get('order_name')}")
+                    
+                    # Пробуем получить GTIN напрямую из полей заказа
+                    gtin = item.get("gtin")
+                    if gtin:
+                        self.tsd_log_insert(f"✅ Найден GTIN в поле заказа: {gtin}")
+                        return gtin
+                    
+                    # Если нет прямого поля gtin, ищем в history_entry
+                    history_entry = item.get("history_entry")
+                    if history_entry:
+                        self.tsd_log_insert(f"🔍 Ищем в history_entry...")
+                        
+                        # Ищем поле gtin в корне history_entry
+                        gtin = history_entry.get("gtin")
+                        if gtin:
+                            self.tsd_log_insert(f"✅ Найден GTIN в корне history_entry: {gtin}")
+                            return gtin
+                        
+                        # Ищем в order_data -> positions
+                        order_data = history_entry.get("order_data", {})
+                        positions = order_data.get("positions", [])
+                        
+                        if not positions:
+                            # Ищем в корне history_entry -> positions
+                            positions = history_entry.get("positions", [])
+                        
+                        if positions and len(positions) > 0:
+                            gtin = positions[0].get("gtin")
+                            self.tsd_log_insert(f"🔍 Найден GTIN в позициях: {gtin}")
+                            if gtin:
+                                return gtin
+                    
+                    self.tsd_log_insert("❌ GTIN не найден в данных заказа")
+                    break
+            
+            self.tsd_log_insert("❌ GTIN не найден ни в collected, ни в download_list")
+            return None
+            
         except Exception as e:
-            self.tsd_log_insert(f"❌ Ошибка при получении GTIN для {document_id}: {e}")
-            return ""
+            self.tsd_log_insert(f"❌ Ошибка при поиске GTIN: {e}")
+            import traceback
+            self.tsd_log_insert(f"🔍 Детали ошибки: {traceback.format_exc()}")
+            return None
+        
+    def _extract_gtin_from_order_data(self, item: dict) -> str | None:
+        """Извлекает GTIN из данных заказа разными способами"""
+        try:
+            document_id = item.get("document_id")
+            self.tsd_log_insert(f"🔍 Извлечение GTIN для заказа {document_id}")
+            
+            # 1. Пробуем получить из history_entry -> order_data -> positions
+            history_entry = item.get("history_entry")
+            if history_entry:
+                self.tsd_log_insert(f"🔍 Анализ history_entry...")
+                
+                # Способ 1: из order_data -> positions
+                order_data = history_entry.get("order_data", {})
+                positions = order_data.get("positions", [])
+                
+                # Способ 2: из корня history_entry -> positions
+                if not positions:
+                    positions = history_entry.get("positions", [])
+                
+                # Способ 3: из result -> positions
+                if not positions:
+                    result_data = history_entry.get("result", {})
+                    positions = result_data.get("positions", [])
+                
+                if positions and len(positions) > 0:
+                    gtin = positions[0].get("gtin")
+                    self.tsd_log_insert(f"🔍 Найден GTIN в позициях: {gtin}")
+                    if gtin:
+                        # Убираем лидирующий ноль если есть
+                        if gtin.startswith('0'):
+                            gtin = gtin[1:]
+                        return gtin
+            
+            # 2. Пробуем получить из полей заказа
+            simpl = item.get("simpl", "")
+            if simpl and "gtin" in simpl.lower():
+                # Парсим GTIN из simpl поля
+                import re
+                gtin_match = re.search(r'\d{13,14}', simpl)
+                if gtin_match:
+                    gtin = gtin_match.group()
+                    self.tsd_log_insert(f"🔍 Найден GTIN в simpl поле: {gtin}")
+                    return gtin
+            
+            self.tsd_log_insert("❌ Не удалось извлечь GTIN из данных заказа")
+            return None
+            
+        except Exception as e:
+            self.tsd_log_insert(f"❌ Ошибка при извлечении GTIN: {e}")
+            return None
 
 if __name__ == "__main__":
     if not os.path.exists(NOMENCLATURE_XLSX):
