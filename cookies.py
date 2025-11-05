@@ -4,7 +4,6 @@ import time
 from pathlib import Path
 from typing import Dict, Optional, Any
 from utils import find_yandex_paths
-import threading
 
 
 paths = find_yandex_paths()
