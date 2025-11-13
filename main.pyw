@@ -2726,7 +2726,6 @@ class App(ctk.CTk):
             order_dict = {order['document_id']: order for order in all_orders}
             
             added_count = 0
-            skipped_count = 0
             resent_count = 0
             
             # Сначала собираем информацию о уже отправленных заказах
@@ -2766,117 +2765,46 @@ class App(ctk.CTk):
                         "filename": order_data.get("filename"),
                         "simpl": order_data.get("simpl"),
                         "full_name": order_data.get("full_name"),
-                        "gtin": order_data.get("gtin"),  # ВАЖНО: копируем GTIN из истории
+                        "gtin": order_data.get("gtin"),
                         "from_history": True,
                         "downloading": False,
-                        "history_data": order_data  # Сохраняем полные данные из истории
+                        "history_data": order_data
                     }
                     self.download_list.append(new_item)
                     added_count += 1
                     print(f"✅ DEBUG: Добавлен заказ из истории с GTIN: {order_data.get('gtin')}")
                 else:
                     # Обновляем существующий заказ
-                    existing_item["status"] = "Готов для ТСД"
-                    existing_item["from_history"] = True
-                    existing_item["gtin"] = order_data.get("gtin")  # Обновляем GTIN
-                    existing_item["history_data"] = order_data
+                    existing_item.update({
+                        "status": "Готов для ТСД",
+                        "from_history": True,
+                        "gtin": order_data.get("gtin"),
+                        "history_data": order_data
+                    })
                     added_count += 1
                     print(f"✅ DEBUG: Обновлен заказ с GTIN: {order_data.get('gtin')}")
             
             # Обрабатываем уже отправленные заказы с запросом подтверждения
             if already_sent_orders:
-                order_names = [order.get('order_name', 'Неизвестный заказ') for order in already_sent_orders[:5]]  # Показываем первые 5
-                if len(already_sent_orders) > 5:
-                    order_names.append(f"... и еще {len(already_sent_orders) - 5} заказов")
+                # Упрощенный диалог с использованием messagebox
+                order_names = [order.get('order_name', 'Неизвестный заказ') for order in already_sent_orders[:3]]
+                if len(already_sent_orders) > 3:
+                    order_names.append(f"... и еще {len(already_sent_orders) - 3} заказов")
                 
                 message = (
-                    f"Найдено {len(already_sent_orders)} заказов, которые уже отправлялись на ТСД!\n\n"
-                    f"Примеры:\n" + "\n".join(f"• {name}" for name in order_names) + 
-                    f"\n\nОтправить эти заказы повторно?"
+                    f"Найдено {len(already_sent_orders)} заказов, которые уже отправлялись на ТСД.\n\n"
+                    f"{chr(10).join(order_names)}\n\n"
+                    f"Отправить эти заказы повторно?"
                 )
                 
-                # Создаем кастомное диалоговое окно с кнопками Да/Нет
-                confirm_dialog = tk.Toplevel(history_window)
-                confirm_dialog.title("Подтверждение повторной отправки")
-                confirm_dialog.geometry("500x300")
-                confirm_dialog.resizable(False, False)
-                confirm_dialog.transient(history_window)
-                confirm_dialog.grab_set()
-                
-                # Центрируем окно
-                confirm_dialog.update_idletasks()
-                x = (confirm_dialog.winfo_screenwidth() - confirm_dialog.winfo_width()) // 2
-                y = (confirm_dialog.winfo_screenheight() - confirm_dialog.winfo_height()) // 2
-                confirm_dialog.geometry(f"+{x}+{y}")
-                
-                # Содержимое диалога
-                main_frame = ctk.CTkFrame(confirm_dialog)
-                main_frame.pack(fill="both", expand=True, padx=20, pady=20)
-                
-                # Иконка предупреждения
-                ctk.CTkLabel(
-                    main_frame,
-                    text="⚠️",
-                    font=("Segoe UI", 24),
-                    text_color="#FFA500"
-                ).pack(pady=(10, 5))
-                
-                # Заголовок
-                ctk.CTkLabel(
-                    main_frame,
-                    text="Повторная отправка на ТСД",
-                    font=("Segoe UI", 16, "bold")
-                ).pack(pady=(0, 10))
-                
-                # Текст сообщения
-                message_text = ctk.CTkTextbox(main_frame, height=120, wrap="word")
-                message_text.pack(fill="x", padx=10, pady=10)
-                message_text.insert("1.0", message)
-                message_text.configure(state="disabled")
-                
-                # Фрейм для кнопок
-                button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-                button_frame.pack(fill="x", pady=10)
-                button_frame.grid_columnconfigure(0, weight=1)
-                button_frame.grid_columnconfigure(1, weight=1)
-                
-                result = {"confirmed": False}
-                
-                def on_yes():
-                    result["confirmed"] = True
-                    confirm_dialog.destroy()
-                
-                def on_no():
-                    result["confirmed"] = False
-                    confirm_dialog.destroy()
-                
-                # Кнопка Да
-                yes_btn = ctk.CTkButton(
-                    button_frame,
-                    text="Да, отправить повторно",
-                    command=on_yes,
-                    fg_color="#28a745",
-                    hover_color="#218838",
-                    font=("Segoe UI", 12)
+                # Используем стандартный messagebox для упрощения
+                response = tk.messagebox.askyesno(
+                    "Повторная отправка на ТСД", 
+                    message,
+                    icon="warning"
                 )
-                yes_btn.grid(row=0, column=0, padx=5, sticky="ew")
                 
-                # Кнопка Нет
-                no_btn = ctk.CTkButton(
-                    button_frame,
-                    text="Нет, пропустить",
-                    command=on_no,
-                    fg_color="#dc3545",
-                    hover_color="#c82333",
-                    font=("Segoe UI", 12)
-                )
-                no_btn.grid(row=0, column=1, padx=5, sticky="ew")
-                
-                # Ждем закрытия диалога
-                confirm_dialog.wait_window()
-                
-                # Обрабатываем результат
-                if result["confirmed"]:
+                if response:  # Если пользователь ответил "Да"
                     for order_data in already_sent_orders:
                         document_id = order_data.get('document_id')
                         
@@ -2886,7 +2814,7 @@ class App(ctk.CTk):
                             new_item = {
                                 "order_name": order_data.get("order_name"),
                                 "document_id": document_id,
-                                "status": "Повторная отправка",
+                                "status": "Готов для ТСД",  # Используем тот же статус, что и для новых
                                 "filename": order_data.get("filename"),
                                 "simpl": order_data.get("simpl"),
                                 "full_name": order_data.get("full_name"),
@@ -2901,28 +2829,32 @@ class App(ctk.CTk):
                             print(f"🔄 DEBUG: Повторно добавлен заказ с GTIN: {order_data.get('gtin')}")
                         else:
                             # Обновляем существующий заказ
-                            existing_item["status"] = "Повторная отправка"
-                            existing_item["from_history"] = True
-                            existing_item["gtin"] = order_data.get("gtin")
-                            existing_item["history_data"] = order_data
-                            existing_item["resent"] = True
+                            existing_item.update({
+                                "status": "Готов для ТСД",
+                                "from_history": True,
+                                "gtin": order_data.get("gtin"),
+                                "history_data": order_data,
+                                "resent": True
+                            })
                             resent_count += 1
                             print(f"🔄 DEBUG: Обновлен заказ для повторной отправки с GTIN: {order_data.get('gtin')}")
-                else:
-                    skipped_count = len(already_sent_orders)
             
-            # Обновляем таблицу ТСД и закрываем диалог
+            # Обновляем таблицу ТСД
             self.update_tsd_tree()
-            history_window.destroy()
+            
+            # Закрываем окно истории только если оно еще существует
+            if history_window and tk._default_root:
+                try:
+                    history_window.destroy()
+                except:
+                    pass
             
             # Показываем информативное сообщение
             message_parts = []
             if added_count > 0:
-                message_parts.append(f"Добавлено новых заказов в ТСД: {added_count}")
+                message_parts.append(f"Добавлено новых заказов: {added_count}")
             if resent_count > 0:
                 message_parts.append(f"Повторно отправлено заказов: {resent_count}")
-            if skipped_count > 0:
-                message_parts.append(f"Пропущено (уже отправлены на ТСД): {skipped_count}")
             
             if message_parts:
                 tk.messagebox.showinfo("Добавление в ТСД", "\n".join(message_parts))
@@ -2933,6 +2865,7 @@ class App(ctk.CTk):
             print(f"💥 DEBUG: Критическая ошибка в _add_history_to_tsd: {e}")
             import traceback
             print(f"🔍 DEBUG: Детали ошибки: {traceback.format_exc()}")
+            tk.messagebox.showerror("Ошибка", f"Произошла ошибка при добавлении заказов: {str(e)}")
 
     def load_history_for_dialog(self):
         """Загружает заказы из истории ТОЛЬКО для отображения в диалоге истории"""
