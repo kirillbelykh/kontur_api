@@ -9,6 +9,6 @@ last_snapshot.json
 lookup.log
 /driver
 yandexdriver.exe
-
+orders_history.json
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md

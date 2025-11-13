@@ -1155,23 +1155,23 @@ class App(ctk.CTk):
             self.update_aggregation_progress(0)
 
     def _setup_create_frame(self):
-        """Современный фрейм создания заказов"""
+        """Современный фрейм создания заказов с адаптивным расположением"""
         self.content_frames["create"] = CTkScrollableFrame(self.main_content, corner_radius=0)
         
-        # Основной контейнер
+        # Основной контейнер с минимальными отступами
         main_frame = ctk.CTkFrame(self.content_frames["create"], corner_radius=15)
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Заголовок с иконкой
+        # Заголовок с иконкой - компактный
         header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(0, 30))
+        header_frame.pack(fill="x", pady=(0, 20), padx=15)
         
         ctk.CTkLabel(
             header_frame,
             text="📦",
-            font=("Segoe UI", 48),
+            font=("Segoe UI", 36),
             text_color=self._get_color("primary")
-        ).pack(side="left", padx=(0, 15))
+        ).pack(side="left", padx=(0, 10))
         
         title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
         title_frame.pack(side="left", fill="y")
@@ -1190,90 +1190,215 @@ class App(ctk.CTk):
             text_color=self._get_color("text_secondary")
         ).pack(anchor="w")
         
-        # Две колонки
+        # Две колонки с адаптивным расположением
         columns_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        columns_frame.pack(fill="both", expand=True)
-        columns_frame.grid_columnconfigure(0, weight=1)
-        columns_frame.grid_columnconfigure(1, weight=1)
+        columns_frame.pack(fill="both", expand=True, padx=10)
+        
+        # Настраиваем адаптивные колонки
+        columns_frame.grid_columnconfigure(0, weight=1, minsize=400)
+        columns_frame.grid_columnconfigure(1, weight=1, minsize=400)
         columns_frame.grid_rowconfigure(0, weight=1)
         
         # Левая колонка - форма
         left_column = ctk.CTkFrame(columns_frame, corner_radius=12)
-        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
         # Правая колонка - таблица и лог
         right_column = ctk.CTkFrame(columns_frame, corner_radius=12)
-        right_column.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+        right_column.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         
-        # Левая панель - форма ввода (адаптированный код из _setup_create_tab)
+        # === ЛЕВАЯ КОЛОНКА - ФОРМА ===
         ctk.CTkLabel(
             left_column, 
             text="Добавление позиции", 
             font=self.fonts["subheading"]
-        ).pack(pady=(20, 15), padx=20, anchor="w")
+        ).pack(pady=(15, 10), padx=15, anchor="w")
         
-        # Поля ввода
-        form_frame = ctk.CTkFrame(left_column, fg_color="transparent")
-        form_frame.pack(fill="x", padx=20, pady=10)
+        # Основной контейнер формы с минимальными отступами
+        form_container = ctk.CTkScrollableFrame(left_column, fg_color="transparent")
+        form_container.pack(fill="both", expand=True, padx=10, pady=5)
         
+        # Поля ввода - компактное расположение
         # Заявка №
-        ctk.CTkLabel(form_frame, text="Заявка №:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
-        self.order_entry = ctk.CTkEntry(form_frame, width=250, placeholder_text="Введите номер заявки", font=self.fonts["normal"])
-        self.order_entry.grid(row=0, column=1, pady=10, padx=(10, 0))
+        row_frame = ctk.CTkFrame(form_container, fg_color="transparent", height=45)
+        row_frame.pack(fill="x", pady=3)
+        row_frame.grid_propagate(False)
+        row_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(row_frame, text="Заявка №:", font=self.fonts["normal"]).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        self.order_entry = ctk.CTkEntry(
+            row_frame, 
+            placeholder_text="Введите номер заявки", 
+            font=self.fonts["normal"]
+        )
+        self.order_entry.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
         # Режим поиска
-        ctk.CTkLabel(form_frame, text="Режим поиска:", font=self.fonts["normal"]).grid(row=1, column=0, sticky="w", pady=10)
-        mode_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
-        mode_frame.grid(row=1, column=1, sticky="w", pady=10, padx=(10, 0))
+        row_frame = ctk.CTkFrame(form_container, fg_color="transparent", height=45)
+        row_frame.pack(fill="x", pady=3)
+        row_frame.grid_propagate(False)
+        row_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(row_frame, text="Режим поиска:", font=self.fonts["normal"]).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        
+        mode_frame = ctk.CTkFrame(row_frame, fg_color="transparent")
+        mode_frame.grid(row=0, column=1, sticky="w")
         
         self.gtin_var = ctk.StringVar(value="No")
-        ctk.CTkRadioButton(mode_frame, text="Поиск по GTIN", variable=self.gtin_var, value="Yes", 
-                        command=self.toggle_mode, font=self.fonts["normal"]).pack(side="left", padx=(0, 10))
-        ctk.CTkRadioButton(mode_frame, text="Выбор опций", variable=self.gtin_var, value="No", 
-                        command=self.toggle_mode, font=self.fonts["normal"]).pack(side="left")
+        ctk.CTkRadioButton(
+            mode_frame, 
+            text="Поиск по GTIN", 
+            variable=self.gtin_var, 
+            value="Yes",
+            command=self.toggle_mode, 
+            font=self.fonts["small"]
+        ).pack(side="left", padx=(0, 8))
+        ctk.CTkRadioButton(
+            mode_frame, 
+            text="Выбор опций", 
+            variable=self.gtin_var, 
+            value="No",
+            command=self.toggle_mode, 
+            font=self.fonts["small"]
+        ).pack(side="left")
         
         # GTIN frame (изначально скрыт)
-        self.gtin_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
-        ctk.CTkLabel(self.gtin_frame, text="GTIN:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
-        self.gtin_entry = ctk.CTkEntry(self.gtin_frame, width=250, placeholder_text="Введите GTIN", font=self.fonts["normal"])
-        self.gtin_entry.grid(row=0, column=1, pady=10, padx=(10, 0))
+        self.gtin_frame = ctk.CTkFrame(form_container, fg_color="transparent", height=45)
+        self.gtin_frame.pack_forget()  # Сначала скрываем
+        self.gtin_frame.grid_propagate(False)
+        self.gtin_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(self.gtin_frame, text="GTIN:", font=self.fonts["normal"]).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        self.gtin_entry = ctk.CTkEntry(
+            self.gtin_frame, 
+            placeholder_text="Введите GTIN", 
+            font=self.fonts["normal"]
+        )
+        self.gtin_entry.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         self._add_entry_context_menu(self.gtin_entry)
         
         # Select frame
-        self.select_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        self.select_frame = ctk.CTkFrame(form_container, fg_color="transparent")
+        self.select_frame.pack(fill="x", pady=5)  # Показываем по умолчанию
         
         # Вид товара
-        ctk.CTkLabel(self.select_frame, text="Вид товара:", font=self.fonts["normal"]).grid(row=0, column=0, sticky="w", pady=10)
-        self.simpl_combo = ctk.CTkComboBox(self.select_frame, values=simplified_options, 
-                                        command=self.update_options, width=250, font=self.fonts["normal"])
-        self.simpl_combo.grid(row=0, column=1, pady=10, padx=(10, 0))
+        row_frame = ctk.CTkFrame(self.select_frame, fg_color="transparent", height=45)
+        row_frame.pack(fill="x", pady=3)
+        row_frame.grid_propagate(False)
+        row_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(row_frame, text="Вид товара:", font=self.fonts["normal"]).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        self.simpl_combo = ctk.CTkComboBox(
+            row_frame, 
+            values=simplified_options,
+            command=self.update_options, 
+            font=self.fonts["normal"]
+        )
+        self.simpl_combo.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
         # Цвет
-        self.color_label = ctk.CTkLabel(self.select_frame, text="Цвет:", font=self.fonts["normal"])
-        self.color_combo = ctk.CTkComboBox(self.select_frame, values=color_options, width=250, font=self.fonts["normal"])
+        self.color_row = ctk.CTkFrame(self.select_frame, fg_color="transparent", height=45)
+        self.color_row.pack(fill="x", pady=3)
+        self.color_row.grid_propagate(False)
+        self.color_row.grid_columnconfigure(1, weight=1)
+        
+        self.color_label = ctk.CTkLabel(
+            self.color_row, 
+            text="Цвет:", 
+            font=self.fonts["normal"]
+        )
+        self.color_label.grid(row=0, column=0, sticky="w", padx=(0, 10))
+        
+        self.color_combo = ctk.CTkComboBox(
+            self.color_row, 
+            values=color_options, 
+            font=self.fonts["normal"]
+        )
+        self.color_combo.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
         # Венчик
-        self.venchik_label = ctk.CTkLabel(self.select_frame, text="Венчик:", font=self.fonts["normal"])
-        self.venchik_combo = ctk.CTkComboBox(self.select_frame, values=venchik_options, width=250, font=self.fonts["normal"])
+        self.venchik_row = ctk.CTkFrame(self.select_frame, fg_color="transparent", height=45)
+        self.venchik_row.pack(fill="x", pady=3)
+        self.venchik_row.grid_propagate(False)
+        self.venchik_row.grid_columnconfigure(1, weight=1)
+        
+        self.venchik_label = ctk.CTkLabel(
+            self.venchik_row, 
+            text="Венчик:", 
+            font=self.fonts["normal"]
+        )
+        self.venchik_label.grid(row=0, column=0, sticky="w", padx=(0, 10))
+        
+        self.venchik_combo = ctk.CTkComboBox(
+            self.venchik_row, 
+            values=venchik_options, 
+            font=self.fonts["normal"]
+        )
+        self.venchik_combo.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
         # Размер
-        ctk.CTkLabel(self.select_frame, text="Размер:", font=self.fonts["normal"]).grid(row=3, column=0, sticky="w", pady=10)
-        self.size_combo = ctk.CTkComboBox(self.select_frame, values=size_options, width=250, font=self.fonts["normal"])
-        self.size_combo.grid(row=3, column=1, pady=10, padx=(10, 0))
+        row_frame = ctk.CTkFrame(self.select_frame, fg_color="transparent", height=45)
+        row_frame.pack(fill="x", pady=3)
+        row_frame.grid_propagate(False)
+        row_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(row_frame, text="Размер:", font=self.fonts["normal"]).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        self.size_combo = ctk.CTkComboBox(
+            row_frame, 
+            values=size_options, 
+            font=self.fonts["normal"]
+        )
+        self.size_combo.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
         # Упаковка
-        ctk.CTkLabel(self.select_frame, text="Единиц в упаковке:", font=self.fonts["normal"]).grid(row=4, column=0, sticky="w", pady=10)
-        self.units_combo = ctk.CTkComboBox(self.select_frame, values=[str(u) for u in units_options], width=250, font=self.fonts["normal"])
-        self.units_combo.grid(row=4, column=1, pady=10, padx=(10, 0))
+        row_frame = ctk.CTkFrame(self.select_frame, fg_color="transparent", height=45)
+        row_frame.pack(fill="x", pady=3)
+        row_frame.grid_propagate(False)
+        row_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(row_frame, text="Единиц в упаковке:", font=self.fonts["normal"]).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        self.units_combo = ctk.CTkComboBox(
+            row_frame, 
+            values=[str(u) for u in units_options], 
+            font=self.fonts["normal"]
+        )
+        self.units_combo.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
         # Количество кодов
-        ctk.CTkLabel(form_frame, text="Количество кодов:", font=self.fonts["normal"]).grid(row=6, column=0, sticky="w", pady=10)
-        self.codes_entry = ctk.CTkEntry(form_frame, width=250, placeholder_text="Введите количество", font=self.fonts["normal"])
-        self.codes_entry.grid(row=6, column=1, pady=10, padx=(10, 0))
+        row_frame = ctk.CTkFrame(form_container, fg_color="transparent", height=45)
+        row_frame.pack(fill="x", pady=3)
+        row_frame.grid_propagate(False)
+        row_frame.grid_columnconfigure(1, weight=1)
+        
+        ctk.CTkLabel(row_frame, text="Количество кодов:", font=self.fonts["normal"]).grid(
+            row=0, column=0, sticky="w", padx=(0, 10)
+        )
+        self.codes_entry = ctk.CTkEntry(
+            row_frame, 
+            placeholder_text="Введите количество", 
+            font=self.fonts["normal"]
+        )
+        self.codes_entry.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
         # Кнопка добавления
+        add_btn_frame = ctk.CTkFrame(form_container, fg_color="transparent", height=50)
+        add_btn_frame.pack(fill="x", pady=10)
+        add_btn_frame.grid_columnconfigure(0, weight=1)
+        
         add_btn = ctk.CTkButton(
-            form_frame, 
+            add_btn_frame, 
             text="➕ Добавить позицию", 
             command=self.add_item,
             height=35,
@@ -1282,29 +1407,34 @@ class App(ctk.CTk):
             font=self.fonts["button"],
             corner_radius=8
         )
-        add_btn.grid(row=7, column=0, columnspan=2, pady=20)
+        add_btn.grid(row=0, column=0, sticky="ew")
         
-        self.toggle_mode()
-        
-        # Правая колонка - таблица и лог
-        right_column.grid_rowconfigure(0, weight=1)  # Таблица
-        right_column.grid_rowconfigure(1, weight=1)  # Лог
+        # === ПРАВАЯ КОЛОНКА - ТАБЛИЦА И ЛОГ ===
+        right_column.grid_rowconfigure(0, weight=2)  # Таблица (больше места)
+        right_column.grid_rowconfigure(1, weight=1)  # Лог (меньше места)
+        right_column.grid_columnconfigure(0, weight=1)
         
         # Таблица
         table_container = ctk.CTkFrame(right_column, corner_radius=8)
-        table_container.grid(row=0, column=0, sticky="nsew", pady=(0, 10))
+        table_container.grid(row=0, column=0, sticky="nsew", pady=(0, 5), padx=5)
         
         ctk.CTkLabel(
             table_container, 
             text="Список позиций", 
             font=self.fonts["subheading"]
-        ).pack(anchor="w", pady=(15, 10), padx=15)
+        ).pack(anchor="w", pady=(12, 8), padx=12)
         
-        table_inner_frame = ctk.CTkFrame(table_container, fg_color="transparent")
-        table_inner_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        # Контейнер для таблицы с прокруткой
+        table_scroll_frame = ctk.CTkFrame(table_container, fg_color="transparent")
+        table_scroll_frame.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         
+        # Создаем Treeview с прокруткой
         columns = ("idx", "full_name", "simpl_name", "size", "units_per_pack", "gtin", "codes_count", "order_name", "uid")
-        self.tree = ttk.Treeview(table_inner_frame, columns=columns, show="headings", height=8)
+        self.tree = ttk.Treeview(table_scroll_frame, columns=columns, show="headings", height=6)
+        
+        # Настраиваем прокрутку для таблицы
+        tree_scrollbar = ttk.Scrollbar(table_scroll_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=tree_scrollbar.set)
         
         # Заголовки
         headers = {
@@ -1315,63 +1445,71 @@ class App(ctk.CTk):
         
         for col, text in headers.items():
             self.tree.heading(col, text=text)
-            self.tree.column(col, width=80 if col == "idx" else 120)
+            # Адаптивная ширина колонок
+            if col == "idx":
+                self.tree.column(col, width=40, minwidth=40)
+            elif col in ["size", "units_per_pack", "codes_count"]:
+                self.tree.column(col, width=70, minwidth=60)
+            else:
+                self.tree.column(col, width=100, minwidth=80)
         
-        # Scrollbar для таблицы
-        scrollbar = ttk.Scrollbar(table_inner_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
+        # Размещаем таблицу и скроллбар
         self.tree.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        tree_scrollbar.pack(side="right", fill="y")
         
         # Кнопки управления под таблицей
         btn_frame = ctk.CTkFrame(table_container, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=10, pady=10)
+        btn_frame.pack(fill="x", padx=8, pady=8)
+        
+        btn_frame.grid_columnconfigure(0, weight=1)
+        btn_frame.grid_columnconfigure(1, weight=1)
+        btn_frame.grid_columnconfigure(2, weight=1)
         
         delete_btn = ctk.CTkButton(
             btn_frame, 
             text="🗑️ Удалить", 
             command=self.delete_item, 
-            width=120,
+            height=32,
             font=self.fonts["button"],
             fg_color=self._get_color("error"),
             corner_radius=6
         )
-        delete_btn.pack(side="left", padx=5)
+        delete_btn.grid(row=0, column=0, sticky="ew", padx=2)
         
         self.execute_btn = ctk.CTkButton(
             btn_frame, 
-            text="⚡ Выполнить все", 
+            text="⚡ Выполнить", 
             command=self.execute_all,
-            width=120,
+            height=32,
             fg_color=self._get_color("primary"),
             hover_color="#2874A6",
             font=self.fonts["button"],
             corner_radius=6
         )
-        self.execute_btn.pack(side="left", padx=5)
+        self.execute_btn.grid(row=0, column=1, sticky="ew", padx=2)
         
         clear_btn = ctk.CTkButton(
             btn_frame, 
             text="🧹 Очистить", 
             command=self.clear_all, 
-            width=120,
+            height=32,
             font=self.fonts["button"],
             corner_radius=6
         )
-        clear_btn.pack(side="left", padx=5)
+        clear_btn.grid(row=0, column=2, sticky="ew", padx=2)
         
         # Лог
         log_container = ctk.CTkFrame(right_column, corner_radius=8)
-        log_container.grid(row=1, column=0, sticky="nsew", pady=(10, 0))
+        log_container.grid(row=1, column=0, sticky="nsew", pady=(5, 0), padx=5)
         
         ctk.CTkLabel(
             log_container, 
             text="Лог операций", 
             font=self.fonts["subheading"]
-        ).pack(anchor="w", pady=(15, 10), padx=15)
+        ).pack(anchor="w", pady=(12, 8), padx=12)
 
-        self.log_text = ctk.CTkTextbox(log_container, height=200, font=self.fonts["normal"])
-        self.log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.log_text = ctk.CTkTextbox(log_container, font=self.fonts["normal"])
+        self.log_text.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self.log_text.configure(state="disabled")
 
         # Контекстное меню для лога
@@ -1381,6 +1519,17 @@ class App(ctk.CTk):
         
         # Стиль для таблицы
         self._configure_treeview_style()
+
+    def toggle_mode(self):
+        """Переключение между режимами ввода с использованием pack"""
+        if self.gtin_var.get() == "Yes":
+            # Показываем GTIN, скрываем select frame
+            self.select_frame.pack_forget()
+            self.gtin_frame.pack(fill="x", pady=5)
+        else:
+            # Показываем select frame, скрываем GTIN
+            self.gtin_frame.pack_forget()
+            self.select_frame.pack(fill="x", pady=5)
 
     
     def _setup_download_frame(self):
