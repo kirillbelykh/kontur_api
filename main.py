@@ -1199,23 +1199,23 @@ class App(ctk.CTk):
         columns_frame.grid_columnconfigure(1, weight=1, minsize=400)
         columns_frame.grid_rowconfigure(0, weight=1)
         
-        # Левая колонка - форма
+        # Левая колонка - форма (фиксированной высоты, без ограничений)
         left_column = ctk.CTkFrame(columns_frame, corner_radius=12)
         left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
         
-        # Правая колонка - таблица и лог
+        # Правая колонка - таблица и лог (с прокруткой если нужно)
         right_column = ctk.CTkFrame(columns_frame, corner_radius=12)
         right_column.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
         
-        # === ЛЕВАЯ КОЛОНКА - ФОРМА ===
+        # === ЛЕВАЯ КОЛОНКА - ФОРМА (БЕЗ ПРОКРУТКИ, ВСЕГДА ВИДНА) ===
         ctk.CTkLabel(
             left_column, 
             text="Добавление позиции", 
             font=self.fonts["subheading"]
         ).pack(pady=(15, 10), padx=15, anchor="w")
         
-        # Основной контейнер формы с минимальными отступами
-        form_container = ctk.CTkScrollableFrame(left_column, fg_color="transparent")
+        # Основной контейнер формы БЕЗ прокрутки - все поля всегда видны
+        form_container = ctk.CTkFrame(left_column, fg_color="transparent")
         form_container.pack(fill="both", expand=True, padx=10, pady=5)
         
         # Поля ввода - компактное расположение
@@ -1392,10 +1392,9 @@ class App(ctk.CTk):
         )
         self.codes_entry.grid(row=0, column=1, sticky="ew", padx=(0, 0))
         
-        # Кнопка добавления
+        # Кнопка добавления - ВСЕГДА ВИДНА ВНИЗУ
         add_btn_frame = ctk.CTkFrame(form_container, fg_color="transparent", height=50)
-        add_btn_frame.pack(fill="x", pady=10)
-        add_btn_frame.grid_columnconfigure(0, weight=1)
+        add_btn_frame.pack(fill="x", pady=(20, 10), side="bottom")  # Фиксируем внизу
         
         add_btn = ctk.CTkButton(
             add_btn_frame, 
@@ -1407,14 +1406,18 @@ class App(ctk.CTk):
             font=self.fonts["button"],
             corner_radius=8
         )
-        add_btn.grid(row=0, column=0, sticky="ew")
+        add_btn.pack(fill="x")  # Растягиваем на всю ширину
         
-        # === ПРАВАЯ КОЛОНКА - ТАБЛИЦА И ЛОГ ===
+        # Пустое пространство, которое займет все оставшееся место между полями и кнопкой
+        spacer = ctk.CTkFrame(form_container, fg_color="transparent", height=0)
+        spacer.pack(fill="both", expand=True)
+        
+        # === ПРАВАЯ КОЛОНКА - ТАБЛИЦА И ЛОГ (С ПРОКРУТКОЙ ЕСЛИ НУЖНО) ===
         right_column.grid_rowconfigure(0, weight=2)  # Таблица (больше места)
         right_column.grid_rowconfigure(1, weight=1)  # Лог (меньше места)
         right_column.grid_columnconfigure(0, weight=1)
         
-        # Таблица
+        # Таблица в прокручиваемом контейнере
         table_container = ctk.CTkFrame(right_column, corner_radius=8)
         table_container.grid(row=0, column=0, sticky="nsew", pady=(0, 5), padx=5)
         
@@ -1498,7 +1501,7 @@ class App(ctk.CTk):
         )
         clear_btn.grid(row=0, column=2, sticky="ew", padx=2)
         
-        # Лог
+        # Лог в прокручиваемом контейнере
         log_container = ctk.CTkFrame(right_column, corner_radius=8)
         log_container.grid(row=1, column=0, sticky="nsew", pady=(5, 0), padx=5)
         
@@ -2724,6 +2727,11 @@ class App(ctk.CTk):
             
             added_count = 0
             skipped_count = 0
+            resent_count = 0
+            
+            # Сначала собираем информацию о уже отправленных заказах
+            already_sent_orders = []
+            orders_to_add = []
             
             for item_id in selected_items:
                 try:
@@ -2736,59 +2744,190 @@ class App(ctk.CTk):
                     
                     # ПРОВЕРЯЕМ, НЕ ОТПРАВЛЕН ЛИ УЖЕ ЗАКАЗ НА ТСД
                     if order_data.get('tsd_created'):
-                        skipped_count += 1
-                        continue
-                    
-                    # ДЕТАЛЬНАЯ ПРОВЕРКА ДАННЫХ ИЗ ИСТОРИИ
-                    print(f"🔍 DEBUG: Данные из истории для {document_id}:")
-                    print(f"   - order_name: {order_data.get('order_name')}")
-                    print(f"   - gtin: {order_data.get('gtin')}")
-                    print(f"   - simpl: {order_data.get('simpl')}")
-                    print(f"   - full_name: {order_data.get('full_name')}")
-                        
-                    # Проверяем, не добавлен ли уже заказ в текущей сессии
-                    existing_item = next((item for item in self.download_list if item.get("document_id") == document_id), None)
-                    if not existing_item:
-                        new_item = {
-                            "order_name": order_data.get("order_name"),
-                            "document_id": document_id,
-                            "status": "Готов для ТСД",
-                            "filename": order_data.get("filename"),
-                            "simpl": order_data.get("simpl"),
-                            "full_name": order_data.get("full_name"),
-                            "gtin": order_data.get("gtin"),  # ВАЖНО: копируем GTIN из истории
-                            "from_history": True,
-                            "downloading": False,
-                            "history_data": order_data  # Сохраняем полные данные из истории
-                        }
-                        self.download_list.append(new_item)
-                        added_count += 1
-                        print(f"✅ DEBUG: Добавлен заказ из истории с GTIN: {order_data.get('gtin')}")
+                        already_sent_orders.append(order_data)
                     else:
-                        # Обновляем существующий заказ
-                        existing_item["status"] = "Готов для ТСД"
-                        existing_item["from_history"] = True
-                        existing_item["gtin"] = order_data.get("gtin")  # Обновляем GTIN
-                        existing_item["history_data"] = order_data
-                        added_count += 1
-                        print(f"✅ DEBUG: Обновлен заказ с GTIN: {order_data.get('gtin')}")
+                        orders_to_add.append(order_data)
                         
                 except Exception as e:
                     print(f"❌ DEBUG: Ошибка обработки элемента: {e}")
                     continue
+            
+            # Обрабатываем заказы, которые еще не отправлялись
+            for order_data in orders_to_add:
+                document_id = order_data.get('document_id')
+                
+                # Проверяем, не добавлен ли уже заказ в текущей сессии
+                existing_item = next((item for item in self.download_list if item.get("document_id") == document_id), None)
+                if not existing_item:
+                    new_item = {
+                        "order_name": order_data.get("order_name"),
+                        "document_id": document_id,
+                        "status": "Готов для ТСД",
+                        "filename": order_data.get("filename"),
+                        "simpl": order_data.get("simpl"),
+                        "full_name": order_data.get("full_name"),
+                        "gtin": order_data.get("gtin"),  # ВАЖНО: копируем GTIN из истории
+                        "from_history": True,
+                        "downloading": False,
+                        "history_data": order_data  # Сохраняем полные данные из истории
+                    }
+                    self.download_list.append(new_item)
+                    added_count += 1
+                    print(f"✅ DEBUG: Добавлен заказ из истории с GTIN: {order_data.get('gtin')}")
+                else:
+                    # Обновляем существующий заказ
+                    existing_item["status"] = "Готов для ТСД"
+                    existing_item["from_history"] = True
+                    existing_item["gtin"] = order_data.get("gtin")  # Обновляем GTIN
+                    existing_item["history_data"] = order_data
+                    added_count += 1
+                    print(f"✅ DEBUG: Обновлен заказ с GTIN: {order_data.get('gtin')}")
+            
+            # Обрабатываем уже отправленные заказы с запросом подтверждения
+            if already_sent_orders:
+                order_names = [order.get('order_name', 'Неизвестный заказ') for order in already_sent_orders[:5]]  # Показываем первые 5
+                if len(already_sent_orders) > 5:
+                    order_names.append(f"... и еще {len(already_sent_orders) - 5} заказов")
+                
+                message = (
+                    f"Найдено {len(already_sent_orders)} заказов, которые уже отправлялись на ТСД!\n\n"
+                    f"Примеры:\n" + "\n".join(f"• {name}" for name in order_names) + 
+                    f"\n\nОтправить эти заказы повторно?"
+                )
+                
+                # Создаем кастомное диалоговое окно с кнопками Да/Нет
+                confirm_dialog = tk.Toplevel(history_window)
+                confirm_dialog.title("Подтверждение повторной отправки")
+                confirm_dialog.geometry("500x300")
+                confirm_dialog.resizable(False, False)
+                confirm_dialog.transient(history_window)
+                confirm_dialog.grab_set()
+                
+                # Центрируем окно
+                confirm_dialog.update_idletasks()
+                x = (confirm_dialog.winfo_screenwidth() - confirm_dialog.winfo_width()) // 2
+                y = (confirm_dialog.winfo_screenheight() - confirm_dialog.winfo_height()) // 2
+                confirm_dialog.geometry(f"+{x}+{y}")
+                
+                # Содержимое диалога
+                main_frame = ctk.CTkFrame(confirm_dialog)
+                main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+                
+                # Иконка предупреждения
+                ctk.CTkLabel(
+                    main_frame,
+                    text="⚠️",
+                    font=("Segoe UI", 24),
+                    text_color="#FFA500"
+                ).pack(pady=(10, 5))
+                
+                # Заголовок
+                ctk.CTkLabel(
+                    main_frame,
+                    text="Повторная отправка на ТСД",
+                    font=("Segoe UI", 16, "bold")
+                ).pack(pady=(0, 10))
+                
+                # Текст сообщения
+                message_text = ctk.CTkTextbox(main_frame, height=120, wrap="word")
+                message_text.pack(fill="x", padx=10, pady=10)
+                message_text.insert("1.0", message)
+                message_text.configure(state="disabled")
+                
+                # Фрейм для кнопок
+                button_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+                button_frame.pack(fill="x", pady=10)
+                button_frame.grid_columnconfigure(0, weight=1)
+                button_frame.grid_columnconfigure(1, weight=1)
+                
+                result = {"confirmed": False}
+                
+                def on_yes():
+                    result["confirmed"] = True
+                    confirm_dialog.destroy()
+                
+                def on_no():
+                    result["confirmed"] = False
+                    confirm_dialog.destroy()
+                
+                # Кнопка Да
+                yes_btn = ctk.CTkButton(
+                    button_frame,
+                    text="Да, отправить повторно",
+                    command=on_yes,
+                    fg_color="#28a745",
+                    hover_color="#218838",
+                    font=("Segoe UI", 12)
+                )
+                yes_btn.grid(row=0, column=0, padx=5, sticky="ew")
+                
+                # Кнопка Нет
+                no_btn = ctk.CTkButton(
+                    button_frame,
+                    text="Нет, пропустить",
+                    command=on_no,
+                    fg_color="#dc3545",
+                    hover_color="#c82333",
+                    font=("Segoe UI", 12)
+                )
+                no_btn.grid(row=0, column=1, padx=5, sticky="ew")
+                
+                # Ждем закрытия диалога
+                confirm_dialog.wait_window()
+                
+                # Обрабатываем результат
+                if result["confirmed"]:
+                    for order_data in already_sent_orders:
+                        document_id = order_data.get('document_id')
+                        
+                        # Проверяем, не добавлен ли уже заказ в текущей сессии
+                        existing_item = next((item for item in self.download_list if item.get("document_id") == document_id), None)
+                        if not existing_item:
+                            new_item = {
+                                "order_name": order_data.get("order_name"),
+                                "document_id": document_id,
+                                "status": "Повторная отправка",
+                                "filename": order_data.get("filename"),
+                                "simpl": order_data.get("simpl"),
+                                "full_name": order_data.get("full_name"),
+                                "gtin": order_data.get("gtin"),
+                                "from_history": True,
+                                "downloading": False,
+                                "history_data": order_data,
+                                "resent": True  # Помечаем как повторно отправленный
+                            }
+                            self.download_list.append(new_item)
+                            resent_count += 1
+                            print(f"🔄 DEBUG: Повторно добавлен заказ с GTIN: {order_data.get('gtin')}")
+                        else:
+                            # Обновляем существующий заказ
+                            existing_item["status"] = "Повторная отправка"
+                            existing_item["from_history"] = True
+                            existing_item["gtin"] = order_data.get("gtin")
+                            existing_item["history_data"] = order_data
+                            existing_item["resent"] = True
+                            resent_count += 1
+                            print(f"🔄 DEBUG: Обновлен заказ для повторной отправки с GTIN: {order_data.get('gtin')}")
+                else:
+                    skipped_count = len(already_sent_orders)
             
             # Обновляем таблицу ТСД и закрываем диалог
             self.update_tsd_tree()
             history_window.destroy()
             
             # Показываем информативное сообщение
+            message_parts = []
             if added_count > 0:
-                message = f"Добавлено заказов в ТСД: {added_count}"
-                if skipped_count > 0:
-                    message += f"\nПропущено (уже отправлены на ТСД): {skipped_count}"
-                tk.messagebox.showinfo("Добавление в ТСД", message)
+                message_parts.append(f"Добавлено новых заказов в ТСД: {added_count}")
+            if resent_count > 0:
+                message_parts.append(f"Повторно отправлено заказов: {resent_count}")
+            if skipped_count > 0:
+                message_parts.append(f"Пропущено (уже отправлены на ТСД): {skipped_count}")
+            
+            if message_parts:
+                tk.messagebox.showinfo("Добавление в ТСД", "\n".join(message_parts))
             else:
-                tk.messagebox.showwarning("Добавление в ТСД", "Не удалось добавить заказы. Возможно, они уже были отправлены на ТСД.")
+                tk.messagebox.showwarning("Добавление в ТСД", "Не удалось добавить заказы.")
                 
         except Exception as e:
             print(f"💥 DEBUG: Критическая ошибка в _add_history_to_tsd: {e}")
