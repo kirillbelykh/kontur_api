@@ -2,8 +2,9 @@ import json
 from logger import logger
 import time
 from pathlib import Path
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any
 from utils import find_yandex_paths
+
 
 paths = find_yandex_paths()
 # Настройки — поправь пути под систему
@@ -18,75 +19,24 @@ TARGET_URL = "https://mk.kontur.ru/organizations/5cda50fa-523f-4bb5-85b6-66d7241
 WAIT_TIMEOUT = 20
 SLEEP = 1.0
 COOKIE_TTL = 10 * 60  # 15 минут в секундах
-MAX_ATTEMPTS = 3  # Максимальное количество попыток получения cookies
-
-
-def validate_cookies(cookies: Dict[str, str]) -> bool:
-    """
-    Проверяет, что cookies содержат все обязательные поля.
-    
-    Args:
-        cookies: Словарь с cookies
-        
-    Returns:
-        bool: True если cookies валидны, False если нет
-    """
-    required_fields = ["auth.sid", "token", "auth.check"]
-    
-    if not cookies:
-        logger.error("Cookies пусты или None")
-        return False
-        
-    missing_fields = []
-    for field in required_fields:
-        if field not in cookies:
-            missing_fields.append(field)
-            
-    if missing_fields:
-        logger.error(f"В cookies отсутствуют обязательные поля: {missing_fields}")
-        return False
-        
-    # Дополнительная проверка, что значения не пустые
-    empty_fields = []
-    for field in required_fields:
-        if not cookies[field]:
-            empty_fields.append(field)
-            
-    if empty_fields:
-        logger.error(f"Обязательные поля cookies пусты: {empty_fields}")
-        return False
-        
-    logger.info("Cookies прошли валидацию: все обязательные поля присутствуют")
-    return True
 
 
 def load_cookies_from_file() -> Optional[Dict[str, str]]:
-    """Загружает cookies из файла, проверяя возраст и валидность."""
+    """Загружает cookies из файла, проверяя возраст."""
     if not COOKIES_FILE.exists():
-        logger.info("Файл cookies не существует")
         return None
-        
     try:
         data = json.loads(COOKIES_FILE.read_text(encoding="utf-8"))
         cookies = data.get("cookies")
         ts = data.get("timestamp", 0)
         age = time.time() - ts
-        
         if age > COOKIE_TTL:
             logger.info(f"Cookies устарели ({age:.0f} сек). Нужно обновить.")
             return None
-            
-        # Проверяем валидность загруженных cookies
-        if not validate_cookies(cookies):
-            logger.warning("Cookies в файле невалидны. Требуется обновление.")
-            return None
-            
-        logger.info("Успешно загружены валидные cookies из файла")
         return cookies
-        
     except Exception as e:
         logger.exception("Ошибка при чтении cookies из файла")
-        logger.error(f"Ошибка при чтении cookies из файла: {e}")
+        logger.error("Ошибка при чтении cookies из файла:", e)
         return None
 
 
@@ -121,7 +71,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         from selenium.webdriver.support import expected_conditions as EC
     except Exception as e:
         logger.exception("Selenium import failed")
-        logger.error(f"Selenium не установлен или недоступен: {e}")
+        logger.error("Selenium не установлен или недоступен:", e)
         return None
 
     # Импорт pywin32 для скрытия окна
@@ -138,9 +88,11 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
 
     if not driver_path.exists():
         logger.error(f"Driver not found: {driver_path}")
+        logger.error("Driver not found:", driver_path)
         return None
     if not browser_path.exists():
         logger.error(f"Browser binary not found: {browser_path}")
+        logger.error("Browser binary not found:", browser_path)
         return None
 
     opts = Options()
@@ -225,18 +177,13 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
             return None
 
         cookies = {c["name"]: c["value"] for c in raw}
-        
-        # Проверяем валидность cookies перед сохранением
-        if validate_cookies(cookies):
-            save_cookies_to_file(cookies)
-            return cookies
-        else:
-            logger.warning("Полученные cookies невалидны, не сохраняем в файл")
-            return None
+        save_cookies_to_file(cookies)
+
+        return cookies
 
     except Exception as e:
         logger.exception("get_cookies failed")
-        logger.error(f"get_cookies failed: {str(e)}")
+        logger.error("get_cookies failed: " + str(e))
         return None
     finally:
         try:
@@ -245,42 +192,12 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
             pass
 
 
-def get_valid_cookies(max_attempts: int = MAX_ATTEMPTS) -> Optional[Dict[str, str]]:
-    """
-    Основная точка входа: возвращает валидные cookies (из файла или новые).
-    
-    Args:
-        max_attempts: Максимальное количество попыток получения cookies
-        
-    Returns:
-        Dict[str, str] or None: Валидные cookies или None если не удалось получить
-    """
-    # Пытаемся загрузить из файла
+def get_valid_cookies() -> Optional[Dict[str, str]]:
+    """Основная точка входа: возвращает валидные cookies (из файла или новые)."""
     cookies = load_cookies_from_file()
     if cookies:
         return cookies
-        
-    # Если в файле нет валидных cookies, пытаемся получить новые
-    logger.info("Получение новых cookies...")
-    
-    for attempt in range(1, max_attempts + 1):
-        logger.info(f"Попытка {attempt} из {max_attempts}")
-        
-        cookies = get_cookies()
-        
-        if cookies and validate_cookies(cookies):
-            logger.info(f"Успешно получены валидные cookies с попытки {attempt}")
-            return cookies
-        else:
-            logger.warning(f"Попытка {attempt} не удалась: не удалось получить валидные cookies")
-            
-            if attempt < max_attempts:
-                retry_delay = attempt * 5  # Увеличиваем задержку с каждой попыткой
-                logger.info(f"Повторная попытка через {retry_delay} секунд...")
-                time.sleep(retry_delay)
-    
-    logger.error(f"Не удалось получить валидные cookies после {max_attempts} попыток")
-    return None
+    return get_cookies()
 
 
 if __name__ == "__main__":
