@@ -2599,6 +2599,28 @@ class App(ctk.CTk):
             font=ctk.CTkFont(size=16, weight="bold")
         ).pack(pady=(0, 10))
 
+        # Фрейм для поиска
+        search_frame = ctk.CTkFrame(main_frame)
+        search_frame.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(search_frame, text="Поиск:").pack(side="left", padx=5)
+        
+        search_var = ctk.StringVar()
+        search_entry = ctk.CTkEntry(
+            search_frame, 
+            textvariable=search_var,
+            placeholder_text="Введите номер заказа или название...",
+            width=300
+        )
+        search_entry.pack(side="left", padx=5, fill="x", expand=True)
+        
+        ctk.CTkButton(
+            search_frame,
+            text="Найти",
+            command=lambda: self._update_history_tree(history_tree, filter_var.get(), search_var.get())
+        ).pack(side="left", padx=5)
+
+        # Фрейм для фильтров
         filter_frame = ctk.CTkFrame(main_frame)
         filter_frame.pack(fill="x", pady=(0, 10))
 
@@ -2611,7 +2633,7 @@ class App(ctk.CTk):
             text="Все заказы",
             variable=filter_var,
             value="all",
-            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+            command=lambda: self._update_history_tree(history_tree, filter_var.get(), search_var.get())
         ).pack(side="left", padx=10)
 
         ctk.CTkRadioButton(
@@ -2619,7 +2641,7 @@ class App(ctk.CTk):
             text="Не отправлено",
             variable=filter_var,
             value="without_tsd",
-            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+            command=lambda: self._update_history_tree(history_tree, filter_var.get(), search_var.get())
         ).pack(side="left", padx=10)
 
         ctk.CTkRadioButton(
@@ -2627,7 +2649,7 @@ class App(ctk.CTk):
             text="Отправлено",
             variable=filter_var,
             value="with_tsd",
-            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+            command=lambda: self._update_history_tree(history_tree, filter_var.get(), search_var.get())
         ).pack(side="left", padx=10)
 
         table_frame = ctk.CTkFrame(main_frame)
@@ -2666,13 +2688,13 @@ class App(ctk.CTk):
         ctk.CTkButton(
             button_frame,
             text="🔄 Обновить",
-            command=lambda: self._update_history_tree(history_tree, filter_var.get())
+            command=lambda: self._update_history_tree(history_tree, filter_var.get(), search_var.get())
         ).pack(side="left", padx=5)
 
         ctk.CTkButton(
             button_frame,
             text="📋 Добавить в ТСД",
-            command=lambda: self._add_history_to_tsd(history_tree, history_window),  # Используем исправленный метод
+            command=lambda: self._add_history_to_tsd(history_tree, history_window),
             fg_color="#E67E22",
             hover_color="#D35400"
         ).pack(side="left", padx=5)
@@ -2692,11 +2714,14 @@ class App(ctk.CTk):
             command=history_window.destroy
         ).pack(side="right", padx=5)
         
+        # Обработка нажатия Enter в поле поиска
+        search_entry.bind("<Return>", lambda event: self._update_history_tree(history_tree, filter_var.get(), search_var.get()))
+        
         # Первоначальное заполнение таблицы
-        self._update_history_tree(history_tree, "all")
+        self._update_history_tree(history_tree, "all", "")
 
-    def _update_history_tree(self, history_tree, filter_type="all"):
-        """Обновляет дерево истории в диалоге согласно фильтру"""
+    def _update_history_tree(self, history_tree, filter_type="all", search_query=""):
+        """Обновляет дерево истории в диалоге согласно фильтру и поиску"""
         # Очищаем дерево
         for item in history_tree.get_children():
             history_tree.delete(item)
@@ -2709,6 +2734,20 @@ class App(ctk.CTk):
         elif filter_type == "with_tsd":
             history_orders = [order for order in self.history_db.get_all_orders() 
                             if order.get("tsd_created")]
+        
+        # СОРТИРОВКА: сначала новые заказы, потом старые
+        try:
+            history_orders.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        except:
+            # Если сортировка не удалась, оставляем как есть
+            pass
+        
+        # Применяем поиск, если есть поисковый запрос
+        if search_query:
+            search_lower = search_query.lower()
+            history_orders = [order for order in history_orders 
+                            if search_lower in order.get('document_id', '').lower() 
+                            or search_lower in order.get('order_name', '').lower()]
         
         # Заполняем дерево
         for order in history_orders:
