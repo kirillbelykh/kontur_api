@@ -3977,6 +3977,11 @@ class App(ctk.CTk):
             elif mode == "comment" and len(all_codes) > limit:
                 all_codes = all_codes[:limit]
             
+            # СОРТИРОВКА ПО ВОЗРАСТАНИЮ НОМЕРА
+            # Поскольку коды выглядят как "04650118042512020000000010" и "04650118042512010000000428",
+            # сортируем по числовой части в конце строки
+            all_codes.sort(key=lambda x: int(x['aggregateCode'][-10:]) if len(x['aggregateCode']) >= 10 else x['aggregateCode'])
+            
             return all_codes
             
         except Exception as e:
@@ -3984,7 +3989,7 @@ class App(ctk.CTk):
             return []
 
     def save_simple_csv(self, codes, filename):
-        """Сохраняет только коды в простом CSV"""
+        """Сохраняет только коды в простом CSV с сортировкой по возрастанию"""
         desktop = os.path.join(os.path.expanduser("~"), "Desktop")
         parent_dir = os.path.join(desktop, "Агрег коды км")
         target_dir = os.path.join(parent_dir, filename)
@@ -3995,10 +4000,12 @@ class App(ctk.CTk):
             return None
         
         try:
+            # СОРТИРУЕМ коды перед сохранением
+            sorted_codes = sorted(codes, key=lambda x: int(x['aggregateCode'][-10:]) if len(x['aggregateCode']) >= 10 else x['aggregateCode'])
+            
             with open(target_path, 'w', newline='', encoding='utf-8') as csvfile:
                 writer = csv.writer(csvfile)
-                # УБРАТЬ эту строку: writer.writerow(['aggregateCode'])
-                for code in codes:
+                for code in sorted_codes:
                     writer.writerow([code['aggregateCode']])
             
             return target_dir
