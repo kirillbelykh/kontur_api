@@ -3939,7 +3939,7 @@ class App(ctk.CTk):
                     # Добавляем отфильтрованные записи
                     for item in filtered_items:
                         aggregate_code = item.get('aggregateCode')
-                        if aggregate_code and aggregate_code not in [c['aggregateCode'] for c in all_codes]:
+                        if aggregate_code:
                             all_codes.append({
                                 'aggregateCode': aggregate_code,
                                 'documentId': item.get('documentId'),
@@ -3970,6 +3970,24 @@ class App(ctk.CTk):
                 except Exception as e:
                     self.log_aggregation_message(f"❌ Ошибка при запросе: {str(e)}")
                     break
+            
+            # Проверка на уникальность и удаление дубликатов
+            unique_codes = {}
+            for code in all_codes:
+                agg_code = code['aggregateCode']
+                if agg_code not in unique_codes:
+                    unique_codes[agg_code] = code
+            
+            # Преобразуем обратно в список и сортируем по номеру кода
+            all_codes = list(unique_codes.values())
+            
+            # Сортируем по увеличению номера (предполагаем, что код можно преобразовать в число)
+            # Если код не числовой, будет использована лексикографическая сортировка
+            all_codes.sort(key=lambda x: (
+                int(x['aggregateCode']) if x['aggregateCode'].isdigit() 
+                else float('inf') if not x['aggregateCode'].isdigit() 
+                else x['aggregateCode']
+            ))
             
             # Обрезаем до нужного количества
             if mode == "count" and len(all_codes) > int(target_value):
