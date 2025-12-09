@@ -232,7 +232,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                 logger.info(f"Error with cookie accept button: {e} - skipping")
 
             try:
-                profile_xpath = '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div/div[1]/div/div/div/div[1]/div/div'
+                profile_xpath = '//*[@id="root"]/div/div/div[1]/div[3]/div/div/div/div/div[2]/div/div/div/div/div/div'
                 profile_el = wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath)))
                 profile_el.click()
                 logger.info("Clicked profile (best-effort)")
