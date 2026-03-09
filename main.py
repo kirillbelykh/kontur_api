@@ -2991,9 +2991,6 @@ class App(ctk.CTk):
             if not batch_num:
                 errors.append("Введите номер партии.")
                 
-            if not thumbprint:
-                errors.append("Введите отпечаток сертификата.")
-
             if errors:
                 for error in errors:
                     self.intro_log_insert(f"❌ {error}")
@@ -3150,7 +3147,7 @@ class App(ctk.CTk):
         except ValueError:
             return False
 
-    def _intro_worker(self, item: dict, production_patch: dict, thumbprint: str):
+    def _intro_worker(self, item: dict, production_patch: dict, thumbprint: str | None):
         """
         Фоновая задача — производит ввод в оборот для одного заказа.
         Возвращает (ok, message).
@@ -3171,7 +3168,7 @@ class App(ctk.CTk):
                 codes_order_id=document_id,
                 production_patch=production_patch,
                 organization_id=os.getenv("ORGANIZATION_ID"),
-                thumbprint=THUMBPRINT,
+                thumbprint=thumbprint,
                 check_poll_interval=10,      # Увеличим интервалы для стабильности
                 check_poll_attempts=30,      # Больше попыток
             )

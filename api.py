@@ -77,10 +77,6 @@ def codes_order(session: requests.Session, document_number: str,
         logger.error(f"Проверка доступности документа {document_number}: {e}")
         return None
 
-    if not thumbprint:
-        logger.error("Thumbprint не передан, подпись документа невозможна")
-        return None
-
     # проверка сертификата
     if thumbprint:
         try:
@@ -92,6 +88,8 @@ def codes_order(session: requests.Session, document_number: str,
         except Exception as e:
             logger.error(f"Проверка сертификата: {e}")
             return None
+    else:
+        logger.info("Thumbprint не задан: будет использован первый доступный сертификат с ПК")
 
     # обновление токена OMS
     cert = find_certificate_by_thumbprint(thumbprint)

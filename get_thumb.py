@@ -1,4 +1,5 @@
 from typing import Optional
+import time
 import win32com.client
 import pythoncom
 
@@ -6,6 +7,24 @@ import pythoncom
 CAPICOM_CURRENT_USER_STORE = 2
 CAPICOM_MY_STORE = "My"
 CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
+
+def _is_cert_usable(cert) -> bool:
+    """Проверка сертификата на пригодность для подписи."""
+    try:
+        thumbprint = getattr(cert, "Thumbprint", None)
+        if not thumbprint:
+            return False
+
+        valid_to = getattr(cert, "ValidToDate", None)
+        if valid_to is not None and hasattr(valid_to, "timestamp"):
+            if valid_to.timestamp() <= time.time():
+                return False
+
+        has_private_key = getattr(cert, "HasPrivateKey", True)
+        return bool(has_private_key)
+    except Exception:
+        return False
+
 
 def find_certificate_thumbprint() -> Optional[str]:
     """
@@ -24,7 +43,7 @@ def find_certificate_thumbprint() -> Optional[str]:
             try:
                 # Получаем thumbprint
                 current_thumbprint = getattr(cert, "Thumbprint", None)
-                if current_thumbprint:
+                if current_thumbprint and _is_cert_usable(cert):
                     thumbprint = current_thumbprint.lower()
                     print(f"✅ Найден сертификат: {thumbprint}")
                     break  # Берем первый найденный
@@ -72,7 +91,7 @@ def find_certificate_thumbprint_detailed() -> Optional[str]:
                 issuer = getattr(cert, "IssuerName", "Неизвестно")
                 valid_to = getattr(cert, "ValidToDate", None)
                 
-                if current_thumbprint:
+                if current_thumbprint and _is_cert_usable(cert):
                     # Сохраняем информацию о первом найденном сертификате
                     if not thumbprint:
                         thumbprint = current_thumbprint
@@ -130,7 +149,7 @@ def get_thumbprint() -> Optional[str]:
         
         for cert in store.Certificates:
             thumbprint = getattr(cert, "Thumbprint", None)
-            if thumbprint:
+            if thumbprint and _is_cert_usable(cert):
                 store.Close()
                 pythoncom.CoUninitialize()
                 return thumbprint.lower()

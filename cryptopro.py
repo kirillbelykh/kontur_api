@@ -21,6 +21,24 @@ CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
 
 
 # ---------- certificate utilities (pywin32 / CAdES) ----------
+def _is_cert_usable(cert) -> bool:
+    """Проверка, что сертификат пригоден для подписи."""
+    try:
+        thumb = getattr(cert, "Thumbprint", "")
+        if not thumb:
+            return False
+
+        valid_to = getattr(cert, "ValidToDate", None)
+        if valid_to is not None and hasattr(valid_to, "timestamp"):
+            if valid_to.timestamp() <= datetime.datetime.now().timestamp():
+                return False
+
+        has_private_key = getattr(cert, "HasPrivateKey", True)
+        return bool(has_private_key)
+    except Exception:
+        return False
+
+
 def find_certificate_by_thumbprint(thumbprint: Optional[str] = None):
     logger.debug(f"Вход в find_certificate_by_thumbprint с thumbprint: {thumbprint}")
     pythoncom.CoInitialize()
@@ -36,6 +54,9 @@ def find_certificate_by_thumbprint(thumbprint: Optional[str] = None):
             try:
                 cert_thumb = getattr(cert, "Thumbprint", "").lower()
                 logger.debug(f"Проверка сертификата с thumbprint: {cert_thumb}")
+                if not _is_cert_usable(cert):
+                    logger.debug(f"Сертификат пропущен как непригодный: {cert_thumb}")
+                    continue
                 if thumbprint:
                     if cert_thumb == thumbprint.lower():
                         found = cert

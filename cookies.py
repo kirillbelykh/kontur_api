@@ -47,6 +47,40 @@ OPTIONAL_COOKIE_FIELDS = [
     "_kfpxv5"
 ]
 
+PROFILE_CARD_XPATHS = [
+    '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div/div[1]/div/div[1]/div/div[1]/div/div/span/span',
+    '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div',
+    '//div[contains(@class,"profile") and .//span]',
+]
+
+WAREHOUSE_XPATHS = [
+    '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]',
+    '//div[@role="button" and contains(., "Склад")]',
+]
+
+
+def click_first_available(driver, xpaths: List[str], step_name: str, timeout_per_xpath: int = 4) -> bool:
+    """Пытается кликнуть первый доступный элемент по списку XPath."""
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+    for xpath in xpaths:
+        try:
+            local_wait = WebDriverWait(driver, timeout_per_xpath)
+            element = local_wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+            try:
+                element.click()
+            except Exception:
+                driver.execute_script("arguments[0].click();", element)
+            logger.info(f"{step_name}: clicked by xpath {xpath}")
+            return True
+        except Exception:
+            continue
+    logger.info(f"{step_name}: no matching clickable elements")
+    return False
+
 
 def validate_cookies(cookies: Dict[str, str]) -> tuple[bool, List[str]]:
     """
@@ -307,32 +341,19 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                 except Exception as e:
                     logger.info(f"Error with cookie accept button: {e} - skipping")
 
-                try:
-                    profile_xpath = '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div'
-                    profile_el = wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath)))
-                    profile_el.click()
-                    logger.info("Clicked profile (best-effort)")
-                    time.sleep(SLEEP)
-                except Exception as e:
-                    logger.info(f"Profile select error: {e} - ignored")
-
-                try:
-                    warehouse_el = wait.until(EC.element_to_be_clickable(
-                        (By.XPATH, '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]')
-                    ))
-                    warehouse_el.click()
-                    logger.info("Clicked warehouse (fallback selector)")
-                    time.sleep(SLEEP)
-                except Exception as e:
-                    logger.info(f"Warehouse select error: {e} - ignored")
+                click_first_available(driver, PROFILE_CARD_XPATHS, "Profile select")
+                time.sleep(SLEEP)
+                click_first_available(driver, WAREHOUSE_XPATHS, "Warehouse select")
+                time.sleep(SLEEP)
 
                 # Дополнительная проверка загрузки страницы
                 wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
                 logger.info("Страница загружена (body найден)")
 
-                validation_wait_seconds = 0 if mode_name == "profile" else 120
+                validation_wait_seconds = 120 if mode_name == "profile" else 180
                 deadline = time.time() + validation_wait_seconds
                 missing_fields: List[str] = []
+                next_click_ts = time.time() + 3
 
                 while True:
                     raw = driver.get_cookies()
@@ -347,6 +368,12 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                             break
                     else:
                         missing_fields = ["all cookies missing"]
+
+                    if time.time() >= next_click_ts:
+                        # Периодически повторяем клики: интерфейс может догружаться асинхронно.
+                        click_first_available(driver, PROFILE_CARD_XPATHS, "Profile retry")
+                        click_first_available(driver, WAREHOUSE_XPATHS, "Warehouse retry")
+                        next_click_ts = time.time() + 5
 
                     if time.time() >= deadline:
                         break
