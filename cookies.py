@@ -1,10 +1,8 @@
 import time
 import json
-import os
 import importlib
 import shutil
 import tempfile
-from urllib.parse import urlparse
 from pathlib import Path
 from typing import Dict, Optional, List
 
@@ -15,14 +13,8 @@ paths = find_yandex_paths()
 # Настройки — поправь пути под систему
 YANDEX_DRIVER_PATH = Path("driver") / "yandexdriver.exe"
 YANDEX_BROWSER_PATH = paths["browser"]
-PROFILE_USER_DATA_DIR = (
-    Path(os.environ["KONTUR_YANDEX_USER_DATA_DIR"])
-    if "KONTUR_YANDEX_USER_DATA_DIR" in os.environ
-    else paths["user_data"]
-)
-PROFILE_DIRECTORY = os.environ.get("KONTUR_YANDEX_PROFILE", paths["profile"] or "Default")
-ALLOW_TEMP_PROFILE_FALLBACK = os.environ.get("KONTUR_ALLOW_TEMP_PROFILE_FALLBACK", "0") == "1"
-HIDE_BROWSER_WINDOW = os.environ.get("KONTUR_HIDE_BROWSER_WINDOW", "0") == "1"
+PROFILE_USER_DATA_DIR = paths["user_data"]
+PROFILE_DIRECTORY = paths["profile"] or "Default"
 HEADLESS = False
 
 COOKIES_FILE = Path("kontur_cookies.json")
@@ -48,100 +40,6 @@ OPTIONAL_COOKIE_FIELDS = [
     "_mfp",
     "_kfpxv5"
 ]
-
-PROFILE_CARD_XPATHS = [
-    '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div/div[1]/div/div[1]/div/div[1]/div/div/span/span',
-    '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div',
-    '//div[contains(@class,"profile") and .//span]',
-]
-
-WAREHOUSE_XPATHS = [
-    '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]',
-    '//div[@role="button" and contains(., "Склад")]',
-]
-
-
-def click_first_available(driver, xpaths: List[str], step_name: str, timeout_per_xpath: int = 4) -> bool:
-    """Пытается кликнуть первый доступный элемент по списку XPath."""
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-
-    for xpath in xpaths:
-        try:
-            local_wait = WebDriverWait(driver, timeout_per_xpath)
-            element = local_wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
-            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
-            try:
-                element.click()
-            except Exception:
-                driver.execute_script("arguments[0].click();", element)
-            logger.info(f"{step_name}: clicked by xpath {xpath}")
-            return True
-        except Exception:
-            continue
-    logger.info(f"{step_name}: no matching clickable elements")
-    return False
-
-
-def ensure_target_url_opened(driver, target_url: str, wait_timeout: int = 8) -> bool:
-    """
-    Гарантирует открытие target_url даже если профиль стартует на прошлых вкладках.
-    Делает несколько стратегий навигации и проверяет текущий URL.
-    """
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-
-    target_host = urlparse(target_url).netloc.lower()
-
-    def is_on_target() -> bool:
-        try:
-            current = (driver.current_url or "").lower()
-            return target_host in current
-        except Exception:
-            return False
-
-    for nav_attempt in range(1, 7):
-        if is_on_target():
-            return True
-
-        try:
-            if nav_attempt == 1:
-                driver.get(target_url)
-            elif nav_attempt == 2:
-                driver.execute_script("window.location.replace(arguments[0]);", target_url)
-            elif nav_attempt == 3:
-                driver.switch_to.new_window("tab")
-                driver.get(target_url)
-            elif nav_attempt == 4:
-                driver.execute_script("window.open(arguments[0], '_blank');", target_url)
-                driver.switch_to.window(driver.window_handles[-1])
-            elif nav_attempt == 5:
-                # Попытка через CDP-навигацию (Chromium API).
-                try:
-                    driver.execute_cdp_cmd("Page.navigate", {"url": target_url})
-                except Exception:
-                    driver.get(target_url)
-            else:
-                # Последняя попытка: закрываем лишние вкладки и открываем URL в текущей.
-                for handle in list(driver.window_handles)[:-1]:
-                    try:
-                        driver.switch_to.window(handle)
-                        driver.close()
-                    except Exception:
-                        pass
-                driver.switch_to.window(driver.window_handles[-1])
-                driver.get(target_url)
-
-            WebDriverWait(driver, wait_timeout).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            time.sleep(1.0)
-        except Exception as e:
-            logger.info(f"Navigation attempt {nav_attempt} failed: {e}")
-
-    return is_on_target()
 
 
 def validate_cookies(cookies: Dict[str, str]) -> tuple[bool, List[str]]:
@@ -305,23 +203,15 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
     if not profile_directory:
         profile_directory = "Default"
 
-    logger.info(f"Профиль браузера для Selenium: {profile_directory}")
-    logger.info(f"Путь user-data-dir: {user_data_dir_for_option}")
-
     for attempt in range(max_retries):
         logger.info(f"Попытка получения cookies #{attempt + 1}")
 
         launch_modes: list[tuple[str, Optional[Path], Optional[str], bool]] = []
         if user_data_dir_for_option:
-            launch_modes.append(("profile", user_data_dir_for_option, profile_directory, HIDE_BROWSER_WINDOW))
+            launch_modes.append(("profile", user_data_dir_for_option, profile_directory, True))
         else:
-            logger.warning("Папка профиля Яндекс Браузера не определена")
-        if ALLOW_TEMP_PROFILE_FALLBACK:
-            launch_modes.append(("temporary", None, None, False))
-        elif not user_data_dir_for_option:
-            logger.error(
-                "Временный профиль отключен. Укажите профиль через KONTUR_YANDEX_USER_DATA_DIR/KONTUR_YANDEX_PROFILE."
-            )
+            logger.warning("Папка профиля Яндекс Браузера не определена, пробуем запуск с временным профилем")
+        launch_modes.append(("temporary", None, None, False))
 
         for mode_name, launch_user_data_dir, launch_profile_dir, hide_window in launch_modes:
             driver = None
@@ -357,7 +247,6 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
 
                 service = Service(str(driver_path))
                 driver = webdriver.Chrome(service=service, options=opts)
-                driver.set_page_load_timeout(45)
                 wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
                 if mode_name == "temporary" and not headless:
@@ -388,11 +277,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                     else:
                         logger.warning("Не удалось найти окна браузера по PID для скрытия")
 
-                opened = ensure_target_url_opened(driver, target_url)
-                if not opened:
-                    logger.warning("Не удалось открыть целевой URL Контур после нескольких попыток")
-                else:
-                    logger.info(f"Открыт целевой URL: {driver.current_url}")
+                driver.get(target_url)
                 time.sleep(2.0)  # Увеличили задержку для полной загрузки
 
                 # best-effort шаги с дополнительными проверками
@@ -408,19 +293,32 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                 except Exception as e:
                     logger.info(f"Error with cookie accept button: {e} - skipping")
 
-                click_first_available(driver, PROFILE_CARD_XPATHS, "Profile select")
-                time.sleep(SLEEP)
-                click_first_available(driver, WAREHOUSE_XPATHS, "Warehouse select")
-                time.sleep(SLEEP)
+                try:
+                    profile_xpath = '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div'
+                    profile_el = wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath)))
+                    profile_el.click()
+                    logger.info("Clicked profile (best-effort)")
+                    time.sleep(SLEEP)
+                except Exception as e:
+                    logger.info(f"Profile select error: {e} - ignored")
+
+                try:
+                    warehouse_el = wait.until(EC.element_to_be_clickable(
+                        (By.XPATH, '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]')
+                    ))
+                    warehouse_el.click()
+                    logger.info("Clicked warehouse (fallback selector)")
+                    time.sleep(SLEEP)
+                except Exception as e:
+                    logger.info(f"Warehouse select error: {e} - ignored")
 
                 # Дополнительная проверка загрузки страницы
                 wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
                 logger.info("Страница загружена (body найден)")
 
-                validation_wait_seconds = 120 if mode_name == "profile" else 180
+                validation_wait_seconds = 0 if mode_name == "profile" else 120
                 deadline = time.time() + validation_wait_seconds
                 missing_fields: List[str] = []
-                next_click_ts = time.time() + 3
 
                 while True:
                     raw = driver.get_cookies()
@@ -435,12 +333,6 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                             break
                     else:
                         missing_fields = ["all cookies missing"]
-
-                    if time.time() >= next_click_ts:
-                        # Периодически повторяем клики: интерфейс может догружаться асинхронно.
-                        click_first_available(driver, PROFILE_CARD_XPATHS, "Profile retry")
-                        click_first_available(driver, WAREHOUSE_XPATHS, "Warehouse retry")
-                        next_click_ts = time.time() + 5
 
                     if time.time() >= deadline:
                         break
@@ -460,7 +352,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                     logger.warning(
                         "Ошибка DevToolsActivePort: закройте все окна Яндекс.Браузера и попробуйте снова."
                     )
-                if mode_name == "profile" and ALLOW_TEMP_PROFILE_FALLBACK:
+                if mode_name == "profile":
                     logger.info("Пробуем резервный запуск без пользовательского профиля")
             finally:
                 if driver is not None:
