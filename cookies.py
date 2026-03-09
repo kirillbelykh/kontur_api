@@ -4,6 +4,7 @@ import os
 import importlib
 import shutil
 import tempfile
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Dict, Optional, List
 
@@ -80,6 +81,60 @@ def click_first_available(driver, xpaths: List[str], step_name: str, timeout_per
             continue
     logger.info(f"{step_name}: no matching clickable elements")
     return False
+
+
+def ensure_target_url_opened(driver, target_url: str, wait_timeout: int = 8) -> bool:
+    """
+    Гарантирует открытие target_url даже если профиль стартует на прошлых вкладках.
+    Делает несколько стратегий навигации и проверяет текущий URL.
+    """
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+    target_host = urlparse(target_url).netloc.lower()
+
+    def is_on_target() -> bool:
+        try:
+            current = (driver.current_url or "").lower()
+            return target_host in current
+        except Exception:
+            return False
+
+    for nav_attempt in range(1, 6):
+        if is_on_target():
+            return True
+
+        try:
+            if nav_attempt == 1:
+                driver.get(target_url)
+            elif nav_attempt == 2:
+                driver.execute_script("window.location.replace(arguments[0]);", target_url)
+            elif nav_attempt == 3:
+                driver.switch_to.new_window("tab")
+                driver.get(target_url)
+            elif nav_attempt == 4:
+                driver.execute_script("window.open(arguments[0], '_blank');", target_url)
+                driver.switch_to.window(driver.window_handles[-1])
+            else:
+                # Последняя попытка: закрываем лишние вкладки и открываем URL в текущей.
+                for handle in list(driver.window_handles)[:-1]:
+                    try:
+                        driver.switch_to.window(handle)
+                        driver.close()
+                    except Exception:
+                        pass
+                driver.switch_to.window(driver.window_handles[-1])
+                driver.get(target_url)
+
+            WebDriverWait(driver, wait_timeout).until(
+                EC.presence_of_element_located((By.TAG_NAME, "body"))
+            )
+            time.sleep(1.0)
+        except Exception as e:
+            logger.info(f"Navigation attempt {nav_attempt} failed: {e}")
+
+    return is_on_target()
 
 
 def validate_cookies(cookies: Dict[str, str]) -> tuple[bool, List[str]]:
@@ -325,7 +380,9 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                     else:
                         logger.warning("Не удалось найти окна браузера по PID для скрытия")
 
-                driver.get(target_url)
+                opened = ensure_target_url_opened(driver, target_url)
+                if not opened:
+                    logger.warning("Не удалось открыть целевой URL Контур после нескольких попыток")
                 time.sleep(2.0)  # Увеличили задержку для полной загрузки
 
                 # best-effort шаги с дополнительными проверками
