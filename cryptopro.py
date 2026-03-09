@@ -167,7 +167,7 @@ def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> 
         logger.debug(f"Строки Set-Cookie: {set_cookie_lines}")
         if set_cookie_lines:
             temp_resp = requests.Response()
-            temp_resp.headers['Set-Cookie'] = set_cookie_lines
+            temp_resp.headers['Set-Cookie'] = ", ".join(set_cookie_lines)
             temp_resp.status_code = status
             temp_resp.url = url_auth
             session.cookies.update(temp_resp.cookies)

@@ -142,7 +142,7 @@ def test_concurrent_access():
     
     # Второй "пользователь" читает заказы
     time.sleep(1)  # Небольшая задержка
-    orders_user2 = db2.get_all_orders()
+    db2.get_all_orders()
     concurrent_order = db2.get_order_by_document_id("CONCURRENT_001")
     
     if concurrent_order:

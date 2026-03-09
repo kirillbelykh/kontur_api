@@ -7,12 +7,20 @@ import tkinter.messagebox as mbox
 
 def _git_kwargs():
     """kwargs для subprocess: скрыть консоль на Windows и вернуть текст."""
-    kwargs = {'text': True}
+    kwargs: dict[str, object] = {'text': True}
     if os.name == 'nt':
-        si = subprocess.STARTUPINFO()
-        si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-        si.wShowWindow = 0
-        kwargs.update({'startupinfo': si, 'creationflags': getattr(subprocess, 'CREATE_NO_WINDOW', 0)})
+        startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
+        startf_use_showwindow = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
+        create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", None)
+
+        if startupinfo_cls is not None:
+            si = startupinfo_cls()
+            si.dwFlags |= startf_use_showwindow
+            si.wShowWindow = 0
+            kwargs['startupinfo'] = si
+
+        if create_no_window is not None:
+            kwargs['creationflags'] = int(create_no_window)
     return kwargs
 
 def _run_git(args, repo_dir, check=True):
@@ -138,7 +146,7 @@ def check_for_updates(repo_dir=None, pre_update_cleanup=None, auto_restart=True)
             try:
                 _run_git(["stash", "push", "-u", "-m", "autostash-before-update"], repo_dir)
                 stash_created = True
-            except subprocess.CalledProcessError as e:
+            except subprocess.CalledProcessError:
                 mbox.showerror("Ошибка", "Не удалось временно сохранить локальные изменения. Обновление отменено.")
                 return False
 

@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from logger import logger
 
 class OrderHistoryDB:
-    def __init__(self, db_file: str = None):
+    def __init__(self, db_file: Optional[str] = None):
         # Указываем сетевой путь
         self.db_file = db_file or r"\\192.168.100.2\!files\orders_history.json"
         self._ensure_db_exists()
@@ -74,6 +74,7 @@ class OrderHistoryDB:
                         return self._load_data()
                     raise
                 continue
+        return {"orders": [], "last_update": datetime.now().isoformat()}
     
     def _save_data(self, data: Dict[str, Any]):
         """Сохраняет данные в JSON файл с обработкой сетевых ошибок"""

@@ -3,12 +3,17 @@ import os
 import json
 import requests
 import winreg
-from typing import Dict, Optional
+from typing import Dict, Optional, TypedDict
 from dataclasses import asdict
 from datetime import datetime
 from logger import logger
 
 COOKIES_FILE = Path("cookies.json")
+
+class YandexPaths(TypedDict):
+    browser: Optional[Path]
+    user_data: Optional[Path]
+    profile: str
 
 # ---------------- helpers ----------------
 
@@ -108,12 +113,12 @@ def save_snapshot(to_process) -> bool:
         return False
 
 
-def find_yandex_paths() -> Dict[str, Optional[Path]]:
+def find_yandex_paths() -> YandexPaths:
     """
     Автоматически находит пути Яндекс Браузера и пользовательских данных.
     Возвращает словарь с ключами 'browser', 'user_data', 'profile'.
     """
-    paths = {
+    paths: YandexPaths = {
         'browser': None,
         'user_data': None,
         'profile': "Default"
@@ -121,9 +126,11 @@ def find_yandex_paths() -> Dict[str, Optional[Path]]:
 
     # Поиск браузера через реестр
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                            r"Software\Classes\YandexBrowserHTML\shell\open\command") as key:
-            value = winreg.QueryValue(key, "")
+        with winreg.OpenKey(  # type: ignore[attr-defined]
+            winreg.HKEY_CURRENT_USER,  # type: ignore[attr-defined]
+            r"Software\Classes\YandexBrowserHTML\shell\open\command"
+        ) as key:
+            value = winreg.QueryValue(key, "")  # type: ignore[attr-defined]
             if value:
                 browser_path = value.split('"')[1] if '"' in value else value.split()[0]
                 paths['browser'] = Path(browser_path)

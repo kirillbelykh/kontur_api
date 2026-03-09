@@ -151,7 +151,7 @@ def lookup_gtin(
         available_sizes = df[df['Упрощенно'].str.lower() == simpl]['normalized_size'].unique()
         logger.debug(f"Доступные размеры для {simpl}: {list(available_sizes)}")
 
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка в lookup_gtin")
 
     return None, None
@@ -178,7 +178,7 @@ def lookup_by_gtin(df: pd.DataFrame, gtin: str) -> tuple[str | None, str | None]
             simpl_name = str(row.get('Упрощенно', '')).strip()
             return full_name, simpl_name
 
-    except Exception as e:
+    except Exception:
         logger.exception(f"Ошибка в lookup_by_gtin для GTIN={gtin}")
 
     return None, None

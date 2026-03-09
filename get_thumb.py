@@ -94,11 +94,11 @@ def find_certificate_thumbprint_detailed() -> Optional[str]:
         store.Close()
         
         # Выводим итоговую информацию
-        print(f"\n📊 ИТОГИ ПОИСКА:")
+        print("\n📊 ИТОГИ ПОИСКА:")
         print(f"   Всего сертификатов: {certificate_count}")
         
         if thumbprint:
-            print(f"✅ ИСПОЛЬЗУЕМ СЕРТИФИКАТ:")
+            print("✅ ИСПОЛЬЗУЕМ СЕРТИФИКАТ:")
             print(f"   Thumbprint: {certificate_info['thumbprint']}")
             print(f"   Владелец: {certificate_info['subject']}")
             print(f"   Издатель: {certificate_info['issuer']}")
@@ -150,18 +150,18 @@ if __name__ == '__main__':
     # Простой вызов
     print("=== ПРОСТОЙ ПОИСК ===")
     thumbprint = find_certificate_thumbprint()
-    print(f"Результат: {thumbprint.lower()}")
+    print(f"Результат: {thumbprint.lower() if thumbprint else 'not found'}")
     
     print("\n" + "="*50 + "\n")
     
     # Детальный вызов
     print("=== ДЕТАЛЬНЫЙ ПОИСК ===")
     thumbprint_detailed = find_certificate_thumbprint_detailed()
-    print(f"Итоговый thumbprint: {thumbprint_detailed.lower()}")
+    print(f"Итоговый thumbprint: {thumbprint_detailed.lower() if thumbprint_detailed else 'not found'}")
     
     print("\n" + "="*50 + "\n")
     
     # Использование в проекте
     print("=== ДЛЯ ИСПОЛЬЗОВАНИЯ В ПРОЕКТЕ ===")
     thumb = get_thumbprint()
-    print(f"Thumbprint для .env: {thumb.lower()}")
+    print(f"Thumbprint для .env: {thumb.lower() if thumb else 'not found'}")

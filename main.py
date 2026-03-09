@@ -20,7 +20,6 @@ import update
 import customtkinter as ctk
 from customtkinter import CTkScrollableFrame
 import tkinter as tk
-import tkinter.messagebox as mbox
 from tkinter import ttk, font
 from dotenv import load_dotenv # type: ignore
 from options import (
@@ -102,7 +101,7 @@ class SessionManager:
                     cls._session = new_session
                     cls._last_update = time.time()
                     
-                print(f"✅ Cookies успешно обновлены. Следующее обновление через 13 минут")
+                print("✅ Cookies успешно обновлены. Следующее обновление через 13 минут")
                 
                 # Сбрасываем событие для следующей итерации
                 cls._update_event.clear()
@@ -774,13 +773,6 @@ class App(ctk.CTk):
     def _set_default_fonts(self):
         """Устанавливает шрифты по умолчанию для всех виджетов"""
         try:
-            # Получаем текущую тему
-            current_theme = ctk.get_appearance_mode()
-            
-            # Настраиваем стандартные шрифты через тему
-            normal_font = self.fonts["normal"]
-            button_font = self.fonts["button"]
-            
             # Создаем кастомную тему с нужными шрифтами
             ctk.set_default_color_theme("blue")  # или другая базовая тема
             
@@ -2224,7 +2216,7 @@ class App(ctk.CTk):
             
         except Exception as e:
             logger.error(f"Ошибка скачивания {item['order_name']}: {e}", exc_info=True)
-            self.after(0, lambda: self._update_download_status(item, f'Ошибка: {e}'))
+            self.after(0, lambda err=str(e): self._update_download_status(item, f"Ошибка: {err}"))
         finally:
             item['downloading'] = False
             self.after(0, self.update_idletasks)  # Принудительно обновить UI
@@ -2324,7 +2316,7 @@ class App(ctk.CTk):
             # Дальше общая логика
             order_data = self.history_db.get_order_by_document_id(document_id)
             if not order_data:
-                tk.messagebox.showerror("Ошибка", f"Заказ не найден в истории")
+                tk.messagebox.showerror("Ошибка", "Заказ не найден в истории")
                 return
             
             # Проверяем, не добавлен ли уже заказ в download_list
@@ -3018,7 +3010,6 @@ class App(ctk.CTk):
                     self.intro_log_insert("❌ Пропущен некорректный элемент заказа")
                     continue
                     
-                docid = it["document_id"]
                 order_name = it.get("order_name", "Unknown")
                 simpl_name = it.get("simpl")
                 tnved_code = get_tnved_code(simpl_name) if simpl_name else ""
@@ -3483,7 +3474,6 @@ class App(ctk.CTk):
             
             for iid in sel:
                 # Получаем данные из дерева
-                item_values = self.tsd_tree.item(iid, 'values')
                 docid = iid  # или item_values[1] в зависимости от структуры
                 
                 # Ищем в download_list
@@ -3680,9 +3670,6 @@ class App(ctk.CTk):
                     
                     for i, (fut, it) in enumerate(futures):
                         try:
-                            docid = it.get("document_id", "Unknown")
-                            order_name = it.get("order_name", "Unknown")
-                            
                             # Ждем завершения задачи с таймаутом
                             ok, result = fut.result(timeout=300)  # 5 минут
                             
@@ -3744,7 +3731,6 @@ class App(ctk.CTk):
         """
         try:
             document_id = item["document_id"]
-            order_name = item.get('order_name', 'Unknown')
             
 
             # ВЫЗОВ API
@@ -3805,7 +3791,7 @@ class App(ctk.CTk):
         order_name = item.get("order_name", "Unknown")
         
         if ok:
-            self.tsd_log_insert(f"🎉 ЗАДАНИЕ УСПЕШНО СОЗДАНО!")
+            self.tsd_log_insert("🎉 ЗАДАНИЕ УСПЕШНО СОЗДАНО!")
             self.sent_to_tsd_items.add(docid)
             item["status"] = "Отправлено на ТСД"
             self.show_info(f"Задание на ТСД для заказа '{order_name}' успешно создано!")
@@ -3853,7 +3839,7 @@ class App(ctk.CTk):
             except Exception as e:
                 self.tsd_log_insert(f"⚠️ Ошибка при поиске GTIN в истории БД: {e}")
             
-            self.tsd_log_insert(f"❌ GTIN не найден ни в download_list, ни в истории БД")
+            self.tsd_log_insert("❌ GTIN не найден ни в download_list, ни в истории БД")
             return None
             
         except Exception as e:
@@ -3892,7 +3878,7 @@ class App(ctk.CTk):
                     self.tsd_log_insert(f"✅ GTIN найден в api_data: {gtin}")
                     return gtin
             
-            self.tsd_log_insert(f"❌ Не удалось извлечь GTIN из данных заказа")
+            self.tsd_log_insert("❌ Не удалось извлечь GTIN из данных заказа")
             return None
             
         except Exception as e:

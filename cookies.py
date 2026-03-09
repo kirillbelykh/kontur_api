@@ -1,7 +1,8 @@
 import time
 import json
+import importlib
 from pathlib import Path
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, List
 
 from logger import logger
 from utils import find_yandex_paths
@@ -9,9 +10,9 @@ from utils import find_yandex_paths
 paths = find_yandex_paths()
 # Настройки — поправь пути под систему
 YANDEX_DRIVER_PATH = Path("driver") / "yandexdriver.exe"
-YANDEX_BROWSER_PATH = Path(paths["browser"]) if paths.get("browser") else None
-PROFILE_USER_DATA_DIR = Path(paths["user_data"]) if paths.get("user_data") else None
-PROFILE_DIRECTORY = str(paths.get("profile") or "Default")
+YANDEX_BROWSER_PATH = paths["browser"]
+PROFILE_USER_DATA_DIR = paths["user_data"]
+PROFILE_DIRECTORY = paths["profile"] or "Default"
 HEADLESS = False
 
 COOKIES_FILE = Path("kontur_cookies.json")
@@ -158,13 +159,13 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         return None
 
     # Импорт pywin32 для скрытия окна
-    win32gui = None
-    win32con = None
-    win32process = None
+    win32gui_mod = None
+    win32con_mod = None
+    win32process_mod = None
     try:
-        import win32gui
-        import win32con
-        import win32process
+        win32gui_mod = importlib.import_module("win32gui")
+        win32con_mod = importlib.import_module("win32con")
+        win32process_mod = importlib.import_module("win32process")
     except ImportError as e:
         logger.warning("pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32")
         logger.warning(f"Ошибка импорта pywin32: {e}")
@@ -173,15 +174,15 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
     try:
         runtime_paths = find_yandex_paths()
     except Exception as e:
-        runtime_paths = {}
+        runtime_paths = {"browser": None, "user_data": None, "profile": "Default"}
         logger.warning(f"Не удалось автоматически определить пути Яндекс Браузера: {e}")
 
-    if browser_path is None and runtime_paths.get("browser"):
-        browser_path = Path(runtime_paths["browser"])
-    if profile_user_data_dir is None and runtime_paths.get("user_data"):
-        profile_user_data_dir = Path(runtime_paths["user_data"])
+    if browser_path is None and runtime_paths["browser"] is not None:
+        browser_path = runtime_paths["browser"]
+    if profile_user_data_dir is None and runtime_paths["user_data"] is not None:
+        profile_user_data_dir = runtime_paths["user_data"]
     if not profile_directory:
-        profile_directory = str(runtime_paths.get("profile") or "Default")
+        profile_directory = runtime_paths["profile"] or "Default"
 
     if not driver_path.exists():
         logger.error(f"Driver not found: {driver_path}")
@@ -225,20 +226,24 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
 
         try:
             # Скрытие окна браузера с помощью Windows API по PID (если pywin32 доступен)
-            if win32gui and win32con and win32process:
-                pid = driver.service.process.pid
+            if win32gui_mod and win32con_mod and win32process_mod:
+                if driver.service is None or driver.service.process is None:
+                    logger.warning("Сервис Selenium недоступен для скрытия окна браузера")
+                    pid = None
+                else:
+                    pid = driver.service.process.pid
                 time.sleep(1.0)  # Ждём запуска окна
 
                 def enum_window_callback(hwnd, results):
-                    _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
-                    if window_pid == pid:
+                    _, window_pid = win32process_mod.GetWindowThreadProcessId(hwnd)
+                    if pid is not None and window_pid == pid:
                         results.append(hwnd)
 
-                results = []
-                win32gui.EnumWindows(enum_window_callback, results)
+                results: list[int] = []
+                win32gui_mod.EnumWindows(enum_window_callback, results)
                 if results:
                     for hwnd in results:
-                        win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+                        win32gui_mod.ShowWindow(hwnd, win32con_mod.SW_HIDE)
                     logger.info(f"Скрыто {len(results)} окон браузера по PID {pid}")
                 else:
                     logger.warning("Не удалось найти окна браузера по PID для скрытия")

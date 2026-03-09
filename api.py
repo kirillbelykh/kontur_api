@@ -454,23 +454,28 @@ def put_into_circulation(
     """
     result: Dict[str, Any] = {"errors": []}
     try:
+        use_ip_workaround = False
+
         # 1) create-from-codes-order
         try:
             addr = socket.getaddrinfo('mk.kontur.ru', 443)
             logger.info(f"DNS успешно разрешён: {addr}")
             url_create = f"{BASE}/api/v1/codes-introduction/create-from-codes-order/{codes_order_id}?isImportFts=false&isAccompanyingDocumentNeeds=false"
-            extra_kwargs = {}  # Без verify=False
         except socket.gaierror as dns_err:
             logger.error(f"DNS-разрешение провалено: {dns_err}. Используем workaround с IP.")
             # Workaround: Используем IP вместо домена
             ip = '46.17.200.242'
             original_base = BASE.replace('mk.kontur.ru', ip)
             url_create = f"{original_base}/api/v1/codes-introduction/create-from-codes-order/{codes_order_id}?isImportFts=false&isAccompanyingDocumentNeeds=false"
-            extra_kwargs = {'verify': False}  # Отключаем проверку SSL (небезопасно!)
+            use_ip_workaround = True
         # Добавляем заголовок Host для workaround (если используем IP)
-        headers = {'Host': 'mk.kontur.ru'} if 'ip' in locals() else {}
-        
-        r = session.post(url_create, headers=headers, timeout=30, **extra_kwargs)
+        headers = {'Host': 'mk.kontur.ru'} if use_ip_workaround else {}
+
+        if use_ip_workaround:
+            # Отключаем проверку SSL только для fallback-запроса на IP.
+            r = session.post(url_create, headers=headers, timeout=30, verify=False)
+        else:
+            r = session.post(url_create, headers=headers, timeout=30)
         logger.info(f"Ответ сервера: {r.text}")
         r.raise_for_status()
         intro_id = r.text.strip().strip('"')
@@ -732,7 +737,7 @@ def make_task_on_tsd(
         url_positions = f"{BASE}/api/v1/codes-introduction/{document_id}/positions"
         
         # Форматируем позиции для API
-        positions_payload = {"rows": []}
+        positions_payload: Dict[str, List[Dict[str, Any]]] = {"rows": []}
         for pos in positions_data:
             position = {
                 "name": pos["name"],
@@ -824,7 +829,7 @@ def save_codes_order_to_history(order_data: Dict[str, Any], result: Dict[str, An
             history_db.add_order(history_entry)
             logger.info(f"✅ Заказ {order_data.get('document_number', 'Unknown')} сохранен в историю")
         else:
-            logger.warning(f"⚠️ Заказ не сохранен в историю из-за ошибки")
+            logger.warning("⚠️ Заказ не сохранен в историю из-за ошибки")
         
     except Exception as e:
         logger.error(f"❌ Ошибка сохранения истории заказов кодов: {e}")
