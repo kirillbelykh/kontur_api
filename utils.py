@@ -3,17 +3,12 @@ import os
 import json
 import requests
 import winreg
-from typing import Dict, Optional, TypedDict
+from typing import Dict, Optional
 from dataclasses import asdict
 from datetime import datetime
 from logger import logger
 
 COOKIES_FILE = Path("cookies.json")
-
-class YandexPaths(TypedDict):
-    browser: Optional[Path]
-    user_data: Optional[Path]
-    profile: str
 
 # ---------------- helpers ----------------
 
@@ -113,24 +108,22 @@ def save_snapshot(to_process) -> bool:
         return False
 
 
-def find_yandex_paths() -> YandexPaths:
+def find_yandex_paths() -> Dict[str, Optional[Path]]:
     """
     Автоматически находит пути Яндекс Браузера и пользовательских данных.
     Возвращает словарь с ключами 'browser', 'user_data', 'profile'.
     """
-    paths: YandexPaths = {
+    paths = {
         'browser': None,
         'user_data': None,
-        'profile': "Default"
+        'profile': "Vinsent O`neal"
     }
 
     # Поиск браузера через реестр
     try:
-        with winreg.OpenKey(  # type: ignore[attr-defined]
-            winreg.HKEY_CURRENT_USER,  # type: ignore[attr-defined]
-            r"Software\Classes\YandexBrowserHTML\shell\open\command"
-        ) as key:
-            value = winreg.QueryValue(key, "")  # type: ignore[attr-defined]
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                            r"Software\Classes\YandexBrowserHTML\shell\open\command") as key:
+            value = winreg.QueryValue(key, "")
             if value:
                 browser_path = value.split('"')[1] if '"' in value else value.split()[0]
                 paths['browser'] = Path(browser_path)
@@ -139,22 +132,22 @@ def find_yandex_paths() -> YandexPaths:
 
     # Альтернативные пути поиска браузера
     if not paths['browser'] or not paths['browser'].exists():
-        possible_browser_paths = []
-        for env_var in ('LOCALAPPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)'):
-            base = os.environ.get(env_var)
-            if base:
-                possible_browser_paths.append(Path(base) / "Yandex/YandexBrowser/Application/browser.exe")
+        possible_browser_paths = [
+            Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex/YandexBrowser/Application/browser.exe",
+            Path(os.environ.get('PROGRAMFILES', '')) / "Yandex/YandexBrowser/Application/browser.exe",
+            Path(os.environ.get('PROGRAMFILES(X86)', '')) / "Yandex/YandexBrowser/Application/browser.exe",
+        ]
         for browser_path in possible_browser_paths:
             if browser_path.exists():
                 paths['browser'] = browser_path
                 break
 
-    # Поиск папки с пользовательскими данными (корень User Data)
+    # Поиск папки с пользовательскими данными
     if paths['browser'] and paths['browser'].exists():
-        user_data_paths = [paths['browser'].parent.parent / "User Data"]
-        local_app_data = os.environ.get('LOCALAPPDATA')
-        if local_app_data:
-            user_data_paths.insert(0, Path(local_app_data) / "Yandex/YandexBrowser/User Data")
+        user_data_paths = [
+            Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex/YandexBrowser/User Data/Default",
+            paths['browser'].parent.parent / "User Data/Default",
+        ]
         for user_data_path in user_data_paths:
             if user_data_path.exists():
                 paths['user_data'] = user_data_path
@@ -162,26 +155,8 @@ def find_yandex_paths() -> YandexPaths:
 
     # Если папка с данными не найдена, создаём путь по умолчанию
     if paths['browser'] and not paths['user_data']:
-        local_app_data = os.environ.get('LOCALAPPDATA')
-        if local_app_data:
-            paths['user_data'] = Path(local_app_data) / "Yandex/YandexBrowser/User Data"
-
-    # Выбираем профиль по умолчанию
-    if paths['user_data']:
-        default_profile_dir = paths['user_data'] / "Default"
-        if default_profile_dir.exists():
-            paths['profile'] = "Default"
-        else:
-            try:
-                # Берем первый пользовательский профиль, если Default отсутствует.
-                profiles = [
-                    p.name for p in paths['user_data'].iterdir()
-                    if p.is_dir() and p.name not in {"System Profile", "Guest Profile"}
-                ]
-                if profiles:
-                    paths['profile'] = profiles[0]
-            except Exception:
-                pass
+        default_user_data = Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex/YandexBrowser/User Data/Default"
+        paths['user_data'] = default_user_data
 
     return paths
 
