@@ -1,5 +1,6 @@
 import time
 import json
+import os
 import importlib
 import shutil
 import tempfile
@@ -13,8 +14,13 @@ paths = find_yandex_paths()
 # Настройки — поправь пути под систему
 YANDEX_DRIVER_PATH = Path("driver") / "yandexdriver.exe"
 YANDEX_BROWSER_PATH = paths["browser"]
-PROFILE_USER_DATA_DIR = paths["user_data"]
-PROFILE_DIRECTORY = paths["profile"] or "Default"
+PROFILE_USER_DATA_DIR = (
+    Path(os.environ["KONTUR_YANDEX_USER_DATA_DIR"])
+    if "KONTUR_YANDEX_USER_DATA_DIR" in os.environ
+    else paths["user_data"]
+)
+PROFILE_DIRECTORY = os.environ.get("KONTUR_YANDEX_PROFILE", paths["profile"] or "Default")
+ALLOW_TEMP_PROFILE_FALLBACK = os.environ.get("KONTUR_ALLOW_TEMP_PROFILE_FALLBACK", "0") == "1"
 HEADLESS = False
 
 COOKIES_FILE = Path("kontur_cookies.json")
@@ -203,6 +209,9 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
     if not profile_directory:
         profile_directory = "Default"
 
+    logger.info(f"Профиль браузера для Selenium: {profile_directory}")
+    logger.info(f"Путь user-data-dir: {user_data_dir_for_option}")
+
     for attempt in range(max_retries):
         logger.info(f"Попытка получения cookies #{attempt + 1}")
 
@@ -210,8 +219,13 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         if user_data_dir_for_option:
             launch_modes.append(("profile", user_data_dir_for_option, profile_directory, True))
         else:
-            logger.warning("Папка профиля Яндекс Браузера не определена, пробуем запуск с временным профилем")
-        launch_modes.append(("temporary", None, None, False))
+            logger.warning("Папка профиля Яндекс Браузера не определена")
+        if ALLOW_TEMP_PROFILE_FALLBACK:
+            launch_modes.append(("temporary", None, None, False))
+        elif not user_data_dir_for_option:
+            logger.error(
+                "Временный профиль отключен. Укажите профиль через KONTUR_YANDEX_USER_DATA_DIR/KONTUR_YANDEX_PROFILE."
+            )
 
         for mode_name, launch_user_data_dir, launch_profile_dir, hide_window in launch_modes:
             driver = None
@@ -352,7 +366,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                     logger.warning(
                         "Ошибка DevToolsActivePort: закройте все окна Яндекс.Браузера и попробуйте снова."
                     )
-                if mode_name == "profile":
+                if mode_name == "profile" and ALLOW_TEMP_PROFILE_FALLBACK:
                     logger.info("Пробуем резервный запуск без пользовательского профиля")
             finally:
                 if driver is not None:
