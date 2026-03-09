@@ -22,6 +22,7 @@ PROFILE_USER_DATA_DIR = (
 )
 PROFILE_DIRECTORY = os.environ.get("KONTUR_YANDEX_PROFILE", paths["profile"] or "Default")
 ALLOW_TEMP_PROFILE_FALLBACK = os.environ.get("KONTUR_ALLOW_TEMP_PROFILE_FALLBACK", "0") == "1"
+HIDE_BROWSER_WINDOW = os.environ.get("KONTUR_HIDE_BROWSER_WINDOW", "0") == "1"
 HEADLESS = False
 
 COOKIES_FILE = Path("kontur_cookies.json")
@@ -101,7 +102,7 @@ def ensure_target_url_opened(driver, target_url: str, wait_timeout: int = 8) -> 
         except Exception:
             return False
 
-    for nav_attempt in range(1, 6):
+    for nav_attempt in range(1, 7):
         if is_on_target():
             return True
 
@@ -116,6 +117,12 @@ def ensure_target_url_opened(driver, target_url: str, wait_timeout: int = 8) -> 
             elif nav_attempt == 4:
                 driver.execute_script("window.open(arguments[0], '_blank');", target_url)
                 driver.switch_to.window(driver.window_handles[-1])
+            elif nav_attempt == 5:
+                # Попытка через CDP-навигацию (Chromium API).
+                try:
+                    driver.execute_cdp_cmd("Page.navigate", {"url": target_url})
+                except Exception:
+                    driver.get(target_url)
             else:
                 # Последняя попытка: закрываем лишние вкладки и открываем URL в текущей.
                 for handle in list(driver.window_handles)[:-1]:
@@ -306,7 +313,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
 
         launch_modes: list[tuple[str, Optional[Path], Optional[str], bool]] = []
         if user_data_dir_for_option:
-            launch_modes.append(("profile", user_data_dir_for_option, profile_directory, True))
+            launch_modes.append(("profile", user_data_dir_for_option, profile_directory, HIDE_BROWSER_WINDOW))
         else:
             logger.warning("Папка профиля Яндекс Браузера не определена")
         if ALLOW_TEMP_PROFILE_FALLBACK:
@@ -350,6 +357,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
 
                 service = Service(str(driver_path))
                 driver = webdriver.Chrome(service=service, options=opts)
+                driver.set_page_load_timeout(45)
                 wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
                 if mode_name == "temporary" and not headless:
@@ -383,6 +391,8 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                 opened = ensure_target_url_opened(driver, target_url)
                 if not opened:
                     logger.warning("Не удалось открыть целевой URL Контур после нескольких попыток")
+                else:
+                    logger.info(f"Открыт целевой URL: {driver.current_url}")
                 time.sleep(2.0)  # Увеличили задержку для полной загрузки
 
                 # best-effort шаги с дополнительными проверками
