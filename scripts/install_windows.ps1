@@ -27,6 +27,27 @@ function Refresh-Path {
     $env:Path = "$machinePath;$userPath"
 }
 
+function Add-UserPathDirectory {
+    param([Parameter(Mandatory = $true)][string]$DirectoryPath)
+
+    if (-not (Test-Path $DirectoryPath)) {
+        New-Item -ItemType Directory -Path $DirectoryPath -Force | Out-Null
+    }
+
+    $currentUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+    $entries = @()
+    if (-not [string]::IsNullOrWhiteSpace($currentUserPath)) {
+        $entries = $currentUserPath.Split(';') | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    }
+
+    if ($entries -notcontains $DirectoryPath) {
+        $newPath = if ($currentUserPath) { "$currentUserPath;$DirectoryPath" } else { $DirectoryPath }
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+    }
+
+    Refresh-Path
+}
+
 function Ensure-Winget {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw "winget is not available. Install App Installer from Microsoft Store and re-run setup.bat."
@@ -59,6 +80,101 @@ function Ensure-Command {
     }
 
     Write-Ok "$DisplayName installed"
+}
+
+function Get-UvAssetName {
+    $isArm64 = $false
+    try {
+        $arch = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()
+        $isArm64 = $arch -eq "Arm64"
+    } catch {
+    }
+
+    if ($isArm64) {
+        return "uv-aarch64-pc-windows-msvc.zip"
+    }
+    return "uv-x86_64-pc-windows-msvc.zip"
+}
+
+function Install-UvFallback {
+    Write-Step "Trying fallback installation for uv"
+
+    $tmpRoot = Join-Path $env:TEMP ("konturapi-uv-install-" + [Guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $tmpRoot -Force | Out-Null
+    $installed = $false
+
+    try {
+        $assetName = Get-UvAssetName
+        $downloadUrl = "https://github.com/astral-sh/uv/releases/latest/download/$assetName"
+        $zipPath = Join-Path $tmpRoot $assetName
+
+        Write-Step "Downloading uv directly from GitHub release"
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipPath -Headers @{ "User-Agent" = "KonturAPI-Installer" }
+
+        $extractDir = Join-Path $tmpRoot "uv-extract"
+        Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+
+        $uvExe = Get-ChildItem -Path $extractDir -Recurse -Filter "uv.exe" | Select-Object -First 1
+        if (-not $uvExe) {
+            throw "uv.exe was not found in downloaded archive."
+        }
+
+        $targetDir = Join-Path $env:LOCALAPPDATA "Programs\uv\bin"
+        Add-UserPathDirectory -DirectoryPath $targetDir
+        Copy-Item -Path $uvExe.FullName -Destination (Join-Path $targetDir "uv.exe") -Force
+
+        $uvxExe = Get-ChildItem -Path $extractDir -Recurse -Filter "uvx.exe" | Select-Object -First 1
+        if ($uvxExe) {
+            Copy-Item -Path $uvxExe.FullName -Destination (Join-Path $targetDir "uvx.exe") -Force
+        }
+
+        if (Get-Command uv -ErrorAction SilentlyContinue) {
+            Write-Ok "uv installed via direct download fallback"
+            $installed = $true
+        }
+    } catch {
+        Write-WarnMsg "Direct uv download fallback failed: $($_.Exception.Message)"
+    }
+
+    if (-not $installed) {
+        try {
+            Write-Step "Trying Astral install script fallback for uv"
+            $installerPath = Join-Path $tmpRoot "install-uv.ps1"
+            Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile $installerPath -Headers @{ "User-Agent" = "KonturAPI-Installer" }
+            & powershell -NoProfile -ExecutionPolicy Bypass -File $installerPath
+            Refresh-Path
+
+            if (Get-Command uv -ErrorAction SilentlyContinue) {
+                Write-Ok "uv installed via Astral install script fallback"
+                $installed = $true
+            }
+        } catch {
+            Write-WarnMsg "Astral install script fallback failed: $($_.Exception.Message)"
+        }
+    }
+
+    Remove-Item -Path $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
+    return $installed
+}
+
+function Ensure-Uv {
+    if (Get-Command uv -ErrorAction SilentlyContinue) {
+        Write-Ok "uv is already installed"
+        return
+    }
+
+    try {
+        Ensure-Command -CommandName "uv" -PackageId "astral-sh.uv" -DisplayName "uv"
+    } catch {
+        Write-WarnMsg "winget installation of uv failed: $($_.Exception.Message)"
+        if (-not (Install-UvFallback)) {
+            throw "Failed to install uv. Check internet/proxy/DNS and try again."
+        }
+    }
+
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        throw "uv installation failed (command 'uv' still not found)."
+    }
 }
 
 function Resolve-ProjectDir {
@@ -405,7 +521,7 @@ if ($env:OS -ne "Windows_NT") {
 Write-Step "Starting KonturAPI setup"
 
 Ensure-Command -CommandName "git" -PackageId "Git.Git" -DisplayName "Git"
-Ensure-Command -CommandName "uv" -PackageId "astral-sh.uv" -DisplayName "uv"
+Ensure-Uv
 
 $projectDir = Resolve-ProjectDir -ScriptRoot $PSScriptRoot
 Write-Ok "Project directory: $projectDir"
