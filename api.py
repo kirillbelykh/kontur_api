@@ -77,6 +77,10 @@ def codes_order(session: requests.Session, document_number: str,
         logger.error(f"Проверка доступности документа {document_number}: {e}")
         return None
 
+    if not thumbprint:
+        logger.error("Thumbprint не передан, подпись документа невозможна")
+        return None
+
     # проверка сертификата
     if thumbprint:
         try:
@@ -127,7 +131,7 @@ def codes_order(session: requests.Session, document_number: str,
         r_send.raise_for_status()
         logger.info("Отправка прошла успешно (detached signature)")
     except Exception as e:
-        logger.info(f"Отправка документа {document_number}: {e}")
+        logger.error(f"Отправка документа {document_number}: {e}")
         return None
 
     # финальный статус
@@ -156,7 +160,7 @@ def codes_order(session: requests.Session, document_number: str,
             }
             
             # Сохраняем в историю
-            self.history_db.add_order(history_entry)
+            history_db.add_order(history_entry)
             logger.info(f"✅ Заказ {document_number} сохранен в историю")
             
         except Exception as history_error:
@@ -261,7 +265,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
         templates = resp_templates.json()
         template_id = None
         for t in templates:
-            if t.get("name") == "Этикетка 2х2см" or t.get("size") == "2х2" or t.get("dekkoId") == "20x20Template_v2":
+            if t.get("name") == "Этикетка 30x20" or t.get("size") == "30х20" or t.get("dekkoId") == "30x20Template_v2":
                 template_id = t.get("id")
                 break
         if template_id:
@@ -306,7 +310,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
             else:
                 logger.warning(f"PDF export для {document_id} завершился без fileUrl")
         else:
-            logger.warning("Шаблон '2x2' для PDF не найден — пропускаем PDF экспорт")
+            logger.warning("Шаблон '30x20' для PDF не найден — пропускаем PDF экспорт")
     except Exception as e:
         logger.exception(f"Ошибка в PDF-части для {document_id}: {e}")
         pdf_path = None

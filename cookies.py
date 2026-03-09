@@ -1,16 +1,17 @@
-import json
-from logger import logger
 import time
+import json
 from pathlib import Path
 from typing import Dict, Optional, Any, List
+
+from logger import logger
 from utils import find_yandex_paths
 
 paths = find_yandex_paths()
 # Настройки — поправь пути под систему
-YANDEX_DRIVER_PATH = Path(r"driver\yandexdriver.exe")
-YANDEX_BROWSER_PATH = paths['browser']
-PROFILE_USER_DATA_DIR = paths['user_data']
-PROFILE_DIRECTORY = "Vinsent O`neal"
+YANDEX_DRIVER_PATH = Path("driver") / "yandexdriver.exe"
+YANDEX_BROWSER_PATH = Path(paths["browser"]) if paths.get("browser") else None
+PROFILE_USER_DATA_DIR = Path(paths["user_data"]) if paths.get("user_data") else None
+PROFILE_DIRECTORY = str(paths.get("profile") or "Default")
 HEADLESS = False
 
 COOKIES_FILE = Path("kontur_cookies.json")
@@ -134,8 +135,8 @@ def save_cookies_to_file(cookies: Dict[str, str]) -> bool:
 
 
 def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
-                browser_path: Path = YANDEX_BROWSER_PATH,
-                profile_user_data_dir: Path = PROFILE_USER_DATA_DIR,
+                browser_path: Optional[Path] = YANDEX_BROWSER_PATH,
+                profile_user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
                 profile_directory: str = PROFILE_DIRECTORY,
                 headless: bool = HEADLESS,
                 target_url: str = TARGET_URL,
@@ -168,20 +169,47 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         logger.warning("pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32")
         logger.warning(f"Ошибка импорта pywin32: {e}")
 
+    # Повторно проверяем пути на момент запуска (вдруг браузер установили после старта приложения)
+    try:
+        runtime_paths = find_yandex_paths()
+    except Exception as e:
+        runtime_paths = {}
+        logger.warning(f"Не удалось автоматически определить пути Яндекс Браузера: {e}")
+
+    if browser_path is None and runtime_paths.get("browser"):
+        browser_path = Path(runtime_paths["browser"])
+    if profile_user_data_dir is None and runtime_paths.get("user_data"):
+        profile_user_data_dir = Path(runtime_paths["user_data"])
+    if not profile_directory:
+        profile_directory = str(runtime_paths.get("profile") or "Default")
+
     if not driver_path.exists():
         logger.error(f"Driver not found: {driver_path}")
         return None
-    if not browser_path.exists():
+    if browser_path is None or not browser_path.exists():
         logger.error(f"Browser binary not found: {browser_path}")
         return None
+
+    user_data_dir_for_option = profile_user_data_dir
+    if profile_user_data_dir and profile_user_data_dir.name.lower() == "default":
+        # Selenium ожидает путь к "User Data", а профиль задаётся отдельным параметром.
+        user_data_dir_for_option = profile_user_data_dir.parent
+        if not profile_directory:
+            profile_directory = "Default"
+
+    if not profile_directory:
+        profile_directory = "Default"
 
     for attempt in range(max_retries):
         logger.info(f"Попытка получения cookies #{attempt + 1}")
         
         opts = Options()
         opts.binary_location = str(browser_path)
-        opts.add_argument(f"--user-data-dir={profile_user_data_dir}")
-        opts.add_argument(f"--profile-directory={profile_directory}")
+        if user_data_dir_for_option:
+            opts.add_argument(f"--user-data-dir={user_data_dir_for_option}")
+            opts.add_argument(f"--profile-directory={profile_directory}")
+        else:
+            logger.warning("Папка профиля Яндекс Браузера не определена, запускаем браузер без профиля")
         if headless:
             opts.add_argument("--headless=new")
             opts.add_argument("--no-sandbox")
