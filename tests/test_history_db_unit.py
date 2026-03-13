@@ -86,6 +86,55 @@ class OrderHistoryDBTests(unittest.TestCase):
 
         self.assertEqual(db.get_all_orders(), [])
 
+    def test_merge_prefers_newer_record_values(self):
+        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        current = {
+            "document_id": "DOC-4",
+            "status": "Ожидает",
+            "updated_at": "2026-03-01T10:00:00",
+            "updated_by": "pc-1",
+        }
+        incoming = {
+            "document_id": "DOC-4",
+            "status": "Скачан",
+            "updated_at": "2026-03-01T11:00:00",
+            "updated_by": "pc-2",
+        }
+
+        merged = db._merge_order_records(current, incoming)
+
+        self.assertEqual(merged["status"], "Скачан")
+        self.assertEqual(merged["updated_by"], "pc-2")
+        self.assertEqual(merged["updated_at"], "2026-03-01T11:00:00")
+
+    def test_merge_history_payloads_keeps_orders_from_both_sources(self):
+        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        remote_data = {
+            "orders": [
+                {
+                    "document_id": "REMOTE-1",
+                    "status": "Ожидает",
+                    "created_at": "2026-03-01T09:00:00",
+                    "updated_at": "2026-03-01T09:00:00",
+                }
+            ]
+        }
+        local_data = {
+            "orders": [
+                {
+                    "document_id": "LOCAL-1",
+                    "status": "Скачан",
+                    "created_at": "2026-03-01T10:00:00",
+                    "updated_at": "2026-03-01T10:00:00",
+                }
+            ]
+        }
+
+        merged = db._merge_history_payloads(remote_data, local_data)
+        merged_ids = {order["document_id"] for order in merged["orders"]}
+
+        self.assertEqual(merged_ids, {"REMOTE-1", "LOCAL-1"})
+
 
 if __name__ == "__main__":
     unittest.main()

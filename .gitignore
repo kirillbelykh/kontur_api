@@ -12,5 +12,6 @@ lookup.log
 driver/
 yandexdriver.exe
 orders_history.json
+.history_sync_cache/
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
