@@ -47,7 +47,9 @@ class OrderHistoryDB:
 
         self._ensure_db_exists()
         self._migrate_legacy_history()
-        self.sync_with_github(force=True, push=False, reason="startup")
+        # На старте сразу делаем двустороннюю синхронизацию с push,
+        # чтобы локальная история этого ПК попала в GitHub без потерь.
+        self.sync_with_github(force=True, push=True, reason="startup")
 
     def _resolve_path(self, value: str) -> Path:
         path = Path(value)
@@ -562,12 +564,16 @@ class OrderHistoryDB:
         try:
             with self._io_lock:
                 data = self._load_data()
-                if self._upsert_order_in_data(data, order_data):
+                changed = self._upsert_order_in_data(data, order_data)
+                if changed:
                     self._save_data(data)
-                    self._sync_with_github_locked(push=True, reason="add_order")
                     logger.info(f"✅ История обновлена для заказа: {order_data.get('document_id')}")
                 else:
                     logger.info(f"Заказ {order_data.get('document_id')} уже актуален в истории")
+
+                # Пытаемся выгрузить историю после каждого заказа кодов,
+                # даже если запись не изменилась (например, при повторе после сетевого сбоя).
+                self._sync_with_github_locked(push=True, reason="add_order")
         except Exception as e:
             logger.error(f"Ошибка добавления заказа {order_data.get('document_id')}: {e}")
 

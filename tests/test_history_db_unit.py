@@ -135,6 +135,34 @@ class OrderHistoryDBTests(unittest.TestCase):
 
         self.assertEqual(merged_ids, {"REMOTE-1", "LOCAL-1"})
 
+    def test_init_requests_startup_sync_with_push(self):
+        db_path = self.base_path / "full_orders_history.json"
+        with patch.object(OrderHistoryDB, "sync_with_github", autospec=True) as sync_mock:
+            OrderHistoryDB(db_file=str(db_path), legacy_db_files=[])
+
+        sync_mock.assert_called_once()
+        _, kwargs = sync_mock.call_args
+        self.assertTrue(kwargs.get("force"))
+        self.assertTrue(kwargs.get("push"))
+        self.assertEqual(kwargs.get("reason"), "startup")
+
+    def test_add_order_attempts_sync_even_when_record_is_unchanged(self):
+        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        order_data = {
+            "document_id": "DOC-SYNC-1",
+            "order_name": "sync test",
+            "status": "Ожидает",
+        }
+
+        with patch.object(db, "_sync_with_github_locked", autospec=True, return_value=False) as sync_mock:
+            db.add_order(order_data)
+            db.add_order(order_data)
+
+        self.assertEqual(sync_mock.call_count, 2)
+        for _, kwargs in sync_mock.call_args_list:
+            self.assertTrue(kwargs.get("push"))
+            self.assertEqual(kwargs.get("reason"), "add_order")
+
 
 if __name__ == "__main__":
     unittest.main()
