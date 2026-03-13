@@ -3,17 +3,11 @@ import os
 import sys
 import time
 import subprocess
-import base64
 import tkinter.messagebox as mbox
 
 def _git_kwargs():
     """kwargs для subprocess: скрыть консоль на Windows и вернуть текст."""
     kwargs: dict[str, object] = {'text': True}
-    env = os.environ.copy()
-    # Запрещаем интерактивные запросы логина/пароля в GUI.
-    env["GIT_TERMINAL_PROMPT"] = "0"
-    env["GCM_INTERACTIVE"] = "Never"
-    kwargs["env"] = env
     if os.name == 'nt':
         startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
         startf_use_showwindow = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
@@ -26,22 +20,14 @@ def _git_kwargs():
             kwargs['startupinfo'] = si
 
         if create_no_window is not None:
-                kwargs['creationflags'] = int(create_no_window)
+            kwargs['creationflags'] = int(create_no_window)
     return kwargs
 
-def _git_auth_args():
-    token = (os.getenv("GITHUB_TOKEN") or os.getenv("HISTORY_SYNC_TOKEN") or "").strip()
-    if not token:
-        return []
-    username = (os.getenv("GITHUB_USERNAME") or os.getenv("HISTORY_SYNC_USERNAME") or "x-access-token").strip()
-    auth = base64.b64encode(f"{username}:{token}".encode("utf-8")).decode("ascii")
-    return ["-c", f"http.https://github.com/.extraheader=AUTHORIZATION: basic {auth}"]
-
 def _run_git(args, repo_dir, check=True):
-    return subprocess.run(["git"] + _git_auth_args() + args, cwd=repo_dir, check=check, **_git_kwargs())
+    return subprocess.run(["git"] + args, cwd=repo_dir, check=check, **_git_kwargs())
 
 def _capture_git(args, repo_dir):
-    return subprocess.check_output(["git"] + _git_auth_args() + args, cwd=repo_dir, **_git_kwargs())
+    return subprocess.check_output(["git"] + args, cwd=repo_dir, **_git_kwargs())
 
 def _kill_git_processes():
     try:
@@ -127,11 +113,7 @@ def check_for_updates(repo_dir=None, pre_update_cleanup=None, auto_restart=True)
         except subprocess.CalledProcessError:
             # fallback — ls-remote
             try:
-                remote_commit = subprocess.check_output(
-                    ["git"] + _git_auth_args() + ["ls-remote", "origin", "main"],
-                    cwd=repo_dir,
-                    **_git_kwargs(),
-                ).split()[0]
+                remote_commit = subprocess.check_output(["git", "ls-remote", "origin", "main"], cwd=repo_dir, text=True).split()[0]
             except Exception as e:
                 print("ls-remote failed:", e)
                 mbox.showerror("Ошибка", "Не удалось определить удалённый коммит.")
