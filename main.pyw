@@ -5,7 +5,7 @@ import uuid
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from logger import logger
 import pandas as pd # type: ignore
 from dataclasses import dataclass, asdict
@@ -14,6 +14,7 @@ from get_gtin import lookup_gtin, lookup_by_gtin
 from api import codes_order, download_codes, make_task_on_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
+from date_defaults import get_default_production_window
 from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
 import update
@@ -2120,6 +2121,41 @@ class App(ctk.CTk):
         except:
             pass
 
+    def _set_default_date_range(self, production_entry, expiration_entry):
+        production_date, expiration_date = get_default_production_window()
+
+        if production_entry:
+            production_entry.delete(0, "end")
+            production_entry.insert(0, production_date)
+
+        if expiration_entry:
+            expiration_entry.delete(0, "end")
+            expiration_entry.insert(0, expiration_date)
+
+    def _should_auto_download_order(self, item: dict) -> bool:
+        return (
+            not item.get("from_history", False)
+            and not item.get("downloading", False)
+            and not item.get("filename")
+            and item.get("document_id") not in self.sent_to_tsd_items
+            and item.get("status") in {"Ожидает", "Генерируется"}
+        )
+
+    def _sync_history_from_download_item(self, item: dict):
+        document_id = item.get("document_id")
+        if not document_id:
+            return
+
+        self.history_db.add_order({
+            "document_id": document_id,
+            "order_name": item.get("order_name"),
+            "status": item.get("status"),
+            "filename": item.get("filename"),
+            "simpl": item.get("simpl"),
+            "full_name": item.get("full_name"),
+            "gtin": item.get("gtin"),
+        })
+
 
     def start_auto_status_check(self):
         """Запускает автоматическую проверку статусов заказов (только для новых заказов, не из истории)"""
@@ -2136,9 +2172,10 @@ class App(ctk.CTk):
                     time.sleep(10)
                     
                     # Получаем заказы, которые ожидают скачивания и НЕ являются заказами из истории
-                    pending_orders = [item for item in self.download_list 
-                                    if item['status'] not in ['Скачивается', 'Скачан', 'Ошибка генерации', 'Из истории']
-                                    and not item.get('from_history', False)]  # Исключаем заказы из истории
+                    pending_orders = [
+                        item for item in self.download_list
+                        if self._should_auto_download_order(item)
+                    ]
                     
                     if not pending_orders:
                         continue
@@ -2150,9 +2187,6 @@ class App(ctk.CTk):
                         if not self.auto_download_active:
                             break
                         
-                        if item.get('downloading', False):
-                            continue  # Пропускаем, если уже скачивается
-                            
                         try:
                             # Проверяем статус заказа
                             status = self._check_order_status(item['document_id'])
@@ -2245,6 +2279,7 @@ class App(ctk.CTk):
         try:
             item['status'] = 'Скачан'
             item['filename'] = filename
+            self._sync_history_from_download_item(item)
             self.update_download_tree()
             self.download_log_insert(f"✅ Успешно скачан: {filename}")
             # Принудительно обновляем интерфейс
@@ -2493,14 +2528,7 @@ class App(ctk.CTk):
             entry.grid(row=i, column=1, pady=8, padx=5)
             setattr(self, attr_name, entry)
         
-        # Заполнение дат по умолчанию
-        today = datetime.now().strftime("%d-%m-%Y")
-        future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
-        
-        if self.prod_date_intro_entry:
-            self.prod_date_intro_entry.insert(0, today)
-        if self.exp_date_intro_entry:
-            self.exp_date_intro_entry.insert(0, future_date)
+        self._set_default_date_range(self.prod_date_intro_entry, self.exp_date_intro_entry)
         
         # Кнопки
         btn_frame = ctk.CTkFrame(form_container, fg_color="transparent")
@@ -3295,13 +3323,7 @@ class App(ctk.CTk):
             entry.grid(row=i, column=1, pady=8, padx=5)
             setattr(self, attr_name, entry)
         
-        # Заполнение дат по умолчанию
-        today = datetime.now().strftime("%d-%m-%Y")
-        future_date = (datetime.now() + timedelta(days=1826)).strftime("%d-%m-%Y")
-        if self.tsd_prod_date_entry:
-            self.tsd_prod_date_entry.insert(0, today)
-        if self.tsd_exp_date_entry:
-            self.tsd_exp_date_entry.insert(0, future_date)
+        self._set_default_date_range(self.tsd_prod_date_entry, self.tsd_exp_date_entry)
         
         # Кнопки
         btn_frame = ctk.CTkFrame(form_container, fg_color="transparent")
@@ -3461,9 +3483,10 @@ class App(ctk.CTk):
             document_id = item.get("document_id")
             
             # ВАЖНО: Показываем заказы, которые готовы для ТСД (включая из истории)
-            if (document_id not in self.sent_to_tsd_items and 
-                item.get("status") in ("Скачан", "Downloaded", "Ожидает", "Скачивается", "Готов для ТСД") or 
-                item.get("filename")):
+            if document_id not in self.sent_to_tsd_items and (
+                item.get("status") in ("Скачан", "Downloaded", "Ожидает", "Скачивается", "Готов для ТСД")
+                or item.get("filename")
+            ):
                 
                 vals = (
                     item.get("order_name"), 
