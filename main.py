@@ -15,6 +15,7 @@ from api import codes_order, download_codes, make_task_on_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 from date_defaults import get_default_production_window
+from queue_utils import remove_order_by_document_id
 from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
 import update
@@ -3827,11 +3828,16 @@ class App(ctk.CTk):
             
             # ОЧИЩАЕМ ФОРМУ ПОСЛЕ УСПЕШНОЙ ОТПРАВКИ
             self.clear_tsd_form()
+            remove_order_by_document_id(self.download_list, docid)
         else:
             self.tsd_log_insert(f"❌ [ОШИБКА] {order_name} (ID: {docid}) — {msg}")
             item["status"] = "Ошибка ТСД"
 
         self.update_tsd_tree()
+        if hasattr(self, "update_download_tree"):
+            self.update_download_tree()
+        if hasattr(self, "update_introduction_tree"):
+            self.update_introduction_tree()
     
         
     def _get_gtin_for_order(self, document_id):
