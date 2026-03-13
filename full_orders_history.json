@@ -23,7 +23,8 @@
       "updated_by": "User",
       "tsd_created": false,
       "tsd_created_at": null,
-      "tsd_intro_number": null
+      "tsd_intro_number": null,
+      "tsd_created_by": null
     },
     {
       "order_name": "544 лат диаг М 260215 (доп. код)",
@@ -3599,7 +3600,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-13T17:30:28.144219",
+  "last_update": "2026-03-13T17:30:50.435585",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
