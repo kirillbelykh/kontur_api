@@ -51,3 +51,7 @@ uv run pytest -q
 
 - `HISTORY_SYNC_ENABLED=0` — полностью выключить синхронизацию.
 - `HISTORY_SYNC_BRANCH=<branch_name>` — использовать другую ветку вместо `orders-history`.
+- `HISTORY_SYNC_TOKEN=<github_pat>` — токен GitHub для синхронизации без интерактивной авторизации.
+- `HISTORY_SYNC_USERNAME=<username>` — логин для basic-auth (по умолчанию `x-access-token`).
+- `GITHUB_TOKEN=<github_pat>` — общий токен для автообновления и синхронизации (fallback).
+- `GITHUB_USERNAME=<username>` — логин для автообновления (fallback).

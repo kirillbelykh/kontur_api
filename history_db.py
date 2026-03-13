@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import threading
 import time
+import base64
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
@@ -17,6 +18,9 @@ LEGACY_NETWORK_HISTORY = r"\\192.168.100.2\!files\orders_history.json"
 DEFAULT_SYNC_BRANCH = "orders-history"
 SYNC_BRANCH_ENV = "HISTORY_SYNC_BRANCH"
 SYNC_ENABLED_ENV = "HISTORY_SYNC_ENABLED"
+SYNC_TOKEN_ENV = "HISTORY_SYNC_TOKEN"
+SYNC_TOKEN_FALLBACK_ENV = "GITHUB_TOKEN"
+SYNC_USERNAME_ENV = "HISTORY_SYNC_USERNAME"
 SYNC_CACHE_DIR = ".history_sync_cache"
 SYNC_PULL_INTERVAL_SECONDS = 20
 SYNC_PUSH_RETRIES = 3
@@ -40,6 +44,8 @@ class OrderHistoryDB:
         self.legacy_db_files = self._build_legacy_paths(legacy_db_files)
         self.sync_branch = sync_branch or os.getenv(SYNC_BRANCH_ENV, DEFAULT_SYNC_BRANCH)
         self.sync_enabled = self._resolve_sync_enabled(sync_enabled)
+        self.sync_token = (os.getenv(SYNC_TOKEN_ENV) or os.getenv(SYNC_TOKEN_FALLBACK_ENV) or "").strip() or None
+        self.sync_username = (os.getenv(SYNC_USERNAME_ENV) or "x-access-token").strip() or "x-access-token"
         self.sync_cache_dir = self.repo_root / SYNC_CACHE_DIR
         self._last_sync_pull_at = 0.0
 
@@ -307,6 +313,11 @@ class OrderHistoryDB:
 
     def _subprocess_kwargs(self) -> Dict[str, Any]:
         kwargs: Dict[str, Any] = {"text": True}
+        env = os.environ.copy()
+        # Не допускаем интерактивных запросов логина/пароля в GUI-процессе.
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        env["GCM_INTERACTIVE"] = "Never"
+        kwargs["env"] = env
         if os.name == "nt":
             startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
             startf_use_showwindow = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
@@ -321,6 +332,14 @@ class OrderHistoryDB:
             if create_no_window is not None:
                 kwargs["creationflags"] = int(create_no_window)
         return kwargs
+
+    def _git_auth_config_args(self) -> List[str]:
+        if not self.sync_token:
+            return []
+
+        credentials = f"{self.sync_username}:{self.sync_token}".encode("utf-8")
+        auth = base64.b64encode(credentials).decode("ascii")
+        return ["-c", f"http.https://github.com/.extraheader=AUTHORIZATION: basic {auth}"]
 
     def _run_git(
         self,
@@ -337,7 +356,8 @@ class OrderHistoryDB:
             kwargs["stdout"] = subprocess.DEVNULL
             kwargs["stderr"] = subprocess.DEVNULL
 
-        result = subprocess.run(["git"] + args, cwd=str(cwd), check=False, **kwargs)
+        git_command = ["git"] + self._git_auth_config_args() + args
+        result = subprocess.run(git_command, cwd=str(cwd), check=False, **kwargs)
         if check and result.returncode != 0:
             stderr = (result.stderr or "").strip()
             raise RuntimeError(f"git {' '.join(args)} failed: {stderr}")
