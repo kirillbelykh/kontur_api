@@ -29,8 +29,8 @@
     {
       "order_name": "545 стер лат заявка 5340 10пар",
       "document_id": "45c5beb6-66af-46de-b9b9-3d1fe2ffa639",
-      "status": "Ожидает",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\sklad\\Desktop\\Коды км\\545 стер лат заявка 5340 10пар\\545 стер лат заявка 5340 10пар.pdf, C:\\Users\\sklad\\Desktop\\Коды км\\545 стер лат заявка 5340 10пар\\545 стер лат заявка 5340 10пар_csv.csv, C:\\Users\\sklad\\Desktop\\Коды км\\545 стер лат заявка 5340 10пар\\545 стер лат заявка 5340 10пар.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4640473512264",
@@ -45,7 +45,7 @@
       ],
       "created_at": "2026-03-13T17:50:14.182471",
       "created_by": "sklad",
-      "updated_at": "2026-03-13T17:50:26.166443",
+      "updated_at": "2026-03-13T17:53:31.984784",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -3678,7 +3678,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-13T17:53:28.642229",
+  "last_update": "2026-03-13T17:53:36.096779",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
