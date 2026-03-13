@@ -3626,8 +3626,8 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-13T17:31:18.022499",
+  "last_update": "2026-03-13T17:32:50.877852",
   "created_by": "sklad",
-  "updated_by": "User",
-  "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
+  "updated_by": "user",
+  "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
 }
