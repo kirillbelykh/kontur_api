@@ -185,7 +185,13 @@ class OrderHistoryDB:
         changed = False
 
         for legacy_path in self.legacy_db_files:
-            if not legacy_path.exists():
+            try:
+                legacy_exists = legacy_path.exists()
+            except OSError as e:
+                logger.warning(f"Не удалось проверить старую историю {legacy_path}: {e}")
+                continue
+
+            if not legacy_exists:
                 continue
 
             try:

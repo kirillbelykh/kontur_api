@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from history_db import OrderHistoryDB
 
@@ -69,6 +70,21 @@ class OrderHistoryDBTests(unittest.TestCase):
         self.assertIsNotNone(order)
         self.assertTrue(order["tsd_created"])
         self.assertEqual(order["tsd_intro_number"], "INTRO-77")
+
+    def test_ignores_unavailable_legacy_path(self):
+        db_path = self.base_path / "full_orders_history.json"
+        unavailable_legacy = self.base_path / "legacy_unavailable.json"
+        original_exists = Path.exists
+
+        def fake_exists(path_obj):
+            if path_obj == unavailable_legacy:
+                raise OSError("network unavailable")
+            return original_exists(path_obj)
+
+        with patch("history_db.Path.exists", autospec=True, side_effect=fake_exists):
+            db = OrderHistoryDB(db_file=str(db_path), legacy_db_files=[str(unavailable_legacy)])
+
+        self.assertEqual(db.get_all_orders(), [])
 
 
 if __name__ == "__main__":
