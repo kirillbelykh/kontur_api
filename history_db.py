@@ -24,6 +24,8 @@ SYNC_PUSH_RETRIES = 3
 
 class OrderHistoryDB:
     _io_lock = threading.RLock()
+    _startup_sync_lock = threading.Lock()
+    _startup_sync_started = False
 
     def __init__(
         self,
@@ -31,6 +33,7 @@ class OrderHistoryDB:
         legacy_db_files: Optional[Iterable[str]] = None,
         sync_enabled: Optional[bool] = None,
         sync_branch: Optional[str] = None,
+        startup_sync: str = "background",
     ):
         self.repo_root = Path(__file__).resolve().parent
         self.db_file = self._resolve_path(db_file or DEFAULT_HISTORY_FILE)
@@ -47,9 +50,29 @@ class OrderHistoryDB:
 
         self._ensure_db_exists()
         self._migrate_legacy_history()
-        # На старте сразу делаем двустороннюю синхронизацию с push,
-        # чтобы локальная история этого ПК попала в GitHub без потерь.
-        self.sync_with_github(force=True, push=True, reason="startup")
+        self._run_startup_sync(startup_sync)
+
+    def _run_startup_sync(self, mode: str):
+        if mode == "none":
+            return
+
+        if mode == "sync":
+            self.sync_with_github(force=True, push=True, reason="startup")
+            return
+
+        # По умолчанию запускаем один общий фоновый startup-sync на процесс,
+        # чтобы не блокировать запуск GUI и не дублировать тяжелые git-операции.
+        with self._startup_sync_lock:
+            if OrderHistoryDB._startup_sync_started:
+                return
+            OrderHistoryDB._startup_sync_started = True
+
+        threading.Thread(
+            target=self.sync_with_github,
+            kwargs={"force": True, "push": True, "reason": "startup"},
+            daemon=True,
+            name="OrderHistoryStartupSync",
+        ).start()
 
     def _resolve_path(self, value: str) -> Path:
         path = Path(value)

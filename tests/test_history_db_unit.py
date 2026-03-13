@@ -29,14 +29,18 @@ class OrderHistoryDBTests(unittest.TestCase):
         }
         legacy_path.write_text(json.dumps(legacy_payload, ensure_ascii=False), encoding="utf-8")
 
-        db = OrderHistoryDB(db_file=str(db_path), legacy_db_files=[str(legacy_path)])
+        db = OrderHistoryDB(db_file=str(db_path), legacy_db_files=[str(legacy_path)], startup_sync="none")
 
         migrated_order = db.get_order_by_document_id("LEGACY-1")
         self.assertIsNotNone(migrated_order)
         self.assertEqual(migrated_order["order_name"], "legacy order")
 
     def test_add_order_updates_existing_record_instead_of_duplicating_it(self):
-        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            startup_sync="none",
+        )
 
         db.add_order({
             "document_id": "DOC-1",
@@ -57,7 +61,11 @@ class OrderHistoryDBTests(unittest.TestCase):
         self.assertEqual(all_orders[0]["gtin"], "1234567890123")
 
     def test_mark_tsd_created_updates_existing_order(self):
-        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            startup_sync="none",
+        )
         db.add_order({
             "document_id": "DOC-2",
             "order_name": "for tsd",
@@ -82,12 +90,20 @@ class OrderHistoryDBTests(unittest.TestCase):
             return original_exists(path_obj)
 
         with patch("history_db.Path.exists", autospec=True, side_effect=fake_exists):
-            db = OrderHistoryDB(db_file=str(db_path), legacy_db_files=[str(unavailable_legacy)])
+            db = OrderHistoryDB(
+                db_file=str(db_path),
+                legacy_db_files=[str(unavailable_legacy)],
+                startup_sync="none",
+            )
 
         self.assertEqual(db.get_all_orders(), [])
 
     def test_merge_prefers_newer_record_values(self):
-        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            startup_sync="none",
+        )
         current = {
             "document_id": "DOC-4",
             "status": "Ожидает",
@@ -108,7 +124,11 @@ class OrderHistoryDBTests(unittest.TestCase):
         self.assertEqual(merged["updated_at"], "2026-03-01T11:00:00")
 
     def test_merge_history_payloads_keeps_orders_from_both_sources(self):
-        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            startup_sync="none",
+        )
         remote_data = {
             "orders": [
                 {
@@ -138,7 +158,7 @@ class OrderHistoryDBTests(unittest.TestCase):
     def test_init_requests_startup_sync_with_push(self):
         db_path = self.base_path / "full_orders_history.json"
         with patch.object(OrderHistoryDB, "sync_with_github", autospec=True) as sync_mock:
-            OrderHistoryDB(db_file=str(db_path), legacy_db_files=[])
+            OrderHistoryDB(db_file=str(db_path), legacy_db_files=[], startup_sync="sync")
 
         sync_mock.assert_called_once()
         _, kwargs = sync_mock.call_args
@@ -147,7 +167,11 @@ class OrderHistoryDBTests(unittest.TestCase):
         self.assertEqual(kwargs.get("reason"), "startup")
 
     def test_add_order_attempts_sync_even_when_record_is_unchanged(self):
-        db = OrderHistoryDB(db_file=str(self.base_path / "full_orders_history.json"), legacy_db_files=[])
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            startup_sync="none",
+        )
         order_data = {
             "document_id": "DOC-SYNC-1",
             "order_name": "sync test",

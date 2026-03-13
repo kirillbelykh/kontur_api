@@ -239,8 +239,7 @@ class App(ctk.CTk):
         ctk.set_appearance_mode(self.current_theme)
         ctk.set_default_color_theme("blue")
         
-        repo_dir = os.path.abspath(os.path.dirname(__file__))
-        update.check_for_updates(repo_dir=repo_dir, pre_update_cleanup=self.cleanup_before_update, auto_restart=True)
+        self._repo_dir = os.path.abspath(os.path.dirname(__file__))
         # Настройка окна
         self.title("Kontur Marking System")
         self.is_fullscreen = False
@@ -280,6 +279,8 @@ class App(ctk.CTk):
         self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)
         
         self.start_auto_status_check()
+        # Проверяем обновления после появления окна, чтобы не тормозить старт.
+        self.after(1200, self._check_for_updates_deferred)
         
         # Atributes for linter
         self.prod_date_entry: ctk.CTkEntry | None = None
@@ -701,6 +702,17 @@ class App(ctk.CTk):
             self.intro_tsd_executor.shutdown(wait=False)
         except Exception as e:
             logger.error(f"⚠️ Ошибка при очистке перед обновлением: {e}")
+
+    def _check_for_updates_deferred(self):
+        """Отложенная проверка обновлений после старта GUI."""
+        try:
+            update.check_for_updates(
+                repo_dir=self._repo_dir,
+                pre_update_cleanup=self.cleanup_before_update,
+                auto_restart=True,
+            )
+        except Exception as e:
+            logger.error(f"⚠️ Ошибка при проверке обновлений: {e}")
 
     def _load_history_to_download_list(self):
         """Загружает заказы без заданий на ТСД из истории в download_list"""
