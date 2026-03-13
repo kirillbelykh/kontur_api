@@ -15,7 +15,11 @@ from api import codes_order, download_codes, make_task_on_tsd
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 from date_defaults import get_default_production_window
-from queue_utils import remove_order_by_document_id
+from queue_utils import (
+    is_order_ready_for_intro,
+    is_order_ready_for_tsd,
+    remove_order_by_document_id,
+)
 from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
 import update
@@ -3002,6 +3006,17 @@ class App(ctk.CTk):
                 self.intro_log_insert("❌ Не выбрано ни одного заказа.")
                 return
 
+            blocked_items = [item for item in selected_items if not is_order_ready_for_intro(item)]
+            if blocked_items:
+                blocked_names = ", ".join(
+                    item.get("order_name", item.get("document_id", "Неизвестный заказ"))
+                    for item in blocked_items
+                )
+                self.intro_log_insert(
+                    f"❌ Обычный ввод в оборот доступен только после скачивания кодов. Недоступно: {blocked_names}"
+                )
+                return
+
             # Безопасное получение данных из полей ввода
             prod_date_text = self.prod_date_intro_entry.get().strip() if self.prod_date_intro_entry.get() else ""
             exp_date_text = self.exp_date_intro_entry.get().strip() if self.exp_date_intro_entry.get() else ""
@@ -3150,8 +3165,7 @@ class App(ctk.CTk):
             
             # Добавить записи из self.download_list
             for item in self.download_list:
-                # показываем только скачанные заказы
-                if item.get("status") in ("Скачан", "Downloaded", "Ожидает") and item.get("document_id"):
+                if is_order_ready_for_intro(item):
                     vals = (
                         item.get("order_name", ""), 
                         item.get("document_id", ""), 
@@ -3483,11 +3497,7 @@ class App(ctk.CTk):
         for item in self.download_list:
             document_id = item.get("document_id")
             
-            # ВАЖНО: Показываем заказы, которые готовы для ТСД (включая из истории)
-            if document_id not in self.sent_to_tsd_items and (
-                item.get("status") in ("Скачан", "Downloaded", "Ожидает", "Скачивается", "Готов для ТСД")
-                or item.get("filename")
-            ):
+            if document_id not in self.sent_to_tsd_items and is_order_ready_for_tsd(item):
                 
                 vals = (
                     item.get("order_name"), 

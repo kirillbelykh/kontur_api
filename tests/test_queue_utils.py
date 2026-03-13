@@ -1,6 +1,26 @@
 import unittest
 
-from queue_utils import remove_order_by_document_id
+from queue_utils import (
+    is_order_ready_for_intro,
+    is_order_ready_for_tsd,
+    remove_order_by_document_id,
+)
+
+
+class OrderReadinessTests(unittest.TestCase):
+    def test_intro_requires_downloaded_status(self):
+        self.assertTrue(is_order_ready_for_intro({"document_id": "doc-1", "status": "Скачан"}))
+        self.assertFalse(is_order_ready_for_intro({"document_id": "doc-1", "status": "Ожидает"}))
+
+    def test_intro_allows_order_with_downloaded_file(self):
+        self.assertTrue(
+            is_order_ready_for_intro({"document_id": "doc-1", "status": "Из истории", "filename": "codes.csv"})
+        )
+
+    def test_tsd_allows_fresh_order_before_download(self):
+        self.assertTrue(is_order_ready_for_tsd({"document_id": "doc-1", "status": "Ожидает"}))
+        self.assertTrue(is_order_ready_for_tsd({"document_id": "doc-1", "status": "Скачан"}))
+        self.assertFalse(is_order_ready_for_tsd({"document_id": "doc-1", "status": "Ошибка генерации"}))
 
 
 class RemoveOrderByDocumentIdTests(unittest.TestCase):
