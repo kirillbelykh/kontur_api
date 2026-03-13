@@ -1,6 +1,31 @@
 {
   "orders": [
     {
+      "order_name": "545 стер лат заявка 5340 10пар",
+      "document_id": "45c5beb6-66af-46de-b9b9-3d1fe2ffa639",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
+      "gtin": "4640473512264",
+      "positions": [
+        {
+          "gtin": "4640473512264",
+          "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-13T17:50:14.182471",
+      "created_by": "sklad",
+      "updated_at": "2026-03-13T17:50:14.182471",
+      "updated_by": "sklad",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null
+    },
+    {
       "order_name": "test",
       "document_id": "2e933236-9927-4c4c-b7f2-a7bb803b4d2e",
       "status": "Ожидает",
@@ -101,7 +126,7 @@
       "tsd_created_at": "2026-03-13T16:08:21.935121",
       "tsd_intro_number": "5658ddf0-2d5b-4e82-9190-6e106b2cf20e",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.686285",
+      "updated_at": "2026-03-13T17:47:30.158529",
       "updated_by": "sklad"
     },
     {
@@ -127,7 +152,7 @@
       "tsd_created_at": "2026-03-13T16:08:46.019348",
       "tsd_intro_number": "48b5a56e-ad76-4328-9b47-fad376609ffc",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.158529",
       "updated_by": "sklad"
     },
     {
@@ -153,7 +178,7 @@
       "tsd_created_at": "2026-03-13T16:09:04.173391",
       "tsd_intro_number": "dacdc928-b8ac-445c-a063-c6b6f9964e02",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.158529",
       "updated_by": "sklad"
     },
     {
@@ -170,7 +195,7 @@
       "tsd_created_at": "2026-03-13T16:07:44.821148",
       "tsd_intro_number": "c0e697ea-7d47-4bd3-8d55-d0d388ead06f",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.159536",
       "updated_by": "sklad"
     },
     {
@@ -187,7 +212,7 @@
       "tsd_created_at": "2026-03-13T16:07:24.866316",
       "tsd_intro_number": "c6225b0d-3760-4e1e-b313-58d5b7e0c46a",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.159536",
       "updated_by": "sklad"
     },
     {
@@ -213,7 +238,7 @@
       "tsd_created_at": "2026-03-13T16:06:59.254146",
       "tsd_intro_number": "9c479868-1d70-4d7c-af10-2fb56e6ae3e0",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.159536",
       "updated_by": "sklad"
     },
     {
@@ -239,7 +264,7 @@
       "tsd_created_at": "2026-03-13T12:25:15.827684",
       "tsd_intro_number": "378b7498-b3a1-4ee8-85c6-95f7eb70542f",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.159536",
       "updated_by": "sklad"
     },
     {
@@ -265,7 +290,7 @@
       "tsd_created_at": "2026-03-13T12:26:25.743015",
       "tsd_intro_number": "e2b0ef38-6e71-40b8-8f54-a6fe08ad20e2",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.159536",
       "updated_by": "sklad"
     },
     {
@@ -291,7 +316,7 @@
       "tsd_created_at": "2026-03-13T12:26:01.726064",
       "tsd_intro_number": "b920c25f-267c-40d0-bc9c-320ec7b02d17",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.159536",
       "updated_by": "sklad"
     },
     {
@@ -317,7 +342,7 @@
       "tsd_created_at": "2026-03-13T12:25:37.519612",
       "tsd_intro_number": "d8281e7b-d121-4144-8ca5-8f50574449a3",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.687285",
+      "updated_at": "2026-03-13T17:47:30.159536",
       "updated_by": "sklad"
     },
     {
@@ -334,7 +359,7 @@
       "tsd_created_at": "2026-03-13T12:24:24.874025",
       "tsd_intro_number": "ba6ed7b2-4c0a-4375-bfec-f9554d203ec5",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.160529",
       "updated_by": "sklad"
     },
     {
@@ -360,7 +385,7 @@
       "tsd_created_at": "2026-03-13T12:23:52.746753",
       "tsd_intro_number": "0f85ab59-cec7-4cff-9708-9e75246e35c4",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.160529",
       "updated_by": "sklad"
     },
     {
@@ -386,7 +411,7 @@
       "tsd_created_at": "2026-03-13T12:24:49.638932",
       "tsd_intro_number": "4ec8d7ae-d6b4-4bff-a8fd-41dfbd7386f0",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.160529",
       "updated_by": "sklad"
     },
     {
@@ -412,7 +437,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.160529",
       "updated_by": "sklad"
     },
     {
@@ -438,7 +463,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.160529",
       "updated_by": "sklad"
     },
     {
@@ -455,7 +480,7 @@
       "tsd_created_at": "2026-03-12T11:31:16.581447",
       "tsd_intro_number": "b5104ee9-c92d-44e8-a49d-a20a5b912374",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.160529",
       "updated_by": "sklad"
     },
     {
@@ -481,7 +506,7 @@
       "tsd_created_at": "2026-03-12T11:39:16.870170",
       "tsd_intro_number": "cf783d87-f32b-4051-946a-31383a34e674",
       "tsd_created_by": "sklad",
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.160529",
       "updated_by": "sklad"
     },
     {
@@ -507,7 +532,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -524,7 +549,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -550,7 +575,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -576,7 +601,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -602,7 +627,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -628,7 +653,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -654,7 +679,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -680,7 +705,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -706,7 +731,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.688273",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -732,7 +757,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.689784",
+      "updated_at": "2026-03-13T17:47:30.161527",
       "updated_by": "sklad"
     },
     {
@@ -749,7 +774,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.689784",
+      "updated_at": "2026-03-13T17:47:30.162525",
       "updated_by": "sklad"
     },
     {
@@ -766,7 +791,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.689784",
+      "updated_at": "2026-03-13T17:47:30.162525",
       "updated_by": "sklad"
     },
     {
@@ -783,7 +808,7 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "updated_at": "2026-03-13T17:47:26.689784",
+      "updated_at": "2026-03-13T17:47:30.162525",
       "updated_by": "sklad"
     },
     {
@@ -3626,7 +3651,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-13T17:47:28.533319",
+  "last_update": "2026-03-13T17:50:17.564209",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
