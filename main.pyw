@@ -4040,6 +4040,9 @@ if __name__ == "__main__":
     if not os.path.exists(NOMENCLATURE_XLSX):
         logger.error(f"файл {NOMENCLATURE_XLSX} не найден.")
     else:
+        from desktop_shortcuts import ensure_kontur_test_shortcut
+
+        ensure_kontur_test_shortcut()
         df = pd.read_excel(NOMENCLATURE_XLSX)
         df.columns = df.columns.str.strip()
         ctk.set_appearance_mode("dark")

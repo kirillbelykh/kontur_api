@@ -489,7 +489,12 @@ function Sync-ProjectDependencies {
 }
 
 function Create-DesktopShortcut {
-    param([Parameter(Mandatory = $true)][string]$ProjectDir)
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectDir,
+        [Parameter(Mandatory = $true)][string]$ShortcutName,
+        [Parameter(Mandatory = $true)][string]$EntryScript,
+        [Parameter(Mandatory = $true)][string]$IconFile
+    )
 
     $pythonw = Join-Path $ProjectDir ".venv\\Scripts\\pythonw.exe"
     if (-not (Test-Path $pythonw)) {
@@ -497,15 +502,15 @@ function Create-DesktopShortcut {
     }
 
     $desktop = [Environment]::GetFolderPath("Desktop")
-    $shortcutPath = Join-Path $desktop "KonturAPI.lnk"
+    $shortcutPath = Join-Path $desktop "${ShortcutName}.lnk"
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $pythonw
-    $shortcut.Arguments = "`"$(Join-Path $ProjectDir 'main.pyw')`""
+    $shortcut.Arguments = "`"$(Join-Path $ProjectDir $EntryScript)`""
     $shortcut.WorkingDirectory = $ProjectDir
 
-    $iconPath = Join-Path $ProjectDir "icon.ico"
+    $iconPath = Join-Path $ProjectDir $IconFile
     if (Test-Path $iconPath) {
         $shortcut.IconLocation = $iconPath
     }
@@ -533,8 +538,9 @@ $browserVersion = Get-YandexBrowserVersion -BrowserPath $browserPath
 Write-Ok "Yandex Browser version: $browserVersion"
 
 Install-YandexDriver -ProjectDir $projectDir -BrowserVersion $browserVersion
-Create-DesktopShortcut -ProjectDir $projectDir
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -EntryScript "main.pyw" -IconFile "icon.ico"
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTEST" -EntryScript "kontur_test.pyw" -IconFile "kontur.ico"
 
 Write-Host ""
 Write-Ok "Installation completed"
-Write-Host "Run the app from desktop shortcut: KonturAPI"
+Write-Host "Run the app from desktop shortcut: KonturAPI or KonturTEST"
