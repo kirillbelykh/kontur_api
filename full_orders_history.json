@@ -23,7 +23,8 @@
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
-      "tsd_intro_number": null
+      "tsd_intro_number": null,
+      "tsd_created_by": null
     },
     {
       "order_name": "550 лат диаг M 260316 -5д",
@@ -54,9 +55,9 @@
     {
       "order_name": "548 лат диаг S 260316 -100д",
       "document_id": "a3e6e152-1da2-4ad4-ac3e-92ff2ae184aa",
-      "status": "Выполнен",
+      "status": "Ожидает",
       "filename": null,
-      "simpl": "wheelchairs",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
       "gtin": "4650118041257",
       "positions": [
@@ -70,7 +71,7 @@
       ],
       "created_at": "2026-03-16T15:45:02.610112",
       "created_by": "user",
-      "updated_at": "2026-03-16T15:45:02.610112",
+      "updated_at": "2026-03-16T15:45:13.507713",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -4509,7 +4510,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-16T15:45:11.584069",
+  "last_update": "2026-03-16T15:45:20.293100",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
