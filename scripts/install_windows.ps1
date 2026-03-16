@@ -495,14 +495,21 @@ function Create-DesktopShortcut {
     if (-not (Test-Path $launcher)) {
         throw "run_kontur.vbs was not found in project directory."
     }
+    $wscript = Join-Path $env:WINDIR "System32\\wscript.exe"
+    if (-not (Test-Path $wscript)) {
+        $wscript = "wscript.exe"
+    }
 
     $desktop = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktop "KonturAPI.lnk"
+    if (Test-Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
+    }
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $launcher
-    $shortcut.Arguments = ""
+    $shortcut.TargetPath = $wscript
+    $shortcut.Arguments = "`"$launcher`""
     $shortcut.WorkingDirectory = $ProjectDir
 
     $iconPath = Join-Path $ProjectDir "icon.ico"

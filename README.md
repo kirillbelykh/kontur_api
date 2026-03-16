@@ -24,6 +24,8 @@
    - определит версию браузера, подберет и скачает подходящий `YandexDriver` в `driver/yandexdriver.exe`;
    - создаст ярлык `KonturAPI` на рабочем столе для запуска `main.pyw`.
 
+Если ярлык сломан (ошибка Python Launcher), запустите `repair_shortcut.bat` в корне проекта.
+
 ## Ручной запуск через uv
 
 ```bash
