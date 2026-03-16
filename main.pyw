@@ -3956,10 +3956,24 @@ class App(ctk.CTk):
         warehouse_id = "59739360-7d62-434b-ad13-4617c87a6d13"
         
         all_codes = []
+        seen_codes = set()
         page_limit = 100
         offset = 0
+        normalized_target = str(target_value or "").strip().lower()
+        logger.info(
+            "Агрегация: старт загрузки (mode=%s, target=%s, status=%s, limit=%s)",
+            mode,
+            target_value,
+            status_filter,
+            limit,
+        )
         
         try:
+            if mode == "comment" and not normalized_target:
+                self.log_aggregation_message("❌ Ошибка: пустое наименование для поиска")
+                logger.warning("Агрегация: пустое наименование для режима comment")
+                return []
+
             while True:
                 params = {
                     'warehouseId': warehouse_id,
@@ -3971,11 +3985,12 @@ class App(ctk.CTk):
                 }
                 
                 try:
-                    response = session.get(base_url, params=params)
+                    response = session.get(base_url, params=params, timeout=30)
                     response.raise_for_status()
                     
                     data = response.json()
                     items = data.get('items', [])
+                    logger.info("Агрегация: получено %s записей (offset=%s)", len(items), offset)
                     
                     if not items:
                         break
@@ -3983,14 +3998,19 @@ class App(ctk.CTk):
                     # Фильтрация в зависимости от режима
                     filtered_items = []
                     if mode == "comment":
-                        filtered_items = [item for item in items if item.get('comment') == target_value]
+                        filtered_items = [
+                            item for item in items
+                            if normalized_target in str(item.get('comment') or '').strip().lower()
+                        ]
                     elif mode == "count":
                         filtered_items = items
+                    logger.info("Агрегация: после фильтра mode=%s осталось %s", mode, len(filtered_items))
                     
                     # Добавляем отфильтрованные записи
                     for item in filtered_items:
                         aggregate_code = item.get('aggregateCode')
-                        if aggregate_code and aggregate_code not in [c['aggregateCode'] for c in all_codes]:
+                        if aggregate_code and aggregate_code not in seen_codes:
+                            seen_codes.add(aggregate_code)
                             all_codes.append({
                                 'aggregateCode': aggregate_code,
                                 'documentId': item.get('documentId'),
@@ -4020,6 +4040,7 @@ class App(ctk.CTk):
                     
                 except Exception as e:
                     self.log_aggregation_message(f"❌ Ошибка при запросе: {str(e)}")
+                    logger.exception("Агрегация: ошибка запроса (offset=%s)", offset)
                     break
             
             # Обрезаем до нужного количества
@@ -4027,16 +4048,22 @@ class App(ctk.CTk):
                 all_codes = all_codes[:int(target_value)]
             elif mode == "comment" and len(all_codes) > limit:
                 all_codes = all_codes[:limit]
+
+            if mode == "comment" and not all_codes:
+                self.log_aggregation_message("ℹ️ По указанному наименованию коды не найдены")
+                logger.info("Агрегация: по наименованию '%s' совпадений не найдено", target_value)
             
             # СОРТИРОВКА ПО ВОЗРАСТАНИЮ НОМЕРА
             # Поскольку коды выглядят как "04650118042512020000000010" и "04650118042512010000000428",
             # сортируем по числовой части в конце строки
             all_codes.sort(key=lambda x: int(x['aggregateCode'][-10:]) if len(x['aggregateCode']) >= 10 else x['aggregateCode'])
+            logger.info("Агрегация: успешно отобрано %s кодов (mode=%s)", len(all_codes), mode)
             
             return all_codes
             
         except Exception as e:
             self.log_aggregation_message(f"❌ Критическая ошибка при загрузке кодов: {str(e)}")
+            logger.exception("Агрегация: критическая ошибка загрузки")
             return []
 
     def save_simple_csv(self, codes, filename):
