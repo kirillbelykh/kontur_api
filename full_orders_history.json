@@ -3,9 +3,9 @@
     {
       "order_name": "549 лат диаг M 260316 -100д",
       "document_id": "90bbf144-eedf-45ec-8cbe-049d2d4a0bd0",
-      "status": "Выполнен",
+      "status": "Ожидает",
       "filename": null,
-      "simpl": "wheelchairs",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
       "gtin": "4650118041295",
       "positions": [
@@ -19,7 +19,7 @@
       ],
       "created_at": "2026-03-16T15:45:09.879134",
       "created_by": "user",
-      "updated_at": "2026-03-16T15:45:09.879134",
+      "updated_at": "2026-03-16T15:45:22.305767",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -4510,7 +4510,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-16T15:45:20.293100",
+  "last_update": "2026-03-16T15:45:24.050117",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
