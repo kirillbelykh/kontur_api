@@ -491,9 +491,9 @@ function Sync-ProjectDependencies {
 function Create-DesktopShortcut {
     param([Parameter(Mandatory = $true)][string]$ProjectDir)
 
-    $pythonw = Join-Path $ProjectDir ".venv\\Scripts\\pythonw.exe"
-    if (-not (Test-Path $pythonw)) {
-        throw "pythonw.exe was not found in .venv. Dependencies may not be installed correctly."
+    $launcher = Join-Path $ProjectDir "run_kontur.vbs"
+    if (-not (Test-Path $launcher)) {
+        throw "run_kontur.vbs was not found in project directory."
     }
 
     $desktop = [Environment]::GetFolderPath("Desktop")
@@ -501,8 +501,8 @@ function Create-DesktopShortcut {
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $pythonw
-    $shortcut.Arguments = "`"$(Join-Path $ProjectDir 'main.pyw')`""
+    $shortcut.TargetPath = $launcher
+    $shortcut.Arguments = ""
     $shortcut.WorkingDirectory = $ProjectDir
 
     $iconPath = Join-Path $ProjectDir "icon.ico"
