@@ -3,8 +3,8 @@
     {
       "order_name": "548 лат диаг S 260316 -200д",
       "document_id": "8345addb-3070-4823-bdb2-fffeac30bca9",
-      "status": "Ожидает",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\sklad\\Desktop\\Коды км\\548 лат диаг S 260316 -200д\\548 лат диаг S 260316 -200д.pdf, C:\\Users\\sklad\\Desktop\\Коды км\\548 лат диаг S 260316 -200д\\548 лат диаг S 260316 -200д_csv.csv, C:\\Users\\sklad\\Desktop\\Коды км\\548 лат диаг S 260316 -200д\\548 лат диаг S 260316 -200д.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
       "gtin": "4650118041257",
@@ -19,8 +19,8 @@
       ],
       "created_at": "2026-03-16T15:56:28.415534",
       "created_by": "user",
-      "updated_at": "2026-03-16T15:56:37.150716",
-      "updated_by": "user",
+      "updated_at": "2026-03-16T16:00:31.162803",
+      "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
@@ -4666,8 +4666,8 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-16T15:56:45.674016",
+  "last_update": "2026-03-16T16:00:34.241080",
   "created_by": "sklad",
-  "updated_by": "user",
-  "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
+  "updated_by": "sklad",
+  "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
 }
