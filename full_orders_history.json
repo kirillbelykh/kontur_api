@@ -1,6 +1,31 @@
 {
   "orders": [
     {
+      "order_name": "548 лат диаг S 260316 -200д",
+      "document_id": "8345addb-3070-4823-bdb2-fffeac30bca9",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelchairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+      "gtin": "4650118041257",
+      "positions": [
+        {
+          "gtin": "4650118041257",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 200,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-16T15:56:28.415534",
+      "created_by": "user",
+      "updated_at": "2026-03-16T15:56:28.415534",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null
+    },
+    {
       "order_name": "549 лат диаг M 260316 -310д",
       "document_id": "8096781b-f7db-4338-8599-103bc7785bc1",
       "status": "Выполнен",
@@ -23,7 +48,8 @@
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
-      "tsd_intro_number": null
+      "tsd_intro_number": null,
+      "tsd_created_by": null
     },
     {
       "order_name": "550 лат диаг L 260316 -90д",
@@ -4639,7 +4665,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-16T15:56:26.510219",
+  "last_update": "2026-03-16T15:56:35.190002",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
