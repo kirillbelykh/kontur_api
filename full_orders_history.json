@@ -3,8 +3,8 @@
     {
       "order_name": "547 ультра нат 260110 14шт",
       "document_id": "4fca4d66-4b18-4804-adf2-cd4c502003fa",
-      "status": "Ожидает",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\sklad\\Desktop\\Коды км\\547 ультра нат 260110 14шт\\547 ультра нат 260110 14шт.pdf, C:\\Users\\sklad\\Desktop\\Коды км\\547 ультра нат 260110 14шт\\547 ультра нат 260110 14шт_csv.csv, C:\\Users\\sklad\\Desktop\\Коды км\\547 ультра нат 260110 14шт\\547 ультра нат 260110 14шт.xls",
       "simpl": "ультра",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 8,0",
       "gtin": "4640473509936",
@@ -19,7 +19,7 @@
       ],
       "created_at": "2026-03-16T09:41:39.217657",
       "created_by": "sklad",
-      "updated_at": "2026-03-16T09:41:44.423492",
+      "updated_at": "2026-03-16T09:45:21.378385",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -3704,7 +3704,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-16T09:41:46.165372",
+  "last_update": "2026-03-16T09:45:24.484343",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
