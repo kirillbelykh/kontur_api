@@ -20,26 +20,40 @@ func NewService(cfg config.Config) *Service {
 
 func (s *Service) CheckDependencies(ctx context.Context) ([]dto.DependencyStatus, error) {
 	_ = ctx
-	return []dto.DependencyStatus{
-		checkExecutable("go", "Go toolchain is required to build the alternative desktop app."),
-		checkExecutable("npm", "Node.js frontend dependencies are installed through npm."),
-		checkExecutable("git", "Git is required for orders-history sync."),
-		checkExecutable("wails", "Wails CLI is required for local desktop builds."),
+	statuses := []dto.DependencyStatus{
 		checkOptionalFile("yandex-browser", s.cfg.YandexBrowserPath, "Yandex Browser binary can be pinned explicitly via YANDEX_BROWSER_PATH."),
 		checkOptionalFile("yandex-user-data", s.cfg.YandexUserDataDir, "Browser profile directory can be pinned explicitly via YANDEX_USER_DATA_DIR."),
 		checkFile("history", s.cfg.HistoryPath, "Shared order history is stored here."),
 		checkFile("runtime", s.cfg.RuntimeDir, "Go-specific runtime artifacts live here."),
-		checkFile("sync-cache", s.cfg.SyncCacheDir, "Dedicated git clone for orders-history sync lives here."),
+		checkOptionalFile("env-file", s.cfg.EnvFilePath, "User configuration for the installed app is stored here."),
 		checkOptionalValue("base-url", s.cfg.BaseURL, "Kontur API base URL must be present for remote flows."),
 		checkOptionalValue("warehouse-id", s.cfg.WarehouseID, "Warehouse ID is required for orders, TSD and aggregation flows."),
 		checkOptionalValue("organization-id", s.cfg.OrganizationID, "Organization ID is required for certificate checks and exports."),
+		{
+			Name:      "mode",
+			Available: true,
+			Status:    s.cfg.Mode,
+			Hint:      "repo mode shares the Python project history, standalone mode uses installed app data.",
+		},
 		{
 			Name:      "target-platform",
 			Available: runtime.GOOS == "windows",
 			Status:    runtime.GOOS,
 			Hint:      "Windows is the primary runtime target for Yandex Browser and CryptoPro integrations.",
 		},
-	}, nil
+	}
+
+	if s.cfg.Mode == "repo" {
+		statuses = append([]dto.DependencyStatus{
+			checkExecutable("go", "Go toolchain is required to build the alternative desktop app."),
+			checkExecutable("npm", "Node.js frontend dependencies are installed through npm."),
+			checkExecutable("git", "Git is required for orders-history sync."),
+			checkExecutable("wails", "Wails CLI is required for local desktop builds."),
+		}, statuses...)
+		statuses = append(statuses, checkFile("sync-cache", s.cfg.SyncCacheDir, "Dedicated git clone for orders-history sync lives here."))
+	}
+
+	return statuses, nil
 }
 
 func checkExecutable(name, hint string) dto.DependencyStatus {

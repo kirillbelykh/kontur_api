@@ -4,3 +4,5 @@ frontend/package.json.md5
 runtime/
 build/bin/
 build/installer/
+build/package/
+build/windows/MicrosoftEdgeWebView2Setup.exe
