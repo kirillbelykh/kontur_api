@@ -82,7 +82,7 @@
       "order_name": "558 лат диаг L 260316 -1750д",
       "document_id": "b1fa3982-cccd-4efc-a0c4-823996a5548e",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\558 лат диаг L 260316 -1750д\\558 лат диаг L 260316 -1750д.pdf, C:\\Users\\user\\Desktop\\Коды км\\558 лат диаг L 260316 -1750д\\558 лат диаг L 260316 -1750д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\558 лат диаг L 260316 -1750д\\558 лат диаг L 260316 -1750д.xls",
+      "filename": "C:\\Users\\sklad\\Desktop\\Коды км\\558 лат диаг L 260316 -1750д\\558 лат диаг L 260316 -1750д.pdf, C:\\Users\\sklad\\Desktop\\Коды км\\558 лат диаг L 260316 -1750д\\558 лат диаг L 260316 -1750д_csv.csv, C:\\Users\\sklad\\Desktop\\Коды км\\558 лат диаг L 260316 -1750д\\558 лат диаг L 260316 -1750д.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041332",
@@ -97,8 +97,8 @@
       ],
       "created_at": "2026-03-17T15:30:50.940119",
       "created_by": "user",
-      "updated_at": "2026-03-17T15:36:43.419000",
-      "updated_by": "user",
+      "updated_at": "2026-03-17T16:30:22.848243",
+      "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-17T15:36:01.071218",
       "tsd_intro_number": "c84172ac-2760-43fb-9e2f-a35145bcd0e1",
@@ -4900,7 +4900,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-17T16:30:14.963463",
+  "last_update": "2026-03-17T16:30:26.870035",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
