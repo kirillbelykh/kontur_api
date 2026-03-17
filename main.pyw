@@ -1302,8 +1302,33 @@ class App(ctk.CTk):
                 logger.error("❌ Не удалось получить сессию для создания агрегации")
                 return
 
-            aggregate_ids = self.create_aggregate_codes(session=session, comment=comment, count=count)
-            self.update_aggregation_progress(0.8)
+            batch_limit = 99
+            remaining = count
+            batch_counts = []
+            while remaining > 0:
+                batch_size = min(batch_limit, remaining)
+                batch_counts.append(batch_size)
+                remaining -= batch_size
+
+            total_batches = len(batch_counts)
+            aggregate_ids = []
+
+            for batch_index, batch_count in enumerate(batch_counts, start=1):
+                self.log_aggregation_message(
+                    f"📦 Запрос {batch_index}/{total_batches}: создаем {batch_count} кодов"
+                )
+                batch_ids = self.create_aggregate_codes(
+                    session=session,
+                    comment=comment,
+                    count=batch_count
+                )
+                aggregate_ids.extend(batch_ids)
+                self.log_aggregation_message(
+                    f"✅ Запрос {batch_index}/{total_batches} выполнен: получено {len(batch_ids)} кодов"
+                )
+
+                progress = 0.35 + (0.45 * batch_index / total_batches)
+                self.update_aggregation_progress(progress)
 
             created_count = len(aggregate_ids)
             self.log_aggregation_message(f"✅ Создано {created_count} агрегационных кодов")
