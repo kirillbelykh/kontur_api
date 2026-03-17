@@ -19,12 +19,12 @@
       ],
       "created_at": "2026-03-17T10:01:02.506554",
       "created_by": "user",
-      "updated_at": "2026-03-17T10:01:05.466929",
+      "updated_at": "2026-03-17T10:01:55.694483",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created": true,
+      "tsd_created_at": "2026-03-17T10:01:55.694483",
+      "tsd_intro_number": "a0b26f79-09ea-4ec8-92f8-b527df3fe074",
+      "tsd_created_by": "user"
     },
     {
       "order_name": "552 стер лат M 260317 434к",
@@ -4744,7 +4744,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-17T10:01:12.951288",
+  "last_update": "2026-03-17T10:01:57.109363",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
