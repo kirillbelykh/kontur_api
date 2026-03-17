@@ -56,7 +56,7 @@
       "order_name": "553 стер лат L 260318 390к",
       "document_id": "541416ef-8df5-4794-ad78-1bd987712b41",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\553 стер лат L 260318 390к\\553 стер лат L 260318 390к.pdf, C:\\Users\\user\\Desktop\\Коды км\\553 стер лат L 260318 390к\\553 стер лат L 260318 390к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\553 стер лат L 260318 390к\\553 стер лат L 260318 390к.xls",
+      "filename": "C:\\Users\\sklad\\Desktop\\Коды км\\553 стер лат L 260318 390к\\553 стер лат L 260318 390к.pdf, C:\\Users\\sklad\\Desktop\\Коды км\\553 стер лат L 260318 390к\\553 стер лат L 260318 390к_csv.csv, C:\\Users\\sklad\\Desktop\\Коды км\\553 стер лат L 260318 390к\\553 стер лат L 260318 390к.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118040069",
@@ -71,8 +71,8 @@
       ],
       "created_at": "2026-03-17T10:00:56.337525",
       "created_by": "user",
-      "updated_at": "2026-03-17T10:05:22.165522",
-      "updated_by": "user",
+      "updated_at": "2026-03-17T11:22:33.015176",
+      "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-17T10:03:36.896578",
       "tsd_intro_number": "0d578627-bd81-4790-83b7-8325dbe09efd",
@@ -4744,7 +4744,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-17T11:22:06.918563",
+  "last_update": "2026-03-17T11:22:34.682232",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
