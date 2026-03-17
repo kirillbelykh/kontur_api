@@ -4900,8 +4900,8 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-17T18:10:38.585190",
+  "last_update": "2026-03-17T18:33:12.502686",
   "created_by": "sklad",
-  "updated_by": "sklad",
-  "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
+  "updated_by": "user",
+  "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
 }
