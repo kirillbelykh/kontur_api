@@ -344,6 +344,9 @@ class App(ctk.CTk):
         self.agg_mode_var = None
         self.count_entry = None
         self.comment_entry = None
+        self.agg_create_name_entry = None
+        self.agg_create_count_entry = None
+        self.create_agg_btn = None
         self.download_agg_btn = None
         self.agg_progress = None
         self.agg_log_text = None
@@ -835,7 +838,76 @@ class App(ctk.CTk):
             font=self.fonts["small"],
             text_color=self._get_color("text_secondary")
         ).pack(anchor="w")
-        
+
+        # Карточка создания агрегационных кодов
+        create_card = ctk.CTkFrame(main_frame, corner_radius=12)
+        create_card.pack(fill="x", pady=(0, 20))
+
+        ctk.CTkLabel(
+            create_card,
+            text="Создание кодов агрегации",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+
+        create_input_frame = ctk.CTkFrame(create_card, fg_color="transparent")
+        create_input_frame.pack(fill="x", padx=20, pady=(0, 10))
+
+        create_name_frame = ctk.CTkFrame(create_input_frame, fg_color="transparent")
+        create_name_frame.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            create_name_frame,
+            text="Название:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary")
+        ).pack(side="left", padx=(0, 15))
+
+        self.agg_create_name_entry = ctk.CTkEntry(
+            create_name_frame,
+            width=360,
+            placeholder_text="Введите название агрегации...",
+            font=self.fonts["normal"],
+            height=40,
+            corner_radius=8,
+            border_color=self._get_color("secondary")
+        )
+        self.agg_create_name_entry.pack(side="left", fill="x", expand=True)
+
+        create_count_frame = ctk.CTkFrame(create_input_frame, fg_color="transparent")
+        create_count_frame.pack(fill="x")
+
+        ctk.CTkLabel(
+            create_count_frame,
+            text="Количество агрегатов:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary")
+        ).pack(side="left", padx=(0, 15))
+
+        self.agg_create_count_entry = ctk.CTkEntry(
+            create_count_frame,
+            width=220,
+            placeholder_text="Введите количество...",
+            font=self.fonts["normal"],
+            height=40,
+            corner_radius=8,
+            border_color=self._get_color("secondary")
+        )
+        self.agg_create_count_entry.pack(side="left")
+
+        self.create_agg_btn = ctk.CTkButton(
+            create_card,
+            text="⚡ Генерировать",
+            command=self.start_aggregation_generation,
+            height=45,
+            font=self.fonts["button"],
+            fg_color=self._get_color("primary"),
+            hover_color=self._get_color("accent"),
+            corner_radius=8,
+            border_width=0
+        )
+        self.create_agg_btn.pack(padx=20, pady=(10, 20), anchor="w")
+
         # Карточка с настройками
         settings_card = ctk.CTkFrame(main_frame, corner_radius=12)
         settings_card.pack(fill="x", pady=(0, 20))
@@ -1060,6 +1132,40 @@ class App(ctk.CTk):
             print(f"Критическая ошибка в start_aggregation_download: {e}")
             self.log_aggregation_message(f"❌ Критическая ошибка: {str(e)}")
 
+    def start_aggregation_generation(self):
+        """Запуск процесса создания кодов агрегации в отдельном потоке"""
+        try:
+            if (
+                self.agg_create_name_entry is None
+                or self.agg_create_count_entry is None
+                or self.create_agg_btn is None
+            ):
+                self.log_aggregation_message("❌ Ошибка: интерфейс создания не инициализирован")
+                return
+
+            comment = self.agg_create_name_entry.get().strip()
+            count_text = self.agg_create_count_entry.get().strip()
+
+            if not comment:
+                self.log_aggregation_message("❌ Ошибка: введите название")
+                return
+
+            if not count_text or not count_text.isdigit():
+                self.log_aggregation_message("❌ Ошибка: введите корректное количество агрегатов")
+                return
+
+            count = int(count_text)
+            if count <= 0:
+                self.log_aggregation_message("❌ Ошибка: количество агрегатов должно быть больше 0")
+                return
+
+            self.create_agg_btn.configure(state="disabled", text="Генерация...")
+            self.download_executor.submit(self.generate_aggregation_process, comment, count)
+
+        except Exception as e:
+            print(f"Критическая ошибка в start_aggregation_generation: {e}")
+            self.log_aggregation_message(f"❌ Критическая ошибка генерации: {str(e)}")
+
     def _initialize_aggregation_widgets(self):
         """Инициализирует виджеты агрегационного таба, если таб уже существует"""
         try:
@@ -1171,6 +1277,45 @@ class App(ctk.CTk):
         finally:
             # Разблокируем кнопку
             self.download_agg_btn.configure(state="normal", text="🚀 Загрузить коды агрегации")
+            self.update_aggregation_progress(0)
+
+    def generate_aggregation_process(self, comment, count):
+        """Процесс создания кодов агрегации с использованием SessionManager"""
+        try:
+            self.log_aggregation_message(f"🚀 Создаем агрегационные коды: {comment} ({count} шт.)")
+            self.update_aggregation_progress(0.1)
+
+            logger.info("🔐 Получаем сессию для создания агрегации...")
+            session = SessionManager.get_session()
+            self.update_aggregation_progress(0.35)
+
+            if not session:
+                self.log_aggregation_message("❌ Не удалось получить сессию")
+                logger.error("❌ Не удалось получить сессию для создания агрегации")
+                return
+
+            aggregate_ids = self.create_aggregate_codes(session=session, comment=comment, count=count)
+            self.update_aggregation_progress(0.8)
+
+            created_count = len(aggregate_ids)
+            self.log_aggregation_message(f"✅ Создано {created_count} агрегационных кодов")
+
+            preview_ids = aggregate_ids[:5]
+            for aggregate_id in preview_ids:
+                self.log_aggregation_message(f"• {aggregate_id}")
+
+            if created_count > len(preview_ids):
+                self.log_aggregation_message(f"… и еще {created_count - len(preview_ids)} кодов")
+
+            self.status_bar.configure(text=f"Создано {created_count} кодов агрегации")
+            self.update_aggregation_progress(1.0)
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка создания кодов агрегации: {e}")
+            self.log_aggregation_message(f"❌ Ошибка создания кодов агрегации: {str(e)}")
+        finally:
+            if self.create_agg_btn is not None:
+                self.create_agg_btn.configure(state="normal", text="⚡ Генерировать")
             self.update_aggregation_progress(0)
 
     def _setup_create_frame(self):
@@ -4048,6 +4193,47 @@ class App(ctk.CTk):
             self.log_aggregation_message(f"❌ Критическая ошибка при загрузке кодов: {str(e)}")
             logger.exception("Агрегация: критическая ошибка загрузки")
             return []
+
+    def create_aggregate_codes(
+        self,
+        session,
+        comment,
+        count,
+        extension_symbol="0",
+        aggregation_type="gs1GlnAggregate",
+    ):
+        """Создает новые агрегационные коды"""
+        base_url = "https://mk.kontur.ru/api/v1/aggregates"
+        warehouse_id = "59739360-7d62-434b-ad13-4617c87a6d13"
+        payload = {
+            "extensionSymbol": extension_symbol,
+            "comment": comment,
+            "count": int(count),
+            "productGroup": PRODUCT_GROUP or "wheelChairs",
+            "aggregationType": aggregation_type,
+        }
+
+        logger.info(
+            "Агрегация: создание кодов (warehouse_id=%s, comment=%s, count=%s)",
+            warehouse_id,
+            comment,
+            count,
+        )
+
+        response = session.post(
+            base_url,
+            params={"warehouseId": warehouse_id},
+            json=payload,
+            timeout=30,
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        if not isinstance(data, list):
+            raise ValueError("Некорректный ответ сервиса создания агрегации")
+
+        logger.info("Агрегация: сервис вернул %s идентификаторов", len(data))
+        return data
 
     def save_simple_csv(self, codes, filename):
         """Сохраняет только коды в простом CSV с сортировкой по возрастанию"""
