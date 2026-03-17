@@ -1,6 +1,31 @@
 {
   "orders": [
     {
+      "order_name": "554 лат диаг М 260316 690д",
+      "document_id": "2d667d37-0cc4-43f8-92f5-d6e99635f30f",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041295",
+      "positions": [
+        {
+          "gtin": "4650118041295",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 690,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-17T11:29:42.084537",
+      "created_by": "sklad",
+      "updated_at": "2026-03-17T11:29:42.084537",
+      "updated_by": "sklad",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null
+    },
+    {
       "order_name": "551 стер лат S 260316 48к",
       "document_id": "04092570-df5e-4001-9d45-1ce105165ebf",
       "status": "Скачан",
@@ -4744,7 +4769,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-17T11:22:34.682232",
+  "last_update": "2026-03-17T11:29:43.669856",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
