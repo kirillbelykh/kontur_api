@@ -149,12 +149,12 @@
       ],
       "created_at": "2026-03-16T15:56:24.818310",
       "created_by": "user",
-      "updated_at": "2026-03-16T17:06:56.047923",
-      "updated_by": "user",
+      "updated_at": "2026-03-17T11:43:44.362687",
+      "updated_by": "sklad",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-16T17:06:56.047923",
-      "tsd_intro_number": "2937eb1e-74c2-4f7a-b9e5-fb1d2530963e",
-      "tsd_created_by": "user"
+      "tsd_created_at": "2026-03-17T11:43:44.362687",
+      "tsd_intro_number": "c3f34ee6-e4a7-43f3-89fa-f2c252c07bc4",
+      "tsd_created_by": "sklad"
     },
     {
       "order_name": "550 лат диаг L 260316 -90д",
@@ -4770,7 +4770,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-17T11:33:39.629311",
+  "last_update": "2026-03-17T11:43:46.121238",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
