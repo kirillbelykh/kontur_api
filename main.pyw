@@ -1145,7 +1145,7 @@ class App(ctk.CTk):
             
             # Загружаем данные
             self.log_aggregation_message("🚀 Загружаем коды агрегации...")
-            limit = int(target_value) if mode == "count" else 100
+            limit = int(target_value) if mode == "count" else None
             codes = self.download_aggregate_codes(
                 session=session,
                 mode=mode,
@@ -3950,7 +3950,7 @@ class App(ctk.CTk):
             self.tsd_log_insert(f"❌ Ошибка при извлечении GTIN: {e}")
             return None
 
-    def download_aggregate_codes(self, session, mode, target_value, status_filter="tsdProcessStart", limit=100):
+    def download_aggregate_codes(self, session, mode, target_value, status_filter="tsdProcessStart", limit=None):
         """Загружает aggregate codes в зависимости от выбранного режима"""
         base_url = "https://mk.kontur.ru/api/v1/aggregates"
         warehouse_id = "59739360-7d62-434b-ad13-4617c87a6d13"
@@ -4029,7 +4029,7 @@ class App(ctk.CTk):
                     # Проверяем условия остановки
                     if mode == "count" and len(all_codes) >= int(target_value):
                         break
-                    elif mode == "comment" and len(all_codes) >= limit:
+                    elif mode == "comment" and limit is not None and len(all_codes) >= limit:
                         break
                     
                     if len(items) < page_limit:
@@ -4046,7 +4046,7 @@ class App(ctk.CTk):
             # Обрезаем до нужного количества
             if mode == "count" and len(all_codes) > int(target_value):
                 all_codes = all_codes[:int(target_value)]
-            elif mode == "comment" and len(all_codes) > limit:
+            elif mode == "comment" and limit is not None and len(all_codes) > limit:
                 all_codes = all_codes[:limit]
 
             if mode == "comment" and not all_codes:
