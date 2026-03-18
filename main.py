@@ -26,12 +26,15 @@ import update
 import customtkinter as ctk
 from customtkinter import CTkScrollableFrame
 import tkinter as tk
+import tkinter.messagebox as mbox
 from tkinter import ttk, font
 from dotenv import load_dotenv # type: ignore
 from options import (
     simplified_options, color_required, venchik_required,
     color_options, venchik_options, size_options, units_options
 )
+from aggregation_bulk import BulkAggregationService
+from cryptopro import find_certificate_by_thumbprint, sign_data, sign_text_data
 
 load_dotenv()
 
@@ -277,6 +280,7 @@ class App(ctk.CTk):
         self.execute_all_executor = ThreadPoolExecutor(max_workers=3)
         self.intro_executor = ThreadPoolExecutor(max_workers=3)
         self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)
+        self.bulk_aggregation_service = BulkAggregationService()
         
         self.start_auto_status_check()
         # Проверяем обновления после появления окна, чтобы не тормозить старт.
@@ -348,6 +352,7 @@ class App(ctk.CTk):
         self.agg_create_count_entry = None
         self.create_agg_btn = None
         self.download_agg_btn = None
+        self.bulk_agg_btn = None
         self.agg_progress = None
         self.agg_log_text = None
         
@@ -1007,8 +1012,11 @@ class App(ctk.CTk):
         self.comment_entry.pack(side="left")
         
         # Стилизованная кнопка загрузки
+        actions_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        actions_frame.pack(fill="x", padx=20, pady=20)
+
         self.download_agg_btn = ctk.CTkButton(
-            settings_card,
+            actions_frame,
             text="🚀 Начать загрузку кодов",
             command=self.start_aggregation_download,
             height=45,
@@ -1018,7 +1026,20 @@ class App(ctk.CTk):
             corner_radius=8,
             border_width=0
         )
-        self.download_agg_btn.pack(pady=20)
+        self.download_agg_btn.pack(side="left", padx=(0, 12))
+
+        self.bulk_agg_btn = ctk.CTkButton(
+            actions_frame,
+            text="✅ Провести все АК",
+            command=self.start_bulk_aggregation_approve,
+            height=45,
+            font=self.fonts["button"],
+            fg_color=self._get_color("success"),
+            hover_color=self._get_color("accent"),
+            corner_radius=8,
+            border_width=0
+        )
+        self.bulk_agg_btn.pack(side="left")
         
         # Прогресс-бар в современном стиле
         progress_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
@@ -1089,6 +1110,64 @@ class App(ctk.CTk):
         """Обновление прогресс-бара агрегации"""
         self.agg_progress.set(value)
         self.update_idletasks()
+
+    def _run_in_ui_thread(self, callback, wait=False):
+        """Выполняет callback в главном потоке Tk."""
+        if threading.current_thread() is threading.main_thread():
+            return callback()
+
+        result = {}
+        event = threading.Event()
+
+        def wrapped():
+            try:
+                result["value"] = callback()
+            except Exception as exc:
+                result["error"] = exc
+            finally:
+                event.set()
+
+        self.after(0, wrapped)
+        if not wait:
+            return None
+
+        event.wait()
+        if "error" in result:
+            raise result["error"]
+        return result.get("value")
+
+    def log_aggregation_message_threadsafe(self, message):
+        self._run_in_ui_thread(lambda: self.log_aggregation_message(message))
+
+    def update_aggregation_progress_threadsafe(self, processed, total):
+        value = 0 if total <= 0 else max(0.0, min(1.0, processed / total))
+        self._run_in_ui_thread(lambda: self.update_aggregation_progress(value))
+
+    def set_status_bar_threadsafe(self, message):
+        self._run_in_ui_thread(lambda: self.status_bar.configure(text=message))
+
+    def set_bulk_aggregation_ui_state(self, running):
+        def apply_state():
+            if self.create_agg_btn is not None:
+                self.create_agg_btn.configure(state="disabled" if running else "normal")
+            if self.download_agg_btn is not None:
+                self.download_agg_btn.configure(state="disabled" if running else "normal")
+            if self.bulk_agg_btn is not None:
+                self.bulk_agg_btn.configure(
+                    state="disabled" if running else "normal",
+                    text="Проведение..." if running else "✅ Провести все АК",
+                )
+
+        self._run_in_ui_thread(apply_state)
+
+    def ask_yes_no_threadsafe(self, title, message):
+        return bool(self._run_in_ui_thread(lambda: mbox.askyesno(title, message), wait=True))
+
+    def show_info_threadsafe(self, title, message):
+        self._run_in_ui_thread(lambda: mbox.showinfo(title, message))
+
+    def show_error_threadsafe(self, title, message):
+        self._run_in_ui_thread(lambda: mbox.showerror(title, message))
 
     def start_aggregation_download(self):
         """Запуск процесса скачивания кодов агрегации в отдельном потоке"""
@@ -1165,6 +1244,63 @@ class App(ctk.CTk):
         except Exception as e:
             print(f"Критическая ошибка в start_aggregation_generation: {e}")
             self.log_aggregation_message(f"❌ Критическая ошибка генерации: {str(e)}")
+
+    def start_bulk_aggregation_approve(self):
+        """Запуск массового проведения readyForSend АК."""
+        try:
+            if self.bulk_agg_btn is None:
+                self.log_aggregation_message("❌ Ошибка: кнопка массового проведения не инициализирована")
+                return
+
+            self.set_bulk_aggregation_ui_state(True)
+            self.log_aggregation_message("🚀 Запускаем массовое проведение readyForSend АК")
+            self.update_aggregation_progress(0)
+            self.download_executor.submit(self.bulk_aggregation_approve_process)
+        except Exception as e:
+            logger.exception("Критическая ошибка запуска массового проведения АК")
+            self.log_aggregation_message(f"❌ Критическая ошибка запуска: {e}")
+            self.set_bulk_aggregation_ui_state(False)
+
+    def bulk_aggregation_approve_process(self):
+        """Фоновый процесс проверки и проведения АК."""
+        summary = None
+        try:
+            self.log_aggregation_message_threadsafe("🔐 Получаем сессию Контур.Маркировки...")
+            self.set_status_bar_threadsafe("Проведение readyForSend АК...")
+            session = SessionManager.get_session()
+
+            if not session:
+                raise RuntimeError("Не удалось получить сессию Контур.Маркировки")
+
+            summary = self.bulk_aggregation_service.run(
+                kontur_session=session,
+                cert_provider=lambda: find_certificate_by_thumbprint(THUMBPRINT),
+                sign_base64_func=sign_data,
+                sign_text_func=sign_text_data,
+                log_callback=self.log_aggregation_message_threadsafe,
+                progress_callback=self.update_aggregation_progress_threadsafe,
+                confirm_callback=self.ask_yes_no_threadsafe,
+            )
+
+            self.log_aggregation_message_threadsafe("📌 Итоги массового проведения:")
+            for line in summary.to_lines():
+                self.log_aggregation_message_threadsafe(f"• {line}")
+
+            self.set_status_bar_threadsafe(
+                f"АК: отправлено {summary.sent_for_approve}, ошибок {summary.errors}"
+            )
+            self.show_info_threadsafe(
+                "Проведение АК завершено",
+                "\n".join(summary.to_lines()),
+            )
+        except Exception as e:
+            logger.exception("Ошибка массового проведения АК")
+            self.log_aggregation_message_threadsafe(f"❌ Ошибка массового проведения АК: {e}")
+            self.set_status_bar_threadsafe("Ошибка массового проведения АК")
+            self.show_error_threadsafe("Ошибка проведения АК", str(e))
+        finally:
+            self.set_bulk_aggregation_ui_state(False)
+            self._run_in_ui_thread(lambda: self.update_aggregation_progress(0))
 
     def _initialize_aggregation_widgets(self):
         """Инициализирует виджеты агрегационного таба, если таб уже существует"""

@@ -127,6 +127,45 @@ def sign_data(cert, base64_content: str, b_detached: bool = False) -> str:
     logger.info(f"Данные успешно подписаны сертификатом с thumbprint: {cert_thumb}")
     return signature
 
+
+def sign_text_data(cert, content: str, b_detached: bool = False) -> str:
+    """
+    Подписывает текстовые данные CAdES-BES подписью.
+    Используется для challenge True API и документов, где подпись формируется по JSON-строке.
+    """
+    cert_thumb = getattr(cert, "Thumbprint", "Неизвестно")
+    logger.debug(
+        "Вход в sign_text_data с thumbprint сертификата: %s, длина content: %s, b_detached: %s",
+        cert_thumb,
+        len(content),
+        b_detached,
+    )
+    pythoncom.CoInitialize()
+    signer = Dispatch("CAdESCOM.CPSigner")
+    signer.Certificate = cert
+
+    signing_time_attr = Dispatch("CAdESCOM.CPAttribute")
+    signing_time_attr.Name = CAPICOM_AUTHENTICATED_ATTRIBUTE_SIGNING_TIME
+    signing_time_attr.Value = datetime.datetime.now()
+    signer.AuthenticatedAttributes2.Add(signing_time_attr)
+
+    signed_data = Dispatch("CAdESCOM.CadesSignedData")
+    signed_data.Content = content
+
+    try:
+        signature = signed_data.SignCades(signer, CADES_BES, b_detached, CAPICOM_ENCODE_BASE64)
+    except Exception as e:
+        logger.error(f"Исключение во время SignCades для text content: {e}")
+        raise
+    finally:
+        pythoncom.CoUninitialize()
+
+    if isinstance(signature, bytes):
+        signature = signature.decode("ascii", errors="ignore")
+    signature = signature.replace("\r", "").replace("\n", "")
+    logger.info("Текстовые данные успешно подписаны сертификатом с thumbprint: %s", cert_thumb)
+    return signature
+
 # ---------------- Refresh OMS token ----------------
 def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> bool:
     cert_thumb = getattr(cert, "Thumbprint", "Неизвестно")
