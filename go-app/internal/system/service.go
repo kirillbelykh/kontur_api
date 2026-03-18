@@ -7,15 +7,20 @@ import (
 	"runtime"
 
 	"github.com/kirillbelykh/kontur_api/go-app/internal/config"
+	"github.com/kirillbelykh/kontur_api/go-app/internal/crypto"
 	"github.com/kirillbelykh/kontur_api/go-app/internal/dto"
 )
 
 type Service struct {
-	cfg config.Config
+	cfg    config.Config
+	crypto *crypto.Service
 }
 
-func NewService(cfg config.Config) *Service {
-	return &Service{cfg: cfg}
+func NewService(cfg config.Config, cryptoService *crypto.Service) *Service {
+	return &Service{
+		cfg:    cfg,
+		crypto: cryptoService,
+	}
 }
 
 func (s *Service) CheckDependencies(ctx context.Context) ([]dto.DependencyStatus, error) {
@@ -41,6 +46,9 @@ func (s *Service) CheckDependencies(ctx context.Context) ([]dto.DependencyStatus
 			Status:    runtime.GOOS,
 			Hint:      "Windows is the primary runtime target for Yandex Browser and CryptoPro integrations.",
 		},
+	}
+	if s.crypto != nil {
+		statuses = append(statuses, s.crypto.StateWithContext(ctx))
 	}
 
 	if s.cfg.Mode == "repo" {

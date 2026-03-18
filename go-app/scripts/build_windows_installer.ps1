@@ -6,10 +6,17 @@ param(
     [string]$WailsCommand = "wails",
     [string]$MakensisCommand = "makensis",
     [string]$WebView2BootstrapperUrl = "https://go.microsoft.com/fwlink/p/?LinkId=2124703",
+    [string]$YandexBrowserInstallerUrl = "https://browser.yandex.ru/download?os=win&bitness=64",
+    [string]$YandexBrowserInstallerPath = "",
+    [string]$CryptoProInstallerPath = "",
+    [string]$CryptoProSilentArgs = "/quiet /norestart",
+    [string]$CertificatePfxPath = "",
+    [string]$CertificatePfxPassword = "",
     [switch]$SkipFrontendInstall,
     [switch]$SkipFrontendBuild,
     [switch]$SkipWailsBuild,
-    [switch]$SkipWebView2BootstrapperDownload
+    [switch]$SkipWebView2BootstrapperDownload,
+    [switch]$SkipYandexBrowserInstallerDownload
 )
 
 $ErrorActionPreference = "Stop"
@@ -24,6 +31,9 @@ $InstallerOutDir = Join-Path $ProjectRoot "build\installer"
 $NsisScript = Join-Path $ProjectRoot "installer\windows\KonturGoWorkbench.nsi"
 $ExecutablePath = Join-Path $BuildBinDir ($OutputFilename + ".exe")
 $WebView2BootstrapperPath = Join-Path $WindowsBuildDir "MicrosoftEdgeWebView2Setup.exe"
+$YandexBrowserInstallerCachedBase = Join-Path $WindowsBuildDir "YandexBrowserSetup"
+$CryptoProInstallerCachedBase = Join-Path $WindowsBuildDir "CryptoProSetup"
+$CertificatePfxCachedPath = Join-Path $WindowsBuildDir "SigningCertificate.pfx"
 $EnvDefaultsPath = Join-Path $PackageDir ".env.defaults"
 
 function Require-Command([string]$CommandName) {
@@ -68,6 +78,59 @@ function Ensure-WebView2Bootstrapper([string]$DestinationPath, [string]$Download
     Write-Host "Downloading Microsoft Edge WebView2 bootstrapper..."
     Invoke-WebRequest -Uri $DownloadUrl -OutFile $DestinationPath
     return $DestinationPath
+}
+
+function Copy-Artifact([string]$SourcePath, [string]$DestinationPath, [string]$Label) {
+    if ([string]::IsNullOrWhiteSpace($SourcePath)) {
+        return $null
+    }
+    if (-not (Test-Path $SourcePath)) {
+        throw "$Label was not found: $SourcePath"
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $DestinationPath) | Out-Null
+    Copy-Item $SourcePath $DestinationPath -Force
+    return $DestinationPath
+}
+
+function Resolve-CachedArtifactPath([string]$BasePath, [string]$ProvidedPath, [string]$FallbackExtension) {
+    $extension = $FallbackExtension
+    if (-not [string]::IsNullOrWhiteSpace($ProvidedPath)) {
+        $providedExtension = [System.IO.Path]::GetExtension($ProvidedPath)
+        if (-not [string]::IsNullOrWhiteSpace($providedExtension)) {
+            $extension = $providedExtension
+        }
+    }
+    return "$BasePath$extension"
+}
+
+function Ensure-DownloadableArtifact(
+    [string]$ProvidedPath,
+    [string]$CachedPath,
+    [string]$DownloadUrl,
+    [bool]$SkipDownload,
+    [string]$Label
+) {
+    $copied = Copy-Artifact -SourcePath $ProvidedPath -DestinationPath $CachedPath -Label $Label
+    if ($copied) {
+        return $copied
+    }
+
+    if (Test-Path $CachedPath) {
+        return $CachedPath
+    }
+
+    if ($SkipDownload) {
+        throw "$Label was not found at '$CachedPath'. Remove the skip flag or provide an explicit path."
+    }
+
+    if ([string]::IsNullOrWhiteSpace($DownloadUrl)) {
+        throw "$Label download URL is empty."
+    }
+
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $CachedPath) | Out-Null
+    Write-Host "Downloading $Label..."
+    Invoke-WebRequest -Uri $DownloadUrl -OutFile $CachedPath
+    return $CachedPath
 }
 
 Require-Command $MakensisCommand
@@ -117,7 +180,18 @@ New-Item -ItemType Directory -Force -Path $InstallerOutDir | Out-Null
 Copy-Item (Join-Path $BuildBinDir "*") -Destination $PackageDir -Recurse -Force
 Write-EnvDefaults $EnvDefaultsPath
 
+$yandexInstallerCachedPath = Resolve-CachedArtifactPath -BasePath $YandexBrowserInstallerCachedBase -ProvidedPath $YandexBrowserInstallerPath -FallbackExtension ".exe"
+$cryptoProInstallerCachedPath = Resolve-CachedArtifactPath -BasePath $CryptoProInstallerCachedBase -ProvidedPath $CryptoProInstallerPath -FallbackExtension ".exe"
+
 $bootstrapperPath = Ensure-WebView2Bootstrapper -DestinationPath $WebView2BootstrapperPath -DownloadUrl $WebView2BootstrapperUrl
+$yandexInstallerPath = Ensure-DownloadableArtifact `
+    -ProvidedPath $YandexBrowserInstallerPath `
+    -CachedPath $yandexInstallerCachedPath `
+    -DownloadUrl $YandexBrowserInstallerUrl `
+    -SkipDownload $SkipYandexBrowserInstallerDownload.IsPresent `
+    -Label "Yandex Browser installer"
+$cryptoProInstaller = Copy-Artifact -SourcePath $CryptoProInstallerPath -DestinationPath $cryptoProInstallerCachedPath -Label "CryptoPro installer"
+$certificatePfx = Copy-Artifact -SourcePath $CertificatePfxPath -DestinationPath $CertificatePfxCachedPath -Label "certificate PFX"
 
 $nsisArgs = @(
     "/DAPP_NAME=$AppName",
@@ -131,6 +205,27 @@ $nsisArgs = @(
 
 if ($bootstrapperPath) {
     $nsisArgs += "/DWEBVIEW2_BOOTSTRAPPER=$bootstrapperPath"
+}
+if ($yandexInstallerPath) {
+    $nsisArgs += "/DYANDEX_BROWSER_INSTALLER=$yandexInstallerPath"
+    $nsisArgs += "/DYANDEX_BROWSER_INSTALLER_NAME=$([System.IO.Path]::GetFileName($yandexInstallerPath))"
+    $nsisArgs += "/DYANDEX_BROWSER_INSTALLER_KIND=$([System.IO.Path]::GetExtension($yandexInstallerPath).TrimStart('.').ToLowerInvariant())"
+}
+if ($cryptoProInstaller) {
+    $nsisArgs += "/DCRYPTOPRO_INSTALLER=$cryptoProInstaller"
+    $nsisArgs += "/DCRYPTOPRO_INSTALLER_NAME=$([System.IO.Path]::GetFileName($cryptoProInstaller))"
+    $nsisArgs += "/DCRYPTOPRO_INSTALLER_KIND=$([System.IO.Path]::GetExtension($cryptoProInstaller).TrimStart('.').ToLowerInvariant())"
+    $nsisArgs += "/DCRYPTOPRO_SILENT_ARGS=$CryptoProSilentArgs"
+} else {
+    Write-Warning "CryptoPro installer was not provided. The output installer will not be able to install CryptoPro automatically."
+}
+if ($certificatePfx) {
+    $nsisArgs += "/DCERTIFICATE_PFX=$certificatePfx"
+    if (-not [string]::IsNullOrWhiteSpace($CertificatePfxPassword)) {
+        $nsisArgs += "/DCERTIFICATE_PFX_PASSWORD=$CertificatePfxPassword"
+    } else {
+        Write-Warning "Certificate PFX was bundled without a password. Automatic import will be skipped."
+    }
 }
 
 $nsisArgs += $NsisScript

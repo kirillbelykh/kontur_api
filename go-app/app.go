@@ -33,7 +33,7 @@ func NewDesktopApp(cfg config.Config) (*desktopApp, []interface{}, error) {
 
 	sessionService := session.NewService(cfg)
 	cryptoService := crypto.NewService(cfg)
-	systemService := system.NewService(cfg)
+	systemService := system.NewService(cfg, cryptoService)
 	downloadsService := downloads.NewService(cfg, sessionService)
 	introductionService := introduction.NewService(cfg, sessionService, cryptoService)
 	tsdService := tsd.NewService(cfg, sessionService, introductionService)

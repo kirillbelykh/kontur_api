@@ -5,6 +5,7 @@ package crypto
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime"
 	"strings"
 	"time"
@@ -196,10 +197,45 @@ func (w *windowsProvider) withStore(run func(certs *ole.IDispatch) (string, erro
 }
 
 func (w *windowsProvider) State() dto.DependencyStatus {
+	return w.StateWithContext(context.Background())
+}
+
+func (w *windowsProvider) StateWithContext(ctx context.Context) dto.DependencyStatus {
+	thumbprint, err := w.FindCertificateThumbprint(ctx)
+	if err != nil {
+		if isComUnavailable(err) {
+			return dto.DependencyStatus{
+				Name:      "cryptopro",
+				Available: false,
+				Status:    "missing",
+				Hint:      "CryptoPro CSP/CAdESCOM must be installed for signing and OMS authentication.",
+				Details:   err.Error(),
+			}
+		}
+		return dto.DependencyStatus{
+			Name:      "cryptopro",
+			Available: true,
+			Status:    "installed-no-cert",
+			Hint:      "CryptoPro COM bridge is installed, but no signing certificate was found in the current user store.",
+			Details:   err.Error(),
+		}
+	}
 	return dto.DependencyStatus{
 		Name:      "cryptopro",
 		Available: true,
-		Status:    "windows-com",
-		Hint:      "CAdESCOM bridge is available in Windows builds.",
+		Status:    "installed",
+		Hint:      "CryptoPro CSP/CAdESCOM is available and a certificate was found in the current user store.",
+		Details:   fmt.Sprintf("Detected certificate thumbprint: %s", thumbprint),
 	}
+}
+
+func isComUnavailable(err error) bool {
+	if err == nil {
+		return false
+	}
+	text := strings.ToLower(err.Error())
+	return strings.Contains(text, "class not registered") ||
+		strings.Contains(text, "invalid class string") ||
+		strings.Contains(text, "cannot find") ||
+		strings.Contains(text, "cadescom")
 }

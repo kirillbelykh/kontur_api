@@ -32,3 +32,13 @@ func (s *Service) SignBase64(ctx context.Context, thumbprint, content string, de
 func (s *Service) State() dto.DependencyStatus {
 	return s.provider.State()
 }
+
+func (s *Service) StateWithContext(ctx context.Context) dto.DependencyStatus {
+	type contextAwareProvider interface {
+		StateWithContext(context.Context) dto.DependencyStatus
+	}
+	if provider, ok := s.provider.(contextAwareProvider); ok {
+		return provider.StateWithContext(ctx)
+	}
+	return s.provider.State()
+}

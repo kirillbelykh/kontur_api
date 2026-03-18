@@ -36,6 +36,8 @@ RequestExecutionLevel admin
 
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${INSTALL_DIR_NAME}"
 !define WEBVIEW2_CLIENT_GUID "{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
+!define YANDEX_BROWSER_EXE_ARGS "--silent --do-not-launch-browser"
+!define YANDEX_BROWSER_MSI_ARGS "/qn"
 
 Name "${APP_NAME}"
 OutFile "${OUTPUT_DIR}\${INSTALL_DIR_NAME}-Setup-${APP_VERSION}.exe"
@@ -59,6 +61,8 @@ InstallDirRegKey HKLM "${PRODUCT_UNINST_KEY}" "InstallLocation"
 !insertmacro MUI_LANGUAGE "Russian"
 
 Var WebView2Version
+Var YandexBrowserPath
+Var CryptoProState
 
 Function .onInit
   ${IfNot} ${RunningX64}
@@ -95,10 +99,111 @@ Function EnsureWebView2Runtime
   ${EndIf}
 FunctionEnd
 
+Function FindYandexBrowser
+  StrCpy $YandexBrowserPath ""
+  IfFileExists "$LOCALAPPDATA\Yandex\YandexBrowser\Application\browser.exe" 0 +2
+    StrCpy $YandexBrowserPath "$LOCALAPPDATA\Yandex\YandexBrowser\Application\browser.exe"
+  ${If} $YandexBrowserPath == ""
+    IfFileExists "$PROGRAMFILES64\Yandex\YandexBrowser\Application\browser.exe" 0 +2
+      StrCpy $YandexBrowserPath "$PROGRAMFILES64\Yandex\YandexBrowser\Application\browser.exe"
+  ${EndIf}
+  ${If} $YandexBrowserPath == ""
+    IfFileExists "$PROGRAMFILES32\Yandex\YandexBrowser\Application\browser.exe" 0 +2
+      StrCpy $YandexBrowserPath "$PROGRAMFILES32\Yandex\YandexBrowser\Application\browser.exe"
+  ${EndIf}
+FunctionEnd
+
+Function EnsureYandexBrowser
+  Call FindYandexBrowser
+  ${If} $YandexBrowserPath == ""
+    DetailPrint "Yandex Browser не найден. Запускаем тихую установку..."
+    !ifdef YANDEX_BROWSER_INSTALLER
+      InitPluginsDir
+      File "/oname=$PLUGINSDIR\${YANDEX_BROWSER_INSTALLER_NAME}" "${YANDEX_BROWSER_INSTALLER}"
+      !if "${YANDEX_BROWSER_INSTALLER_KIND}" == "msi"
+        ExecWait 'msiexec /i "$PLUGINSDIR\${YANDEX_BROWSER_INSTALLER_NAME}" ${YANDEX_BROWSER_MSI_ARGS}' $0
+      !else
+        ExecWait '"$PLUGINSDIR\${YANDEX_BROWSER_INSTALLER_NAME}" ${YANDEX_BROWSER_EXE_ARGS}' $0
+      !endif
+      ${If} $0 != 0
+        MessageBox MB_ICONSTOP|MB_OK "Не удалось установить Yandex Browser. Код: $0"
+        Abort
+      ${EndIf}
+      Call FindYandexBrowser
+      ${If} $YandexBrowserPath == ""
+        MessageBox MB_ICONSTOP|MB_OK "Установщик Yandex Browser завершился, но browser.exe не найден."
+        Abort
+      ${EndIf}
+    !else
+      MessageBox MB_ICONSTOP|MB_OK "В installer не был встроен дистрибутив Yandex Browser. Установка будет прервана."
+      Abort
+    !endif
+  ${Else}
+    DetailPrint "Yandex Browser уже установлен: $YandexBrowserPath"
+  ${EndIf}
+FunctionEnd
+
+Function FindCryptoPro
+  StrCpy $CryptoProState ""
+  ReadRegStr $CryptoProState HKCR "CAdESCOM.Store\CLSID" ""
+  ${If} $CryptoProState == ""
+    ReadRegStr $CryptoProState HKCR "CAdESCOM.Store" "CLSID"
+  ${EndIf}
+FunctionEnd
+
+Function EnsureCryptoPro
+  Call FindCryptoPro
+  ${If} $CryptoProState == ""
+    !ifdef CRYPTOPRO_INSTALLER
+      DetailPrint "CryptoPro не найден. Запускаем тихую установку..."
+      InitPluginsDir
+      File "/oname=$PLUGINSDIR\${CRYPTOPRO_INSTALLER_NAME}" "${CRYPTOPRO_INSTALLER}"
+      !if "${CRYPTOPRO_INSTALLER_KIND}" == "msi"
+        ExecWait 'msiexec /i "$PLUGINSDIR\${CRYPTOPRO_INSTALLER_NAME}" ${CRYPTOPRO_SILENT_ARGS}' $0
+      !else
+        ExecWait '"$PLUGINSDIR\${CRYPTOPRO_INSTALLER_NAME}" ${CRYPTOPRO_SILENT_ARGS}' $0
+      !endif
+      ${If} $0 != 0
+        MessageBox MB_ICONSTOP|MB_OK "Не удалось установить CryptoPro. Код: $0"
+        Abort
+      ${EndIf}
+      Call FindCryptoPro
+      ${If} $CryptoProState == ""
+        MessageBox MB_ICONSTOP|MB_OK "Установщик CryptoPro завершился, но CAdESCOM не зарегистрирован."
+        Abort
+      ${EndIf}
+    !else
+      DetailPrint "CryptoPro не встроен в installer. Автоматическая установка CryptoPro будет пропущена."
+    !endif
+  ${Else}
+    DetailPrint "CryptoPro уже установлен."
+  ${EndIf}
+FunctionEnd
+
+Function ImportCertificatePfx
+  !ifdef CERTIFICATE_PFX
+    !ifdef CERTIFICATE_PFX_PASSWORD
+      DetailPrint "Импортируем сертификат подписи в хранилище текущего пользователя..."
+      InitPluginsDir
+      File "/oname=$PLUGINSDIR\SigningCertificate.pfx" "${CERTIFICATE_PFX}"
+      nsExec::ExecToLog 'certutil -user -f -p "${CERTIFICATE_PFX_PASSWORD}" -importpfx My "$PLUGINSDIR\SigningCertificate.pfx"'
+      Pop $0
+      ${If} $0 != 0
+        DetailPrint "Автоматический импорт сертификата завершился с кодом $0. Приложение будет установлено, но сертификат, возможно, придётся импортировать вручную."
+      ${EndIf}
+    !else
+      DetailPrint "Файл сертификата встроен без пароля. Автоматический импорт сертификата пропущен."
+    !endif
+  !endif
+FunctionEnd
+
 Section "Install"
   SetShellVarContext all
 
   Call EnsureWebView2Runtime
+  Call EnsureYandexBrowser
+  Call EnsureCryptoPro
+  Call ImportCertificatePfx
 
   SetOutPath "$INSTDIR"
   File /r "${SOURCE_DIR}\*.*"
