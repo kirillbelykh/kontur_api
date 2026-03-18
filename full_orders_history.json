@@ -1,6 +1,31 @@
 {
   "orders": [
     {
+      "order_name": "test",
+      "document_id": "67da338f-298c-4983-bf19-bc82368efd68",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041295",
+      "positions": [
+        {
+          "gtin": "4650118041295",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 10,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-18T17:18:55.253174",
+      "created_by": "user",
+      "updated_at": "2026-03-18T17:18:55.253174",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null
+    },
+    {
       "order_name": "566 ультра зел 8,0 260111 заявка 5355",
       "document_id": "7365da4b-318d-4bc0-91d2-dff6c6202934",
       "status": "Скачан",
@@ -4632,7 +4657,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-18T15:23:36.292661",
+  "last_update": "2026-03-18T17:18:57.284864",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
