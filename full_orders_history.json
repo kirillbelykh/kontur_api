@@ -107,8 +107,8 @@
     {
       "order_name": "563 стер лат L 260201 заявка 5352",
       "document_id": "fadbe9ba-10cd-4977-bc79-208362d9438c",
-      "status": "Ожидает",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\563 стер лат L 260201 заявка 5352\\563 стер лат L 260201 заявка 5352.pdf, C:\\Users\\user\\Desktop\\Коды км\\563 стер лат L 260201 заявка 5352\\563 стер лат L 260201 заявка 5352_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\563 стер лат L 260201 заявка 5352\\563 стер лат L 260201 заявка 5352.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118048324",
@@ -123,7 +123,7 @@
       ],
       "created_at": "2026-03-18T11:41:03.376553",
       "created_by": "user",
-      "updated_at": "2026-03-18T11:41:17.109310",
+      "updated_at": "2026-03-18T11:44:18.020255",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -4631,7 +4631,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-18T11:41:42.497741",
+  "last_update": "2026-03-18T11:44:19.892215",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
