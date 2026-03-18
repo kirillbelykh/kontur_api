@@ -53,12 +53,12 @@ type UserIssue = {
 };
 
 const sections: { id: Section; title: string; blurb: string }[] = [
-  { id: 'overview', title: 'Главная', blurb: 'Состояние приложения и быстрый доступ к основным действиям' },
-  { id: 'orders', title: 'Заказ кодов', blurb: 'Создание, проверка и скачивание заказов' },
-  { id: 'introduction', title: 'Ввод в оборот', blurb: 'Подготовка и отправка документа ввода в оборот' },
-  { id: 'tsd', title: 'ТСД', blurb: 'Создание задач на терминал сбора данных' },
-  { id: 'aggregation', title: 'Коды агрегации', blurb: 'Поиск и выгрузка кодов агрегации' },
-  { id: 'history', title: 'История', blurb: 'Общая история заказов и быстрые действия по строкам' },
+  { id: 'overview', title: 'Главная', blurb: 'Общий обзор работы и быстрый доступ к основным действиям.' },
+  { id: 'orders', title: 'Заказ кодов', blurb: 'Создание заказа, проверка статуса и скачивание файлов.' },
+  { id: 'introduction', title: 'Ввод в оборот', blurb: 'Подготовка и отправка документа ввода в оборот.' },
+  { id: 'tsd', title: 'ТСД', blurb: 'Создание задач на терминал сбора данных по выбранному заказу.' },
+  { id: 'aggregation', title: 'Коды агрегации', blurb: 'Поиск, фильтрация и выгрузка кодов агрегации.' },
+  { id: 'history', title: 'История', blurb: 'Общая история заказов и быстрые действия по строкам.' },
 ];
 
 const initialDraft: OrderDraft = {
@@ -107,6 +107,7 @@ const initialOrderActions: OrderActionsState = {
 
 function App() {
   const [section, setSection] = useState<Section>('overview');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [appState, setAppState] = useState<AppState | null>(null);
   const [history, setHistory] = useState<OrderRecord[]>([]);
   const [dependencies, setDependencies] = useState<DependencyStatus[]>([]);
@@ -136,19 +137,58 @@ function App() {
     void reloadHistory(deferredSearch, historyFilter.status, historyFilter.onlyWithoutTsd);
   }, [deferredSearch, historyFilter.status, historyFilter.onlyWithoutTsd]);
 
+  useEffect(() => {
+    if (!notice) {
+      return undefined;
+    }
+    const timeout = window.setTimeout(() => setNotice(null), 4500);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!menuOpen) {
+      document.body.style.overflow = '';
+      return undefined;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (!selectedOrder) {
+      return;
+    }
+    const fresh = history.find((item) => item.document_id === selectedOrder.document_id);
+    if (!fresh) {
+      setSelectedOrder(null);
+      return;
+    }
+    if (fresh !== selectedOrder) {
+      setSelectedOrder(fresh);
+    }
+  }, [history, selectedOrder]);
+
   const currentSection = useMemo(
     () => sections.find((item) => item.id === section) ?? sections[0],
     [section],
   );
 
   const userIssues = useMemo(() => buildUserIssues(dependencies), [dependencies]);
-
-  const selectedOrderMeta = useMemo(() => {
-    if (!selectedOrder) {
-      return 'Заказ не выбран';
-    }
-    return `${selectedOrder.order_name || 'Без названия'} · ${selectedOrder.document_id}`;
-  }, [selectedOrder]);
+  const selectedOrderTitle = selectedOrder?.order_name || selectedOrder?.document_id || 'Заказ не выбран';
+  const sessionReady = Boolean(appState?.session.available);
 
   async function reloadDashboard() {
     const state = await getAppState();
@@ -161,6 +201,11 @@ function App() {
   async function reloadHistory(search = '', status = '', onlyWithoutTsd = false) {
     const records = await listHistory({ search, status, onlyWithoutTsd });
     startTransition(() => setHistory(records));
+  }
+
+  function openSection(nextSection: Section) {
+    setSection(nextSection);
+    setMenuOpen(false);
   }
 
   function setInfo(text: string, tone: 'ok' | 'error' | 'info' = 'info') {
@@ -207,7 +252,7 @@ function App() {
     }
   }
 
-  async function refreshDataAfterMutation() {
+  async function refreshAll() {
     await Promise.all([
       reloadDashboard(),
       reloadHistory(historyFilter.search, historyFilter.status, historyFilter.onlyWithoutTsd),
@@ -227,9 +272,10 @@ function App() {
       setDraft(initialDraft);
       if (first) {
         setOrderActions({ documentId: first.document_id });
+        pickOrder(first);
       }
       setInfo(`Создано записей: ${created.length}`, 'ok');
-      await refreshDataAfterMutation();
+      await refreshAll();
     });
   }
 
@@ -241,7 +287,7 @@ function App() {
     await runAction('check-order-status', () => checkOrderStatus(documentId.trim()), async (result) => {
       setOrderStatusResult(result);
       setInfo(result.message, result.ok ? 'ok' : 'info');
-      await refreshDataAfterMutation();
+      await refreshAll();
     });
   }
 
@@ -253,7 +299,7 @@ function App() {
     await runAction('download-order', () => downloadOrder(documentId.trim()), async (artifact) => {
       setDownloadResult(artifact);
       setInfo(artifact.directory ? `Файлы сохранены в ${artifact.directory}` : 'Файлы подготовлены', 'ok');
-      await refreshDataAfterMutation();
+      await refreshAll();
     });
   }
 
@@ -265,7 +311,7 @@ function App() {
     await runAction('run-introduction', () => runIntroduction(introductionForm as IntroductionRequest), async (result) => {
       setIntroductionResult(result);
       setInfo(result.message, result.ok ? 'ok' : 'info');
-      await refreshDataAfterMutation();
+      await refreshAll();
     });
   }
 
@@ -292,7 +338,7 @@ function App() {
     await runAction('create-tsd-task', () => createTsdTask(request), async (result) => {
       setTsdResult(result);
       setInfo(result.message, result.ok ? 'ok' : 'info');
-      await refreshDataAfterMutation();
+      await refreshAll();
     });
   }
 
@@ -310,75 +356,85 @@ function App() {
   async function handleMarkTsdCreated(order: OrderRecord) {
     await runAction('mark-tsd-created', () => markTsdCreated(order.document_id, `TSD-${Date.now()}`), async (updated) => {
       setInfo(`Заказ ${updated.document_id} отмечен как обработанный для ТСД`, 'ok');
-      await refreshDataAfterMutation();
+      await refreshAll();
     });
   }
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">КМ</div>
-          <div>
-            <h1>Kontur Go</h1>
-            <p>клиент для работы с Контур.Маркировкой</p>
+    <div className="app-shell">
+      <button
+        type="button"
+        className={menuOpen ? 'drawer-backdrop visible' : 'drawer-backdrop'}
+        aria-label="Закрыть меню"
+        onClick={() => setMenuOpen(false)}
+      />
+
+      <aside className={menuOpen ? 'drawer open' : 'drawer'}>
+        <div className="drawer-top">
+          <div className="brand">
+            <div className="brand-mark">КМ</div>
+            <div>
+              <h2>Kontur Go</h2>
+              <p>рабочее приложение для маркировки</p>
+            </div>
           </div>
+          <button type="button" className="icon-button" aria-label="Закрыть меню" onClick={() => setMenuOpen(false)}>
+            <span />
+            <span />
+          </button>
         </div>
 
-        <nav className="nav">
+        <nav className="drawer-nav">
           {sections.map((item) => (
             <button
               key={item.id}
-              className={section === item.id ? 'nav-item active' : 'nav-item'}
-              onClick={() => setSection(item.id)}
               type="button"
+              className={section === item.id ? 'drawer-link active' : 'drawer-link'}
+              onClick={() => openSection(item.id)}
             >
-              <span>{item.title}</span>
-              <small>{item.blurb}</small>
+              <strong>{item.title}</strong>
+              <span>{item.blurb}</span>
             </button>
           ))}
         </nav>
 
-        <div className="sidebar-card">
-          <span className="label">Сессия</span>
-          <strong>{appState?.session.available ? 'Подключена' : 'Требуется вход'}</strong>
-          <p>{localizeMessage(appState?.session.message ?? 'Ожидание запуска приложения')}</p>
-          {appState?.session.expiresAt && appState.session.available && <p>Действует до {formatDate(appState.session.expiresAt)}</p>}
-          <button type="button" onClick={handleRefreshSession} disabled={isBusy}>
-            {busyAction === 'refresh-session' ? 'Обновление…' : 'Обновить сессию'}
-          </button>
-        </div>
-
-        {selectedOrder && (
-          <div className="sidebar-card">
-            <span className="label">Выбранный заказ</span>
-            <strong>{selectedOrder.order_name || selectedOrder.document_id}</strong>
-            <p>{selectedOrder.document_id}</p>
-            <button type="button" className="secondary" onClick={clearSelection} disabled={isBusy}>
-              Снять выбор
+        <div className="drawer-footer">
+          <div className="session-card">
+            <span className="label">Состояние</span>
+            <strong>{sessionReady ? 'Сессия активна' : 'Нужен вход в Контур'}</strong>
+            <p>{localizeMessage(appState?.session.message ?? 'Ожидание запуска приложения')}</p>
+            <button type="button" onClick={handleRefreshSession} disabled={isBusy}>
+              {busyAction === 'refresh-session' ? 'Обновление…' : 'Обновить сессию'}
             </button>
           </div>
-        )}
+
+          <div className="drawer-meta">
+            <span className="label">Выбранный заказ</span>
+            <strong>{selectedOrderTitle}</strong>
+            {selectedOrder && <p>{selectedOrder.document_id}</p>}
+          </div>
+        </div>
       </aside>
 
-      <main className="workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">Контур.Маркировка</p>
-            <h2>{currentSection.title}</h2>
-            <p className="topbar-copy">{currentSection.blurb}</p>
+      <main className="app-main">
+        <header className="app-header">
+          <div className="header-left">
+            <button type="button" className="menu-toggle" aria-label="Открыть меню" onClick={() => setMenuOpen(true)}>
+              <span />
+              <span />
+              <span />
+            </button>
+            <div>
+              <p className="eyebrow">Контур.Маркировка</p>
+              <h1>{currentSection.title}</h1>
+              <p className="header-copy">{currentSection.blurb}</p>
+            </div>
           </div>
-          <div className="topbar-actions">
-            {section === 'history' && (
-              <div className="command-bar">
-                <input
-                  value={historyFilter.search}
-                  onChange={(event) => setHistoryFilter((current) => ({ ...current, search: event.target.value }))}
-                  placeholder="Поиск по названию, GTIN или ID документа"
-                />
-              </div>
-            )}
-            <button type="button" className="secondary" onClick={() => void refreshDataAfterMutation()} disabled={isBusy}>
+          <div className="header-actions">
+            <div className={sessionReady ? 'status-badge ok' : 'status-badge warn'}>
+              {sessionReady ? 'Сессия активна' : 'Требуется вход'}
+            </div>
+            <button type="button" className="secondary" onClick={() => void refreshAll()} disabled={isBusy}>
               Обновить данные
             </button>
           </div>
@@ -386,95 +442,146 @@ function App() {
 
         {notice && <div className={`notice ${notice.tone}`}>{notice.text}</div>}
 
-        <section className="hero-grid">
-          <article className="metric-card">
+        <section className="summary-grid">
+          <article className="summary-card emphasis">
             <span>Заказы в истории</span>
             <strong>{appState?.ordersTotal ?? 0}</strong>
+            <p>Все записи, которые уже сохранены в общей истории.</p>
           </article>
-          <article className="metric-card">
+          <article className="summary-card">
             <span>Без ТСД</span>
             <strong>{appState?.ordersWithoutTsd ?? 0}</strong>
+            <p>Заказы, по которым еще не создана задача на терминал.</p>
           </article>
-          <article className="metric-card accent">
-            <span>Сессия</span>
-            <strong>{appState?.session.available ? 'Активна' : 'Не подключена'}</strong>
+          <article className="summary-card">
+            <span>Проблемы</span>
+            <strong>{userIssues.length}</strong>
+            <p>{userIssues.length ? 'Есть моменты, которые нужно исправить перед работой.' : 'Обязательные компоненты готовы.'}</p>
           </article>
         </section>
 
+        {selectedOrder && (
+          <section className="context-banner">
+            <div>
+              <span className="label">Текущий заказ</span>
+              <strong>{selectedOrder.order_name || selectedOrder.document_id}</strong>
+              <p>{selectedOrder.document_id}</p>
+            </div>
+            <div className="context-actions">
+              <button type="button" className="secondary" onClick={() => handleCheckOrderStatus(selectedOrder.document_id)} disabled={isBusy}>
+                Проверить статус
+              </button>
+              <button type="button" className="secondary" onClick={() => handleDownloadOrder(selectedOrder.document_id)} disabled={isBusy}>
+                Скачать файлы
+              </button>
+              <button type="button" className="ghost-button" onClick={clearSelection} disabled={isBusy}>
+                Снять выбор
+              </button>
+            </div>
+          </section>
+        )}
+
         {section === 'overview' && (
-          <section className="content-grid wide-grid">
-            <article className="panel">
-              <div className="panel-head">
-                <h3>Быстрые действия</h3>
-                <span className="pill ghost">Основное</span>
-              </div>
-              <div className="button-row wrap">
+          <section className="section-grid">
+            <article className="panel hero-panel panel-wide">
+              <span className="panel-chip">Быстрый старт</span>
+              <h3>Рабочее место для заказов, ТСД и агрегации</h3>
+              <p className="panel-copy">
+                Обновите сессию, выберите заказ из истории и переходите к нужному разделу. Основные действия собраны в одном месте.
+              </p>
+              <div className="action-row wrap">
                 <button type="button" onClick={handleRefreshSession} disabled={isBusy}>
                   {busyAction === 'refresh-session' ? 'Обновление…' : 'Обновить сессию'}
                 </button>
-                <button type="button" className="secondary" onClick={() => setSection('history')}>
+                <button type="button" className="secondary" onClick={() => openSection('orders')}>
+                  Перейти к заказу кодов
+                </button>
+                <button type="button" className="secondary" onClick={() => openSection('history')}>
                   Открыть историю
                 </button>
-                <button type="button" className="secondary" onClick={() => setSection('orders')}>
-                  Заказать коды
-                </button>
-              </div>
-              <div className="surface-block">
-                <span className="label">Текущий выбор</span>
-                <strong>{selectedOrderMeta}</strong>
               </div>
             </article>
 
             <article className="panel">
               <div className="panel-head">
-                <h3>Что можно сделать</h3>
-                <span className="pill ghost">Сценарии</span>
-              </div>
-              <div className="task-rail">
-                <div>
-                  <strong>Заказ кодов</strong>
-                  <span>Создайте заказ, проверьте его статус и скачайте готовые файлы.</span>
-                </div>
-                <div>
-                  <strong>Ввод в оборот и ТСД</strong>
-                  <span>Используйте выбранный заказ из истории, чтобы не вводить ID вручную.</span>
-                </div>
-                <div>
-                  <strong>Коды агрегации</strong>
-                  <span>Ищите коды по названию или количеству и сразу выгружайте результат в файл.</span>
-                </div>
-              </div>
-            </article>
-
-            <article className="panel span-two">
-              <div className="panel-head">
-                <h3>Что требует внимания</h3>
-                <span className="pill ghost">{userIssues.length}</span>
+                <h3>Что проверить перед работой</h3>
+                <span className="panel-tag">Готовность</span>
               </div>
               {userIssues.length ? (
-                <div className="dependency-grid two-up">
+                <div className="issue-stack">
                   {userIssues.map((issue) => (
-                    <div key={issue.key} className="dependency-card warn">
+                    <div key={issue.key} className="issue-card">
                       <strong>{issue.title}</strong>
                       <p>{issue.text}</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="empty-state">Все обязательные компоненты готовы к работе.</div>
+                <div className="empty-state">Все обязательные компоненты готовы. Можно переходить к работе.</div>
+              )}
+            </article>
+
+            <article className="panel">
+              <div className="panel-head">
+                <h3>Порядок работы</h3>
+                <span className="panel-tag">Подсказка</span>
+              </div>
+              <div className="workflow-list">
+                <div>
+                  <strong>1. Обновите сессию</strong>
+                  <span>Если приложение не подключено, сначала обновите сессию через Яндекс Браузер.</span>
+                </div>
+                <div>
+                  <strong>2. Создайте или выберите заказ</strong>
+                  <span>Новый заказ создается в разделе “Заказ кодов”, существующий можно выбрать в истории.</span>
+                </div>
+                <div>
+                  <strong>3. Выполните нужный сценарий</strong>
+                  <span>После выбора заказа переходите к вводу в оборот, ТСД или работе с агрегацией.</span>
+                </div>
+              </div>
+            </article>
+
+            <article className="panel panel-wide">
+              <div className="panel-head">
+                <h3>Текущий контекст</h3>
+                <span className="panel-tag">Выбранный заказ</span>
+              </div>
+              {selectedOrder ? (
+                <div className="context-grid">
+                  <div className="context-item">
+                    <span className="label">Название</span>
+                    <strong>{selectedOrder.order_name || 'Без названия'}</strong>
+                  </div>
+                  <div className="context-item">
+                    <span className="label">ID документа</span>
+                    <strong>{selectedOrder.document_id}</strong>
+                  </div>
+                  <div className="context-item">
+                    <span className="label">Статус</span>
+                    <strong>{localizeStatus(selectedOrder.status)}</strong>
+                  </div>
+                  <div className="context-item">
+                    <span className="label">Обновлен</span>
+                    <strong>{formatDate(selectedOrder.updated_at) || 'Дата не указана'}</strong>
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state">Выберите заказ в разделе “История”, чтобы подставлять его в другие разделы автоматически.</div>
               )}
             </article>
           </section>
         )}
 
         {section === 'orders' && (
-          <section className="content-grid wide-grid">
-            <article className="panel">
+          <section className="section-grid">
+            <article className="panel panel-wide">
               <div className="panel-head">
-                <h3>Новый заказ</h3>
-                <span className="pill">Коды маркировки</span>
+                <h3>Создание заказа</h3>
+                <span className="panel-tag">Новый заказ</span>
               </div>
-              <div className="form-grid">
+              <p className="panel-copy">Заполните данные по товару и количеству кодов, затем создайте заказ.</p>
+              <div className="form-grid two-up">
                 <Field label="Название заказа">
                   <input value={draft.orderName} onChange={(event) => setDraft({ ...draft, orderName: event.target.value })} />
                 </Field>
@@ -500,31 +607,29 @@ function App() {
                   <input value={draft.unitsPerPack} onChange={(event) => setDraft({ ...draft, unitsPerPack: event.target.value })} />
                 </Field>
               </div>
-              <div className="button-row">
+              <div className="action-row">
                 <button type="button" onClick={handleCreateDraft} disabled={isBusy || !draft.orderName.trim()}>
                   {busyAction === 'create-order' ? 'Создание…' : 'Создать заказ'}
                 </button>
                 <button type="button" className="secondary" onClick={() => setDraft(initialDraft)} disabled={isBusy}>
-                  Очистить
+                  Очистить поля
                 </button>
               </div>
             </article>
 
             <article className="panel">
               <div className="panel-head">
-                <h3>Действия по заказу</h3>
-                <span className="pill ghost">Статус и файлы</span>
+                <h3>Работа по ID документа</h3>
+                <span className="panel-tag">Статус и скачивание</span>
               </div>
-              <div className="form-grid single-column compact-grid">
-                <Field label="ID документа">
-                  <input value={orderActions.documentId} onChange={(event) => setOrderActions({ documentId: event.target.value })} />
-                </Field>
-              </div>
-              <div className="button-row wrap">
+              <Field label="ID документа">
+                <input value={orderActions.documentId} onChange={(event) => setOrderActions({ documentId: event.target.value })} />
+              </Field>
+              <div className="action-row wrap">
                 <button type="button" onClick={() => handleCheckOrderStatus()} disabled={isBusy || !orderActions.documentId.trim()}>
                   {busyAction === 'check-order-status' ? 'Проверка…' : 'Проверить статус'}
                 </button>
-                <button type="button" onClick={() => handleDownloadOrder()} disabled={isBusy || !orderActions.documentId.trim()}>
+                <button type="button" className="secondary" onClick={() => handleDownloadOrder()} disabled={isBusy || !orderActions.documentId.trim()}>
                   {busyAction === 'download-order' ? 'Скачивание…' : 'Скачать файлы'}
                 </button>
                 <button type="button" className="ghost-button" onClick={() => selectedOrder && pickOrder(selectedOrder)} disabled={isBusy || !selectedOrder}>
@@ -536,7 +641,7 @@ function App() {
             <article className="panel">
               <div className="panel-head">
                 <h3>Результат проверки</h3>
-                <span className={`pill ${orderStatusResult?.ok ? '' : 'ghost'}`}>{orderStatusResult ? (orderStatusResult.ok ? 'Готово' : 'Статус') : 'Ожидание'}</span>
+                <span className={orderStatusResult?.ok ? 'status-dot ok' : 'status-dot'} />
               </div>
               <ResultStatus result={orderStatusResult} emptyText="Проверка статуса еще не выполнялась." />
             </article>
@@ -544,7 +649,7 @@ function App() {
             <article className="panel">
               <div className="panel-head">
                 <h3>Скачанные файлы</h3>
-                <span className="pill ghost">Результат</span>
+                <span className="panel-tag">Последний результат</span>
               </div>
               <ArtifactResult artifact={downloadResult} />
             </article>
@@ -552,12 +657,13 @@ function App() {
         )}
 
         {section === 'introduction' && (
-          <section className="content-grid wide-grid">
-            <article className="panel span-two">
+          <section className="section-grid">
+            <article className="panel panel-wide">
               <div className="panel-head">
                 <h3>Ввод в оборот</h3>
-                <span className="pill">Документ</span>
+                <span className="panel-tag">Документ</span>
               </div>
+              <p className="panel-copy">Выберите заказ из истории или введите ID вручную, затем заполните сведения о документе.</p>
               <div className="form-grid three-up">
                 <Field label="ID заказа">
                   <input value={introductionForm.codesOrderId} onChange={(event) => setIntroductionForm({ ...introductionForm, codesOrderId: event.target.value })} />
@@ -578,12 +684,12 @@ function App() {
                   <input value={introductionForm.productionPatch.batchNumber} onChange={(event) => setIntroductionForm({ ...introductionForm, productionPatch: { ...introductionForm.productionPatch, batchNumber: event.target.value } })} />
                 </Field>
               </div>
-              <div className="button-row wrap">
+              <div className="action-row wrap">
                 <button type="button" onClick={handleRunIntroduction} disabled={isBusy || !introductionForm.codesOrderId.trim()}>
                   {busyAction === 'run-introduction' ? 'Отправка…' : 'Ввести в оборот'}
                 </button>
                 <button type="button" className="secondary" onClick={() => setIntroductionForm(initialIntroductionForm)} disabled={isBusy}>
-                  Очистить
+                  Очистить поля
                 </button>
                 <button type="button" className="ghost-button" onClick={() => selectedOrder && pickOrder(selectedOrder)} disabled={isBusy || !selectedOrder}>
                   Подставить выбранный заказ
@@ -591,10 +697,10 @@ function App() {
               </div>
             </article>
 
-            <article className="panel span-two">
+            <article className="panel panel-wide">
               <div className="panel-head">
                 <h3>Результат ввода в оборот</h3>
-                <span className={`pill ${introductionResult?.ok ? '' : 'ghost'}`}>{introductionResult ? (introductionResult.ok ? 'Готово' : 'Статус') : 'Ожидание'}</span>
+                <span className={introductionResult?.ok ? 'status-dot ok' : 'status-dot'} />
               </div>
               <ResultStatus result={introductionResult} emptyText="Ввод в оборот еще не выполнялся." />
             </article>
@@ -602,12 +708,13 @@ function App() {
         )}
 
         {section === 'tsd' && (
-          <section className="content-grid wide-grid">
-            <article className="panel span-two">
+          <section className="section-grid">
+            <article className="panel panel-wide">
               <div className="panel-head">
                 <h3>Задача на ТСД</h3>
-                <span className="pill">Позиции</span>
+                <span className="panel-tag">Позиции</span>
               </div>
+              <p className="panel-copy">Позиции вводятся построчно в формате “Наименование|GTIN”.</p>
               <div className="form-grid three-up">
                 <Field label="ID заказа">
                   <input value={tsdForm.codesOrderId} onChange={(event) => setTsdForm({ ...tsdForm, codesOrderId: event.target.value })} />
@@ -628,20 +735,20 @@ function App() {
                   <input value={tsdForm.productionPatch.batchNumber} onChange={(event) => setTsdForm({ ...tsdForm, productionPatch: { ...tsdForm.productionPatch, batchNumber: event.target.value } })} />
                 </Field>
               </div>
-              <Field label="Позиции (каждая строка: Наименование|GTIN)">
+              <Field label="Позиции">
                 <textarea
-                  rows={7}
+                  rows={8}
                   value={tsdForm.positionsText}
                   onChange={(event) => setTsdForm({ ...tsdForm, positionsText: event.target.value })}
                   placeholder={'Кресло-коляска XL|04601234567890\nКресло-коляска S|04601234567891'}
                 />
               </Field>
-              <div className="button-row wrap">
+              <div className="action-row wrap">
                 <button type="button" onClick={handleCreateTsdTask} disabled={isBusy || !tsdForm.codesOrderId.trim()}>
                   {busyAction === 'create-tsd-task' ? 'Создание…' : 'Создать задачу'}
                 </button>
                 <button type="button" className="secondary" onClick={() => setTsdForm(initialTsdForm)} disabled={isBusy}>
-                  Очистить
+                  Очистить поля
                 </button>
                 <button type="button" className="ghost-button" onClick={() => selectedOrder && pickOrder(selectedOrder)} disabled={isBusy || !selectedOrder}>
                   Подставить выбранный заказ
@@ -649,10 +756,10 @@ function App() {
               </div>
             </article>
 
-            <article className="panel span-two">
+            <article className="panel panel-wide">
               <div className="panel-head">
                 <h3>Результат по ТСД</h3>
-                <span className={`pill ${tsdResult?.ok ? '' : 'ghost'}`}>{tsdResult ? (tsdResult.ok ? 'Готово' : 'Статус') : 'Ожидание'}</span>
+                <span className={tsdResult?.ok ? 'status-dot ok' : 'status-dot'} />
               </div>
               <ResultStatus result={tsdResult} emptyText="Задача на ТСД еще не создавалась." />
             </article>
@@ -660,13 +767,13 @@ function App() {
         )}
 
         {section === 'aggregation' && (
-          <section className="content-grid wide-grid">
+          <section className="section-grid">
             <article className="panel">
               <div className="panel-head">
-                <h3>Выгрузка кодов агрегации</h3>
-                <span className="pill">Поиск</span>
+                <h3>Поиск и выгрузка</h3>
+                <span className="panel-tag">Коды агрегации</span>
               </div>
-              <div className="form-grid compact-grid">
+              <div className="form-grid two-up compact-grid">
                 <Field label="Искать по">
                   <select value={aggregationQuery.mode} onChange={(event) => setAggregationQuery({ ...aggregationQuery, mode: event.target.value })}>
                     <option value="comment">Названию</option>
@@ -679,16 +786,16 @@ function App() {
                 <Field label="Статус">
                   <input value={aggregationQuery.statusFilter} onChange={(event) => setAggregationQuery({ ...aggregationQuery, statusFilter: event.target.value })} />
                 </Field>
-                <Field label="Имя файла выгрузки">
+                <Field label="Имя файла">
                   <input value={aggregationQuery.filename} onChange={(event) => setAggregationQuery({ ...aggregationQuery, filename: event.target.value })} placeholder="необязательно.csv" />
                 </Field>
               </div>
-              <div className="button-row wrap">
+              <div className="action-row wrap">
                 <button type="button" onClick={handleAggregationExport} disabled={isBusy || !aggregationQuery.targetValue.trim()}>
                   {busyAction === 'search-aggregation' ? 'Выгрузка…' : 'Найти и выгрузить'}
                 </button>
                 <button type="button" className="secondary" onClick={() => setAggregationQuery(initialAggregationQuery)} disabled={isBusy}>
-                  Очистить
+                  Очистить поля
                 </button>
               </div>
             </article>
@@ -696,28 +803,34 @@ function App() {
             <article className="panel">
               <div className="panel-head">
                 <h3>Результат выгрузки</h3>
-                <span className="pill ghost">{aggregationResult?.records.length ?? 0}</span>
+                <span className="panel-tag">{aggregationResult?.records.length ?? 0} строк</span>
               </div>
               {aggregationResult ? (
                 <>
                   <div className="kv-list compact-list">
-                    <div><span>Папка</span><strong>{aggregationResult.directory || 'не указана'}</strong></div>
-                    <div><span>Файл</span><strong>{aggregationResult.filename || 'не указан'}</strong></div>
+                    <div>
+                      <span>Папка</span>
+                      <strong>{aggregationResult.directory || 'Не указана'}</strong>
+                    </div>
+                    <div>
+                      <span>Файл</span>
+                      <strong>{aggregationResult.filename || 'Не указан'}</strong>
+                    </div>
                   </div>
                   <div className="mini-table aggregation-table">
                     {aggregationResult.records.slice(0, 12).map((record) => (
                       <div className="mini-row" key={`${record.aggregateCode}-${record.documentId ?? ''}`}>
                         <div>
                           <strong>{record.aggregateCode}</strong>
-                          <span>{record.comment || record.documentId || 'без комментария'}</span>
+                          <span>{record.comment || record.documentId || 'Без комментария'}</span>
                         </div>
                         <div>
-                          <strong>{record.status || 'без статуса'}</strong>
-                          <span>{record.updatedDate || record.createdDate || 'дата не указана'}</span>
+                          <strong>{localizeStatus(record.status || 'Без статуса')}</strong>
+                          <span>{formatDate(record.updatedDate || record.createdDate) || 'Дата не указана'}</span>
                         </div>
                       </div>
                     ))}
-                    {!aggregationResult.records.length && <div className="empty-state">По запросу ничего не найдено.</div>}
+                    {!aggregationResult.records.length && <div className="empty-state">По текущему запросу ничего не найдено.</div>}
                   </div>
                 </>
               ) : (
@@ -728,12 +841,22 @@ function App() {
         )}
 
         {section === 'history' && (
-          <section className="panel history-panel">
+          <section className="panel panel-wide history-panel">
             <div className="panel-head">
               <h3>История заказов</h3>
-              <span className="pill ghost">{history.length}</span>
+              <span className="panel-tag">{history.length} записей</span>
             </div>
             <div className="toolbar-row">
+              <input
+                value={historyFilter.search}
+                onChange={(event) => setHistoryFilter((current) => ({ ...current, search: event.target.value }))}
+                placeholder="Поиск по названию, GTIN или ID документа"
+              />
+              <input
+                value={historyFilter.status}
+                onChange={(event) => setHistoryFilter((current) => ({ ...current, status: event.target.value }))}
+                placeholder="Фильтр по статусу"
+              />
               <label className="check-row">
                 <input
                   type="checkbox"
@@ -742,25 +865,20 @@ function App() {
                 />
                 <span>Только без ТСД</span>
               </label>
-              <input
-                value={historyFilter.status}
-                onChange={(event) => setHistoryFilter((current) => ({ ...current, status: event.target.value }))}
-                placeholder="Фильтр по статусу"
-              />
               <button type="button" className="secondary" onClick={() => reloadHistory(historyFilter.search, historyFilter.status, historyFilter.onlyWithoutTsd)} disabled={isBusy}>
                 Обновить
               </button>
             </div>
-            <div className="history-table detailed-history">
+            <div className="history-table">
               {history.map((item) => (
-                <div className="history-row expanded" key={item.document_id}>
+                <div className="history-row" key={item.document_id}>
                   <div>
                     <strong>{item.order_name || item.document_id}</strong>
-                    <span>{item.full_name || item.gtin || 'без описания'}</span>
+                    <span>{item.full_name || item.gtin || 'Без описания'}</span>
                   </div>
                   <div>
-                    <strong>{item.status}</strong>
-                    <span>{formatDate(item.updated_at) || 'дата не указана'}</span>
+                    <strong>{localizeStatus(item.status)}</strong>
+                    <span>{formatDate(item.updated_at) || 'Дата не указана'}</span>
                   </div>
                   <div className="inline-actions">
                     <button type="button" className="ghost-button" onClick={() => pickOrder(item)} disabled={isBusy}>
@@ -898,7 +1016,7 @@ function buildUserIssues(dependencies: DependencyStatus[]): UserIssue[] {
       issues.push({
         key: dependency.name,
         title: 'Конфигурация приложения',
-        text: 'Приложение настроено не полностью. Требуется проверить служебные параметры подключения.',
+        text: 'Приложение настроено не полностью. Нужно проверить служебные параметры подключения.',
       });
     }
   }
@@ -960,6 +1078,25 @@ function localizeDetailLabel(key: string): string {
     thumbprint: 'Сертификат',
   };
   return labels[key] ?? key;
+}
+
+function localizeStatus(status?: string): string {
+  if (!status) {
+    return 'Статус не указан';
+  }
+
+  const normalized = status.trim();
+  const map: Record<string, string> = {
+    created: 'Создан',
+    checked: 'Проверен',
+    inProgress: 'В обработке',
+    noErrors: 'Без ошибок',
+    doesNotHaveErrors: 'Без ошибок',
+    tsdProcessStart: 'Отправлен в ТСД',
+    production: 'Ввод в оборот',
+  };
+
+  return map[normalized] ?? normalized;
 }
 
 function localizeMessage(message: string): string {
