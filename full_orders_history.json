@@ -798,18 +798,19 @@
     {
       "document_id": "b481cea3-5062-47f6-9fc2-0c920f9aae9b",
       "order_name": "540 орто 7,0 260315 -168шт",
-      "status": "Ожидает",
+      "status": "Скачан",
       "simpl": "ортопедия",
       "full_name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 7,0",
       "gtin": "4640473505105",
       "created_at": "2026-03-13T14:12:06.119416",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.269071",
-      "updated_by": "sklad",
+      "updated_at": "2026-03-18T15:23:34.900654",
+      "updated_by": "user",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:07:44.821148",
       "tsd_intro_number": "c0e697ea-7d47-4bd3-8d55-d0d388ead06f",
-      "tsd_created_by": "sklad"
+      "tsd_created_by": "sklad",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\540 орто 70 260315 -168шт\\540 орто 70 260315 -168шт.pdf, C:\\Users\\user\\Desktop\\Коды км\\540 орто 70 260315 -168шт\\540 орто 7,0 260315 -168шт_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\540 орто 70 260315 -168шт\\540 орто 7,0 260315 -168шт.xls"
     },
     {
       "document_id": "0aacd2ac-dbea-4227-9a88-25060af6c309",
@@ -4631,7 +4632,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-18T12:25:02.231584",
+  "last_update": "2026-03-18T15:23:36.292661",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
