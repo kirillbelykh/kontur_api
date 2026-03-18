@@ -152,15 +152,30 @@ declare global {
 }
 
 const mockDependencies: DependencyStatus[] = [
-  { name: 'go', available: true, status: 'detected', hint: 'Go backend is scaffolded.' },
-  { name: 'git', available: true, status: 'detected', hint: 'History sync path is shared with Python.' },
-  { name: 'windows-target', available: false, status: 'preview', hint: 'Windows-only integrations are unavailable in browser preview.' },
+  {
+    name: 'yandex-browser',
+    available: true,
+    status: 'detected',
+    hint: 'Яндекс Браузер найден в системе.',
+  },
+  {
+    name: 'cryptopro',
+    available: false,
+    status: 'preview',
+    hint: 'В предпросмотре нельзя проверить наличие CryptoPro.',
+  },
+  {
+    name: 'target-platform',
+    available: false,
+    status: 'preview',
+    hint: 'Windows-специфичные интеграции недоступны в режиме предпросмотра.',
+  },
 ];
 
 const previewOrderRecord = (draft: OrderDraft, index = 1): OrderRecord => ({
   document_id: `PREVIEW-${Date.now()}-${index}`,
   order_name: draft.orderName,
-  status: 'Черновик Go',
+  status: 'Черновик',
   full_name: draft.fullName,
   gtin: draft.gtin,
   updated_at: new Date().toISOString(),
@@ -187,14 +202,14 @@ function previewOperation(message: string, details?: Record<string, string>): Op
 
 export async function getAppState(): Promise<AppState> {
   return maybeCall<AppState>('AppStateAPI', 'Get', () => WailsGetAppState() as unknown as Promise<AppState>, {
-    repoRoot: 'go-app preview',
-    historyPath: 'shared history not loaded in browser preview',
+    repoRoot: 'preview',
+    historyPath: 'история недоступна в браузерном предпросмотре',
     ordersTotal: 0,
     ordersWithoutTsd: 0,
     session: {
       available: false,
       source: 'preview',
-      message: 'Backend bindings are not connected in browser-only preview.',
+      message: 'Backend еще не подключен в браузерном режиме предпросмотра.',
     },
     dependencies: mockDependencies,
     lastUpdated: new Date().toISOString(),
@@ -214,7 +229,7 @@ export async function refreshSession(): Promise<SessionState> {
   return maybeCall<SessionState>('AuthAPI', 'RefreshSession', () => WailsRefreshSession() as unknown as Promise<SessionState>, {
     available: false,
     source: 'preview',
-    message: 'Session refresh is available only from the Wails desktop runtime.',
+    message: 'Обновление сессии доступно только в desktop-версии приложения.',
   });
 }
 
@@ -232,7 +247,7 @@ export async function checkOrderStatus(documentID: string): Promise<OperationSta
     'OrdersAPI',
     'CheckStatus',
     () => WailsCheckOrderStatus(documentID) as unknown as Promise<OperationStatus>,
-    previewOperation('Order status check is available only from the Wails desktop runtime.', { documentId: documentID }),
+    previewOperation('Проверка статуса доступна только в desktop-версии приложения.', { documentId: documentID }),
   );
 }
 
@@ -250,7 +265,7 @@ export async function runIntroduction(request: IntroductionRequest): Promise<Ope
     'IntroductionAPI',
     'Run',
     () => WailsRunIntroduction(request as unknown as dto.IntroductionRequest) as unknown as Promise<OperationStatus>,
-    previewOperation('Introduction flow is available only from the Wails desktop runtime.', {
+    previewOperation('Ввод в оборот доступен только в desktop-версии приложения.', {
       codesOrderId: request.codesOrderId,
       documentNumber: request.productionPatch.documentNumber,
     }),
@@ -262,7 +277,7 @@ export async function createTsdTask(request: TSDRequest): Promise<OperationStatu
     'TSDAPI',
     'CreateTask',
     () => WailsCreateTsdTask(request as unknown as dto.TSDRequest) as unknown as Promise<OperationStatus>,
-    previewOperation('TSD flow is available only from the Wails desktop runtime.', {
+    previewOperation('Работа с ТСД доступна только в desktop-версии приложения.', {
       codesOrderId: request.codesOrderId,
       positionsCount: String(request.positions.length),
     }),
@@ -288,12 +303,12 @@ export async function markTsdCreated(documentID: string, introNumber: string): P
     'MarkTsdCreated',
     () => WailsMarkTsdCreated(documentID, introNumber) as unknown as Promise<OrderRecord>,
     {
-    document_id: documentID,
-    order_name: 'preview',
-    status: 'Черновик Go',
-    tsd_created: true,
-    tsd_intro_number: introNumber,
-    updated_at: new Date().toISOString(),
+      document_id: documentID,
+      order_name: 'preview',
+      status: 'Черновик',
+      tsd_created: true,
+      tsd_intro_number: introNumber,
+      updated_at: new Date().toISOString(),
     },
   );
 }
