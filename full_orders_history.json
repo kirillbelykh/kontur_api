@@ -235,11 +235,11 @@
       "gtin": "4650118041295",
       "created_at": "2026-03-17T15:30:54.074481",
       "created_by": "user",
-      "updated_at": "2026-03-17T16:30:03.185347",
-      "updated_by": "sklad",
+      "updated_at": "2026-03-18T12:23:55.730314",
+      "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-17T15:35:40.323044",
-      "tsd_intro_number": "078e437e-2bb3-46ae-9969-e44feb1772d0",
+      "tsd_created_at": "2026-03-18T12:23:55.730314",
+      "tsd_intro_number": "e5a2464a-0e54-4882-acc8-fcd1b8259949",
       "tsd_created_by": "user",
       "positions": [
         {
@@ -4631,7 +4631,7 @@
       "tsd_created_by": null
     }
   ],
-  "last_update": "2026-03-18T12:23:23.136400",
+  "last_update": "2026-03-18T12:23:57.093858",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
