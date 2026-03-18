@@ -6,8 +6,6 @@ build/bin/
 build/installer/
 build/package/
 build/windows/MicrosoftEdgeWebView2Setup.exe
-build/windows/YandexBrowserSetup.exe
-build/windows/YandexBrowserSetup.msi
 build/windows/CryptoProSetup.exe
 build/windows/CryptoProSetup.msi
 build/windows/SigningCertificate.pfx

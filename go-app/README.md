@@ -55,7 +55,6 @@ scripts\build_windows_installer.cmd
 - собирает `Wails` binary для `windows/amd64`;
 - генерирует `.env.defaults` для установленной версии;
 - скачивает официальный `Microsoft Edge WebView2 Bootstrapper`;
-- скачивает или встраивает `Yandex Browser` installer;
 - может встроить локальный `CryptoPro` installer;
 - может встроить `pfx` сертификат для автоматического импорта;
 - запускает `NSIS` и выпускает installer.
@@ -76,7 +75,6 @@ cd go-app
 
 - installer сам поставит приложение;
 - installer сам поставит `WebView2`, если его нет;
-- installer сам поставит `Yandex Browser`, если его нет;
 - installer сам поставит `CryptoPro`, если при сборке был подложен его installer;
 - installer сам импортирует `pfx`, если при сборке были подложены `pfx` и пароль.
 
@@ -90,7 +88,6 @@ cd go-app
 - пользователь запускает `KonturGoWorkbench-Setup-<version>.exe`;
 - installer сам ставит приложение в `Program Files`;
 - если в системе нет `Microsoft Edge WebView2 Runtime`, installer ставит его автоматически в тихом режиме;
-- если в системе нет `Yandex Browser`, installer ставит его автоматически в тихом режиме;
 - если в installer встроен `CryptoPro`, он ставится автоматически в тихом режиме;
 - если в installer встроены `pfx` и пароль, сертификат импортируется в `Current User\My`;
 - installer создаёт ярлыки на рабочем столе и в меню Пуск;
@@ -108,5 +105,6 @@ cd go-app
 - silent-ключи для `CryptoPro` зависят от конкретного дистрибутива, поэтому при сборке их можно переопределить параметром `-CryptoProSilentArgs`;
 - пароль от `pfx` при полностью автоматическом импорте вшивается в installer build-time параметром, это удобно, но требует аккуратного обращения;
 - Windows-specific session/certificate adapters не проверялись на macOS-хосте;
-- нужен реальный Windows smoke-test для `Yandex Browser + CryptoPro + certificate import + installer + WebView2 auto-install`;
+- `Yandex Browser` больше не ставится installer-ом и предполагается уже установленным в системе;
+- нужен реальный Windows smoke-test для `CryptoPro + certificate import + installer + WebView2 auto-install`;
 - production rollout без такого smoke-test считать завершённым нельзя.
