@@ -1217,7 +1217,11 @@ class App(ctk.CTk):
     def _run_in_ui_thread(self, callback, wait=False):
         """Выполняет callback в главном потоке Tk."""
         if threading.current_thread() is threading.main_thread():
-            return callback()
+            try:
+                return callback()
+            except (RuntimeError, tk.TclError) as exc:
+                logger.debug("Пропускаем UI callback: %s", exc)
+                return None
 
         result = {}
         event = threading.Event()
@@ -1230,12 +1234,22 @@ class App(ctk.CTk):
             finally:
                 event.set()
 
-        self.after(0, wrapped)
+        try:
+            self.after(0, wrapped)
+        except (RuntimeError, tk.TclError) as exc:
+            logger.debug("Не удалось передать callback в UI-поток: %s", exc)
+            return None
         if not wait:
             return None
 
-        event.wait()
+        event.wait(timeout=5)
+        if not event.is_set():
+            logger.debug("UI callback не выполнился вовремя")
+            return None
         if "error" in result:
+            if isinstance(result["error"], (RuntimeError, tk.TclError)):
+                logger.debug("Пропускаем UI callback после ошибки: %s", result["error"])
+                return None
             raise result["error"]
         return result.get("value")
 
