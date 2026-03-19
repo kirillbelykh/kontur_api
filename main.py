@@ -363,6 +363,8 @@ class App(ctk.CTk):
         self.sidebar_frame = None
         self.main_content = None
         self.theme_button = None
+        self.status_bar = None
+        self.connection_indicator = None
         self.nav_buttons = {}
         self.content_frames = {}
         
@@ -633,8 +635,15 @@ class App(ctk.CTk):
         )
         status_frame.pack(side="bottom", fill="x")
         status_frame.pack_propagate(False)
-        
-        
+
+        self.status_bar = ctk.CTkLabel(
+            status_frame,
+            text="Готов к работе",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        )
+        self.status_bar.pack(side="left", padx=20, pady=5)
+
         # Индикатор подключения
         self.connection_indicator = ctk.CTkLabel(
             status_frame,
@@ -1238,7 +1247,11 @@ class App(ctk.CTk):
         self._run_in_ui_thread(lambda: self.update_aggregation_progress(value))
 
     def set_status_bar_threadsafe(self, message):
-        self._run_in_ui_thread(lambda: self.status_bar.configure(text=message))
+        self._run_in_ui_thread(
+            lambda: self.status_bar.configure(text=message)
+            if hasattr(self, "status_bar") and self.status_bar is not None
+            else None
+        )
 
     def set_bulk_aggregation_ui_state(self, running, active_action=None):
         def apply_state():
@@ -1539,7 +1552,7 @@ class App(ctk.CTk):
                 self.log_aggregation_message(f"💾 Файл сохранен: {save_path}")
                 
                 # Показываем уведомление в статус баре
-                self.status_bar.configure(text=f"Загружено {len(codes)} кодов агрегации")
+                self.set_status_bar_threadsafe(f"Загружено {len(codes)} кодов агрегации")
             else:
                 logger.error("❌ Не удалось загрузить данные")
                 
@@ -1603,7 +1616,7 @@ class App(ctk.CTk):
             if created_count > len(preview_ids):
                 self.log_aggregation_message(f"… и еще {created_count - len(preview_ids)} кодов")
 
-            self.status_bar.configure(text=f"Создано {created_count} кодов агрегации")
+            self.set_status_bar_threadsafe(f"Создано {created_count} кодов агрегации")
             self.update_aggregation_progress(1.0)
 
         except Exception as e:
