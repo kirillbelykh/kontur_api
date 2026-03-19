@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "570 лат диаг L 260316 170д",
+      "document_id": "c0ce8c89-a1bb-4254-bb13-4994b7b17e3a",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
+      "gtin": "4650118041332",
+      "positions": [
+        {
+          "gtin": "4650118041332",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 170,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-19T15:01:12.401667",
+      "created_by": "user",
+      "updated_at": "2026-03-19T15:01:12.401667",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "567 нитрил диаг М 250812 к заявке 5360",
       "document_id": "4cf29adf-4770-4197-94cc-1a3dc21c1156",
       "status": "Скачан",
@@ -5018,7 +5044,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T14:58:50.326382",
+  "last_update": "2026-03-19T15:01:14.065883",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
