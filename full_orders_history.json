@@ -1,6 +1,25 @@
 {
   "orders": [
     {
+      "document_id": "PERF_TEST_002",
+      "order_number": "PERF-002",
+      "customer": "Тестовый клиент 2",
+      "products": [
+        "товар_0",
+        "товар_1",
+        "товар_2"
+      ],
+      "total_amount": 2500,
+      "created_at": "2026-03-19T13:34:35.859345",
+      "created_by": "unknown",
+      "updated_at": "2026-03-19T13:34:35.859345",
+      "updated_by": "unknown",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "document_id": "PERF_TEST_001",
       "order_number": "PERF-001",
       "customer": "Тестовый клиент 1",
@@ -4935,7 +4954,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T13:34:34.094974",
+  "last_update": "2026-03-19T13:34:38.832251",
   "created_by": "sklad",
   "updated_by": "unknown",
   "storage_path": "/Users/darasmirnova/Desktop/it/kontur_api/.history_sync_cache/full_orders_history.json"
