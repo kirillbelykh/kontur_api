@@ -19,12 +19,15 @@
       ],
       "created_at": "2026-03-19T15:01:23.042000",
       "created_by": "user",
-      "updated_at": "2026-03-19T15:05:39.428470",
+      "updated_at": "2026-03-19T16:12:57.591470",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\571 лат диаг XL 260316 180д\\571 лат диаг XL 260316 180д_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\571 лат диаг XL 260316 180д\\571 лат диаг XL 260316 180д.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\571 лат диаг XL 260316 180д\\571 лат диаг XL 260316 180д.xls"
     },
     {
       "order_name": "569 лат диаг M 260316 4610д",
@@ -5122,7 +5125,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T16:12:29.730735",
+  "last_update": "2026-03-19T16:12:59.302973",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
