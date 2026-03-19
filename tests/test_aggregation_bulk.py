@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import threading
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -48,7 +49,7 @@ def make_content_for_sign(participant_id, unit_serial_number, sntins):
 
 
 class BulkAggregationServiceTests(unittest.TestCase):
-    def build_service(self, true_api_session):
+    def build_service(self, true_api_session, max_workers=1):
         return BulkAggregationService(
             kontur_base_url="https://mk.kontur.ru",
             warehouse_id="warehouse-1",
@@ -60,6 +61,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
             document_timeout_seconds=0.2,
             parent_clear_timeout_seconds=0.2,
             kontur_send_timeout_seconds=0.2,
+            max_workers=max_workers,
             sleep_func=lambda seconds: None,
             true_api_session=true_api_session,
         )
@@ -90,6 +92,51 @@ class BulkAggregationServiceTests(unittest.TestCase):
 
         self.assertEqual(service.true_api_base_url, "https://markirovka.sandbox.crptech.ru/api/v3/true-api")
         self.assertEqual(service.true_api_info_base_url, "https://markirovka.sandbox.crptech.ru/api/v4/true-api")
+
+    def test_processes_independent_aggregates_in_parallel(self):
+        barrier = threading.Barrier(2)
+        code_threads = set()
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                return FakeResponse(json_data={
+                    "items": [
+                        {"documentId": "doc-1", "aggregateCode": "AK-1", "status": "readyForSend"},
+                        {"documentId": "doc-2", "aggregateCode": "AK-2", "status": "readyForSend"},
+                    ],
+                    "total": 2,
+                })
+            if path.startswith("/api/v1/aggregates/") and path.endswith("/codes"):
+                code_threads.add(threading.current_thread().name)
+                barrier.wait(timeout=1.0)
+                return FakeResponse(json_data={"aggregateCodes": [], "reaggregationCodes": []})
+            if path.startswith("/api/v1/aggregates/"):
+                document_id = path.rsplit("/", 1)[-1]
+                return FakeResponse(json_data={
+                    "documentId": document_id,
+                    "aggregateCode": document_id.replace("doc", "AK"),
+                    "status": "readyForSend",
+                    "productGroup": "wheelChairs",
+                })
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        service = self.build_service(
+            SimpleNamespace(get=lambda *args, **kwargs: None, post=lambda *args, **kwargs: None),
+            max_workers=2,
+        )
+        summary = service.run(
+            kontur_session=SimpleNamespace(get=kontur_get, post=lambda *args, **kwargs: FakeResponse(json_data={"ok": True})),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "unused",
+            sign_text_func=lambda cert, data, detached: "unused",
+        )
+
+        self.assertEqual(summary.ready_found, 2)
+        self.assertEqual(summary.processed, 2)
+        self.assertEqual(summary.skipped_empty, 2)
+        self.assertEqual(summary.errors, 0)
+        self.assertEqual(len(code_threads), 2)
 
     def test_paginates_ready_aggregates(self):
         kontur_state = {"send_called": False}

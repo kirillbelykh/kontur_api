@@ -1,6 +1,8 @@
 import base64
+import concurrent.futures
 import json
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence
@@ -18,6 +20,7 @@ DEFAULT_TRUE_API_SANDBOX_BASE_URL = "https://markirovka.sandbox.crptech.ru/api/v
 DEFAULT_TRUE_API_BASE_URL = DEFAULT_TRUE_API_PRODUCTION_BASE_URL
 DEFAULT_TRUE_API_PRODUCT_GROUP = "wheelchairs"
 DEFAULT_KONTUR_PRODUCT_GROUP = "wheelChairs"
+DEFAULT_BULK_AGGREGATION_MAX_WORKERS = 3
 
 KONTUR_TO_TRUE_PRODUCT_GROUP = {
     "wheelChairs": "wheelchairs",
@@ -107,6 +110,24 @@ def _resolve_true_api_base_url(explicit_base_url: Optional[str]) -> tuple[str, s
     return DEFAULT_TRUE_API_PRODUCTION_BASE_URL, "default production"
 
 
+def _resolve_bulk_aggregation_workers(explicit_max_workers: Optional[int]) -> int:
+    if explicit_max_workers is not None:
+        return max(1, int(explicit_max_workers))
+
+    env_value = str(os.getenv("BULK_AGGREGATION_MAX_WORKERS") or "").strip()
+    if not env_value:
+        return DEFAULT_BULK_AGGREGATION_MAX_WORKERS
+    try:
+        return max(1, int(env_value))
+    except ValueError:
+        logger.warning(
+            "Переменная окружения BULK_AGGREGATION_MAX_WORKERS=%r некорректна, используем %s",
+            env_value,
+            DEFAULT_BULK_AGGREGATION_MAX_WORKERS,
+        )
+        return DEFAULT_BULK_AGGREGATION_MAX_WORKERS
+
+
 @dataclass(frozen=True)
 class AggregateInfo:
     document_id: str
@@ -167,6 +188,14 @@ class BulkAggregationSummary:
         ]
 
 
+@dataclass
+class AggregateProcessingResult:
+    aggregate: AggregateInfo
+    summary: BulkAggregationSummary
+    error: Optional[Exception] = None
+    connectivity_error: Optional["TrueApiConnectivityError"] = None
+
+
 class TrueApiConnectivityError(RuntimeError):
     """Сетевая недоступность True API, при которой продолжать прогон бессмысленно."""
 
@@ -185,6 +214,7 @@ class BulkAggregationService:
         document_timeout_seconds: float = 180.0,
         parent_clear_timeout_seconds: float = 120.0,
         kontur_send_timeout_seconds: float = 60.0,
+        max_workers: Optional[int] = None,
         sleep_func: Callable[[float], None] = time.sleep,
         true_api_session: Optional[requests.Session] = None,
     ):
@@ -206,12 +236,13 @@ class BulkAggregationService:
         self.document_timeout_seconds = document_timeout_seconds
         self.parent_clear_timeout_seconds = parent_clear_timeout_seconds
         self.kontur_send_timeout_seconds = kontur_send_timeout_seconds
+        self.max_workers = _resolve_bulk_aggregation_workers(max_workers)
         self.sleep_func = sleep_func
         self.true_api_session = true_api_session or requests.Session()
         self._true_api_token: Optional[str] = None
         self._true_api_token_expires_at = 0.0
         logger.info(
-            "BulkAggregationService инициализирован: kontur_base_url=%s, warehouse_id=%s, true_api_base_url=%s, true_api_info_base_url=%s, true_api_base_url_source=%s, page_size=%s, batch_size=%s",
+            "BulkAggregationService инициализирован: kontur_base_url=%s, warehouse_id=%s, true_api_base_url=%s, true_api_info_base_url=%s, true_api_base_url_source=%s, page_size=%s, batch_size=%s, max_workers=%s",
             self.kontur_base_url,
             self.warehouse_id,
             self.true_api_base_url,
@@ -219,6 +250,7 @@ class BulkAggregationService:
             self.true_api_base_url_source,
             self.page_size,
             self.batch_size,
+            self.max_workers,
         )
         self._warn_if_true_api_base_url_looks_suspicious()
 
@@ -234,14 +266,14 @@ class BulkAggregationService:
         confirm_callback: Optional[Callable[[str, str], bool]] = None,
         comment_filter: Optional[str] = None,
     ) -> BulkAggregationSummary:
-        cert = cert_provider()
-        if not cert:
+        if not cert_provider():
             raise RuntimeError("Сертификат для подписи не найден")
 
         logger.info(
-            "Запуск массового проведения АК: comment_filter=%r, true_api_base_url=%s",
+            "Запуск массового проведения АК: comment_filter=%r, true_api_base_url=%s, max_workers=%s",
             comment_filter,
             self.true_api_base_url,
+            self.max_workers,
         )
         log = log_callback or (lambda message: None)
         progress = progress_callback or (lambda processed, total: None)
@@ -257,38 +289,32 @@ class BulkAggregationService:
             summary.ready_found,
         )
 
-        for aggregate in ready_aggregates:
-            summary.processed += 1
-            logger.info(
-                "Обработка АК %s (%s/%s), document_id=%s, comment=%r",
-                aggregate.aggregate_code,
-                summary.processed,
-                summary.ready_found,
-                aggregate.document_id,
-                aggregate.comment,
+        worker_count = min(self.max_workers, len(ready_aggregates)) if ready_aggregates else 1
+        if worker_count <= 1:
+            self._run_sequential(
+                ready_aggregates=ready_aggregates,
+                kontur_session=kontur_session,
+                cert_provider=cert_provider,
+                sign_base64_func=sign_base64_func,
+                sign_text_func=sign_text_func,
+                log=log,
+                progress=progress,
+                confirm=confirm,
+                summary=summary,
             )
-            progress(summary.processed, summary.ready_found or summary.processed)
-            try:
-                self._process_aggregate(
-                    kontur_session=kontur_session,
-                    aggregate=aggregate,
-                    cert=cert,
-                    sign_base64_func=sign_base64_func,
-                    sign_text_func=sign_text_func,
-                    log=log,
-                    confirm=confirm,
-                    summary=summary,
-                )
-            except TrueApiConnectivityError as exc:
-                summary.errors += 1
-                logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
-                log(f"❌ {aggregate.aggregate_code}: {exc}")
-                log("⛔ Проведение остановлено: True API недоступен, повторите позже")
-                break
-            except Exception as exc:
-                summary.errors += 1
-                logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
-                log(f"❌ {aggregate.aggregate_code}: {exc}")
+        else:
+            self._run_parallel(
+                ready_aggregates=ready_aggregates,
+                worker_count=worker_count,
+                kontur_session=kontur_session,
+                cert_provider=cert_provider,
+                sign_base64_func=sign_base64_func,
+                sign_text_func=sign_text_func,
+                log=log,
+                progress=progress,
+                confirm=confirm,
+                summary=summary,
+            )
 
         progress(summary.ready_found or summary.processed, summary.ready_found or summary.processed or 1)
         logger.info(
@@ -304,6 +330,222 @@ class BulkAggregationService:
             summary.errors,
         )
         return summary
+
+    def _run_sequential(
+        self,
+        *,
+        ready_aggregates: Sequence[AggregateInfo],
+        kontur_session: requests.Session,
+        cert_provider: Callable[[], Any],
+        sign_base64_func: Callable[[Any, str, bool], str],
+        sign_text_func: Callable[[Any, str, bool], str],
+        log: Callable[[str], None],
+        progress: Callable[[int, int], None],
+        confirm: Callable[[str, str], bool],
+        summary: BulkAggregationSummary,
+    ) -> None:
+        for aggregate in ready_aggregates:
+            local_summary = BulkAggregationSummary()
+            processed_accounted = False
+            cert = cert_provider()
+            if not cert:
+                raise RuntimeError("Сертификат для подписи не найден")
+            logger.info(
+                "Обработка АК %s (%s/%s), document_id=%s, comment=%r",
+                aggregate.aggregate_code,
+                summary.processed + 1,
+                summary.ready_found,
+                aggregate.document_id,
+                aggregate.comment,
+            )
+            try:
+                self._process_aggregate(
+                    kontur_session=kontur_session,
+                    aggregate=aggregate,
+                    cert=cert,
+                    sign_base64_func=sign_base64_func,
+                    sign_text_func=sign_text_func,
+                    log=log,
+                    confirm=confirm,
+                    summary=local_summary,
+                )
+                self._merge_summary(summary, local_summary)
+            except TrueApiConnectivityError as exc:
+                summary.errors += 1
+                logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
+                log(f"❌ {aggregate.aggregate_code}: {exc}")
+                log("⛔ Проведение остановлено: True API недоступен, повторите позже")
+                summary.processed += 1
+                processed_accounted = True
+                progress(summary.processed, summary.ready_found or summary.processed)
+                break
+            except Exception as exc:
+                summary.errors += 1
+                logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
+                log(f"❌ {aggregate.aggregate_code}: {exc}")
+            finally:
+                if not processed_accounted:
+                    summary.processed += 1
+                    progress(summary.processed, summary.ready_found or summary.processed)
+
+    def _run_parallel(
+        self,
+        *,
+        ready_aggregates: Sequence[AggregateInfo],
+        worker_count: int,
+        kontur_session: requests.Session,
+        cert_provider: Callable[[], Any],
+        sign_base64_func: Callable[[Any, str, bool], str],
+        sign_text_func: Callable[[Any, str, bool], str],
+        log: Callable[[str], None],
+        progress: Callable[[int, int], None],
+        confirm: Callable[[str, str], bool],
+        summary: BulkAggregationSummary,
+    ) -> None:
+        logger.info(
+            "Запускаем параллельное проведение АК: worker_count=%s, ready_found=%s",
+            worker_count,
+            len(ready_aggregates),
+        )
+        stop_event = threading.Event()
+        confirm_lock = threading.Lock()
+        thread_local = threading.local()
+        futures: Dict[concurrent.futures.Future, AggregateInfo] = {}
+        aggregate_iter = iter(ready_aggregates)
+
+        def confirm_serialized(title: str, message: str) -> bool:
+            with confirm_lock:
+                return confirm(title, message)
+
+        def get_worker_context() -> Dict[str, Any]:
+            context = getattr(thread_local, "context", None)
+            if context is None:
+                cert = cert_provider()
+                if not cert:
+                    raise RuntimeError("Сертификат для подписи не найден")
+                context = {
+                    "cert": cert,
+                    "kontur_session": self._clone_requests_session(kontur_session),
+                    "service": self._create_worker_service(),
+                }
+                thread_local.context = context
+                logger.info(
+                    "Инициализирован поток проведения АК: thread=%s",
+                    threading.current_thread().name,
+                )
+            return context
+
+        def process_aggregate(aggregate: AggregateInfo) -> AggregateProcessingResult:
+            if stop_event.is_set():
+                return AggregateProcessingResult(
+                    aggregate=aggregate,
+                    summary=BulkAggregationSummary(),
+                )
+            context = get_worker_context()
+            local_summary = BulkAggregationSummary()
+            try:
+                context["service"]._process_aggregate(
+                    kontur_session=context["kontur_session"],
+                    aggregate=aggregate,
+                    cert=context["cert"],
+                    sign_base64_func=sign_base64_func,
+                    sign_text_func=sign_text_func,
+                    log=log,
+                    confirm=confirm_serialized,
+                    summary=local_summary,
+                )
+                return AggregateProcessingResult(
+                    aggregate=aggregate,
+                    summary=local_summary,
+                )
+            except TrueApiConnectivityError as exc:
+                stop_event.set()
+                return AggregateProcessingResult(
+                    aggregate=aggregate,
+                    summary=local_summary,
+                    connectivity_error=exc,
+                )
+            except Exception as exc:
+                return AggregateProcessingResult(
+                    aggregate=aggregate,
+                    summary=local_summary,
+                    error=exc,
+                )
+
+        def submit_next(executor: concurrent.futures.ThreadPoolExecutor) -> bool:
+            if stop_event.is_set():
+                return False
+            try:
+                aggregate = next(aggregate_iter)
+            except StopIteration:
+                return False
+            future = executor.submit(process_aggregate, aggregate)
+            futures[future] = aggregate
+            logger.info(
+                "АК %s поставлен в очередь на проведение (%s/%s)",
+                aggregate.aggregate_code,
+                len(futures),
+                worker_count,
+            )
+            return True
+
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=worker_count,
+            thread_name_prefix="bulk-agg",
+        ) as executor:
+            for _ in range(min(worker_count, len(ready_aggregates))):
+                submit_next(executor)
+
+            connectivity_stop_logged = False
+            while futures:
+                done, _ = concurrent.futures.wait(
+                    futures,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
+                )
+                for future in done:
+                    aggregate = futures.pop(future)
+                    result = future.result()
+                    self._merge_summary(summary, result.summary)
+                    summary.processed += 1
+
+                    if result.connectivity_error is not None:
+                        summary.errors += 1
+                        logger.exception(
+                            "Ошибка массового проведения АК %s",
+                            aggregate.aggregate_code,
+                            exc_info=(
+                                type(result.connectivity_error),
+                                result.connectivity_error,
+                                result.connectivity_error.__traceback__,
+                            ),
+                        )
+                        log(f"❌ {aggregate.aggregate_code}: {result.connectivity_error}")
+                        if not connectivity_stop_logged:
+                            log("⛔ Проведение остановлено: True API недоступен, повторите позже")
+                            connectivity_stop_logged = True
+                    elif result.error is not None:
+                        summary.errors += 1
+                        logger.exception(
+                            "Ошибка массового проведения АК %s",
+                            aggregate.aggregate_code,
+                            exc_info=(
+                                type(result.error),
+                                result.error,
+                                result.error.__traceback__,
+                            ),
+                        )
+                        log(f"❌ {aggregate.aggregate_code}: {result.error}")
+
+                    progress(summary.processed, summary.ready_found or summary.processed)
+
+                if stop_event.is_set():
+                    logger.warning(
+                        "Параллельное проведение АК останавливается после инфраструктурной ошибки True API"
+                    )
+                    continue
+
+                while len(futures) < worker_count and submit_next(executor):
+                    pass
 
     def list_ready_aggregates(
         self,
@@ -393,6 +635,52 @@ class BulkAggregationService:
         ]
         total = int(payload.get("total") or len(aggregates))
         return aggregates, total
+
+    def _create_worker_service(self) -> "BulkAggregationService":
+        return BulkAggregationService(
+            kontur_base_url=self.kontur_base_url,
+            warehouse_id=self.warehouse_id,
+            true_api_base_url=self.true_api_base_url,
+            true_api_product_group=self.true_api_product_group,
+            page_size=self.page_size,
+            batch_size=self.batch_size,
+            poll_interval_seconds=self.poll_interval_seconds,
+            document_timeout_seconds=self.document_timeout_seconds,
+            parent_clear_timeout_seconds=self.parent_clear_timeout_seconds,
+            kontur_send_timeout_seconds=self.kontur_send_timeout_seconds,
+            max_workers=1,
+            sleep_func=self.sleep_func,
+            true_api_session=self._clone_requests_session(self.true_api_session),
+        )
+
+    @staticmethod
+    def _clone_requests_session(session: Any) -> Any:
+        if not isinstance(session, requests.Session):
+            return session
+        cloned = requests.Session()
+        cloned.headers.update(dict(session.headers))
+        cloned.cookies.update(session.cookies)
+        cloned.auth = session.auth
+        cloned.verify = session.verify
+        cloned.cert = session.cert
+        cloned.proxies = dict(session.proxies)
+        cloned.hooks = {
+            key: list(value)
+            for key, value in (session.hooks or {}).items()
+        }
+        cloned.params = dict(session.params or {})
+        cloned.trust_env = session.trust_env
+        cloned.max_redirects = session.max_redirects
+        return cloned
+
+    @staticmethod
+    def _merge_summary(target: BulkAggregationSummary, source: BulkAggregationSummary) -> None:
+        target.sent_for_approve += source.sent_for_approve
+        target.skipped_due_to_status += source.skipped_due_to_status
+        target.skipped_empty += source.skipped_empty
+        target.skipped_not_ready += source.skipped_not_ready
+        target.skipped_unsupported += source.skipped_unsupported
+        target.disaggregated_parent_codes.update(source.disaggregated_parent_codes)
 
     def _process_aggregate(
         self,
