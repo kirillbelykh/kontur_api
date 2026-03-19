@@ -42,6 +42,9 @@ class OrderHistoryDB:
         self.sync_enabled = self._resolve_sync_enabled(sync_enabled)
         self.sync_cache_dir = self.repo_root / SYNC_CACHE_DIR
         self._last_sync_pull_at = 0.0
+        self._legacy_warning_keys: set[Tuple[str, str, str]] = set()
+        self._last_logged_total_orders: Optional[int] = None
+        self._last_logged_without_tsd: Optional[int] = None
 
         self._sync_rel_path = self._resolve_sync_relative_path()
         self._origin_url = self._detect_origin_url() if self.sync_enabled else None
@@ -207,21 +210,39 @@ class OrderHistoryDB:
             return True
         return False
 
-    def _prepare_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _prepare_order(
+        self,
+        order_data: Dict[str, Any],
+        *,
+        assign_create_metadata: bool = True,
+        assign_update_metadata: bool = True,
+    ) -> Dict[str, Any]:
         now = datetime.now().isoformat()
         prepared = dict(order_data)
-        prepared.setdefault("created_at", now)
-        prepared.setdefault("created_by", os.getenv("USERNAME", "unknown"))
-        prepared.setdefault("updated_at", now)
-        prepared.setdefault("updated_by", os.getenv("USERNAME", "unknown"))
+        if assign_create_metadata:
+            prepared.setdefault("created_at", now)
+            prepared.setdefault("created_by", os.getenv("USERNAME", "unknown"))
+        if assign_update_metadata:
+            prepared.setdefault("updated_at", now)
+            prepared.setdefault("updated_by", os.getenv("USERNAME", "unknown"))
         prepared.setdefault("tsd_created", False)
         prepared.setdefault("tsd_created_at", None)
         prepared.setdefault("tsd_intro_number", None)
+        prepared.setdefault("tsd_created_by", None)
         return prepared
+
+    def _warn_legacy_once(self, legacy_path: Path, stage: str, error: Exception):
+        warning_key = (str(legacy_path), stage, str(error))
+        if warning_key in self._legacy_warning_keys:
+            return
+        self._legacy_warning_keys.add(warning_key)
+        logger.warning("Не удалось %s старую историю %s: %s", stage, legacy_path, error)
 
     def _merge_order_records(self, current: Dict[str, Any], incoming: Dict[str, Any]) -> Dict[str, Any]:
         merged = dict(current)
         prefer_incoming = self._prefer_incoming_record(current, incoming)
+        if not self._parse_timestamp(incoming.get("updated_at")):
+            prefer_incoming = True
 
         for key in set(current.keys()) | set(incoming.keys()):
             current_value = current.get(key)
@@ -273,18 +294,30 @@ class OrderHistoryDB:
             logger.warning("Пропущена запись истории без document_id")
             return False
 
-        prepared = self._prepare_order(order_data)
         orders = data.setdefault("orders", [])
 
         for index, order in enumerate(orders):
             if order.get("document_id") == document_id:
+                prepared = self._prepare_order(
+                    order_data,
+                    assign_create_metadata=False,
+                    assign_update_metadata=False,
+                )
                 merged = self._merge_order_records(order, prepared)
                 if merged != order:
+                    if not prepared.get("updated_at"):
+                        merged["updated_at"] = datetime.now().isoformat()
+                        merged["updated_by"] = os.getenv("USERNAME", "unknown")
                     orders[index] = merged
                     self._sort_orders(orders)
                     return True
                 return False
 
+        prepared = self._prepare_order(
+            order_data,
+            assign_create_metadata=True,
+            assign_update_metadata=True,
+        )
         orders.append(prepared)
         self._sort_orders(orders)
         return True
@@ -558,7 +591,7 @@ class OrderHistoryDB:
             try:
                 legacy_exists = legacy_path.exists()
             except OSError as e:
-                logger.warning(f"Не удалось проверить старую историю {legacy_path}: {e}")
+                self._warn_legacy_once(legacy_path, "проверить", e)
                 continue
 
             if not legacy_exists:
@@ -567,7 +600,7 @@ class OrderHistoryDB:
             try:
                 legacy_data = self._read_data(legacy_path)
             except Exception as e:
-                logger.warning(f"Не удалось прочитать старую историю {legacy_path}: {e}")
+                self._warn_legacy_once(legacy_path, "прочитать", e)
                 continue
 
             migrated = 0
@@ -590,9 +623,9 @@ class OrderHistoryDB:
                 changed = self._upsert_order_in_data(data, order_data)
                 if changed:
                     self._save_data(data)
-                    logger.info(f"✅ История обновлена для заказа: {order_data.get('document_id')}")
+                    logger.info("История обновлена для заказа: %s", order_data.get("document_id"))
                 else:
-                    logger.info(f"Заказ {order_data.get('document_id')} уже актуален в истории")
+                    logger.debug("Заказ %s уже актуален в истории", order_data.get("document_id"))
 
                 # Пытаемся выгрузить историю после каждого заказа кодов,
                 # даже если запись не изменилась (например, при повторе после сетевого сбоя).
@@ -622,9 +655,9 @@ class OrderHistoryDB:
                 if updated:
                     self._save_data(data)
                     self._sync_with_github_locked(push=True, reason="mark_tsd_created")
-                    logger.info(f"✅ Заказ {document_id} помечен как отправленный на ТСД")
+                    logger.info("Заказ %s помечен как отправленный на ТСД", document_id)
                 else:
-                    logger.warning(f"⚠️ Заказ {document_id} не найден в истории")
+                    logger.warning("Заказ %s не найден в истории", document_id)
 
         except Exception as e:
             logger.error(f"Ошибка обновления статуса ТСД для заказа {document_id}: {e}")
@@ -636,7 +669,9 @@ class OrderHistoryDB:
             data = self._load_data()
             orders = [order for order in data["orders"] if not order.get("tsd_created", False)]
             self._sort_orders(orders)
-            logger.info(f"Найдено {len(orders)} заказов без ТСД")
+            if self._last_logged_without_tsd != len(orders):
+                logger.info("Найдено %s заказов без ТСД", len(orders))
+                self._last_logged_without_tsd = len(orders)
             return orders
         except Exception as e:
             logger.error(f"Ошибка получения заказов без ТСД: {e}")
@@ -649,7 +684,9 @@ class OrderHistoryDB:
             data = self._load_data()
             orders = list(data["orders"])
             self._sort_orders(orders)
-            logger.info(f"Загружено {len(orders)} заказов из {self.db_file}")
+            if self._last_logged_total_orders != len(orders):
+                logger.info("Загружено %s заказов из %s", len(orders), self.db_file)
+                self._last_logged_total_orders = len(orders)
             return orders
         except Exception as e:
             logger.error(f"Ошибка получения всех заказов: {e}")

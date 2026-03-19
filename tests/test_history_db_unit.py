@@ -187,6 +187,34 @@ class OrderHistoryDBTests(unittest.TestCase):
             self.assertTrue(kwargs.get("push"))
             self.assertEqual(kwargs.get("reason"), "add_order")
 
+    def test_add_order_does_not_bump_updated_at_for_unchanged_record(self):
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            sync_enabled=False,
+            startup_sync="none",
+        )
+        original_updated_at = "2026-03-19T12:00:00"
+        order_data = {
+            "document_id": "DOC-STABLE-1",
+            "order_name": "stable order",
+            "status": "Ожидает",
+            "updated_at": original_updated_at,
+            "updated_by": "pc-1",
+        }
+
+        db.add_order(order_data)
+        db.add_order({
+            "document_id": "DOC-STABLE-1",
+            "order_name": "stable order",
+            "status": "Ожидает",
+        })
+
+        saved_order = db.get_order_by_document_id("DOC-STABLE-1")
+        self.assertIsNotNone(saved_order)
+        self.assertEqual(saved_order["updated_at"], original_updated_at)
+        self.assertEqual(saved_order["updated_by"], "pc-1")
+
 
 if __name__ == "__main__":
     unittest.main()

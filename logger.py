@@ -1,18 +1,28 @@
-# logger.py
 import logging
+import os
+from logging.handlers import RotatingFileHandler
 
-LOG_FILE = "lookup.log"
 
-# Создаем логгер
+LOG_FILE = os.getenv("LOG_FILE", "lookup.log")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+LOG_MAX_BYTES = 5 * 1024 * 1024
+LOG_BACKUP_COUNT = 3
+LOG_FORMAT = "%(asctime)s | %(levelname)-7s | %(message)s"
+
+
 logger = logging.getLogger("GTIN_Lookup")
-logger.setLevel(logging.INFO)  # Можно DEBUG для детальной информации
+logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+logger.propagate = False
 
-# Файл логов
-file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
-file_handler.setLevel(logging.INFO)
-file_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-file_handler.setFormatter(file_formatter)
 
-# Добавляем обработчики
 if not logger.handlers:
+    file_handler = RotatingFileHandler(
+        LOG_FILE,
+        maxBytes=LOG_MAX_BYTES,
+        backupCount=LOG_BACKUP_COUNT,
+        encoding="utf-8",
+        delay=True,
+    )
+    file_handler.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
+    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
     logger.addHandler(file_handler)

@@ -66,11 +66,11 @@ def validate_cookies(cookies: Dict[str, str]) -> tuple[bool, List[str]]:
         return False, missing_required
     
     if empty_fields:
-        logger.warning(f"Обязательные поля cookies пустые: {empty_fields}")
+        logger.warning("Обязательные поля cookies пустые: %s", empty_fields)
         return False, empty_fields
     
     if missing_optional:
-        logger.info(f"Отсутствуют необязательные поля cookies: {missing_optional}")
+        logger.debug("Отсутствуют необязательные поля cookies: %s", missing_optional)
     
     return True, []
 
@@ -102,11 +102,10 @@ def load_cookies_from_file() -> Optional[Dict[str, str]]:
         return cookies
         
     except json.JSONDecodeError as e:
-        logger.error(f"Ошибка декодирования JSON в файле cookies: {e}")
+        logger.error("Ошибка декодирования JSON в файле cookies: %s", e)
         return None
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка при чтении cookies из файла")
-        logger.error(f"Ошибка при чтении cookies из файла: {e}")
         return None
 
 
@@ -116,7 +115,7 @@ def save_cookies_to_file(cookies: Dict[str, str]) -> bool:
         # Проверяем cookies перед сохранением
         is_valid, missing_fields = validate_cookies(cookies)
         if not is_valid:
-            logger.error(f"Нельзя сохранить невалидные cookies. Отсутствуют поля: {missing_fields}")
+            logger.error("Нельзя сохранить невалидные cookies. Отсутствуют поля: %s", missing_fields)
             return False
         
         data = {
@@ -124,12 +123,11 @@ def save_cookies_to_file(cookies: Dict[str, str]) -> bool:
             "cookies": cookies
         }
         COOKIES_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        logger.info(f"Cookies сохранены в {COOKIES_FILE}")
+        logger.info("Cookies сохранены в %s", COOKIES_FILE)
         return True
         
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка при сохранении cookies")
-        logger.error(f"Ошибка при сохранении cookies: {e}")
         return False
 
 
@@ -152,8 +150,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         from selenium.webdriver.support.ui import WebDriverWait
         from selenium.webdriver.support import expected_conditions as EC
     except Exception as e:
-        logger.exception("Selenium import failed")
-        logger.error(f"Selenium не установлен или недоступен: {e}")
+        logger.error("Selenium не установлен или недоступен: %s", e)
         return None
 
     # Импорт pywin32 для скрытия окна
@@ -166,17 +163,17 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
         import win32process
     except ImportError as e:
         logger.warning("pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32")
-        logger.warning(f"Ошибка импорта pywin32: {e}")
+        logger.debug("Ошибка импорта pywin32: %s", e)
 
     if not driver_path.exists():
-        logger.error(f"Driver not found: {driver_path}")
+        logger.error("Driver not found: %s", driver_path)
         return None
     if not browser_path.exists():
-        logger.error(f"Browser binary not found: {browser_path}")
+        logger.error("Browser binary not found: %s", browser_path)
         return None
 
     for attempt in range(max_retries):
-        logger.info(f"Попытка получения cookies #{attempt + 1}")
+        logger.info("Попытка получения cookies #%s", attempt + 1)
         
         opts = Options()
         opts.binary_location = str(browser_path)
@@ -211,9 +208,9 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                 if results:
                     for hwnd in results:
                         win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
-                    logger.info(f"Скрыто {len(results)} окон браузера по PID {pid}")
+                    logger.debug("Скрыто %s окон браузера по PID %s", len(results), pid)
                 else:
-                    logger.warning("Не удалось найти окна браузера по PID для скрытия")
+                    logger.debug("Не удалось найти окна браузера по PID для скрытия")
 
             driver.get(target_url)
             time.sleep(2.0)  # Увеличили задержку для полной загрузки
@@ -224,35 +221,35 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
                 cookie_btn = driver.find_elements(By.XPATH, '//*[@id="root"]/div/div/div[1]/div[1]/span/button/div[2]/span')
                 if cookie_btn:
                     cookie_btn[0].click()
-                    logger.info("Clicked cookie accept")
+                    logger.debug("Clicked cookie accept")
                     time.sleep(SLEEP)
                 else:
-                    logger.info("Cookie accept button not found on page - skipping")
+                    logger.debug("Cookie accept button not found on page - skipping")
             except Exception as e:
-                logger.info(f"Error with cookie accept button: {e} - skipping")
+                logger.debug("Error with cookie accept button: %s - skipping", e)
 
             try:
                 profile_xpath = '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div' 
                 profile_el = wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath)))
                 profile_el.click()
-                logger.info("Clicked profile (best-effort)")
+                logger.debug("Clicked profile (best-effort)")
                 time.sleep(SLEEP)
             except Exception as e:
-                logger.info(f"Profile select error: {e} - ignored")
+                logger.debug("Profile select error: %s - ignored", e)
 
             try:
                 warehouse_el = wait.until(EC.element_to_be_clickable(
                     (By.XPATH, '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]')
                 ))
                 warehouse_el.click()
-                logger.info("Clicked warehouse (fallback selector)")
+                logger.debug("Clicked warehouse (fallback selector)")
                 time.sleep(SLEEP)
             except Exception as e:
-                logger.info(f"Warehouse select error: {e} - ignored")
+                logger.debug("Warehouse select error: %s - ignored", e)
 
             # Дополнительная проверка загрузки страницы
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            logger.info("Страница загружена (body найден)")
+            logger.debug("Страница загружена (body найден)")
 
             raw = driver.get_cookies()
             if not raw:
@@ -264,7 +261,7 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
             # Проверяем полученные cookies
             is_valid, missing_fields = validate_cookies(cookies)
             if not is_valid:
-                logger.warning(f"Полученные cookies невалидны. Отсутствуют поля: {missing_fields}")
+                logger.warning("Полученные cookies невалидны. Отсутствуют поля: %s", missing_fields)
                 if attempt < max_retries - 1:
                     logger.info("Повторяем попытку...")
                     time.sleep(2)  # Задержка перед повторной попыткой
@@ -277,16 +274,15 @@ def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
             else:
                 logger.error("Не удалось сохранить cookies")
 
-        except Exception as e:
-            logger.exception(f"get_cookies failed on attempt {attempt + 1}")
-            logger.error(f"get_cookies failed: {e}")
+        except Exception:
+            logger.exception("get_cookies failed on attempt %s", attempt + 1)
         finally:
             try:
                 driver.quit()
             except Exception:
                 pass
 
-    logger.error(f"Не удалось получить валидные cookies после {max_retries} попыток")
+    logger.error("Не удалось получить валидные cookies после %s попыток", max_retries)
     return None
 
 
@@ -306,6 +302,6 @@ if __name__ == "__main__":
     if c:
         logger.info("Cookies готовы и прошли проверку")
         is_valid, missing = validate_cookies(c)
-        logger.info(f"Проверка cookies: valid={is_valid}, missing_fields={missing}")
+        logger.debug("Проверка cookies: valid=%s, missing_fields=%s", is_valid, missing)
     else:
         logger.error("Не удалось получить валидные cookies")
