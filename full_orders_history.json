@@ -37,16 +37,16 @@
     },
     {
       "document_id": "TEST_001",
-      "order_number": "ORDER-001",
-      "customer": "Тестовый клиент 1",
+      "order_number": "ORDER-DUP",
+      "customer": "Дубликат",
       "products": [
         "товар1",
         "товар2"
       ],
-      "total_amount": 1500.5,
+      "total_amount": 0,
       "created_at": "2026-03-19T13:33:48.749115",
       "created_by": "unknown",
-      "updated_at": "2026-03-19T13:33:48.749115",
+      "updated_at": "2026-03-19T13:34:02.634623",
       "updated_by": "unknown",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -4880,7 +4880,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T13:34:00.646111",
+  "last_update": "2026-03-19T13:34:05.246981",
   "created_by": "sklad",
   "updated_by": "unknown",
   "storage_path": "/Users/darasmirnova/Desktop/it/kontur_api/.history_sync_cache/full_orders_history.json"
