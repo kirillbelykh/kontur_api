@@ -1,6 +1,23 @@
 {
   "orders": [
     {
+      "document_id": "CONCURRENT_001",
+      "order_number": "CONC-001",
+      "customer": "Пользователь 1",
+      "products": [
+        "товар1"
+      ],
+      "total_amount": 1000,
+      "created_at": "2026-03-19T13:34:10.390495",
+      "created_by": "unknown",
+      "updated_at": "2026-03-19T13:34:10.390495",
+      "updated_by": "unknown",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "document_id": "TEST_003",
       "order_number": "ORDER-003",
       "customer": "Тестовый клиент 3",
@@ -4880,7 +4897,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T13:34:05.246981",
+  "last_update": "2026-03-19T13:34:13.094764",
   "created_by": "sklad",
   "updated_by": "unknown",
   "storage_path": "/Users/darasmirnova/Desktop/it/kontur_api/.history_sync_cache/full_orders_history.json"
