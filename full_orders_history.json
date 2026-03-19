@@ -81,9 +81,9 @@
     {
       "order_name": "570 лат диаг L 260316 170д",
       "document_id": "c0ce8c89-a1bb-4254-bb13-4994b7b17e3a",
-      "status": "Выполнен",
+      "status": "Ожидает",
       "filename": null,
-      "simpl": "wheelChairs",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041332",
       "positions": [
@@ -97,7 +97,7 @@
       ],
       "created_at": "2026-03-19T15:01:12.401667",
       "created_by": "user",
-      "updated_at": "2026-03-19T15:01:12.401667",
+      "updated_at": "2026-03-19T15:01:33.989282",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -5122,7 +5122,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T15:01:32.074180",
+  "last_update": "2026-03-19T15:01:35.723205",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
