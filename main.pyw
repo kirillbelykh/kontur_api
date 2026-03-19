@@ -860,6 +860,15 @@ class App(ctk.CTk):
         self.agg_tabview.add("Скачивание АК")
         self.agg_tabview.add("Проведение АК")
 
+        label_width = 190
+        compact_entry_width = 240
+        primary_button_width = 250
+        secondary_button_width = 210
+
+        def configure_form_grid(frame):
+            frame.grid_columnconfigure(0, weight=0, minsize=label_width)
+            frame.grid_columnconfigure(1, weight=1)
+
         # Таб создания
         create_tab = self.agg_tabview.tab("Создание АК")
         create_card = ctk.CTkFrame(create_tab, corner_radius=12)
@@ -873,54 +882,57 @@ class App(ctk.CTk):
         ).pack(anchor="w", padx=20, pady=(20, 10))
 
         create_input_frame = ctk.CTkFrame(create_card, fg_color="transparent")
-        create_input_frame.pack(fill="x", padx=20, pady=(0, 10))
-
-        create_name_frame = ctk.CTkFrame(create_input_frame, fg_color="transparent")
-        create_name_frame.pack(fill="x", pady=(0, 10))
+        create_input_frame.pack(fill="x", padx=20, pady=(0, 20))
+        configure_form_grid(create_input_frame)
 
         ctk.CTkLabel(
-            create_name_frame,
+            create_input_frame,
             text="Название:",
             font=self.fonts["normal"],
-            text_color=self._get_color("text_primary")
-        ).pack(side="left", padx=(0, 15))
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=0, column=0, sticky="w", padx=(0, 18), pady=(0, 12))
 
         self.agg_create_name_entry = ctk.CTkEntry(
-            create_name_frame,
-            width=360,
+            create_input_frame,
+            width=420,
             placeholder_text="Введите название агрегации...",
             font=self.fonts["normal"],
             height=40,
             corner_radius=8,
             border_color=self._get_color("secondary")
         )
-        self.agg_create_name_entry.pack(side="left", fill="x", expand=True)
-
-        create_count_frame = ctk.CTkFrame(create_input_frame, fg_color="transparent")
-        create_count_frame.pack(fill="x")
+        self.agg_create_name_entry.grid(row=0, column=1, sticky="ew", pady=(0, 12))
 
         ctk.CTkLabel(
-            create_count_frame,
+            create_input_frame,
             text="Количество агрегатов:",
             font=self.fonts["normal"],
-            text_color=self._get_color("text_primary")
-        ).pack(side="left", padx=(0, 15))
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=1, column=0, sticky="w", padx=(0, 18))
 
         self.agg_create_count_entry = ctk.CTkEntry(
-            create_count_frame,
-            width=220,
+            create_input_frame,
+            width=compact_entry_width,
             placeholder_text="Введите количество...",
             font=self.fonts["normal"],
             height=40,
             corner_radius=8,
             border_color=self._get_color("secondary")
         )
-        self.agg_create_count_entry.pack(side="left")
+        self.agg_create_count_entry.grid(row=1, column=1, sticky="w")
+
+        create_actions_frame = ctk.CTkFrame(create_input_frame, fg_color="transparent")
+        create_actions_frame.grid(row=2, column=1, sticky="w", pady=(16, 0))
 
         self.create_agg_btn = ctk.CTkButton(
-            create_card,
+            create_actions_frame,
             text="⚡ Генерировать",
             command=self.start_aggregation_generation,
+            width=primary_button_width,
             height=45,
             font=self.fonts["button"],
             fg_color=self._get_color("primary"),
@@ -928,7 +940,7 @@ class App(ctk.CTk):
             corner_radius=8,
             border_width=0
         )
-        self.create_agg_btn.pack(padx=20, pady=(10, 20), anchor="w")
+        self.create_agg_btn.pack(anchor="w")
 
         # Таб скачивания
         download_tab = self.agg_tabview.tab("Скачивание АК")
@@ -942,19 +954,22 @@ class App(ctk.CTk):
             text_color=self._get_color("text_primary")
         ).pack(anchor="w", padx=20, pady=(20, 10))
         
-        mode_frame = ctk.CTkFrame(download_card, fg_color="transparent")
-        mode_frame.pack(fill="x", padx=20, pady=10)
-        
+        download_form_frame = ctk.CTkFrame(download_card, fg_color="transparent")
+        download_form_frame.pack(fill="x", padx=20, pady=(0, 20))
+        configure_form_grid(download_form_frame)
+
         ctk.CTkLabel(
-            mode_frame,
+            download_form_frame,
             text="Режим поиска:",
             font=self.fonts["normal"],
-            text_color=self._get_color("text_primary")
-        ).pack(side="left", padx=(0, 15))
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=0, column=0, sticky="w", padx=(0, 18), pady=(0, 12))
         
         self.agg_mode_var = ctk.StringVar(value="count")
-        mode_options_frame = ctk.CTkFrame(mode_frame, fg_color="transparent")
-        mode_options_frame.pack(side="left", fill="x", expand=True)
+        mode_options_frame = ctk.CTkFrame(download_form_frame, fg_color="transparent")
+        mode_options_frame.grid(row=0, column=1, sticky="w", pady=(0, 12))
         
         ctk.CTkRadioButton(
             mode_options_frame,
@@ -977,55 +992,64 @@ class App(ctk.CTk):
             border_color=self._get_color("primary"),
             hover_color=self._get_color("accent")
         ).pack(side="left")
-        
-        input_frame = ctk.CTkFrame(download_card, fg_color="transparent")
-        input_frame.pack(fill="x", padx=20, pady=10)
-        
-        self.count_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
-        self.count_frame.pack(fill="x")
-        
+
+        self.count_frame = ctk.CTkFrame(download_form_frame, fg_color="transparent")
+        self.count_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        configure_form_grid(self.count_frame)
+
         ctk.CTkLabel(
             self.count_frame,
             text="Количество кодов:",
             font=self.fonts["normal"],
-            text_color=self._get_color("text_primary")
-        ).pack(side="left", padx=(0, 15))
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=0, column=0, sticky="w", padx=(0, 18))
         
         self.count_entry = ctk.CTkEntry(
             self.count_frame,
-            width=200,
+            width=compact_entry_width,
             placeholder_text="Введите количество...",
             font=self.fonts["normal"],
             height=40,
             corner_radius=8,
             border_color=self._get_color("secondary")
         )
-        self.count_entry.pack(side="left")
+        self.count_entry.grid(row=0, column=1, sticky="w")
         
-        self.comment_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
+        self.comment_frame = ctk.CTkFrame(download_form_frame, fg_color="transparent")
+        self.comment_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        configure_form_grid(self.comment_frame)
         
         ctk.CTkLabel(
             self.comment_frame,
             text="Наименование товара:",
             font=self.fonts["normal"],
-            text_color=self._get_color("text_primary")
-        ).pack(side="left", padx=(0, 15))
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=0, column=0, sticky="w", padx=(0, 18))
         
         self.comment_entry = ctk.CTkEntry(
             self.comment_frame,
-            width=300,
+            width=420,
             placeholder_text="Введите наименование...",
             font=self.fonts["normal"],
             height=40,
             corner_radius=8,
             border_color=self._get_color("secondary")
         )
-        self.comment_entry.pack(side="left")
-        
+        self.comment_entry.grid(row=0, column=1, sticky="ew")
+        self.comment_frame.grid_remove()
+
+        download_actions_frame = ctk.CTkFrame(download_form_frame, fg_color="transparent")
+        download_actions_frame.grid(row=2, column=1, sticky="w")
+
         self.download_agg_btn = ctk.CTkButton(
-            download_card,
+            download_actions_frame,
             text="🚀 Загрузить коды агрегации",
             command=self.start_aggregation_download,
+            width=primary_button_width,
             height=45,
             font=self.fonts["button"],
             fg_color=self._get_color("primary"),
@@ -1033,7 +1057,7 @@ class App(ctk.CTk):
             corner_radius=8,
             border_width=0
         )
-        self.download_agg_btn.pack(padx=20, pady=(10, 20), anchor="w")
+        self.download_agg_btn.pack(anchor="w")
 
         # Таб проведения
         conduct_tab = self.agg_tabview.tab("Проведение АК")
@@ -1054,34 +1078,38 @@ class App(ctk.CTk):
             text_color=self._get_color("text_secondary")
         ).pack(anchor="w", padx=20)
 
-        conduct_name_frame = ctk.CTkFrame(conduct_card, fg_color="transparent")
-        conduct_name_frame.pack(fill="x", padx=20, pady=(15, 10))
+        conduct_form_frame = ctk.CTkFrame(conduct_card, fg_color="transparent")
+        conduct_form_frame.pack(fill="x", padx=20, pady=(15, 20))
+        configure_form_grid(conduct_form_frame)
 
         ctk.CTkLabel(
-            conduct_name_frame,
+            conduct_form_frame,
             text="Наименование товара:",
             font=self.fonts["normal"],
-            text_color=self._get_color("text_primary")
-        ).pack(side="left", padx=(0, 15))
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=0, column=0, sticky="w", padx=(0, 18))
 
         self.bulk_agg_name_entry = ctk.CTkEntry(
-            conduct_name_frame,
-            width=360,
+            conduct_form_frame,
+            width=420,
             placeholder_text="Введите наименование...",
             font=self.fonts["normal"],
             height=40,
             corner_radius=8,
             border_color=self._get_color("secondary")
         )
-        self.bulk_agg_name_entry.pack(side="left", fill="x", expand=True)
+        self.bulk_agg_name_entry.grid(row=0, column=1, sticky="ew")
 
-        conduct_actions_frame = ctk.CTkFrame(conduct_card, fg_color="transparent")
-        conduct_actions_frame.pack(fill="x", padx=20, pady=(10, 20))
+        conduct_actions_frame = ctk.CTkFrame(conduct_form_frame, fg_color="transparent")
+        conduct_actions_frame.grid(row=1, column=1, sticky="w", pady=(16, 0))
 
         self.bulk_agg_by_name_btn = ctk.CTkButton(
             conduct_actions_frame,
             text="✅ Провести",
             command=self.start_bulk_aggregation_approve_by_name,
+            width=secondary_button_width,
             height=45,
             font=self.fonts["button"],
             fg_color=self._get_color("success"),
@@ -1095,6 +1123,7 @@ class App(ctk.CTk):
             conduct_actions_frame,
             text="✅ Провести все АК",
             command=self.start_bulk_aggregation_approve,
+            width=secondary_button_width,
             height=45,
             font=self.fonts["button"],
             fg_color=self._get_color("primary"),
@@ -1158,11 +1187,11 @@ class App(ctk.CTk):
     def toggle_aggregation_mode(self):
         """Переключение между режимами поиска кодов агрегации"""
         if self.agg_mode_var.get() == "count":
-            self.count_frame.pack(fill="x", padx=10, pady=10)
-            self.comment_frame.pack_forget()
+            self.comment_frame.grid_remove()
+            self.count_frame.grid()
         else:
-            self.count_frame.pack_forget()
-            self.comment_frame.pack(fill="x", padx=10, pady=10)
+            self.count_frame.grid_remove()
+            self.comment_frame.grid()
 
     def log_aggregation_message(self, message):
         """Добавление сообщения в лог агрегации"""
