@@ -120,6 +120,57 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertFalse(kontur_state["send_called"])
         self.assertIn((3, 3), progress_calls)
 
+    def test_filters_ready_aggregates_by_comment(self):
+        requested_docs = []
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                return FakeResponse(json_data={
+                    "items": [
+                        {
+                            "documentId": "doc-1",
+                            "aggregateCode": "AK-1",
+                            "status": "readyForSend",
+                            "comment": "Коляска прогулочная",
+                        },
+                        {
+                            "documentId": "doc-2",
+                            "aggregateCode": "AK-2",
+                            "status": "readyForSend",
+                            "comment": "Ходунки",
+                        },
+                    ],
+                    "total": 2,
+                })
+            if path.startswith("/api/v1/aggregates/") and path.endswith("/codes"):
+                requested_docs.append(path.split("/")[4])
+                return FakeResponse(json_data={"aggregateCodes": [], "reaggregationCodes": []})
+            if path.startswith("/api/v1/aggregates/"):
+                document_id = path.rsplit("/", 1)[-1]
+                return FakeResponse(json_data={
+                    "documentId": document_id,
+                    "aggregateCode": document_id.replace("doc", "AK"),
+                    "status": "readyForSend",
+                    "productGroup": "wheelChairs",
+                    "comment": "Коляска прогулочная" if document_id == "doc-1" else "Ходунки",
+                })
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        service = self.build_service(SimpleNamespace(get=lambda *args, **kwargs: None, post=lambda *args, **kwargs: None))
+        summary = service.run(
+            kontur_session=SimpleNamespace(get=kontur_get, post=lambda *args, **kwargs: FakeResponse(json_data={"ok": True})),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "unused",
+            sign_text_func=lambda cert, data, detached: "unused",
+            comment_filter="прогулоч",
+        )
+
+        self.assertEqual(summary.ready_found, 1)
+        self.assertEqual(summary.processed, 1)
+        self.assertEqual(summary.skipped_empty, 1)
+        self.assertEqual(requested_docs, ["doc-1"])
+
     def test_introduced_foreign_parent_disaggregates_then_sends_kontur(self):
         raw_codes = [
             "01046501180412952156bej,nSIQ*?=",

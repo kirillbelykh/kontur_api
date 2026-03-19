@@ -130,8 +130,8 @@ def sign_data(cert, base64_content: str, b_detached: bool = False) -> str:
 
 def sign_text_data(cert, content: str, b_detached: bool = False) -> str:
     """
-    Подписывает текстовые данные CAdES-BES подписью.
-    Используется для challenge True API и документов, где подпись формируется по JSON-строке.
+    Подписывает обычный текст CAdES-BES подписью.
+    Используется для challenge True API и документов, где подпись строится по JSON-строке.
     """
     cert_thumb = getattr(cert, "Thumbprint", "Неизвестно")
     logger.debug(

@@ -168,6 +168,7 @@ class BulkAggregationService:
         log_callback: Optional[Callable[[str], None]] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         confirm_callback: Optional[Callable[[str, str], bool]] = None,
+        comment_filter: Optional[str] = None,
     ) -> BulkAggregationSummary:
         cert = cert_provider()
         if not cert:
@@ -177,41 +178,65 @@ class BulkAggregationService:
         progress = progress_callback or (lambda processed, total: None)
         confirm = confirm_callback or (lambda title, message: False)
         summary = BulkAggregationSummary()
+        ready_aggregates = self.list_ready_aggregates(
+            kontur_session,
+            comment_filter=comment_filter,
+        )
+        summary.ready_found = len(ready_aggregates)
 
-        offset = 0
-        while True:
-            aggregates, total = self.fetch_ready_aggregates_page(kontur_session, offset)
-            if total is not None:
-                summary.ready_found = total
-
-            if not aggregates:
-                break
-
-            for aggregate in aggregates:
-                summary.processed += 1
-                progress(summary.processed, summary.ready_found or summary.processed)
-                try:
-                    self._process_aggregate(
-                        kontur_session=kontur_session,
-                        aggregate=aggregate,
-                        cert=cert,
-                        sign_base64_func=sign_base64_func,
-                        sign_text_func=sign_text_func,
-                        log=log,
-                        confirm=confirm,
-                        summary=summary,
-                    )
-                except Exception as exc:
-                    summary.errors += 1
-                    logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
-                    log(f"❌ {aggregate.aggregate_code}: {exc}")
-
-            if len(aggregates) < self.page_size:
-                break
-            offset += self.page_size
+        for aggregate in ready_aggregates:
+            summary.processed += 1
+            progress(summary.processed, summary.ready_found or summary.processed)
+            try:
+                self._process_aggregate(
+                    kontur_session=kontur_session,
+                    aggregate=aggregate,
+                    cert=cert,
+                    sign_base64_func=sign_base64_func,
+                    sign_text_func=sign_text_func,
+                    log=log,
+                    confirm=confirm,
+                    summary=summary,
+                )
+            except Exception as exc:
+                summary.errors += 1
+                logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
+                log(f"❌ {aggregate.aggregate_code}: {exc}")
 
         progress(summary.ready_found or summary.processed, summary.ready_found or summary.processed or 1)
         return summary
+
+    def list_ready_aggregates(
+        self,
+        kontur_session: requests.Session,
+        *,
+        comment_filter: Optional[str] = None,
+    ) -> List[AggregateInfo]:
+        matched: List[AggregateInfo] = []
+        normalized_filter = self._normalize_comment_filter(comment_filter)
+        offset = 0
+
+        while True:
+            aggregates, total = self.fetch_ready_aggregates_page(kontur_session, offset)
+            page_size = len(aggregates)
+            if not aggregates:
+                break
+
+            if normalized_filter:
+                aggregates = [
+                    aggregate
+                    for aggregate in aggregates
+                    if self._matches_comment_filter(aggregate.comment, normalized_filter)
+                ]
+
+            matched.extend(aggregates)
+            offset += page_size
+            if total and offset >= total:
+                break
+            if page_size < self.page_size:
+                break
+
+        return matched
 
     def fetch_ready_aggregates_page(
         self,
@@ -822,3 +847,12 @@ class BulkAggregationService:
             kontur_product_group,
             DEFAULT_TRUE_API_PRODUCT_GROUP,
         )
+
+    @staticmethod
+    def _normalize_comment_filter(value: Optional[str]) -> Optional[str]:
+        normalized = str(value or "").strip().lower()
+        return normalized or None
+
+    @staticmethod
+    def _matches_comment_filter(comment: str, normalized_filter: str) -> bool:
+        return normalized_filter in str(comment or "").strip().lower()

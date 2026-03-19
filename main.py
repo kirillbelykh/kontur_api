@@ -353,6 +353,9 @@ class App(ctk.CTk):
         self.create_agg_btn = None
         self.download_agg_btn = None
         self.bulk_agg_btn = None
+        self.bulk_agg_name_entry = None
+        self.bulk_agg_by_name_btn = None
+        self.agg_tabview = None
         self.agg_progress = None
         self.agg_log_text = None
         
@@ -844,9 +847,16 @@ class App(ctk.CTk):
             text_color=self._get_color("text_secondary")
         ).pack(anchor="w")
 
-        # Карточка создания агрегационных кодов
-        create_card = ctk.CTkFrame(main_frame, corner_radius=12)
-        create_card.pack(fill="x", pady=(0, 20))
+        self.agg_tabview = ctk.CTkTabview(main_frame, corner_radius=12)
+        self.agg_tabview.pack(fill="x", pady=(0, 20))
+        self.agg_tabview.add("Создание АК")
+        self.agg_tabview.add("Скачивание АК")
+        self.agg_tabview.add("Проведение АК")
+
+        # Таб создания
+        create_tab = self.agg_tabview.tab("Создание АК")
+        create_card = ctk.CTkFrame(create_tab, corner_radius=12)
+        create_card.pack(fill="x", padx=10, pady=10)
 
         ctk.CTkLabel(
             create_card,
@@ -913,19 +923,19 @@ class App(ctk.CTk):
         )
         self.create_agg_btn.pack(padx=20, pady=(10, 20), anchor="w")
 
-        # Карточка с настройками
-        settings_card = ctk.CTkFrame(main_frame, corner_radius=12)
-        settings_card.pack(fill="x", pady=(0, 20))
+        # Таб скачивания
+        download_tab = self.agg_tabview.tab("Скачивание АК")
+        download_card = ctk.CTkFrame(download_tab, corner_radius=12)
+        download_card.pack(fill="x", padx=10, pady=10)
         
         ctk.CTkLabel(
-            settings_card,
-            text="Настройки поиска",
+            download_card,
+            text="Поиск и скачивание АК",
             font=self.fonts["subheading"],
             text_color=self._get_color("text_primary")
         ).pack(anchor="w", padx=20, pady=(20, 10))
         
-        # Переключатель режимов в современном стиле
-        mode_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        mode_frame = ctk.CTkFrame(download_card, fg_color="transparent")
         mode_frame.pack(fill="x", padx=20, pady=10)
         
         ctk.CTkLabel(
@@ -936,12 +946,10 @@ class App(ctk.CTk):
         ).pack(side="left", padx=(0, 15))
         
         self.agg_mode_var = ctk.StringVar(value="count")
-        
-        # Стилизованные радиокнопки
         mode_options_frame = ctk.CTkFrame(mode_frame, fg_color="transparent")
         mode_options_frame.pack(side="left", fill="x", expand=True)
         
-        count_radio = ctk.CTkRadioButton(
+        ctk.CTkRadioButton(
             mode_options_frame,
             text="🔢 По количеству",
             variable=self.agg_mode_var,
@@ -950,10 +958,9 @@ class App(ctk.CTk):
             font=self.fonts["normal"],
             border_color=self._get_color("primary"),
             hover_color=self._get_color("accent")
-        )
-        count_radio.pack(side="left", padx=(0, 20))
+        ).pack(side="left", padx=(0, 20))
         
-        comment_radio = ctk.CTkRadioButton(
+        ctk.CTkRadioButton(
             mode_options_frame,
             text="📝 По наименованию", 
             variable=self.agg_mode_var,
@@ -962,11 +969,9 @@ class App(ctk.CTk):
             font=self.fonts["normal"],
             border_color=self._get_color("primary"),
             hover_color=self._get_color("accent")
-        )
-        comment_radio.pack(side="left")
+        ).pack(side="left")
         
-        # Поля ввода в современном стиле
-        input_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        input_frame = ctk.CTkFrame(download_card, fg_color="transparent")
         input_frame.pack(fill="x", padx=20, pady=10)
         
         self.count_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
@@ -990,7 +995,6 @@ class App(ctk.CTk):
         )
         self.count_entry.pack(side="left")
         
-        # Поле комментария (изначально скрыто)
         self.comment_frame = ctk.CTkFrame(input_frame, fg_color="transparent")
         
         ctk.CTkLabel(
@@ -1011,13 +1015,9 @@ class App(ctk.CTk):
         )
         self.comment_entry.pack(side="left")
         
-        # Стилизованная кнопка загрузки
-        actions_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
-        actions_frame.pack(fill="x", padx=20, pady=20)
-
         self.download_agg_btn = ctk.CTkButton(
-            actions_frame,
-            text="🚀 Начать загрузку кодов",
+            download_card,
+            text="🚀 Загрузить коды агрегации",
             command=self.start_aggregation_download,
             height=45,
             font=self.fonts["button"],
@@ -1026,12 +1026,55 @@ class App(ctk.CTk):
             corner_radius=8,
             border_width=0
         )
-        self.download_agg_btn.pack(side="left", padx=(0, 12))
+        self.download_agg_btn.pack(padx=20, pady=(10, 20), anchor="w")
 
-        self.bulk_agg_btn = ctk.CTkButton(
-            actions_frame,
-            text="✅ Провести все АК",
-            command=self.start_bulk_aggregation_approve,
+        # Таб проведения
+        conduct_tab = self.agg_tabview.tab("Проведение АК")
+        conduct_card = ctk.CTkFrame(conduct_tab, corner_radius=12)
+        conduct_card.pack(fill="x", padx=10, pady=10)
+
+        ctk.CTkLabel(
+            conduct_card,
+            text="Проведение readyForSend АК",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+
+        ctk.CTkLabel(
+            conduct_card,
+            text="Поиск по наименованию использует тот же принцип, что и скачивание АК.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(anchor="w", padx=20)
+
+        conduct_name_frame = ctk.CTkFrame(conduct_card, fg_color="transparent")
+        conduct_name_frame.pack(fill="x", padx=20, pady=(15, 10))
+
+        ctk.CTkLabel(
+            conduct_name_frame,
+            text="Наименование товара:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary")
+        ).pack(side="left", padx=(0, 15))
+
+        self.bulk_agg_name_entry = ctk.CTkEntry(
+            conduct_name_frame,
+            width=360,
+            placeholder_text="Введите наименование...",
+            font=self.fonts["normal"],
+            height=40,
+            corner_radius=8,
+            border_color=self._get_color("secondary")
+        )
+        self.bulk_agg_name_entry.pack(side="left", fill="x", expand=True)
+
+        conduct_actions_frame = ctk.CTkFrame(conduct_card, fg_color="transparent")
+        conduct_actions_frame.pack(fill="x", padx=20, pady=(10, 20))
+
+        self.bulk_agg_by_name_btn = ctk.CTkButton(
+            conduct_actions_frame,
+            text="✅ Провести",
+            command=self.start_bulk_aggregation_approve_by_name,
             height=45,
             font=self.fonts["button"],
             fg_color=self._get_color("success"),
@@ -1039,15 +1082,37 @@ class App(ctk.CTk):
             corner_radius=8,
             border_width=0
         )
+        self.bulk_agg_by_name_btn.pack(side="left", padx=(0, 12))
+
+        self.bulk_agg_btn = ctk.CTkButton(
+            conduct_actions_frame,
+            text="✅ Провести все АК",
+            command=self.start_bulk_aggregation_approve,
+            height=45,
+            font=self.fonts["button"],
+            fg_color=self._get_color("primary"),
+            hover_color=self._get_color("accent"),
+            corner_radius=8,
+            border_width=0
+        )
         self.bulk_agg_btn.pack(side="left")
-        
-        # Прогресс-бар в современном стиле
-        progress_frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+
+        progress_card = ctk.CTkFrame(main_frame, corner_radius=12)
+        progress_card.pack(fill="x", pady=(0, 20))
+
+        ctk.CTkLabel(
+            progress_card,
+            text="Прогресс операции",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+
+        progress_frame = ctk.CTkFrame(progress_card, fg_color="transparent")
         progress_frame.pack(fill="x", padx=20, pady=(0, 20))
         
         ctk.CTkLabel(
             progress_frame,
-            text="Прогресс загрузки:",
+            text="Прогресс:",
             font=self.fonts["small"],
             text_color=self._get_color("text_secondary")
         ).pack(anchor="w")
@@ -1146,16 +1211,23 @@ class App(ctk.CTk):
     def set_status_bar_threadsafe(self, message):
         self._run_in_ui_thread(lambda: self.status_bar.configure(text=message))
 
-    def set_bulk_aggregation_ui_state(self, running):
+    def set_bulk_aggregation_ui_state(self, running, active_action=None):
         def apply_state():
             if self.create_agg_btn is not None:
                 self.create_agg_btn.configure(state="disabled" if running else "normal")
             if self.download_agg_btn is not None:
                 self.download_agg_btn.configure(state="disabled" if running else "normal")
+            if self.bulk_agg_name_entry is not None:
+                self.bulk_agg_name_entry.configure(state="disabled" if running else "normal")
+            if self.bulk_agg_by_name_btn is not None:
+                self.bulk_agg_by_name_btn.configure(
+                    state="disabled" if running else "normal",
+                    text="Проведение..." if running and active_action == "by_name" else "✅ Провести",
+                )
             if self.bulk_agg_btn is not None:
                 self.bulk_agg_btn.configure(
                     state="disabled" if running else "normal",
-                    text="Проведение..." if running else "✅ Провести все АК",
+                    text="Проведение..." if running and active_action == "all" else "✅ Провести все АК",
                 )
 
         self._run_in_ui_thread(apply_state)
@@ -1246,27 +1318,52 @@ class App(ctk.CTk):
             self.log_aggregation_message(f"❌ Критическая ошибка генерации: {str(e)}")
 
     def start_bulk_aggregation_approve(self):
-        """Запуск массового проведения readyForSend АК."""
+        """Запуск массового проведения всех readyForSend АК."""
         try:
             if self.bulk_agg_btn is None:
-                self.log_aggregation_message("❌ Ошибка: кнопка массового проведения не инициализирована")
+                self.log_aggregation_message("❌ Ошибка: кнопка проведения не инициализирована")
                 return
 
-            self.set_bulk_aggregation_ui_state(True)
-            self.log_aggregation_message("🚀 Запускаем массовое проведение readyForSend АК")
+            self.set_bulk_aggregation_ui_state(True, active_action="all")
+            self.log_aggregation_message("🚀 Запускаем проведение всех readyForSend АК")
             self.update_aggregation_progress(0)
-            self.download_executor.submit(self.bulk_aggregation_approve_process)
+            self.download_executor.submit(self.bulk_aggregation_approve_process, None)
         except Exception as e:
-            logger.exception("Критическая ошибка запуска массового проведения АК")
+            logger.exception("Критическая ошибка запуска проведения всех АК")
             self.log_aggregation_message(f"❌ Критическая ошибка запуска: {e}")
             self.set_bulk_aggregation_ui_state(False)
 
-    def bulk_aggregation_approve_process(self):
+    def start_bulk_aggregation_approve_by_name(self):
+        """Запуск проведения readyForSend АК по наименованию."""
+        try:
+            if self.bulk_agg_name_entry is None or self.bulk_agg_by_name_btn is None:
+                self.log_aggregation_message("❌ Ошибка: интерфейс проведения по наименованию не инициализирован")
+                return
+
+            comment_filter = self.bulk_agg_name_entry.get().strip()
+            if not comment_filter:
+                self.log_aggregation_message("❌ Ошибка: введите наименование для проведения АК")
+                return
+
+            self.set_bulk_aggregation_ui_state(True, active_action="by_name")
+            self.log_aggregation_message(
+                f"🚀 Запускаем проведение readyForSend АК по наименованию: {comment_filter}"
+            )
+            self.update_aggregation_progress(0)
+            self.download_executor.submit(self.bulk_aggregation_approve_process, comment_filter)
+        except Exception as e:
+            logger.exception("Критическая ошибка запуска проведения АК по наименованию")
+            self.log_aggregation_message(f"❌ Критическая ошибка запуска: {e}")
+            self.set_bulk_aggregation_ui_state(False)
+
+    def bulk_aggregation_approve_process(self, comment_filter=None):
         """Фоновый процесс проверки и проведения АК."""
-        summary = None
         try:
             self.log_aggregation_message_threadsafe("🔐 Получаем сессию Контур.Маркировки...")
-            self.set_status_bar_threadsafe("Проведение readyForSend АК...")
+            status_message = "Проведение readyForSend АК..."
+            if comment_filter:
+                status_message = f"Проведение АК по наименованию: {comment_filter}"
+            self.set_status_bar_threadsafe(status_message)
             session = SessionManager.get_session()
 
             if not session:
@@ -1280,11 +1377,20 @@ class App(ctk.CTk):
                 log_callback=self.log_aggregation_message_threadsafe,
                 progress_callback=self.update_aggregation_progress_threadsafe,
                 confirm_callback=self.ask_yes_no_threadsafe,
+                comment_filter=comment_filter,
             )
 
-            self.log_aggregation_message_threadsafe("📌 Итоги массового проведения:")
-            for line in summary.to_lines():
-                self.log_aggregation_message_threadsafe(f"• {line}")
+            if comment_filter:
+                self.log_aggregation_message_threadsafe(
+                    f"🔎 Фильтр по наименованию: {comment_filter}"
+                )
+
+            if summary.ready_found == 0:
+                self.log_aggregation_message_threadsafe("ℹ️ Готовые АК для проведения не найдены")
+            else:
+                self.log_aggregation_message_threadsafe("📌 Итоги проведения АК:")
+                for line in summary.to_lines():
+                    self.log_aggregation_message_threadsafe(f"• {line}")
 
             self.set_status_bar_threadsafe(
                 f"АК: отправлено {summary.sent_for_approve}, ошибок {summary.errors}"
@@ -1294,9 +1400,9 @@ class App(ctk.CTk):
                 "\n".join(summary.to_lines()),
             )
         except Exception as e:
-            logger.exception("Ошибка массового проведения АК")
-            self.log_aggregation_message_threadsafe(f"❌ Ошибка массового проведения АК: {e}")
-            self.set_status_bar_threadsafe("Ошибка массового проведения АК")
+            logger.exception("Ошибка проведения АК")
+            self.log_aggregation_message_threadsafe(f"❌ Ошибка проведения АК: {e}")
+            self.set_status_bar_threadsafe("Ошибка проведения АК")
             self.show_error_threadsafe("Ошибка проведения АК", str(e))
         finally:
             self.set_bulk_aggregation_ui_state(False)
