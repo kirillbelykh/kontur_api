@@ -77,12 +77,12 @@
       ],
       "created_at": "2026-03-19T15:01:16.002492",
       "created_by": "user",
-      "updated_at": "2026-03-19T15:04:33.158131",
+      "updated_at": "2026-03-19T16:43:05.922867",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created": true,
+      "tsd_created_at": "2026-03-19T16:43:05.922867",
+      "tsd_intro_number": "0a7d862b-8a29-4f17-92d2-842feac4b607",
+      "tsd_created_by": "user"
     },
     {
       "order_name": "570 лат диаг L 260316 170д",
@@ -5128,7 +5128,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T16:13:13.110453",
+  "last_update": "2026-03-19T16:43:07.574682",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
