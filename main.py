@@ -22,6 +22,7 @@ from queue_utils import (
 )
 from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
+from bartender_print import BarTenderPrintError, build_print_context, print_labels
 import update
 import customtkinter as ctk
 from customtkinter import CTkScrollableFrame
@@ -276,7 +277,9 @@ class App(ctk.CTk):
         # Threading
         self.download_executor = ThreadPoolExecutor(max_workers=2)
         self.status_check_executor = ThreadPoolExecutor(max_workers=1)
+        self.print_executor = ThreadPoolExecutor(max_workers=1)
         self.auto_download_active = False
+        self.print_in_progress = False
         self.execute_all_executor = ThreadPoolExecutor(max_workers=3)
         self.intro_executor = ThreadPoolExecutor(max_workers=3)
         self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)
@@ -2097,8 +2100,14 @@ class App(ctk.CTk):
         table_inner_frame = ctk.CTkFrame(table_container, fg_color="transparent")
         table_inner_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
         
-        download_columns = ("order_name", "status", "filename", "document_id")
-        self.download_tree = ttk.Treeview(table_inner_frame, columns=download_columns, show="headings", height=12)
+        download_columns = ("order_name", "document_id", "status", "filename")
+        self.download_tree = ttk.Treeview(
+            table_inner_frame,
+            columns=download_columns,
+            show="headings",
+            height=12,
+            selectmode="browse"
+        )
         
         headers = {
             "order_name": "Заявка", "status": "Статус", 
@@ -2113,10 +2122,32 @@ class App(ctk.CTk):
         self.download_tree.configure(yscrollcommand=scrollbar.set)
         self.download_tree.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        self.download_tree.bind("<<TreeviewSelect>>", self._update_download_print_button_state)
+
+        actions_frame = ctk.CTkFrame(columns_frame, corner_radius=8)
+        actions_frame.pack(fill="x", pady=(0, 10))
+
+        self.download_print_button = ctk.CTkButton(
+            actions_frame,
+            text="Выполнить печать",
+            command=self.print_selected_download_order,
+            state="disabled",
+            fg_color=self._get_color("primary"),
+            hover_color=self._get_color("secondary"),
+            font=self.fonts["button"],
+        )
+        self.download_print_button.pack(side="left", padx=15, pady=12)
+
+        ctk.CTkLabel(
+            actions_frame,
+            text="Выберите заявку со скачанным CSV, чтобы отправить её в BarTender.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary")
+        ).pack(side="left", padx=(0, 15))
         
         # Нижняя часть - лог
         log_container = ctk.CTkFrame(columns_frame, corner_radius=8)
-        log_container.pack(fill="both", expand=True, pady=(10, 0))
+        log_container.pack(fill="both", expand=True, pady=(0, 0))
         
         ctk.CTkLabel(
             log_container, 
@@ -2494,6 +2525,9 @@ class App(ctk.CTk):
                     'document_id': document_id,
                     'status': 'Ожидает',
                     'filename': None,
+                    'csv_path': None,
+                    'pdf_path': None,
+                    'xls_path': None,
                     'simpl': order_item.simpl_name,
                     'full_name': order_item.full_name
                 }
@@ -2628,6 +2662,9 @@ class App(ctk.CTk):
             "order_name": item.get("order_name"),
             "status": item.get("status"),
             "filename": item.get("filename"),
+            "csv_path": item.get("csv_path"),
+            "pdf_path": item.get("pdf_path"),
+            "xls_path": item.get("xls_path"),
             "simpl": item.get("simpl"),
             "full_name": item.get("full_name"),
             "gtin": item.get("gtin"),
@@ -2726,6 +2763,7 @@ class App(ctk.CTk):
             if paths is None:
                 raise ValueError("download_codes вернул None (заказ не готов или ошибка подготовки)")
             
+            item['pdf_path'], item['csv_path'], item['xls_path'] = paths
             non_none_paths = [p for p in paths if p is not None]
             if non_none_paths:
                 filename = ', '.join(non_none_paths)  # Или просто paths[0] если нужен один
@@ -2777,6 +2815,9 @@ class App(ctk.CTk):
             'document_id': document_id,
             'status': 'Ожидает',
             'filename': None,
+            'csv_path': None,
+            'pdf_path': None,
+            'xls_path': None,
             'simpl': order_item.simpl_name
         }
         
@@ -2805,6 +2846,7 @@ class App(ctk.CTk):
                 item.get("filename") or ""
             )
             self.download_tree.insert("", "end", values=vals)
+        self._update_download_print_button_state()
 
     def download_history_order_manual(self, history_tree_or_document_id):
         """Ручное скачивание заказа из истории"""
@@ -2853,6 +2895,9 @@ class App(ctk.CTk):
                     "document_id": document_id,
                     "status": "Из истории",
                     "filename": order_data.get("filename"),
+                    "csv_path": order_data.get("csv_path"),
+                    "pdf_path": order_data.get("pdf_path"),
+                    "xls_path": order_data.get("xls_path"),
                     "simpl": order_data.get("simpl"),
                     "full_name": order_data.get("full_name"),
                     "gtin": order_data.get("gtin"),
@@ -2916,9 +2961,136 @@ class App(ctk.CTk):
         self.download_log_text.insert("end", f"[{timestamp}] {msg}\n")
         self.download_log_text.see("end")
 
+    def _update_download_print_button_state(self, event=None):
+        if not hasattr(self, "download_print_button") or self.download_print_button is None:
+            return
+
+        has_selection = bool(self.download_tree.selection())
+        button_state = "disabled" if self.print_in_progress or not has_selection else "normal"
+        self.download_print_button.configure(state=button_state)
+
+    def _set_print_busy(self, is_busy: bool):
+        self.print_in_progress = is_busy
+        if hasattr(self, "download_print_button") and self.download_print_button is not None:
+            self.download_print_button.configure(
+                text="Печать..." if is_busy else "Выполнить печать"
+            )
+        self._update_download_print_button_state()
+
+    def _get_selected_download_item(self) -> dict | None:
+        selected_items = self.download_tree.selection()
+        if not selected_items:
+            return None
+
+        item_values = self.download_tree.item(selected_items[0], "values")
+        if len(item_values) < 2:
+            return None
+
+        document_id = item_values[1]
+        for item in self.download_list:
+            if item.get("document_id") == document_id:
+                return item
+
+        return None
+
+    def _resolve_order_csv_path(self, item: dict) -> str | None:
+        candidate_paths = [
+            item.get("csv_path"),
+            (item.get("history_data") or {}).get("csv_path"),
+        ]
+
+        filename_value = item.get("filename") or (item.get("history_data") or {}).get("filename")
+        if filename_value:
+            for chunk in str(filename_value).split(","):
+                normalized = chunk.strip()
+                if normalized.lower().endswith(".csv"):
+                    candidate_paths.append(normalized)
+
+        for path in candidate_paths:
+            if path and os.path.exists(path):
+                return str(path)
+
+        desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+        parent_dir = os.path.join(desktop, "Коды км")
+        safe_order_name = "".join(
+            char for char in str(item.get("order_name") or item.get("document_id") or "")
+            if char.isalnum() or char in " -_"
+        ).strip()
+
+        if safe_order_name:
+            order_dir = os.path.join(parent_dir, safe_order_name[:120])
+            if os.path.isdir(order_dir):
+                csv_files = sorted(
+                    (
+                        os.path.join(order_dir, file_name)
+                        for file_name in os.listdir(order_dir)
+                        if file_name.lower().endswith(".csv")
+                    ),
+                    key=os.path.getmtime,
+                    reverse=True,
+                )
+                if csv_files:
+                    return csv_files[0]
+
+        return None
+
+    def print_selected_download_order(self):
+        selected_item = self._get_selected_download_item()
+        if not selected_item:
+            mbox.showwarning("Выбор заявки", "Сначала выберите заявку в таблице загрузок.")
+            return
+
+        csv_path = self._resolve_order_csv_path(selected_item)
+        if not csv_path:
+            mbox.showwarning(
+                "CSV не найден",
+                "Для выбранной заявки не найден CSV с кодами маркировки. Дождитесь скачивания или скачайте заказ заново."
+            )
+            return
+
+        try:
+            context = build_print_context(
+                order_name=str(selected_item.get("order_name") or ""),
+                document_id=str(selected_item.get("document_id") or ""),
+                csv_path=csv_path,
+            )
+        except BarTenderPrintError as exc:
+            mbox.showerror("Ошибка печати", str(exc))
+            return
+
+        selected_item["csv_path"] = context.csv_path
+        self._sync_history_from_download_item(selected_item)
+        self._set_print_busy(True)
+        self.download_log_insert(
+            f"🖨️ Подготовка печати: {context.order_name} | размер {context.size} | этикеток {context.label_count}"
+        )
+        self.print_executor.submit(self._print_order_worker, context)
+
+    def _print_order_worker(self, context):
+        try:
+            print_labels(context)
+            self.after(0, lambda: self._on_print_completed(True, context, "Печать отправлена в BarTender"))
+        except Exception as exc:
+            self.after(0, lambda err=str(exc): self._on_print_completed(False, context, err))
+
+    def _on_print_completed(self, success: bool, context, message: str):
+        self._set_print_busy(False)
+
+        if success:
+            self.download_log_insert(
+                f"✅ Печать запущена: {context.order_name} | CSV: {context.csv_path}"
+            )
+            if hasattr(self, "status_bar") and self.status_bar:
+                self.status_bar.configure(text=f"Печать отправлена: {context.order_name}")
+                self.after(3000, lambda: self._reset_status_bar())
+            return
+
+        self.download_log_insert(f"❌ Ошибка печати {context.order_name}: {message}")
+        mbox.showerror("Ошибка печати", message)
+
     def on_closing(self):
         self.auto_download_active = False
-        for executor in [self.download_executor, self.status_check_executor,
+        for executor in [self.download_executor, self.status_check_executor, self.print_executor,
                         self.execute_all_executor, self.intro_executor, self.intro_tsd_executor]:
             executor.shutdown(wait=False, cancel_futures=True)
         self.destroy()
@@ -3331,6 +3503,9 @@ class App(ctk.CTk):
                         "document_id": document_id,
                         "status": "Готов для ТСД",
                         "filename": order_data.get("filename"),
+                        "csv_path": order_data.get("csv_path"),
+                        "pdf_path": order_data.get("pdf_path"),
+                        "xls_path": order_data.get("xls_path"),
                         "simpl": order_data.get("simpl"),
                         "full_name": order_data.get("full_name"),
                         "gtin": order_data.get("gtin"),
@@ -3384,6 +3559,9 @@ class App(ctk.CTk):
                                 "document_id": document_id,
                                 "status": "Готов для ТСД",  # Используем тот же статус, что и для новых
                                 "filename": order_data.get("filename"),
+                                "csv_path": order_data.get("csv_path"),
+                                "pdf_path": order_data.get("pdf_path"),
+                                "xls_path": order_data.get("xls_path"),
                                 "simpl": order_data.get("simpl"),
                                 "full_name": order_data.get("full_name"),
                                 "gtin": order_data.get("gtin"),
