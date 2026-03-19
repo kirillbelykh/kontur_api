@@ -391,7 +391,18 @@ try {
         throw 'Шаблон BarTender не поддерживает сериализованные этикетки.'
     }
 
-    $format.PrintSetup.NumberOfSerializedLabels = $LabelCount
+    if ($LabelCount -lt 1) {
+        throw 'В CSV нет записей для печати.'
+    }
+
+    if ($LabelCount -eq 1) {
+        $format.PrintSetup.RecordRange = '1'
+    }
+    else {
+        $format.PrintSetup.RecordRange = ('1-' + $LabelCount)
+    }
+
+    $format.PrintSetup.NumberOfSerializedLabels = 1
 
     if ($PrintNow -eq '1') {
         [void]$format.Print($JobName, 60000)
