@@ -3,7 +3,7 @@
     {
       "order_name": "571 лат диаг XL 260316 180д",
       "document_id": "cf852fd2-236c-4e99-8352-181356d38bf5",
-      "status": "Скачан",
+      "status": "Скачивается",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\571 лат диаг XL 260316 180д\\571 лат диаг XL 260316 180д.pdf, C:\\Users\\user\\Desktop\\Коды км\\571 лат диаг XL 260316 180д\\571 лат диаг XL 260316 180д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\571 лат диаг XL 260316 180д\\571 лат диаг XL 260316 180д.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XL, цвет натуральный",
@@ -19,7 +19,7 @@
       ],
       "created_at": "2026-03-19T15:01:23.042000",
       "created_by": "user",
-      "updated_at": "2026-03-19T16:12:57.591470",
+      "updated_at": "2026-03-19T16:51:50.354485",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -5128,7 +5128,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-19T16:50:17.543309",
+  "last_update": "2026-03-19T16:51:51.964724",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
