@@ -4,6 +4,7 @@ import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence
+from urllib.parse import urlparse
 
 import requests
 
@@ -12,7 +13,9 @@ from logger import logger
 
 DEFAULT_KONTUR_BASE_URL = "https://mk.kontur.ru"
 DEFAULT_WAREHOUSE_ID = "59739360-7d62-434b-ad13-4617c87a6d13"
-DEFAULT_TRUE_API_BASE_URL = "https://markirovka.crptech.ru/api/v3/true-api"
+DEFAULT_TRUE_API_PRODUCTION_BASE_URL = "https://markirovka.crpt.ru/api/v3/true-api"
+DEFAULT_TRUE_API_SANDBOX_BASE_URL = "https://markirovka.sandbox.crptech.ru/api/v3/true-api"
+DEFAULT_TRUE_API_BASE_URL = DEFAULT_TRUE_API_PRODUCTION_BASE_URL
 DEFAULT_TRUE_API_PRODUCT_GROUP = "wheelchairs"
 DEFAULT_KONTUR_PRODUCT_GROUP = "wheelChairs"
 
@@ -56,6 +59,52 @@ def _status_counts(states: Sequence["CodeState"]) -> str:
         key = state.status or "UNKNOWN"
         counts[key] = counts.get(key, 0) + 1
     return ", ".join(f"{status}: {count}" for status, count in sorted(counts.items()))
+
+
+def _preview_items(items: Sequence[str], limit: int = 5) -> str:
+    prepared = [str(item).strip() for item in items if str(item).strip()]
+    if not prepared:
+        return "-"
+    if len(prepared) <= limit:
+        return ", ".join(prepared)
+    return ", ".join(prepared[:limit]) + f" ... (+{len(prepared) - limit})"
+
+
+def _parse_env_bool(value: Optional[str]) -> Optional[bool]:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+    return None
+
+
+def _resolve_true_api_base_url(explicit_base_url: Optional[str]) -> tuple[str, str]:
+    explicit = str(explicit_base_url or "").strip()
+    if explicit:
+        return explicit.rstrip("/"), "argument"
+
+    env_base_url = str(os.getenv("TRUE_API_BASE_URL") or "").strip()
+    if env_base_url:
+        return env_base_url.rstrip("/"), "env:TRUE_API_BASE_URL"
+
+    for env_name in ("TRUE_API_SANDBOX", "CRPT_SANDBOX"):
+        env_value = os.getenv(env_name)
+        parsed = _parse_env_bool(env_value)
+        if parsed is True:
+            return DEFAULT_TRUE_API_SANDBOX_BASE_URL, f"default sandbox via {env_name}"
+        if parsed is False:
+            return DEFAULT_TRUE_API_PRODUCTION_BASE_URL, f"default production via {env_name}"
+        if env_value:
+            logger.warning(
+                "Переменная окружения %s=%r не распознана как bool, используем production True API",
+                env_name,
+                env_value,
+            )
+
+    return DEFAULT_TRUE_API_PRODUCTION_BASE_URL, "default production"
 
 
 @dataclass(frozen=True)
@@ -118,6 +167,10 @@ class BulkAggregationSummary:
         ]
 
 
+class TrueApiConnectivityError(RuntimeError):
+    """Сетевая недоступность True API, при которой продолжать прогон бессмысленно."""
+
+
 class BulkAggregationService:
     def __init__(
         self,
@@ -139,9 +192,9 @@ class BulkAggregationService:
             kontur_base_url or os.getenv("BASE_URL", DEFAULT_KONTUR_BASE_URL)
         ).rstrip("/")
         self.warehouse_id = warehouse_id or os.getenv("WAREHOUSE_ID", DEFAULT_WAREHOUSE_ID)
-        self.true_api_base_url = (
-            true_api_base_url or os.getenv("TRUE_API_BASE_URL", DEFAULT_TRUE_API_BASE_URL)
-        ).rstrip("/")
+        self.true_api_base_url, self.true_api_base_url_source = _resolve_true_api_base_url(
+            true_api_base_url
+        )
         self.true_api_info_base_url = self._build_info_base_url(self.true_api_base_url)
         self.true_api_product_group = (
             true_api_product_group
@@ -157,6 +210,17 @@ class BulkAggregationService:
         self.true_api_session = true_api_session or requests.Session()
         self._true_api_token: Optional[str] = None
         self._true_api_token_expires_at = 0.0
+        logger.info(
+            "BulkAggregationService инициализирован: kontur_base_url=%s, warehouse_id=%s, true_api_base_url=%s, true_api_info_base_url=%s, true_api_base_url_source=%s, page_size=%s, batch_size=%s",
+            self.kontur_base_url,
+            self.warehouse_id,
+            self.true_api_base_url,
+            self.true_api_info_base_url,
+            self.true_api_base_url_source,
+            self.page_size,
+            self.batch_size,
+        )
+        self._warn_if_true_api_base_url_looks_suspicious()
 
     def run(
         self,
@@ -174,6 +238,11 @@ class BulkAggregationService:
         if not cert:
             raise RuntimeError("Сертификат для подписи не найден")
 
+        logger.info(
+            "Запуск массового проведения АК: comment_filter=%r, true_api_base_url=%s",
+            comment_filter,
+            self.true_api_base_url,
+        )
         log = log_callback or (lambda message: None)
         progress = progress_callback or (lambda processed, total: None)
         confirm = confirm_callback or (lambda title, message: False)
@@ -183,9 +252,21 @@ class BulkAggregationService:
             comment_filter=comment_filter,
         )
         summary.ready_found = len(ready_aggregates)
+        logger.info(
+            "Для проведения найдено readyForSend АК: %s",
+            summary.ready_found,
+        )
 
         for aggregate in ready_aggregates:
             summary.processed += 1
+            logger.info(
+                "Обработка АК %s (%s/%s), document_id=%s, comment=%r",
+                aggregate.aggregate_code,
+                summary.processed,
+                summary.ready_found,
+                aggregate.document_id,
+                aggregate.comment,
+            )
             progress(summary.processed, summary.ready_found or summary.processed)
             try:
                 self._process_aggregate(
@@ -198,12 +279,30 @@ class BulkAggregationService:
                     confirm=confirm,
                     summary=summary,
                 )
+            except TrueApiConnectivityError as exc:
+                summary.errors += 1
+                logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
+                log(f"❌ {aggregate.aggregate_code}: {exc}")
+                log("⛔ Проведение остановлено: True API недоступен, повторите позже")
+                break
             except Exception as exc:
                 summary.errors += 1
                 logger.exception("Ошибка массового проведения АК %s", aggregate.aggregate_code)
                 log(f"❌ {aggregate.aggregate_code}: {exc}")
 
         progress(summary.ready_found or summary.processed, summary.ready_found or summary.processed or 1)
+        logger.info(
+            "Массовое проведение АК завершено: ready_found=%s, processed=%s, sent_for_approve=%s, skipped_due_to_status=%s, skipped_empty=%s, skipped_not_ready=%s, skipped_unsupported=%s, disaggregated=%s, errors=%s",
+            summary.ready_found,
+            summary.processed,
+            summary.sent_for_approve,
+            summary.skipped_due_to_status,
+            summary.skipped_empty,
+            summary.skipped_not_ready,
+            summary.skipped_unsupported,
+            summary.disaggregated_parents,
+            summary.errors,
+        )
         return summary
 
     def list_ready_aggregates(
@@ -215,13 +314,19 @@ class BulkAggregationService:
         matched: List[AggregateInfo] = []
         normalized_filter = self._normalize_comment_filter(comment_filter)
         offset = 0
+        logger.info(
+            "Начинаем загрузку readyForSend АК из Контур.Маркировки: comment_filter=%r",
+            normalized_filter,
+        )
 
         while True:
             aggregates, total = self.fetch_ready_aggregates_page(kontur_session, offset)
             page_size = len(aggregates)
             if not aggregates:
+                logger.info("Страница АК offset=%s пустая, завершаем загрузку", offset)
                 break
 
+            page_aggregates = aggregates
             if normalized_filter:
                 aggregates = [
                     aggregate
@@ -230,12 +335,27 @@ class BulkAggregationService:
                 ]
 
             matched.extend(aggregates)
+            logger.info(
+                "Загружена страница АК: offset=%s, total=%s, page_size=%s, matched_after_filter=%s",
+                offset,
+                total,
+                page_size,
+                len(aggregates),
+            )
+            if normalized_filter and len(aggregates) != len(page_aggregates):
+                logger.info(
+                    "Фильтр comment_filter=%r отбросил %s АК на странице offset=%s",
+                    normalized_filter,
+                    len(page_aggregates) - len(aggregates),
+                    offset,
+                )
             offset += page_size
             if total and offset >= total:
                 break
             if page_size < self.page_size:
                 break
 
+        logger.info("Загрузка readyForSend АК завершена: matched=%s", len(matched))
         return matched
 
     def fetch_ready_aggregates_page(
@@ -287,14 +407,34 @@ class BulkAggregationService:
         summary: BulkAggregationSummary,
     ) -> None:
         log(f"▶️ Проверяем АК {aggregate.aggregate_code} ({aggregate.comment or 'без названия'})")
+        logger.info(
+            "АК %s: старт обработки, document_id=%s, product_group=%s, comment=%r",
+            aggregate.aggregate_code,
+            aggregate.document_id,
+            aggregate.product_group,
+            aggregate.comment,
+        )
 
         detail = self.fetch_aggregate_detail(kontur_session, aggregate.document_id)
+        logger.info(
+            "АК %s: получены детали, status=%s, includes_units_count=%s, codes_check_errors_count=%s",
+            aggregate.aggregate_code,
+            detail.status,
+            detail.includes_units_count,
+            detail.codes_check_errors_count,
+        )
         if detail.status != "readyForSend":
             summary.skipped_not_ready += 1
             log(f"⏭️ {aggregate.aggregate_code}: статус уже изменился на {detail.status}")
             return
 
         raw_codes, reaggregation_codes = self.fetch_aggregate_codes(kontur_session, aggregate.document_id)
+        logger.info(
+            "АК %s: загружены коды, km_count=%s, nested_ak_count=%s",
+            aggregate.aggregate_code,
+            len(raw_codes),
+            len(reaggregation_codes),
+        )
         if reaggregation_codes:
             summary.skipped_unsupported += 1
             log(
@@ -309,6 +449,12 @@ class BulkAggregationService:
             return
 
         log(f"• {aggregate.aggregate_code}: найдено КМ {len(raw_codes)}")
+        logger.info(
+            "АК %s: запрашиваем статусы КМ в True API, product_group=%s, codes=%s",
+            aggregate.aggregate_code,
+            self._resolve_true_product_group(aggregate.product_group),
+            len(raw_codes),
+        )
         states = self.fetch_code_states(
             cert=cert,
             sign_text_func=sign_text_func,
@@ -317,6 +463,21 @@ class BulkAggregationService:
         )
 
         errored = [state for state in states if state.api_error]
+        foreign_parents = sorted({
+            (state.parent or "").strip()
+            for state in states
+            if state.parent and state.parent.strip() and state.parent.strip() != aggregate.aggregate_code
+        })
+        not_introduced = [state for state in states if state.status != "INTRODUCED"]
+        logger.info(
+            "АК %s: статусы КМ получены, total=%s, statuses=%s, api_errors=%s, not_introduced=%s, foreign_parents=%s",
+            aggregate.aggregate_code,
+            len(states),
+            _status_counts(states),
+            len(errored),
+            len(not_introduced),
+            _preview_items(foreign_parents),
+        )
         if errored:
             raise RuntimeError(
                 "True API вернул ошибки по кодам: "
@@ -326,18 +487,16 @@ class BulkAggregationService:
                 )
             )
 
-        foreign_parents = sorted({
-            (state.parent or "").strip()
-            for state in states
-            if state.parent and state.parent.strip() and state.parent.strip() != aggregate.aggregate_code
-        })
-        not_introduced = [state for state in states if state.status != "INTRODUCED"]
-
         if not_introduced:
             summary.skipped_due_to_status += 1
             log(
                 f"⏭️ {aggregate.aggregate_code}: КМ не готовы к проведению "
                 f"({_status_counts(not_introduced)})"
+            )
+            logger.info(
+                "АК %s: пропускаем из-за статусов КМ %s",
+                aggregate.aggregate_code,
+                _status_counts(not_introduced),
             )
             if foreign_parents:
                 message = (
@@ -348,6 +507,11 @@ class BulkAggregationService:
                     f"Текущий АК всё равно будет пропущен до следующего запуска."
                 )
                 if confirm("Расформировать чужие АК", message):
+                    logger.info(
+                        "АК %s: пользователь подтвердил расформирование чужих АК: %s",
+                        aggregate.aggregate_code,
+                        _preview_items(foreign_parents),
+                    )
                     participant_inn = self.resolve_participant_inn(
                         kontur_session=kontur_session,
                         aggregate=aggregate,
@@ -364,10 +528,20 @@ class BulkAggregationService:
                     summary.disaggregated_parent_codes.update(disaggregated)
                     log(f"ℹ️ {aggregate.aggregate_code}: текущий АК пропущен, повторите запуск позже")
                 else:
+                    logger.info(
+                        "АК %s: пользователь отменил расформирование чужих АК: %s",
+                        aggregate.aggregate_code,
+                        _preview_items(foreign_parents),
+                    )
                     log(f"ℹ️ {aggregate.aggregate_code}: расформирование отменено пользователем")
             return
 
         if foreign_parents:
+            logger.info(
+                "АК %s: обнаружены чужие родительские АК, начинаем расформирование: %s",
+                aggregate.aggregate_code,
+                _preview_items(foreign_parents),
+            )
             participant_inn = self.resolve_participant_inn(
                 kontur_session=kontur_session,
                 aggregate=aggregate,
@@ -391,6 +565,7 @@ class BulkAggregationService:
                 log=log,
             )
 
+        logger.info("АК %s: отправляем в Контур на подпись", aggregate.aggregate_code)
         final_detail = self.send_aggregate_for_approve(
             kontur_session=kontur_session,
             aggregate=aggregate,
@@ -398,6 +573,11 @@ class BulkAggregationService:
             sign_base64_func=sign_base64_func,
         )
         summary.sent_for_approve += 1
+        logger.info(
+            "АК %s: успешно отправлен на подпись, final_status=%s",
+            aggregate.aggregate_code,
+            final_detail.status,
+        )
         log(
             f"✅ {aggregate.aggregate_code}: отправлен в Контур на подпись, "
             f"текущий статус {final_detail.status}"
@@ -458,10 +638,24 @@ class BulkAggregationService:
         normalized = [extract_sntin(code) for code in raw_codes]
         unique_codes = list(dict.fromkeys(normalized))
         by_sntin: Dict[str, Dict[str, Any]] = {}
+        total_chunks = len(_chunks(unique_codes, self.batch_size))
+        logger.info(
+            "True API: начинаем получение статусов КМ, product_group=%s, raw_codes=%s, unique_codes=%s, chunks=%s",
+            product_group,
+            len(raw_codes),
+            len(unique_codes),
+            total_chunks,
+        )
 
-        for chunk in _chunks(unique_codes, self.batch_size):
+        for chunk_index, chunk in enumerate(_chunks(unique_codes, self.batch_size), start=1):
+            logger.info(
+                "True API: обрабатываем chunk %s/%s для статусов КМ, chunk_size=%s",
+                chunk_index,
+                total_chunks,
+                len(chunk),
+            )
             token = self.get_true_api_token(cert, sign_text_func)
-            response = self.true_api_session.post(
+            response = self._true_api_post(
                 f"{self.true_api_base_url}/cises/short/list",
                 params={"pg": product_group},
                 headers={
@@ -476,6 +670,12 @@ class BulkAggregationService:
             items = response.json()
             if not isinstance(items, list):
                 raise RuntimeError("Некорректный ответ True API при получении статусов КМ")
+            logger.info(
+                "True API: chunk %s/%s обработан, result_items=%s",
+                chunk_index,
+                total_chunks,
+                len(items),
+            )
             for item in items:
                 result = item.get("result") if isinstance(item, dict) and isinstance(item.get("result"), dict) else item
                 if not isinstance(result, dict):
@@ -510,6 +710,12 @@ class BulkAggregationService:
                     api_error=self._extract_result_error(result),
                 )
             )
+        logger.info(
+            "True API: получение статусов КМ завершено, total_states=%s, statuses=%s, api_errors=%s",
+            len(states),
+            _status_counts(states),
+            sum(1 for state in states if state.api_error),
+        )
         return states
 
     def get_true_api_token(
@@ -519,16 +725,18 @@ class BulkAggregationService:
     ) -> str:
         now = time.monotonic()
         if self._true_api_token and now < self._true_api_token_expires_at:
+            logger.debug("True API: используем закешированный bearer token")
             return self._true_api_token
 
-        auth_key_response = self.true_api_session.get(
+        logger.info("True API: запрашиваем новый bearer token")
+        auth_key_response = self._true_api_get(
             f"{self.true_api_base_url}/auth/key",
             timeout=15,
         )
         auth_key_response.raise_for_status()
         auth_key = auth_key_response.json()
         signature = sign_text_func(cert, str(auth_key["data"]), False)
-        token_response = self.true_api_session.post(
+        token_response = self._true_api_post(
             f"{self.true_api_base_url}/auth/simpleSignIn",
             json={
                 "uuid": auth_key["uuid"],
@@ -547,6 +755,7 @@ class BulkAggregationService:
             raise RuntimeError("True API не вернул bearer token")
         self._true_api_token = str(token)
         self._true_api_token_expires_at = now + 8 * 60 * 60
+        logger.info("True API: новый bearer token успешно получен")
         return self._true_api_token
 
     def resolve_participant_inn(
@@ -558,6 +767,11 @@ class BulkAggregationService:
     ) -> str:
         sign_content = self.fetch_content_for_sign(kontur_session, aggregate.document_id)
         if sign_content.participant_id:
+            logger.info(
+                "АК %s: participantId определён из content-for-sign: %s",
+                aggregate.aggregate_code,
+                sign_content.participant_id,
+            )
             return sign_content.participant_id
 
         owner_inns = sorted({
@@ -566,6 +780,11 @@ class BulkAggregationService:
             if state.owner_inn
         })
         if len(owner_inns) == 1:
+            logger.info(
+                "АК %s: participantId определён по ownerInn кодов: %s",
+                aggregate.aggregate_code,
+                owner_inns[0],
+            )
             return owner_inns[0]
 
         raise RuntimeError(
@@ -591,6 +810,12 @@ class BulkAggregationService:
         participant_id = self._clean_optional_string(
             data.get("participantId") or data.get("participant_inn")
         )
+        logger.info(
+            "Контур: получен content-for-sign для document_id=%s, participant_id=%s, aggregation_units=%s",
+            document_id,
+            participant_id or "-",
+            len(data.get("aggregationUnits") or []),
+        )
         return KonturSignContent(
             document_id=str(payload.get("documentId") or document_id),
             base64_content=base64_content,
@@ -609,6 +834,12 @@ class BulkAggregationService:
         log: Callable[[str], None],
     ) -> List[str]:
         disaggregated: List[str] = []
+        logger.info(
+            "True API: начинаем расформирование чужих АК, participant_inn=%s, parent_count=%s, parents=%s",
+            participant_inn,
+            len(dict.fromkeys(parent_codes)),
+            _preview_items(parent_codes),
+        )
         for parent_code in dict.fromkeys(parent_codes):
             document_body = {
                 "participant_inn": participant_inn,
@@ -646,7 +877,13 @@ class BulkAggregationService:
         token = self.get_true_api_token(cert, sign_text_func)
         serialized = self._serialize_document(document_body)
         signature = sign_text_func(cert, serialized, True)
-        response = self.true_api_session.post(
+        logger.info(
+            "True API: создаём документ, type=%s, product_group=%s, body_keys=%s",
+            document_type,
+            product_group,
+            sorted(document_body.keys()),
+        )
+        response = self._true_api_post(
             f"{self.true_api_base_url}/lk/documents/create",
             params={"pg": product_group},
             headers={
@@ -671,6 +908,11 @@ class BulkAggregationService:
         )
         if not document_id:
             raise RuntimeError(f"True API не вернул document id для {document_type}")
+        logger.info(
+            "True API: документ создан, type=%s, document_id=%s",
+            document_type,
+            document_id,
+        )
         return str(document_id)
 
     def wait_true_api_document(
@@ -683,10 +925,17 @@ class BulkAggregationService:
     ) -> Dict[str, Any]:
         deadline = time.monotonic() + self.document_timeout_seconds
         last_status = ""
+        last_logged_status = ""
         last_payload: Dict[str, Any] = {}
+        logger.info(
+            "True API: ожидаем обработки документа document_id=%s, product_group=%s, timeout=%ss",
+            document_id,
+            product_group,
+            self.document_timeout_seconds,
+        )
         while time.monotonic() <= deadline:
             token = self.get_true_api_token(cert, sign_text_func)
-            response = self.true_api_session.get(
+            response = self._true_api_get(
                 f"{self.true_api_info_base_url}/doc/{document_id}/info",
                 params={"pg": product_group},
                 headers={
@@ -696,7 +945,7 @@ class BulkAggregationService:
                 timeout=30,
             )
             if response.status_code == 404 and self.true_api_info_base_url != self.true_api_base_url:
-                response = self.true_api_session.get(
+                response = self._true_api_get(
                     f"{self.true_api_base_url}/doc/{document_id}/info",
                     params={"pg": product_group},
                     headers={
@@ -716,6 +965,13 @@ class BulkAggregationService:
                 or last_payload.get("statusCode")
                 or ""
             ).upper()
+            if last_status != last_logged_status:
+                logger.info(
+                    "True API: документ %s сменил статус на %s",
+                    document_id,
+                    last_status or "UNKNOWN",
+                )
+                last_logged_status = last_status
             if last_status == "CHECKED_OK":
                 return last_payload
             if (
@@ -744,6 +1000,13 @@ class BulkAggregationService:
         log: Callable[[str], None],
     ) -> None:
         deadline = time.monotonic() + self.parent_clear_timeout_seconds
+        last_foreign_parents: Optional[List[str]] = None
+        logger.info(
+            "True API: ожидаем отвязки КМ от чужих АК, current_aggregate_code=%s, product_group=%s, timeout=%ss",
+            current_aggregate_code,
+            product_group,
+            self.parent_clear_timeout_seconds,
+        )
         while time.monotonic() <= deadline:
             states = self.fetch_code_states(
                 cert=cert,
@@ -756,6 +1019,13 @@ class BulkAggregationService:
                 for state in states
                 if state.parent and state.parent.strip() and state.parent.strip() != current_aggregate_code
             })
+            if last_foreign_parents != foreign_parents:
+                logger.info(
+                    "True API: статус отвязки для АК %s, remaining_foreign_parents=%s",
+                    current_aggregate_code,
+                    _preview_items(foreign_parents),
+                )
+                last_foreign_parents = list(foreign_parents)
             if not foreign_parents:
                 log("✅ КМ успешно отвязаны от чужих АК")
                 return
@@ -782,6 +1052,11 @@ class BulkAggregationService:
 
         sign_content = self.fetch_content_for_sign(kontur_session, aggregate.document_id)
         signature = sign_base64_func(cert, sign_content.base64_content, True)
+        logger.info(
+            "Контур: отправляем АК %s в send, document_id=%s",
+            aggregate.aggregate_code,
+            aggregate.document_id,
+        )
         response = kontur_session.post(
             f"{self.kontur_base_url}/api/v1/aggregates/{aggregate.document_id}/send",
             json={"signedContent": signature},
@@ -791,8 +1066,17 @@ class BulkAggregationService:
 
         deadline = time.monotonic() + self.kontur_send_timeout_seconds
         last_detail = detail
+        last_status = detail.status
         while time.monotonic() <= deadline:
             last_detail = self.fetch_aggregate_detail(kontur_session, aggregate.document_id)
+            if last_detail.status != last_status:
+                logger.info(
+                    "Контур: АК %s сменил статус %s -> %s после send",
+                    aggregate.aggregate_code,
+                    last_status,
+                    last_detail.status,
+                )
+                last_status = last_detail.status
             if last_detail.status in {"approved", "sentForApprove"}:
                 return last_detail
             if last_detail.status not in {"readyForSend", "returnedToTsd"}:
@@ -814,6 +1098,133 @@ class BulkAggregationService:
             separators=(",", ":"),
             sort_keys=True,
         )
+
+    def _true_api_get(self, url: str, **kwargs) -> requests.Response:
+        try:
+            return self.true_api_session.get(url, **kwargs)
+        except requests.Timeout as exc:
+            logger.warning(
+                "True API GET timeout: host=%s, path=%s, timeout=%s",
+                self._extract_host(url),
+                urlparse(url).path,
+                kwargs.get("timeout"),
+            )
+            raise TrueApiConnectivityError(
+                f"True API ({self._extract_host(url)}) не ответил вовремя"
+            ) from exc
+        except requests.exceptions.SSLError as exc:
+            logger.warning(
+                "True API GET SSL error: host=%s, path=%s, details=%s",
+                self._extract_host(url),
+                urlparse(url).path,
+                exc,
+            )
+            raise TrueApiConnectivityError(
+                self._format_true_api_ssl_error(url)
+            ) from exc
+        except requests.ConnectionError as exc:
+            logger.warning(
+                "True API GET connection error: host=%s, path=%s, details=%s",
+                self._extract_host(url),
+                urlparse(url).path,
+                exc,
+            )
+            raise TrueApiConnectivityError(
+                self._format_true_api_connection_error(url, exc)
+            ) from exc
+
+    def _true_api_post(self, url: str, **kwargs) -> requests.Response:
+        try:
+            return self.true_api_session.post(url, **kwargs)
+        except requests.Timeout as exc:
+            logger.warning(
+                "True API POST timeout: host=%s, path=%s, timeout=%s",
+                self._extract_host(url),
+                urlparse(url).path,
+                kwargs.get("timeout"),
+            )
+            raise TrueApiConnectivityError(
+                f"True API ({self._extract_host(url)}) не ответил вовремя"
+            ) from exc
+        except requests.exceptions.SSLError as exc:
+            logger.warning(
+                "True API POST SSL error: host=%s, path=%s, details=%s",
+                self._extract_host(url),
+                urlparse(url).path,
+                exc,
+            )
+            raise TrueApiConnectivityError(
+                self._format_true_api_ssl_error(url)
+            ) from exc
+        except requests.ConnectionError as exc:
+            logger.warning(
+                "True API POST connection error: host=%s, path=%s, details=%s",
+                self._extract_host(url),
+                urlparse(url).path,
+                exc,
+            )
+            raise TrueApiConnectivityError(
+                self._format_true_api_connection_error(url, exc)
+            ) from exc
+
+    @staticmethod
+    def _extract_host(url: str) -> str:
+        return urlparse(url).netloc or "True API"
+
+    def _format_true_api_connection_error(
+        self,
+        url: str,
+        exc: requests.ConnectionError,
+    ) -> str:
+        host = self._extract_host(url)
+        details = str(exc)
+        hint = self._true_api_host_hint(host)
+        if (
+            "NameResolutionError" in details
+            or "Failed to resolve" in details
+            or "getaddrinfo failed" in details
+        ):
+            return (
+                f"Не удалось подключиться к True API ({host}): DNS-имя не разрешается. "
+                f"Проверьте интернет, DNS/VPN или доступ к домену {host}.{hint}"
+            )
+        return (
+            f"Не удалось подключиться к True API ({host}). "
+            f"Проверьте интернет, VPN, прокси или доступ к домену.{hint}"
+        )
+
+    def _format_true_api_ssl_error(self, url: str) -> str:
+        host = self._extract_host(url)
+        return (
+            f"Не удалось установить TLS-соединение с True API ({host}). "
+            f"Проверьте корректность хоста, VPN/прокси и сертификаты.{self._true_api_host_hint(host)}"
+        )
+
+    @staticmethod
+    def _true_api_host_hint(host: str) -> str:
+        if host.endswith(".crptech.ru") and "sandbox" not in host:
+            return (
+                " Для production используйте "
+                f"{DEFAULT_TRUE_API_PRODUCTION_BASE_URL}, а для sandbox - "
+                f"{DEFAULT_TRUE_API_SANDBOX_BASE_URL}"
+            )
+        if host == "markirovka.sandbox.crpt.ru":
+            return (
+                " Для sandbox используйте "
+                f"{DEFAULT_TRUE_API_SANDBOX_BASE_URL}"
+            )
+        return ""
+
+    def _warn_if_true_api_base_url_looks_suspicious(self) -> None:
+        host = self._extract_host(self.true_api_base_url)
+        hint = self._true_api_host_hint(host)
+        if hint:
+            logger.warning(
+                "True API base URL выглядит подозрительно: %s (source=%s).%s",
+                self.true_api_base_url,
+                self.true_api_base_url_source,
+                hint,
+            )
 
     @staticmethod
     def _build_info_base_url(base_url: str) -> str:

@@ -1,7 +1,9 @@
 import base64
 import json
+import os
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import requests
 
@@ -50,7 +52,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         return BulkAggregationService(
             kontur_base_url="https://mk.kontur.ru",
             warehouse_id="warehouse-1",
-            true_api_base_url="https://markirovka.crptech.ru/api/v3/true-api",
+            true_api_base_url="https://markirovka.crpt.ru/api/v3/true-api",
             true_api_product_group="wheelchairs",
             page_size=2,
             batch_size=1000,
@@ -61,6 +63,33 @@ class BulkAggregationServiceTests(unittest.TestCase):
             sleep_func=lambda seconds: None,
             true_api_session=true_api_session,
         )
+
+    def test_uses_production_true_api_host_by_default(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("TRUE_API_BASE_URL", None)
+            os.environ.pop("TRUE_API_SANDBOX", None)
+            os.environ.pop("CRPT_SANDBOX", None)
+            service = BulkAggregationService(
+                kontur_base_url="https://mk.kontur.ru",
+                warehouse_id="warehouse-1",
+                true_api_session=SimpleNamespace(get=lambda *args, **kwargs: None, post=lambda *args, **kwargs: None),
+            )
+
+        self.assertEqual(service.true_api_base_url, "https://markirovka.crpt.ru/api/v3/true-api")
+        self.assertEqual(service.true_api_info_base_url, "https://markirovka.crpt.ru/api/v4/true-api")
+
+    def test_uses_sandbox_true_api_host_when_crpt_sandbox_enabled(self):
+        with patch.dict(os.environ, {"CRPT_SANDBOX": "true"}, clear=False):
+            os.environ.pop("TRUE_API_BASE_URL", None)
+            os.environ.pop("TRUE_API_SANDBOX", None)
+            service = BulkAggregationService(
+                kontur_base_url="https://mk.kontur.ru",
+                warehouse_id="warehouse-1",
+                true_api_session=SimpleNamespace(get=lambda *args, **kwargs: None, post=lambda *args, **kwargs: None),
+            )
+
+        self.assertEqual(service.true_api_base_url, "https://markirovka.sandbox.crptech.ru/api/v3/true-api")
+        self.assertEqual(service.true_api_info_base_url, "https://markirovka.sandbox.crptech.ru/api/v4/true-api")
 
     def test_paginates_ready_aggregates(self):
         kontur_state = {"send_called": False}
@@ -170,6 +199,73 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertEqual(summary.processed, 1)
         self.assertEqual(summary.skipped_empty, 1)
         self.assertEqual(requested_docs, ["doc-1"])
+
+    def test_stops_run_when_true_api_is_unreachable(self):
+        log_messages = []
+        true_post_calls = {"count": 0}
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                return FakeResponse(json_data={
+                    "items": [
+                        {
+                            "documentId": "doc-1",
+                            "aggregateCode": "AK-1",
+                            "status": "readyForSend",
+                            "productGroup": "wheelChairs",
+                        },
+                        {
+                            "documentId": "doc-2",
+                            "aggregateCode": "AK-2",
+                            "status": "readyForSend",
+                            "productGroup": "wheelChairs",
+                        },
+                    ],
+                    "total": 2,
+                })
+            if path.endswith("/codes"):
+                return FakeResponse(json_data={
+                    "aggregateCodes": [{"ttisCode": "01046501180412952156bej,nSIQ*?="}],
+                    "reaggregationCodes": [],
+                })
+            if path.startswith("/api/v1/aggregates/"):
+                document_id = path.rsplit("/", 1)[-1]
+                return FakeResponse(json_data={
+                    "documentId": document_id,
+                    "aggregateCode": document_id.replace("doc", "AK"),
+                    "status": "readyForSend",
+                    "productGroup": "wheelChairs",
+                })
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                raise requests.ConnectionError(
+                    "HTTPSConnectionPool(host='markirovka.crpt.ru', port=443): "
+                    "Caused by NameResolutionError(\"Failed to resolve\")"
+                )
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            true_post_calls["count"] += 1
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        summary = service.run(
+            kontur_session=SimpleNamespace(get=kontur_get, post=lambda *args, **kwargs: FakeResponse(json_data={"ok": True})),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "unused",
+            sign_text_func=lambda cert, data, detached: "unused",
+            log_callback=log_messages.append,
+        )
+
+        self.assertEqual(summary.ready_found, 2)
+        self.assertEqual(summary.processed, 1)
+        self.assertEqual(summary.errors, 1)
+        self.assertEqual(true_post_calls["count"], 0)
+        self.assertTrue(any("DNS-имя не разрешается" in message for message in log_messages))
+        self.assertTrue(any("Проведение остановлено" in message for message in log_messages))
 
     def test_introduced_foreign_parent_disaggregates_then_sends_kontur(self):
         raw_codes = [
