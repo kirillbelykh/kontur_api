@@ -22,7 +22,12 @@ from queue_utils import (
 )
 from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
-from bartender_print import BarTenderPrintError, build_print_context, print_labels
+from bartender_print import (
+    BarTenderPrintError,
+    build_print_context,
+    list_installed_printers,
+    print_labels,
+)
 from bartender_label_100x180 import (
     AGGREGATION_SOURCE_KIND,
     AggregationCsvInfo,
@@ -60,6 +65,7 @@ CIS_TYPE = os.getenv("CIS_TYPE")
 FILLING_METHOD = os.getenv("FILLING_METHOD")  
 THUMBPRINT = get_thumbprint()
 NOMENCLATURE_XLSX = "data/nomenclature.xlsx"
+LABEL_PRINT_REFRESH_CACHE_SECONDS = 30
 
 # -----------------------------
 # Data container
@@ -374,6 +380,10 @@ class App(ctk.CTk):
         self.agg_tabview = None
         self.agg_progress = None
         self.agg_log_text = None
+        self.download_printer_combo = None
+        self.download_printer_refresh_button = None
+        self.download_printer_names: list[str] = []
+        self.download_default_printer_name = None
 
         # Атрибуты для печати этикеток 100x180
         self.label_print_agg_tree = None
@@ -388,6 +398,15 @@ class App(ctk.CTk):
         self.label_print_source_hint_label = None
         self.label_print_templates_frame = None
         self.label_print_selected_template_path = None
+        self.label_print_printer_combo = None
+        self.label_print_printer_refresh_button = None
+        self.label_print_printer_names: list[str] = []
+        self.label_print_default_printer_name = None
+        self.label_print_order_metadata_cache: dict[str, Any] = {}
+        self.label_print_order_display_cache: dict[str, dict[str, str]] = {}
+        self.label_print_refresh_in_progress = False
+        self.label_print_data_loaded = False
+        self.label_print_last_refresh_at = 0.0
         self.label_print_template_cards = {}
         self.label_print_templates: list[LabelTemplateInfo] = []
         self.label_print_aggregation_files: list[AggregationCsvInfo] = []
@@ -405,6 +424,7 @@ class App(ctk.CTk):
         self.connection_indicator = None
         self.nav_buttons = {}
         self.content_frames = {}
+        self.active_content_frame = "create"
         
         # Атрибут для управления полноэкранным режимом
         self.is_fullscreen = True
@@ -430,7 +450,7 @@ class App(ctk.CTk):
         """Создание современной боковой панели с улучшенным дизайном"""
         self.sidebar_frame = ctk.CTkFrame(
             self.main_container, 
-            width=280,
+            width=292,
             corner_radius=0,
             fg_color=self._get_color("bg_secondary")
         )
@@ -495,24 +515,23 @@ class App(ctk.CTk):
         
         # Современные иконки и названия разделов
         nav_items = [
-            ("create", "📋 Заказ кодов", self.show_create_frame),
-            ("download", "⏬ Загрузка кодов", self.show_download_frame),
-            ("intro", "🔄 Ввод в оборот", self.show_intro_frame),
-            ("intro_tsd", "📲 Задание на ТСД", self.show_intro_tsd_frame),
-            ("aggregation", "📦 Коды агрегации", self.show_aggregation_frame),
-            ("label_print", "🖨️ Печать этикеток", self.show_label_print_frame),
+            ("create", "КМ", "Заказ кодов", self.show_create_frame),
+            ("download", "ЗК", "Загрузка кодов", self.show_download_frame),
+            ("intro", "ВО", "Ввод в оборот", self.show_intro_frame),
+            ("intro_tsd", "ТС", "Задание на ТСД", self.show_intro_tsd_frame),
+            ("aggregation", "АК", "Коды агрегации", self.show_aggregation_frame),
+            ("label_print", "ПЭ", "Печать этикеток", self.show_label_print_frame),
         ]
         
         nav_font = ctk.CTkFont(family="Segoe UI", size=13, weight="normal")
         nav_font_bold = ctk.CTkFont(family="Segoe UI", size=13, weight="bold")
+        nav_icon_font = ctk.CTkFont(family="Segoe UI", size=10, weight="bold")
         
-        for nav_id, text, command in nav_items:
-            # Контейнер для кнопки навигации
-            nav_item_frame = ctk.CTkFrame(nav_frame, fg_color="transparent", height=48)
-            nav_item_frame.pack(fill="x", pady=2)
+        for nav_id, icon, title, command in nav_items:
+            nav_item_frame = ctk.CTkFrame(nav_frame, fg_color="transparent", height=52)
+            nav_item_frame.pack(fill="x", pady=3)
             nav_item_frame.pack_propagate(False)
             
-            # Индикатор активного состояния (изначально скрыт)
             active_indicator = ctk.CTkFrame(
                 nav_item_frame, 
                 width=4, 
@@ -521,29 +540,56 @@ class App(ctk.CTk):
             )
             active_indicator.pack(side="left", fill="y", padx=(2, 0))
             
-            # Кнопка навигации
-            btn = ctk.CTkButton(
+            card = ctk.CTkFrame(
                 nav_item_frame,
-                text=text,
-                command=command,
-                anchor="w",
-                height=44,
-                font=nav_font,
+                height=48,
+                corner_radius=12,
                 fg_color="transparent",
-                hover_color=self._get_color("secondary"),
-                text_color=self._get_color("text_primary"),
-                corner_radius=8,
-                border_spacing=15
+                border_width=1,
+                border_color="transparent",
             )
-            btn.pack(side="left", fill="x", expand=True, padx=(8, 0))
+            card.pack(side="left", fill="x", expand=True, padx=(10, 0))
+            card.pack_propagate(False)
+            card.grid_columnconfigure(0, minsize=36)
+            card.grid_columnconfigure(1, weight=1)
+
+            icon_label = ctk.CTkLabel(
+                card,
+                text=icon,
+                width=38,
+                height=28,
+                anchor="center",
+                font=nav_icon_font,
+                text_color=self._get_color("text_secondary"),
+                fg_color=self._get_color("secondary"),
+                corner_radius=8,
+            )
+            icon_label.grid(row=0, column=0, sticky="nsw", padx=(14, 10), pady=12)
+
+            text_label = ctk.CTkLabel(
+                card,
+                text=title,
+                anchor="w",
+                justify="left",
+                font=nav_font,
+                text_color=self._get_color("text_primary"),
+            )
+            text_label.grid(row=0, column=1, sticky="nsew", padx=(0, 14), pady=12)
+
+            clickable_widgets = (nav_item_frame, card, icon_label, text_label)
+            for widget in clickable_widgets:
+                widget.bind("<Button-1>", lambda event, cb=command: cb())
+                widget.bind("<Enter>", lambda event, current_id=nav_id: self._animate_nav_hover(current_id, True))
+                widget.bind("<Leave>", lambda event, current_id=nav_id: self._animate_nav_hover(current_id, False))
             
-            # Сохраняем ссылки на элементы для управления состоянием
             self.nav_buttons[nav_id] = {
-                'button': btn,
+                'card': card,
+                'icon': icon_label,
+                'label': text_label,
                 'indicator': active_indicator,
                 'frame': nav_item_frame,
                 'font_normal': nav_font,
-                'font_bold': nav_font_bold
+                'font_bold': nav_font_bold,
             }
         
         # Гибкое пространство между навигацией и нижней частью
@@ -566,33 +612,44 @@ class App(ctk.CTk):
         # Кнопка выхода из полноэкранного режима
         self.fullscreen_button = ctk.CTkButton(
             bottom_frame,
-            text="⛶ Оконный режим",
+            text="Оконный режим",
             command=self.toggle_fullscreen,
-            height=38,
+            height=42,
             font=ctk.CTkFont(family="Segoe UI", size=11, weight="normal"),
             fg_color="transparent",
             hover_color=self._get_color("secondary"),
             text_color=self._get_color("text_secondary"),
-            corner_radius=6
+            border_width=1,
+            border_color=self._get_color("secondary"),
+            corner_radius=12,
+            anchor="w",
         )
         self.fullscreen_button.pack(fill="x")
     
     def _setup_navigation_animations(self):
         """Настройка анимаций для навигации"""
         for nav_id, elements in self.nav_buttons.items():
-            elements['button'].bind('<Enter>', lambda e, btn=elements['button']: self._animate_nav_hover(btn, True))
-            elements['button'].bind('<Leave>', lambda e, btn=elements['button']: self._animate_nav_hover(btn, False))
+            for widget_key in ("frame", "card", "icon", "label"):
+                widget = elements.get(widget_key)
+                if widget is None:
+                    continue
+                widget.bind('<Enter>', lambda e, current_id=nav_id: self._animate_nav_hover(current_id, True))
+                widget.bind('<Leave>', lambda e, current_id=nav_id: self._animate_nav_hover(current_id, False))
 
-    def _animate_nav_hover(self, button, is_hover):
+    def _animate_nav_hover(self, nav_id, is_hover):
         """Анимация при наведении на элемент навигации"""
+        elements = self.nav_buttons.get(nav_id)
+        if not elements:
+            return
+
+        card = elements.get("card")
+        if card is None or nav_id == getattr(self, "active_content_frame", ""):
+            return
+
         if is_hover:
-            # Плавное изменение цвета при наведении
-            button.configure(fg_color=self._get_color("secondary"))
+            card.configure(fg_color=self._get_color("secondary"))
         else:
-            # Возврат к исходному цвету
-            current_bg = button.cget("fg_color")
-            if current_bg != self._get_color("primary"):  # Если не активный элемент
-                button.configure(fg_color="transparent")
+            card.configure(fg_color="transparent")
 
     def _get_theme_icon(self, theme):
         """Возвращает иконку для кнопки темы"""
@@ -624,28 +681,40 @@ class App(ctk.CTk):
         active_nav_id = frame_to_nav_id.get(active_frame, "")
         
         for nav_id, elements in self.nav_buttons.items():
+            card = elements.get("card")
+            icon_label = elements.get("icon")
+            text_label = elements.get("label")
             if nav_id == active_nav_id:
-                # Активное состояние
-                elements['button'].configure(
-                    fg_color=self._get_color("primary"),
-                    text_color="white",
-                    font=elements['font_bold'],
-                    hover_color=self._get_color("primary")
-                )
-                elements['indicator'].configure(
-                    fg_color=self._get_color("accent")
-                )
+                if card is not None:
+                    card.configure(
+                        fg_color=self._get_color("primary"),
+                        border_color=self._get_color("primary"),
+                    )
+                if text_label is not None:
+                    text_label.configure(text_color="white", font=elements['font_bold'])
+                if icon_label is not None:
+                    icon_label.configure(
+                        text_color=self._get_color("primary"),
+                        fg_color="white",
+                    )
+                elements['indicator'].configure(fg_color=self._get_color("accent"))
             else:
-                # Неактивное состояние
-                elements['button'].configure(
-                    fg_color="transparent",
-                    text_color=self._get_color("text_primary"),
-                    font=elements['font_normal'],
-                    hover_color=self._get_color("secondary")
-                )
-                elements['indicator'].configure(
-                    fg_color="transparent"
-                )
+                if card is not None:
+                    card.configure(
+                        fg_color="transparent",
+                        border_color="transparent",
+                    )
+                if text_label is not None:
+                    text_label.configure(
+                        text_color=self._get_color("text_primary"),
+                        font=elements['font_normal'],
+                    )
+                if icon_label is not None:
+                    icon_label.configure(
+                        text_color=self._get_color("text_secondary"),
+                        fg_color=self._get_color("secondary"),
+                    )
+                elements['indicator'].configure(fg_color="transparent")
 
     def _create_main_content(self):
         """Создание основного контента с переключаемыми фреймами"""
@@ -701,6 +770,7 @@ class App(ctk.CTk):
                 frame.pack(fill="both", expand=True)
             else:
                 frame.pack_forget()
+        self.active_content_frame = frame_name
         self._update_navigation_style(frame_name)
 
     def show_create_frame(self):
@@ -710,6 +780,7 @@ class App(ctk.CTk):
     def show_download_frame(self):
         """Показать раздел загрузки кодов"""
         self.show_content_frame("download")
+        self._refresh_download_printers()
 
     def show_intro_frame(self):
         """Показать раздел введения в оборот"""
@@ -738,6 +809,12 @@ class App(ctk.CTk):
         """Обновление цветов интерфейса при смене темы"""
         if hasattr(self, 'sidebar_frame') and self.sidebar_frame:
             self.sidebar_frame.configure(fg_color=self._get_color("bg_secondary"))
+        if hasattr(self, 'fullscreen_button') and self.fullscreen_button:
+            self.fullscreen_button.configure(
+                hover_color=self._get_color("secondary"),
+                text_color=self._get_color("text_secondary"),
+                border_color=self._get_color("secondary"),
+            )
         
         if hasattr(self, 'status_bar') and self.status_bar:
             status_frame = self.status_bar.master
@@ -747,12 +824,7 @@ class App(ctk.CTk):
         
         # Обновляем навигацию с новой структурой
         if hasattr(self, 'nav_buttons') and self.nav_buttons:
-            for nav_id, elements in self.nav_buttons.items():
-                if 'button' in elements and elements['button']:
-                    elements['button'].configure(
-                        hover_color=self._get_color("secondary"),
-                        text_color=self._get_color("text_primary")
-                    )
+            self._update_navigation_style(getattr(self, "active_content_frame", "create"))
 
     def cleanup_before_update(self):
         """Очистка ресурсов перед обновлением."""
@@ -1418,14 +1490,14 @@ class App(ctk.CTk):
             self.log_aggregation_message(f"❌ Критическая ошибка генерации: {str(e)}")
 
     def start_bulk_aggregation_approve(self):
-        """Запуск массового проведения всех readyForSend АК."""
+        """Запуск массового проведения всех АК, доступных для повторного проведения."""
         try:
             if self.bulk_agg_btn is None:
                 self.log_aggregation_message("❌ Ошибка: кнопка проведения не инициализирована")
                 return
 
             self.set_bulk_aggregation_ui_state(True, active_action="all")
-            self.log_aggregation_message("🚀 Запускаем проведение всех readyForSend АК")
+            self.log_aggregation_message("🚀 Запускаем проведение АК в статусах readyForSend и approveFailed")
             self.update_aggregation_progress(0)
             self.download_executor.submit(self.bulk_aggregation_approve_process, None)
         except Exception as e:
@@ -1434,7 +1506,7 @@ class App(ctk.CTk):
             self.set_bulk_aggregation_ui_state(False)
 
     def start_bulk_aggregation_approve_by_name(self):
-        """Запуск проведения readyForSend АК по наименованию."""
+        """Запуск проведения АК readyForSend/approveFailed по наименованию."""
         try:
             if self.bulk_agg_name_entry is None or self.bulk_agg_by_name_btn is None:
                 self.log_aggregation_message("❌ Ошибка: интерфейс проведения по наименованию не инициализирован")
@@ -1447,7 +1519,7 @@ class App(ctk.CTk):
 
             self.set_bulk_aggregation_ui_state(True, active_action="by_name")
             self.log_aggregation_message(
-                f"🚀 Запускаем проведение readyForSend АК по наименованию: {comment_filter}"
+                f"🚀 Запускаем проведение АК readyForSend/approveFailed по наименованию: {comment_filter}"
             )
             self.update_aggregation_progress(0)
             self.download_executor.submit(self.bulk_aggregation_approve_process, comment_filter)
@@ -1460,7 +1532,7 @@ class App(ctk.CTk):
         """Фоновый процесс проверки и проведения АК."""
         try:
             self.log_aggregation_message_threadsafe("🔐 Получаем сессию Контур.Маркировки...")
-            status_message = "Проведение readyForSend АК..."
+            status_message = "Проведение АК readyForSend/approveFailed..."
             if comment_filter:
                 status_message = f"Проведение АК по наименованию: {comment_filter}"
             self.set_status_bar_threadsafe(status_message)
@@ -1486,7 +1558,9 @@ class App(ctk.CTk):
                 )
 
             if summary.ready_found == 0:
-                self.log_aggregation_message_threadsafe("ℹ️ Готовые АК для проведения не найдены")
+                self.log_aggregation_message_threadsafe(
+                    "ℹ️ АК в статусах readyForSend/approveFailed для проведения не найдены"
+                )
             else:
                 self.log_aggregation_message_threadsafe("📌 Итоги проведения АК:")
                 for line in summary.to_lines():
@@ -2168,6 +2242,37 @@ class App(ctk.CTk):
         actions_frame = ctk.CTkFrame(columns_frame, corner_radius=8)
         actions_frame.pack(fill="x", pady=(0, 10))
 
+        printer_select_frame = ctk.CTkFrame(actions_frame, fg_color="transparent")
+        printer_select_frame.pack(side="left", padx=(15, 10), pady=12)
+
+        ctk.CTkLabel(
+            printer_select_frame,
+            text="Принтер",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary"),
+        ).pack(side="left", padx=(0, 8))
+
+        self.download_printer_combo = ctk.CTkComboBox(
+            printer_select_frame,
+            values=["Загрузка списка принтеров..."],
+            width=320,
+            state="readonly",
+            command=lambda _: self._update_download_print_button_state(),
+            font=self.fonts["normal"],
+        )
+        self.download_printer_combo.pack(side="left")
+
+        self.download_printer_refresh_button = ctk.CTkButton(
+            printer_select_frame,
+            text="Обновить",
+            command=lambda: self._refresh_download_printers(manual=True),
+            width=110,
+            fg_color=self._get_color("secondary"),
+            hover_color=self._get_color("primary"),
+            font=self.fonts["button"],
+        )
+        self.download_printer_refresh_button.pack(side="left", padx=(8, 0))
+
         self.download_print_button = ctk.CTkButton(
             actions_frame,
             text="Выполнить печать",
@@ -2181,7 +2286,7 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(
             actions_frame,
-            text="Выберите заявку со скачанным CSV, чтобы отправить её в BarTender.",
+            text="Выберите принтер и заявку со скачанным CSV, чтобы отправить её в BarTender.",
             font=self.fonts["small"],
             text_color=self._get_color("text_secondary")
         ).pack(side="left", padx=(0, 15))
@@ -2198,6 +2303,7 @@ class App(ctk.CTk):
         
         self.download_log_text = ctk.CTkTextbox(log_container, height=150)
         self.download_log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self._refresh_download_printers()
 
     def _setup_label_print_frame(self):
         """Экран печати крупных этикеток 100x180 через BarTender."""
@@ -2446,6 +2552,37 @@ class App(ctk.CTk):
         actions_container = ctk.CTkFrame(right_column, corner_radius=10)
         actions_container.pack(fill="x", padx=12, pady=(0, 8))
 
+        printer_actions_frame = ctk.CTkFrame(actions_container, fg_color="transparent")
+        printer_actions_frame.pack(side="left", padx=(14, 0), pady=14)
+
+        ctk.CTkLabel(
+            printer_actions_frame,
+            text="Принтер",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary"),
+        ).pack(side="left", padx=(0, 8))
+
+        self.label_print_printer_combo = ctk.CTkComboBox(
+            printer_actions_frame,
+            values=["Загрузка списка принтеров..."],
+            width=320,
+            state="readonly",
+            command=lambda _: self._update_label_print_button_state(),
+            font=self.fonts["normal"],
+        )
+        self.label_print_printer_combo.pack(side="left")
+
+        self.label_print_printer_refresh_button = ctk.CTkButton(
+            printer_actions_frame,
+            text="Обновить",
+            command=lambda: self._refresh_label_print_printers(manual=True),
+            width=110,
+            fg_color=self._get_color("secondary"),
+            hover_color=self._get_color("primary"),
+            font=self.fonts["button"],
+        )
+        self.label_print_printer_refresh_button.pack(side="left", padx=(8, 14))
+
         self.label_print_button = ctk.CTkButton(
             actions_container,
             text="Выполнить печать",
@@ -2460,7 +2597,7 @@ class App(ctk.CTk):
 
         ctk.CTkLabel(
             actions_container,
-            text="BarTender получит выбранный CSV АК как базу данных и распечатает каждую запись файла.",
+            text="BarTender получит выбранный CSV как базу данных и отправит печать на выбранный принтер.",
             font=self.fonts["small"],
             text_color=self._get_color("text_secondary"),
         ).pack(side="left", padx=(0, 14))
@@ -2486,6 +2623,103 @@ class App(ctk.CTk):
         self._set_default_date_range(self.label_print_mfg_entry, self.label_print_exp_entry)
 
     def _refresh_label_print_data(self, manual: bool = False):
+        if self.label_print_refresh_in_progress:
+            if manual:
+                self.label_print_log_insert("Обновление вкладки печати этикеток уже выполняется.")
+            return
+
+        now = time.time()
+        needs_refresh = manual or not self.label_print_data_loaded
+        if not needs_refresh and now - self.label_print_last_refresh_at >= LABEL_PRINT_REFRESH_CACHE_SECONDS:
+            needs_refresh = True
+
+        if not needs_refresh:
+            self._apply_label_print_loaded_data(manual=False)
+            return
+
+        self.label_print_refresh_in_progress = True
+        self._update_label_print_button_state()
+        if self.label_print_summary_label is not None:
+            self.label_print_summary_label.configure(
+                text="Загружаю данные для печати этикеток: шаблоны, CSV, историю заказов и список принтеров..."
+            )
+
+        threading.Thread(
+            target=self._load_label_print_data_worker,
+            args=(manual,),
+            daemon=True,
+            name="LabelPrintDataLoader",
+        ).start()
+
+    def _load_label_print_data_worker(self, manual: bool):
+        try:
+            printer_names, default_printer = list_installed_printers()
+            templates = list_100x180_templates()
+            aggregation_files = list_aggregation_csv_files()
+            marking_files = list_marking_csv_files()
+            history_orders = self.history_db.get_all_orders()
+            orders = sorted(
+                history_orders,
+                key=lambda order: str(order.get("updated_at") or order.get("created_at") or ""),
+                reverse=True,
+            )
+
+            metadata_cache: dict[str, Any] = {}
+            display_cache: dict[str, dict[str, str]] = {}
+            for order in orders:
+                document_id = str(order.get("document_id") or "")
+                try:
+                    metadata = resolve_order_metadata(order, self.df)
+                    metadata_cache[document_id] = metadata
+                    display_cache[document_id] = {
+                        "size": metadata.size or "-",
+                        "units": str(metadata.units_per_pack or "-"),
+                        "color": metadata.color or "-",
+                    }
+                except Exception as exc:
+                    metadata_cache[document_id] = exc
+                    display_cache[document_id] = {"size": "-", "units": "-", "color": "-"}
+
+            payload = {
+                "printers": printer_names,
+                "default_printer": default_printer,
+                "templates": templates,
+                "aggregation_files": aggregation_files,
+                "marking_files": marking_files,
+                "orders": orders,
+                "metadata_cache": metadata_cache,
+                "display_cache": display_cache,
+                "manual": manual,
+            }
+            self.after(0, lambda: self._apply_label_print_data_payload(payload))
+        except Exception as exc:
+            self.after(0, lambda err=str(exc), is_manual=manual: self._on_label_print_data_failed(err, is_manual))
+
+    def _apply_label_print_data_payload(self, payload: dict[str, Any]):
+        self.label_print_printer_names = payload["printers"]
+        self.label_print_default_printer_name = payload["default_printer"]
+        self.label_print_templates = payload["templates"]
+        self.label_print_aggregation_files = payload["aggregation_files"]
+        self.label_print_marking_files = payload["marking_files"]
+        self.label_print_orders = payload["orders"]
+        self.label_print_order_metadata_cache = payload["metadata_cache"]
+        self.label_print_order_display_cache = payload["display_cache"]
+        self.label_print_data_loaded = True
+        self.label_print_last_refresh_at = time.time()
+        self.label_print_refresh_in_progress = False
+        self._apply_label_print_loaded_data(manual=bool(payload.get("manual")))
+
+    def _on_label_print_data_failed(self, error_message: str, manual: bool):
+        self.label_print_refresh_in_progress = False
+        self._update_label_print_button_state()
+        if self.label_print_summary_label is not None:
+            self.label_print_summary_label.configure(
+                text=f"Не удалось загрузить данные для печати этикеток: {error_message}"
+            )
+        self.label_print_log_insert(f"Ошибка обновления вкладки печати этикеток: {error_message}")
+
+    def _apply_label_print_loaded_data(self, manual: bool):
+        self._refresh_label_print_printers()
         self._refresh_label_print_templates()
         self._refresh_label_print_aggregation_files()
         self._refresh_label_print_orders()
@@ -2495,13 +2729,12 @@ class App(ctk.CTk):
 
         if manual:
             self.label_print_log_insert(
-                f"????????? ?????? ??? ??????: ???????? {len(self.label_print_templates)}, "
-                f"CSV ?? {len(self.label_print_aggregation_files)}, CSV ?? {len(self.label_print_marking_files)}, "
-                f"??????? {len(self.label_print_orders)}"
+                f"Обновлены данные для печати: шаблоны {len(self.label_print_templates)}, "
+                f"CSV АК {len(self.label_print_aggregation_files)}, CSV КМ {len(self.label_print_marking_files)}, "
+                f"заказы {len(self.label_print_orders)}, принтеры {len(self.label_print_printer_names)}"
             )
     def _refresh_label_print_templates(self):
         current_path = self.label_print_selected_template_path
-        self.label_print_templates = list_100x180_templates()
 
         if current_path and not any(template.path == current_path for template in self.label_print_templates):
             self.label_print_selected_template_path = None
@@ -2708,11 +2941,9 @@ class App(ctk.CTk):
         source_kind = self._get_label_print_source_kind()
 
         if source_kind == MARKING_SOURCE_KIND:
-            self.label_print_marking_files = list_marking_csv_files()
             files_to_show = self.label_print_marking_files
             self.label_print_agg_tree.heading("records", text="КМ")
         else:
-            self.label_print_aggregation_files = list_aggregation_csv_files()
             files_to_show = self.label_print_aggregation_files
             self.label_print_agg_tree.heading("records", text="АК")
 
@@ -2744,13 +2975,6 @@ class App(ctk.CTk):
 
         current_selection = self._get_selected_label_order()
         selected_document_id = str(current_selection.get("document_id") or "") if current_selection else ""
-
-        history_orders = self.history_db.get_all_orders()
-        self.label_print_orders = sorted(
-            history_orders,
-            key=lambda order: str(order.get("updated_at") or order.get("created_at") or ""),
-            reverse=True,
-        )
         self.label_print_order_by_iid = {}
 
         for item_id in self.label_print_order_tree.get_children():
@@ -2761,18 +2985,11 @@ class App(ctk.CTk):
             item_iid = f"order_{index}"
             self.label_print_order_by_iid[item_iid] = order
 
-            size_value = "-"
-            units_value = "-"
-            color_value = "-"
-            try:
-                metadata = resolve_order_metadata(order, self.df)
-                size_value = metadata.size or "-"
-                units_value = str(metadata.units_per_pack or "-")
-                color_value = metadata.color or "-"
-            except Exception:
-                pass
-
             document_id = str(order.get("document_id") or "")
+            display_data = self.label_print_order_display_cache.get(
+                document_id,
+                {"size": "-", "units": "-", "color": "-"},
+            )
             self.label_print_order_tree.insert(
                 "",
                 "end",
@@ -2780,9 +2997,9 @@ class App(ctk.CTk):
                 values=(
                     str(order.get("order_name") or ""),
                     document_id,
-                    size_value,
-                    units_value,
-                    color_value,
+                    display_data.get("size", "-"),
+                    display_data.get("units", "-"),
+                    display_data.get("color", "-"),
                 ),
             )
             if selected_document_id and document_id == selected_document_id:
@@ -2817,9 +3034,16 @@ class App(ctk.CTk):
         if not order_data:
             return None, None
 
+        document_id = str(order_data.get("document_id") or "")
+        if document_id in self.label_print_order_metadata_cache:
+            return order_data, self.label_print_order_metadata_cache[document_id]
+
         try:
-            return order_data, resolve_order_metadata(order_data, self.df)
+            metadata = resolve_order_metadata(order_data, self.df)
+            self.label_print_order_metadata_cache[document_id] = metadata
+            return order_data, metadata
         except Exception as exc:
+            self.label_print_order_metadata_cache[document_id] = exc
             return order_data, exc
 
     def _update_label_print_summary(self, event=None):
@@ -2915,6 +3139,45 @@ class App(ctk.CTk):
             return few
         return many
 
+    def _refresh_label_print_printers(self, manual: bool = False):
+        current_printer = self._get_selected_label_print_printer()
+        printer_names = self.label_print_printer_names
+        default_printer = self.label_print_default_printer_name
+        is_busy = bool(getattr(self, "label_print_in_progress", False))
+        is_loading = bool(getattr(self, "label_print_refresh_in_progress", False))
+
+        if self.label_print_printer_combo is None:
+            return
+
+        if not printer_names:
+            self.label_print_printer_combo.configure(values=["Принтеры не найдены"], state="disabled")
+            self.label_print_printer_combo.set("Принтеры не найдены")
+        else:
+            preferred_printer = current_printer
+            if preferred_printer not in printer_names:
+                preferred_printer = default_printer if default_printer in printer_names else printer_names[0]
+
+            combo_state = "disabled" if is_busy or is_loading else "readonly"
+            self.label_print_printer_combo.configure(values=printer_names, state=combo_state)
+            self.label_print_printer_combo.set(preferred_printer)
+
+        if self.label_print_printer_refresh_button is not None:
+            self.label_print_printer_refresh_button.configure(
+                state="disabled" if is_busy or is_loading else "normal"
+            )
+
+        self._update_label_print_button_state()
+
+    def _get_selected_label_print_printer(self) -> str | None:
+        if self.label_print_printer_combo is None:
+            return None
+
+        printer_name = str(self.label_print_printer_combo.get() or "").strip()
+        if printer_name and printer_name in self.label_print_printer_names:
+            return printer_name
+
+        return None
+
     def _update_label_print_button_state(self, event=None):
         if self.label_print_button is None:
             return
@@ -2923,6 +3186,7 @@ class App(ctk.CTk):
         has_template = self._get_selected_label_template() is not None
         has_source = self._get_selected_aggregation_csv() is not None
         has_order = self._get_selected_label_order() is not None
+        has_printer = self._get_selected_label_print_printer() is not None
         has_dates = bool(
             self.label_print_mfg_entry
             and self.label_print_exp_entry
@@ -2934,23 +3198,36 @@ class App(ctk.CTk):
         quantity_is_valid = False
         selected_order = self._get_selected_label_order()
         if selected_order is not None:
-            try:
-                metadata = resolve_order_metadata(selected_order, self.df)
+            document_id = str(selected_order.get("document_id") or "")
+            metadata = self.label_print_order_metadata_cache.get(document_id)
+            if metadata is not None and not isinstance(metadata, Exception):
                 order_is_valid = True
                 if source_kind == MARKING_SOURCE_KIND:
                     quantity_is_valid = metadata.units_per_pack > 0
                 elif self.label_print_quantity_entry is not None:
                     raw_quantity = self.label_print_quantity_entry.get().strip().replace(" ", "")
                     if raw_quantity:
-                        parsed_quantity = int(raw_quantity)
-                        quantity_is_valid = parsed_quantity > 0 and parsed_quantity % metadata.units_per_pack == 0
-            except Exception:
-                order_is_valid = False
-                quantity_is_valid = False
+                        try:
+                            parsed_quantity = int(raw_quantity)
+                            quantity_is_valid = (
+                                metadata.units_per_pack > 0
+                                and parsed_quantity > 0
+                                and parsed_quantity % metadata.units_per_pack == 0
+                            )
+                        except ValueError:
+                            quantity_is_valid = False
 
         button_state = (
             "normal"
-            if has_template and has_source and has_order and has_dates and order_is_valid and quantity_is_valid and not self.label_print_in_progress
+            if has_template
+            and has_source
+            and has_order
+            and has_printer
+            and has_dates
+            and order_is_valid
+            and quantity_is_valid
+            and not self.label_print_in_progress
+            and not self.label_print_refresh_in_progress
             else "disabled"
         )
         self.label_print_button.configure(state=button_state)
@@ -2961,17 +3238,53 @@ class App(ctk.CTk):
             self.label_print_button.configure(
                 text="Печать..." if is_busy else "Выполнить печать"
             )
+        if self.label_print_printer_combo is not None:
+            combo_state = "disabled" if is_busy or not self.label_print_printer_names else "readonly"
+            self.label_print_printer_combo.configure(state=combo_state)
+        if self.label_print_printer_refresh_button is not None:
+            self.label_print_printer_refresh_button.configure(
+                state="disabled" if is_busy else "normal"
+            )
         self._update_label_print_button_state()
+
+    def _append_textbox_message(self, textbox, message: str):
+        if textbox is None:
+            return
+
+        def append_message():
+            try:
+                previous_state = None
+                try:
+                    previous_state = str(textbox.cget("state"))
+                except Exception:
+                    previous_state = None
+
+                if previous_state == "disabled":
+                    textbox.configure(state="normal")
+
+                textbox.insert("end", message)
+                textbox.see("end")
+
+                if previous_state == "disabled":
+                    textbox.configure(state="disabled")
+            except Exception as exc:
+                logger.error(f"Ошибка при записи в текстовое поле: {exc}")
+
+        if threading.current_thread() is threading.main_thread():
+            append_message()
+            return
+
+        try:
+            self.after(0, append_message)
+        except Exception as exc:
+            logger.error(f"Не удалось запланировать запись в текстовое поле: {exc}")
 
     def label_print_log_insert(self, message: str):
         if self.label_print_log_text is None:
             return
 
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.label_print_log_text.configure(state="normal")
-        self.label_print_log_text.insert("end", f"[{timestamp}] {message}\n")
-        self.label_print_log_text.see("end")
-        self.label_print_log_text.configure(state="disabled")
+        self._append_textbox_message(self.label_print_log_text, f"[{timestamp}] {message}\n")
 
     def print_selected_100x180_labels(self):
         template = self._get_selected_label_template()
@@ -2988,6 +3301,11 @@ class App(ctk.CTk):
             mbox.showwarning("Выбор CSV", f"Сначала выберите CSV с {source_title}.")
             return
 
+        printer_name = self._get_selected_label_print_printer()
+        if not printer_name:
+            mbox.showwarning("Выбор принтера", "Сначала выберите принтер для печати этикеток 100x180.")
+            return
+
         order_data = self._get_selected_label_order()
         if order_data is None:
             mbox.showwarning("Выбор заявки", "Сначала выберите заказ кодов маркировки.")
@@ -2999,6 +3317,7 @@ class App(ctk.CTk):
                 order_data=order_data,
                 template_path=template_path,
                 aggregation_csv_path=source_file.path,
+                printer_name=printer_name,
                 manufacture_date=self.label_print_mfg_entry.get().strip() if self.label_print_mfg_entry else "",
                 expiration_date=self.label_print_exp_entry.get().strip() if self.label_print_exp_entry else "",
                 quantity_value=(
@@ -3014,7 +3333,7 @@ class App(ctk.CTk):
 
         self._set_label_print_busy(True)
         self.label_print_log_insert(
-            f"Подготовка 100x180: {context.order_name} | шаблон {os.path.basename(context.template_path)} | "
+            f"Подготовка 100x180: {context.order_name} | принтер {context.printer_name} | шаблон {os.path.basename(context.template_path)} | "
             f"{source_short} {os.path.basename(context.aggregation_csv_path)} | записей {context.label_count}"
         )
         self.print_executor.submit(self._label_print_worker, context)
@@ -3032,11 +3351,12 @@ class App(ctk.CTk):
 
         if success:
             self.label_print_log_insert(
-                f"Печать запущена: {context.order_name} | {source_short} {os.path.basename(context.aggregation_csv_path)} | "
+                f"Печать запущена: {context.order_name} | принтер {context.printer_name} | "
+                f"{source_short} {os.path.basename(context.aggregation_csv_path)} | "
                 f"{context.label_count} этикеток"
             )
             if hasattr(self, "status_bar") and self.status_bar:
-                self.status_bar.configure(text=f"Печать 100x180 отправлена: {context.order_name}")
+                self.status_bar.configure(text=f"Печать 100x180 отправлена: {context.order_name} -> {context.printer_name}")
                 self.after(3000, lambda: self._reset_status_bar())
             return
 
@@ -3329,69 +3649,68 @@ class App(ctk.CTk):
                 self.log_insert("Выполнение отменено пользователем.")
                 return
 
-            to_process = copy.deepcopy(self.collected)
-            save_snapshot(to_process)
-            save_order_history(to_process)
-            
-            self.log_insert(f"\nБудет выполнено {len(to_process)} заказов.")
-            
-            # Отключаем кнопку выполнения на время работы
-            self.execute_btn.configure(state="disabled")  # Предполагается, что у вас есть такая кнопка
-            
-            # Запускаем задачи в ThreadPoolExecutor
-            futures = []
-            for it in to_process:
-                session = SessionManager.get_session()
-                fut = self.execute_all_executor.submit(self._execute_worker, it, session)
-                futures.append((fut, it))
+            source_items = list(self.collected)
+            self.execute_btn.configure(state="disabled")
+            self.log_insert("Подготавливаю выполнение заказов в фоне...")
 
-            # Мониторинг завершения задач
-            def execute_all_monitor():
-                completed = 0
-                success_count = 0
-                fail_count = 0
-                results = []
-                
-                for fut, it in futures:
-                    try:
-                        # Ждем завершения задачи с таймаутом
-                        ok, msg = fut.result(timeout=60)  # 1 минута таймаут
-                        results.append((ok, msg, it))
-                        
-                        # Обновляем GUI в основном потоке
-                        self.after(0, self._on_execute_finished, it, ok, msg)
-                        
-                        if ok:
-                            success_count += 1
-                        else:
-                            fail_count += 1
-                            
-                        completed += 1
-                        
-                    except Exception as e:
-                        error_msg = f"Таймаут или ошибка выполнения: {e}"
-                        self.after(0, self._on_execute_finished, it, False, error_msg)
-                        fail_count += 1
-                        completed += 1
-                
-                # Все задачи завершены - разблокируем кнопку и выводим итоги
-                self.after(0, self._on_all_execute_finished, success_count, fail_count, results)
-                
-                # Запускаем автоматическую загрузку
-                self.after(0, self.start_auto_status_check)
-
-            # Запускаем мониторинг в отдельном потоке
-            threading.Thread(target=execute_all_monitor, daemon=True).start()
+            threading.Thread(
+                target=self._execute_all_background,
+                args=(source_items,),
+                daemon=True,
+                name="ExecuteAllStarter",
+            ).start()
 
         except Exception as e:
             self.log_insert(f"❌ Ошибка при запуске выполнения: {e}")
             # В случае ошибки разблокируем кнопку
             self.execute_btn.configure(state="normal")
 
-    def _execute_worker(self, order_item, session):
+    def _execute_all_background(self, source_items):
+        try:
+            to_process = copy.deepcopy(source_items)
+            save_snapshot(to_process)
+            save_order_history(to_process)
+            self.after(0, lambda count=len(to_process): self.log_insert(f"\nБудет выполнено {count} заказов."))
+
+            futures = []
+            for order_item in to_process:
+                fut = self.execute_all_executor.submit(self._execute_worker, order_item)
+                futures.append((fut, order_item))
+
+            success_count = 0
+            fail_count = 0
+            results = []
+
+            for fut, order_item in futures:
+                try:
+                    ok, msg = fut.result(timeout=60)
+                    results.append((ok, msg, order_item))
+                    self.after(0, self._on_execute_finished, order_item, ok, msg)
+
+                    if ok:
+                        success_count += 1
+                    else:
+                        fail_count += 1
+                except Exception as exc:
+                    error_msg = f"Таймаут или ошибка выполнения: {exc}"
+                    results.append((False, error_msg, order_item))
+                    self.after(0, self._on_execute_finished, order_item, False, error_msg)
+                    fail_count += 1
+
+            self.after(0, self._on_all_execute_finished, success_count, fail_count, results)
+            self.after(0, self.start_auto_status_check)
+        except Exception as exc:
+            self.after(0, lambda err=str(exc): self._on_execute_all_failed(err))
+
+    def _on_execute_all_failed(self, error_message: str):
+        self.log_insert(f"❌ Ошибка подготовки выполнения: {error_message}")
+        self.execute_btn.configure(state="normal")
+
+    def _execute_worker(self, order_item):
         """Воркер для выполнения одного заказа в отдельном потоке"""
         try:
             self.log_insert(f"🎬 Запуск позиции: {order_item.simpl_name}  GTIN {order_item.gtin}  заявка № {order_item.order_name}")
+            session = SessionManager.get_session()
             ok, msg = make_order_to_kontur(order_item, session)
             return ok, msg
         except Exception as e:
@@ -3463,13 +3782,7 @@ class App(ctk.CTk):
 
     def log_insert(self, msg: str):
         """Выводит сообщение в лог (с ограничением доступа только для чтения)"""
-        try:
-            self.log_text.configure(state="normal")
-            self.log_text.insert("end", f"{msg}\n")
-            self.log_text.see("end")  # Автопрокрутка к новому сообщению
-            self.log_text.configure(state="disabled")
-        except Exception as e:
-            logger.error(f"Ошибка при записи в лог: {e}")
+        self._append_textbox_message(self.log_text, f"{msg}\n")
 
     def _show_log_context_menu(self, event):
         """Показывает контекстное меню для текстового поля лога"""
@@ -3843,22 +4156,82 @@ class App(ctk.CTk):
     def download_log_insert(self, msg: str):
         """Добавляет сообщение в лог скачиваний"""
         timestamp = datetime.now().strftime("%H:%M:%S")
-        self.download_log_text.insert("end", f"[{timestamp}] {msg}\n")
-        self.download_log_text.see("end")
+        self._append_textbox_message(self.download_log_text, f"[{timestamp}] {msg}\n")
 
     def _update_download_print_button_state(self, event=None):
         if not hasattr(self, "download_print_button") or self.download_print_button is None:
             return
 
+        is_busy = bool(getattr(self, "print_in_progress", False))
         has_selection = bool(self.download_tree.selection())
-        button_state = "disabled" if self.print_in_progress or not has_selection else "normal"
+        has_printer = self._get_selected_download_printer() is not None
+        button_state = "disabled" if is_busy or not has_selection or not has_printer else "normal"
         self.download_print_button.configure(state=button_state)
+
+    def _refresh_download_printers(self, manual: bool = False):
+        current_printer = self._get_selected_download_printer()
+        printer_names, default_printer = list_installed_printers()
+        self.download_printer_names = printer_names
+        self.download_default_printer_name = default_printer
+        is_busy = bool(getattr(self, "print_in_progress", False))
+
+        if self.download_printer_combo is None:
+            return
+
+        if not printer_names:
+            self.download_printer_combo.configure(values=["Принтеры не найдены"], state="disabled")
+            self.download_printer_combo.set("Принтеры не найдены")
+        else:
+            preferred_printer = current_printer
+            if preferred_printer not in printer_names:
+                preferred_printer = default_printer if default_printer in printer_names else printer_names[0]
+
+            combo_state = "disabled" if is_busy else "readonly"
+            self.download_printer_combo.configure(values=printer_names, state=combo_state)
+            self.download_printer_combo.set(preferred_printer)
+
+        if self.download_printer_refresh_button is not None:
+            self.download_printer_refresh_button.configure(
+                state="disabled" if is_busy else "normal"
+            )
+
+        if manual:
+            if printer_names:
+                default_note = (
+                    f" | по умолчанию: {default_printer}"
+                    if default_printer and default_printer in printer_names
+                    else ""
+                )
+                self.download_log_insert(
+                    f"🖨️ Список принтеров обновлен: {len(printer_names)} шт.{default_note}"
+                )
+            else:
+                self.download_log_insert("⚠️ Принтеры не найдены. Проверьте установленные устройства Windows.")
+
+        self._update_download_print_button_state()
+
+    def _get_selected_download_printer(self) -> str | None:
+        if self.download_printer_combo is None:
+            return None
+
+        printer_name = str(self.download_printer_combo.get() or "").strip()
+        if printer_name and printer_name in self.download_printer_names:
+            return printer_name
+
+        return None
 
     def _set_print_busy(self, is_busy: bool):
         self.print_in_progress = is_busy
         if hasattr(self, "download_print_button") and self.download_print_button is not None:
             self.download_print_button.configure(
                 text="Печать..." if is_busy else "Выполнить печать"
+            )
+        if self.download_printer_combo is not None:
+            combo_state = "disabled" if is_busy or not self.download_printer_names else "readonly"
+            self.download_printer_combo.configure(state=combo_state)
+        if self.download_printer_refresh_button is not None:
+            self.download_printer_refresh_button.configure(
+                state="disabled" if is_busy else "normal"
             )
         self._update_download_print_button_state()
 
@@ -3925,6 +4298,11 @@ class App(ctk.CTk):
             mbox.showwarning("Выбор заявки", "Сначала выберите заявку в таблице загрузок.")
             return
 
+        printer_name = self._get_selected_download_printer()
+        if not printer_name:
+            mbox.showwarning("Выбор принтера", "Сначала выберите принтер для печати термоэтикеток.")
+            return
+
         csv_path = self._resolve_order_csv_path(selected_item)
         if not csv_path:
             mbox.showwarning(
@@ -3938,6 +4316,7 @@ class App(ctk.CTk):
                 order_name=str(selected_item.get("order_name") or ""),
                 document_id=str(selected_item.get("document_id") or ""),
                 csv_path=csv_path,
+                printer_name=printer_name,
             )
         except BarTenderPrintError as exc:
             mbox.showerror("Ошибка печати", str(exc))
@@ -3947,7 +4326,8 @@ class App(ctk.CTk):
         self._sync_history_from_download_item(selected_item)
         self._set_print_busy(True)
         self.download_log_insert(
-            f"🖨️ Подготовка печати: {context.order_name} | размер {context.size} | этикеток {context.label_count}"
+            f"🖨️ Подготовка печати: {context.order_name} | принтер {context.printer_name} | "
+            f"размер {context.size} | этикеток {context.label_count}"
         )
         self.print_executor.submit(self._print_order_worker, context)
 
@@ -3963,10 +4343,10 @@ class App(ctk.CTk):
 
         if success:
             self.download_log_insert(
-                f"✅ Печать запущена: {context.order_name} | CSV: {context.csv_path}"
+                f"✅ Печать запущена: {context.order_name} | принтер: {context.printer_name} | CSV: {context.csv_path}"
             )
             if hasattr(self, "status_bar") and self.status_bar:
-                self.status_bar.configure(text=f"Печать отправлена: {context.order_name}")
+                self.status_bar.configure(text=f"Печать отправлена: {context.order_name} -> {context.printer_name}")
                 self.after(3000, lambda: self._reset_status_bar())
             return
 
@@ -4677,15 +5057,8 @@ class App(ctk.CTk):
 
     def intro_log_insert(self, text: str):
         """Удобная функция логирования в таб 'Ввод' (вызовы только из GUI-потока)."""
-        try:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            msg = f"{now} - {text}"
-            
-            self.intro_log_text.configure(state="normal")
-            self.intro_log_text.insert("end", msg + "\n")
-            self.intro_log_text.see("end")
-        except Exception as e:
-            logger.error(f"Ошибка записи в лог: {e}")
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._append_textbox_message(self.intro_log_text, f"{now} - {text}\n")
 
     def update_introduction_tree(self):
         """Наполнить дерево заказами, у которых status == 'Скачан'"""
@@ -5011,12 +5384,7 @@ class App(ctk.CTk):
     def tsd_log_insert(self, text: str):
         """Удобная функция логирования в таб 'ТСД' (вызовы только из GUI-потока)."""
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        msg = f"{now} - {text}\n"
-        try:
-            self.tsd_log_text.insert("end", msg)
-            self.tsd_log_text.see("end")
-        except Exception:
-            pass
+        self._append_textbox_message(self.tsd_log_text, f"{now} - {text}\n")
 
     def update_tsd_tree(self):
         """Наполнить дерево заказами, которые готовы для отправки на ТСД"""

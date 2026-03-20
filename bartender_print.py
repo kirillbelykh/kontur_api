@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import re
 import subprocess
 import tempfile
@@ -34,14 +35,24 @@ class PrintContext:
     document_id: str
     csv_path: str
     template_path: str
+    printer_name: str
     size: str
     label_count: int
 
 
-def build_print_context(order_name: str, document_id: str, csv_path: str) -> PrintContext:
+def build_print_context(
+    order_name: str,
+    document_id: str,
+    csv_path: str,
+    printer_name: str | None = None,
+) -> PrintContext:
     csv_file = Path(csv_path)
     if not csv_file.exists():
         raise BarTenderPrintError(f"CSV-файл не найден: {csv_file}")
+
+    printer_name_text = str(printer_name or "").strip()
+    if not printer_name_text:
+        raise BarTenderPrintError("Не выбран принтер для печати.")
 
     template_path = find_template_path()
     size = extract_size_from_order_name(order_name)
@@ -55,9 +66,43 @@ def build_print_context(order_name: str, document_id: str, csv_path: str) -> Pri
         document_id=document_id,
         csv_path=str(csv_file),
         template_path=str(template_path),
+        printer_name=printer_name_text,
         size=size,
         label_count=label_count,
     )
+
+
+def list_installed_printers() -> tuple[list[str], str | None]:
+    try:
+        import win32print  # type: ignore
+
+        printer_flags = win32print.PRINTER_ENUM_LOCAL | getattr(
+            win32print, "PRINTER_ENUM_CONNECTIONS", 0
+        )
+        raw_printers = win32print.EnumPrinters(printer_flags)
+        printer_names: list[str] = []
+
+        for printer_info in raw_printers:
+            printer_name = ""
+            if isinstance(printer_info, tuple) and len(printer_info) >= 3:
+                printer_name = str(printer_info[2] or "").strip()
+            elif isinstance(printer_info, dict):
+                printer_name = str(
+                    printer_info.get("pPrinterName") or printer_info.get("name") or ""
+                ).strip()
+
+            if printer_name and printer_name not in printer_names:
+                printer_names.append(printer_name)
+
+        default_printer = None
+        try:
+            default_printer = str(win32print.GetDefaultPrinter() or "").strip() or None
+        except Exception:
+            default_printer = None
+
+        return _normalize_printer_listing(printer_names, default_printer)
+    except Exception:
+        return _list_installed_printers_via_powershell()
 
 
 def find_template_path() -> Path:
@@ -115,6 +160,7 @@ def print_labels(context: PrintContext) -> None:
             csv_path=Path(context.csv_path),
             label_count=context.label_count,
             job_name=context.order_name,
+            printer_name=context.printer_name,
         )
     finally:
         try:
@@ -287,7 +333,15 @@ def _describe_objects(object_elements: list[ET.Element]) -> str:
     return ", ".join(descriptions) if descriptions else "ничего"
 
 
-def _run_sdk_print(template_path: Path, csv_path: Path, label_count: int, job_name: str, *, print_now: bool = True) -> None:
+def _run_sdk_print(
+    template_path: Path,
+    csv_path: Path,
+    label_count: int,
+    job_name: str,
+    *,
+    printer_name: str | None = None,
+    print_now: bool = True,
+) -> None:
     if not BARTENDER_SDK_DLL.exists():
         raise BarTenderPrintError(f"Не найден BarTender Print SDK: {BARTENDER_SDK_DLL}")
 
@@ -306,6 +360,7 @@ def _run_sdk_print(template_path: Path, csv_path: Path, label_count: int, job_na
         str(csv_path),
         str(label_count),
         str(job_name),
+        str(printer_name or ""),
         str(BARTENDER_SDK_DLL),
         "1" if print_now else "0",
     ]
@@ -343,6 +398,7 @@ param(
     [string]$CsvPath,
     [int]$LabelCount,
     [string]$JobName,
+    [string]$PrinterName,
     [string]$SdkPath,
     [string]$PrintNow
 )
@@ -381,6 +437,10 @@ try {
 
     if ($JobName) {
         $format.PrintSetup.JobName = $JobName
+    }
+
+    if ($PrinterName) {
+        $format.PrintSetup.PrinterName = $PrinterName
     }
 
     if ($format.PrintSetup.SupportsIdenticalCopies) {
@@ -427,6 +487,71 @@ finally {
     }
 }
 """.strip()
+
+
+def _normalize_printer_listing(
+    printer_names: list[str], default_printer: str | None
+) -> tuple[list[str], str | None]:
+    unique_printers = sorted(
+        {str(printer or "").strip() for printer in printer_names if str(printer or "").strip()},
+        key=str.casefold,
+    )
+    normalized_default = str(default_printer or "").strip() or None
+
+    if normalized_default and normalized_default not in unique_printers:
+        unique_printers.insert(0, normalized_default)
+
+    return unique_printers, normalized_default
+
+
+def _list_installed_printers_via_powershell() -> tuple[list[str], str | None]:
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    script = """
+$printers = @(Get-CimInstance Win32_Printer | Sort-Object Name | Select-Object -ExpandProperty Name)
+$defaultPrinter = Get-CimInstance Win32_Printer | Where-Object { $_.Default } | Select-Object -First 1 -ExpandProperty Name
+@{
+    printers = $printers
+    defaultPrinter = $defaultPrinter
+} | ConvertTo-Json -Depth 3
+""".strip()
+
+    try:
+        completed = subprocess.run(
+            [
+                POWERSHELL_EXE,
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=creationflags,
+        )
+    except FileNotFoundError:
+        return [], None
+
+    if completed.returncode != 0:
+        return [], None
+
+    try:
+        payload = json.loads(completed.stdout or "{}")
+    except json.JSONDecodeError:
+        return [], None
+
+    printers = payload.get("printers") or []
+    if isinstance(printers, str):
+        printers = [printers]
+
+    default_printer = payload.get("defaultPrinter")
+    if isinstance(default_printer, list):
+        default_printer = default_printer[0] if default_printer else None
+
+    return _normalize_printer_listing(list(printers), str(default_printer or "").strip() or None)
 
 
 def _extract_process_error(raw_output: str) -> str:

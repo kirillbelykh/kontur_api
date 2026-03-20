@@ -86,6 +86,7 @@ class LabelPrint100x180Context:
     order_name: str
     template_path: str
     aggregation_csv_path: str
+    printer_name: str
     data_source_kind: str
     template_category: str
     label_count: int
@@ -188,6 +189,7 @@ def build_label_print_context(
     order_data: dict[str, Any],
     template_path: str,
     aggregation_csv_path: str,
+    printer_name: str,
     manufacture_date: str,
     expiration_date: str,
     quantity_value: str | int | None = None,
@@ -199,6 +201,10 @@ def build_label_print_context(
     csv_file = Path(aggregation_csv_path)
     if not csv_file.exists():
         raise BarTenderLabel100x180Error(f"CSV для печати не найден: {csv_file}")
+
+    printer_name_text = str(printer_name or "").strip()
+    if not printer_name_text:
+        raise BarTenderLabel100x180Error("Не выбран принтер для печати этикеток 100x180.")
 
     label_count = count_csv_records(csv_file)
     if label_count <= 0:
@@ -234,6 +240,7 @@ def build_label_print_context(
         order_name=metadata.order_name,
         template_path=str(template_file),
         aggregation_csv_path=str(csv_file),
+        printer_name=printer_name_text,
         data_source_kind=data_source_kind,
         template_category=template_category,
         label_count=label_count,
@@ -260,6 +267,7 @@ def print_100x180_labels(context: LabelPrint100x180Context) -> None:
             csv_path=Path(context.aggregation_csv_path),
             record_count=context.label_count,
             job_name=context.order_name,
+            printer_name=context.printer_name,
         )
     finally:
         try:
@@ -794,7 +802,14 @@ def _pluralize_ru(value: int, singular: str, few: str, many: str) -> str:
     return many
 
 
-def _run_sdk_database_print(template_path: Path, csv_path: Path, record_count: int, job_name: str) -> None:
+def _run_sdk_database_print(
+    template_path: Path,
+    csv_path: Path,
+    record_count: int,
+    job_name: str,
+    printer_name: str | None = None,
+    print_now: bool = True,
+) -> None:
     if not BARTENDER_SDK_DLL.exists():
         raise BarTenderLabel100x180Error(f"Не найден BarTender Print SDK: {BARTENDER_SDK_DLL}")
 
@@ -813,7 +828,9 @@ def _run_sdk_database_print(template_path: Path, csv_path: Path, record_count: i
         str(csv_path),
         str(record_count),
         str(job_name),
+        str(printer_name or ""),
         str(BARTENDER_SDK_DLL),
+        "1" if print_now else "0",
     ]
 
     try:
@@ -851,7 +868,9 @@ param(
     [string]$CsvPath,
     [int]$RecordCount,
     [string]$JobName,
-    [string]$SdkPath
+    [string]$PrinterName,
+    [string]$SdkPath,
+    [string]$PrintNow
 )
 
 $ErrorActionPreference = 'Stop'
@@ -902,7 +921,13 @@ try {
         $format.PrintSetup.JobName = $JobName
     }
 
-    [void]$format.Print($JobName, 60000)
+    if ($PrinterName) {
+        $format.PrintSetup.PrinterName = $PrinterName
+    }
+
+    if ($PrintNow -eq '1') {
+        [void]$format.Print($JobName, 60000)
+    }
 }
 catch {
     $message = $_.Exception.Message

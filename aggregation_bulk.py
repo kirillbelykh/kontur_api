@@ -21,6 +21,7 @@ DEFAULT_TRUE_API_BASE_URL = DEFAULT_TRUE_API_PRODUCTION_BASE_URL
 DEFAULT_TRUE_API_PRODUCT_GROUP = "wheelchairs"
 DEFAULT_KONTUR_PRODUCT_GROUP = "wheelChairs"
 DEFAULT_BULK_AGGREGATION_MAX_WORKERS = 3
+PROCESSABLE_AGGREGATE_STATUSES = ("readyForSend", "approveFailed")
 
 KONTUR_TO_TRUE_PRODUCT_GROUP = {
     "wheelChairs": "wheelchairs",
@@ -176,13 +177,13 @@ class BulkAggregationSummary:
 
     def to_lines(self) -> List[str]:
         return [
-            f"Найдено readyForSend АК: {self.ready_found}",
+            f"Найдено АК для проведения: {self.ready_found}",
             f"Обработано АК: {self.processed}",
             f"Отправлено на подпись: {self.sent_for_approve}",
             f"Пропущено из-за статусов КМ: {self.skipped_due_to_status}",
             f"Пропущено без кодов: {self.skipped_empty}",
             f"Пропущено как неподдерживаемые: {self.skipped_unsupported}",
-            f"Пропущено не readyForSend: {self.skipped_not_ready}",
+            f"Пропущено из-за статуса АК: {self.skipped_not_ready}",
             f"Расформировано чужих АК: {self.disaggregated_parents}",
             f"Ошибок: {self.errors}",
         ]
@@ -285,7 +286,8 @@ class BulkAggregationService:
         )
         summary.ready_found = len(ready_aggregates)
         logger.info(
-            "Для проведения найдено readyForSend АК: %s",
+            "Для проведения найдено АК со статусами %s: %s",
+            ", ".join(PROCESSABLE_AGGREGATE_STATUSES),
             summary.ready_found,
         )
 
@@ -555,55 +557,82 @@ class BulkAggregationService:
     ) -> List[AggregateInfo]:
         matched: List[AggregateInfo] = []
         normalized_filter = self._normalize_comment_filter(comment_filter)
-        offset = 0
         logger.info(
-            "Начинаем загрузку readyForSend АК из Контур.Маркировки: comment_filter=%r",
+            "Начинаем загрузку АК для проведения из Контур.Маркировки: statuses=%s, comment_filter=%r",
+            ", ".join(PROCESSABLE_AGGREGATE_STATUSES),
             normalized_filter,
         )
+        seen_document_ids: set[str] = set()
 
-        while True:
-            aggregates, total = self.fetch_ready_aggregates_page(kontur_session, offset)
-            page_size = len(aggregates)
-            if not aggregates:
-                logger.info("Страница АК offset=%s пустая, завершаем загрузку", offset)
-                break
-
-            page_aggregates = aggregates
-            if normalized_filter:
-                aggregates = [
-                    aggregate
-                    for aggregate in aggregates
-                    if self._matches_comment_filter(aggregate.comment, normalized_filter)
-                ]
-
-            matched.extend(aggregates)
-            logger.info(
-                "Загружена страница АК: offset=%s, total=%s, page_size=%s, matched_after_filter=%s",
-                offset,
-                total,
-                page_size,
-                len(aggregates),
-            )
-            if normalized_filter and len(aggregates) != len(page_aggregates):
-                logger.info(
-                    "Фильтр comment_filter=%r отбросил %s АК на странице offset=%s",
-                    normalized_filter,
-                    len(page_aggregates) - len(aggregates),
+        for status_filter in PROCESSABLE_AGGREGATE_STATUSES:
+            offset = 0
+            while True:
+                aggregates, total = self.fetch_ready_aggregates_page(
+                    kontur_session,
                     offset,
+                    status_filter=status_filter,
                 )
-            offset += page_size
-            if total and offset >= total:
-                break
-            if page_size < self.page_size:
-                break
+                page_size = len(aggregates)
+                if not aggregates:
+                    logger.info(
+                        "Страница АК status=%s offset=%s пустая, завершаем загрузку",
+                        status_filter,
+                        offset,
+                    )
+                    break
 
-        logger.info("Загрузка readyForSend АК завершена: matched=%s", len(matched))
+                page_aggregates = aggregates
+                if normalized_filter:
+                    aggregates = [
+                        aggregate
+                        for aggregate in aggregates
+                        if self._matches_comment_filter(aggregate.comment, normalized_filter)
+                    ]
+
+                unique_aggregates: List[AggregateInfo] = []
+                for aggregate in aggregates:
+                    if aggregate.document_id in seen_document_ids:
+                        continue
+                    seen_document_ids.add(aggregate.document_id)
+                    unique_aggregates.append(aggregate)
+
+                matched.extend(unique_aggregates)
+                logger.info(
+                    "Загружена страница АК: status=%s, offset=%s, total=%s, page_size=%s, matched_after_filter=%s, unique_added=%s",
+                    status_filter,
+                    offset,
+                    total,
+                    page_size,
+                    len(aggregates),
+                    len(unique_aggregates),
+                )
+                if normalized_filter and len(aggregates) != len(page_aggregates):
+                    logger.info(
+                        "Фильтр comment_filter=%r отбросил %s АК на странице status=%s offset=%s",
+                        normalized_filter,
+                        len(page_aggregates) - len(aggregates),
+                        status_filter,
+                        offset,
+                    )
+                offset += page_size
+                if total and offset >= total:
+                    break
+                if page_size < self.page_size:
+                    break
+
+        logger.info(
+            "Загрузка АК для проведения завершена: statuses=%s, matched=%s",
+            ", ".join(PROCESSABLE_AGGREGATE_STATUSES),
+            len(matched),
+        )
         return matched
 
     def fetch_ready_aggregates_page(
         self,
         kontur_session: requests.Session,
         offset: int,
+        *,
+        status_filter: str = "readyForSend",
     ) -> tuple[List[AggregateInfo], int]:
         response = kontur_session.get(
             f"{self.kontur_base_url}/api/v1/aggregates",
@@ -611,7 +640,7 @@ class BulkAggregationService:
                 "warehouseId": self.warehouse_id,
                 "limit": self.page_size,
                 "offset": offset,
-                "statuses": "readyForSend",
+                "statuses": status_filter,
                 "sortField": "createDate",
                 "sortOrder": "descending",
             },
@@ -711,7 +740,7 @@ class BulkAggregationService:
             detail.includes_units_count,
             detail.codes_check_errors_count,
         )
-        if detail.status != "readyForSend":
+        if detail.status not in PROCESSABLE_AGGREGATE_STATUSES:
             summary.skipped_not_ready += 1
             log(f"⏭️ {aggregate.aggregate_code}: статус уже изменился на {detail.status}")
             return
@@ -775,58 +804,37 @@ class BulkAggregationService:
                 )
             )
 
-        if not_introduced:
-            summary.skipped_due_to_status += 1
-            log(
-                f"⏭️ {aggregate.aggregate_code}: КМ не готовы к проведению "
-                f"({_status_counts(not_introduced)})"
-            )
-            logger.info(
-                "АК %s: пропускаем из-за статусов КМ %s",
-                aggregate.aggregate_code,
-                _status_counts(not_introduced),
-            )
-            if foreign_parents:
-                message = (
-                    f"АК {aggregate.aggregate_code} содержит КМ со статусами "
-                    f"{_status_counts(not_introduced)}.\n\n"
-                    f"При этом часть КМ уже привязана к другим АК: {', '.join(foreign_parents)}.\n"
-                    f"Расформировать эти АК сейчас?\n\n"
-                    f"Текущий АК всё равно будет пропущен до следующего запуска."
-                )
-                if confirm("Расформировать чужие АК", message):
-                    logger.info(
-                        "АК %s: пользователь подтвердил расформирование чужих АК: %s",
-                        aggregate.aggregate_code,
-                        _preview_items(foreign_parents),
-                    )
-                    participant_inn = self.resolve_participant_inn(
-                        kontur_session=kontur_session,
-                        aggregate=aggregate,
-                        states=states,
-                    )
-                    disaggregated = self.disaggregate_parents(
-                        cert=cert,
-                        sign_text_func=sign_text_func,
-                        product_group=self._resolve_true_product_group(aggregate.product_group),
-                        participant_inn=participant_inn,
-                        parent_codes=foreign_parents,
-                        log=log,
-                    )
-                    summary.disaggregated_parent_codes.update(disaggregated)
-                    log(f"ℹ️ {aggregate.aggregate_code}: текущий АК пропущен, повторите запуск позже")
-                else:
-                    logger.info(
-                        "АК %s: пользователь отменил расформирование чужих АК: %s",
-                        aggregate.aggregate_code,
-                        _preview_items(foreign_parents),
-                    )
-                    log(f"ℹ️ {aggregate.aggregate_code}: расформирование отменено пользователем")
-            return
-
         if foreign_parents:
+            status_hint = (
+                f"Статусы КМ сейчас: {_status_counts(not_introduced)}.\n\n"
+                if not_introduced
+                else ""
+            )
+            next_step_hint = (
+                "После расформирования текущий АК будет пропущен до следующего запуска."
+                if not_introduced
+                else "После расформирования программа попробует провести текущий АК сразу."
+            )
+            message = (
+                f"АК {aggregate.aggregate_code} содержит КМ, уже привязанные к другим АК: "
+                f"{', '.join(foreign_parents)}.\n\n"
+                f"{status_hint}"
+                f"Расформировать эти АК сейчас?\n\n"
+                f"{next_step_hint}"
+            )
+            if not confirm("Расформировать чужие АК", message):
+                if not_introduced:
+                    summary.skipped_due_to_status += 1
+                logger.info(
+                    "АК %s: пользователь отменил расформирование чужих АК: %s",
+                    aggregate.aggregate_code,
+                    _preview_items(foreign_parents),
+                )
+                log(f"ℹ️ {aggregate.aggregate_code}: расформирование чужих АК отменено пользователем")
+                return
+
             logger.info(
-                "АК %s: обнаружены чужие родительские АК, начинаем расформирование: %s",
+                "АК %s: пользователь подтвердил расформирование чужих АК: %s",
                 aggregate.aggregate_code,
                 _preview_items(foreign_parents),
             )
@@ -844,6 +852,13 @@ class BulkAggregationService:
                 log=log,
             )
             summary.disaggregated_parent_codes.update(disaggregated)
+            if not_introduced:
+                summary.skipped_due_to_status += 1
+                log(
+                    f"ℹ️ {aggregate.aggregate_code}: после расформирования статусы КМ ещё не готовы "
+                    f"({_status_counts(not_introduced)}), повторите запуск позже"
+                )
+                return
             self.wait_until_parents_cleared(
                 cert=cert,
                 sign_text_func=sign_text_func,
@@ -852,6 +867,19 @@ class BulkAggregationService:
                 current_aggregate_code=aggregate.aggregate_code,
                 log=log,
             )
+
+        if not_introduced:
+            summary.skipped_due_to_status += 1
+            log(
+                f"⏭️ {aggregate.aggregate_code}: КМ не готовы к проведению "
+                f"({_status_counts(not_introduced)})"
+            )
+            logger.info(
+                "АК %s: пропускаем из-за статусов КМ %s",
+                aggregate.aggregate_code,
+                _status_counts(not_introduced),
+            )
+            return
 
         logger.info("АК %s: отправляем в Контур на подпись", aggregate.aggregate_code)
         final_detail = self.send_aggregate_for_approve(
@@ -1333,17 +1361,18 @@ class BulkAggregationService:
         sign_base64_func: Callable[[Any, str, bool], str],
     ) -> AggregateInfo:
         detail = self.fetch_aggregate_detail(kontur_session, aggregate.document_id)
-        if detail.status != "readyForSend":
+        if detail.status not in PROCESSABLE_AGGREGATE_STATUSES:
             raise RuntimeError(
-                f"АК {aggregate.aggregate_code} больше не readyForSend, текущий статус {detail.status}"
+                f"АК {aggregate.aggregate_code} больше не доступен для проведения, текущий статус {detail.status}"
             )
 
         sign_content = self.fetch_content_for_sign(kontur_session, aggregate.document_id)
         signature = sign_base64_func(cert, sign_content.base64_content, True)
         logger.info(
-            "Контур: отправляем АК %s в send, document_id=%s",
+            "Контур: отправляем АК %s в send, document_id=%s, initial_status=%s",
             aggregate.aggregate_code,
             aggregate.document_id,
+            detail.status,
         )
         response = kontur_session.post(
             f"{self.kontur_base_url}/api/v1/aggregates/{aggregate.document_id}/send",
@@ -1367,7 +1396,7 @@ class BulkAggregationService:
                 last_status = last_detail.status
             if last_detail.status in {"approved", "sentForApprove"}:
                 return last_detail
-            if last_detail.status not in {"readyForSend", "returnedToTsd"}:
+            if last_detail.status not in set(PROCESSABLE_AGGREGATE_STATUSES) | {"returnedToTsd"}:
                 raise RuntimeError(
                     f"Контур вернул неожиданный статус {last_detail.status} после отправки АК"
                 )
