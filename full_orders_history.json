@@ -3,9 +3,9 @@
     {
       "order_name": "572 лит диаг L 260316 51д",
       "document_id": "7500ac8c-831b-4cc9-8197-514332bfa608",
-      "status": "Выполнен",
+      "status": "Ожидает",
       "filename": null,
-      "simpl": "wheelChairs",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041332",
       "positions": [
@@ -19,12 +19,15 @@
       ],
       "created_at": "2026-03-20T12:00:58.143647",
       "created_by": "user",
-      "updated_at": "2026-03-20T12:00:58.143647",
+      "updated_at": "2026-03-20T12:01:02.200455",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": null,
+      "xls_path": null,
+      "pdf_path": null
     },
     {
       "order_name": "571 лат диаг XL 260316 180д",
@@ -5154,7 +5157,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-20T12:00:59.808178",
+  "last_update": "2026-03-20T12:01:03.892425",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
