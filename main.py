@@ -23,6 +23,19 @@ from queue_utils import (
 from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
 from bartender_print import BarTenderPrintError, build_print_context, print_labels
+from bartender_label_100x180 import (
+    AGGREGATION_SOURCE_KIND,
+    AggregationCsvInfo,
+    BarTenderLabel100x180Error,
+    LabelTemplateInfo,
+    MARKING_SOURCE_KIND,
+    build_label_print_context as build_100x180_label_print_context,
+    list_aggregation_csv_files,
+    list_100x180_templates,
+    list_marking_csv_files,
+    print_100x180_labels,
+    resolve_order_metadata,
+)
 import update
 import customtkinter as ctk
 from customtkinter import CTkScrollableFrame
@@ -361,6 +374,28 @@ class App(ctk.CTk):
         self.agg_tabview = None
         self.agg_progress = None
         self.agg_log_text = None
+
+        # Атрибуты для печати этикеток 100x180
+        self.label_print_agg_tree = None
+        self.label_print_order_tree = None
+        self.label_print_button = None
+        self.label_print_mfg_entry = None
+        self.label_print_exp_entry = None
+        self.label_print_quantity_entry = None
+        self.label_print_summary_label = None
+        self.label_print_log_text = None
+        self.label_print_source_title_label = None
+        self.label_print_source_hint_label = None
+        self.label_print_templates_frame = None
+        self.label_print_selected_template_path = None
+        self.label_print_template_cards = {}
+        self.label_print_templates: list[LabelTemplateInfo] = []
+        self.label_print_aggregation_files: list[AggregationCsvInfo] = []
+        self.label_print_marking_files: list[AggregationCsvInfo] = []
+        self.label_print_orders: list[dict] = []
+        self.label_print_agg_by_iid = {}
+        self.label_print_order_by_iid = {}
+        self.label_print_in_progress = False
         
         # Атрибуты для навигации
         self.sidebar_frame = None
@@ -464,7 +499,8 @@ class App(ctk.CTk):
             ("download", "⏬ Загрузка кодов", self.show_download_frame),
             ("intro", "🔄 Ввод в оборот", self.show_intro_frame),
             ("intro_tsd", "📲 Задание на ТСД", self.show_intro_tsd_frame),
-            ("aggregation", "📦 Коды агрегации", self.show_aggregation_frame)
+            ("aggregation", "📦 Коды агрегации", self.show_aggregation_frame),
+            ("label_print", "🖨️ Печать этикеток", self.show_label_print_frame),
         ]
         
         nav_font = ctk.CTkFont(family="Segoe UI", size=13, weight="normal")
@@ -578,10 +614,11 @@ class App(ctk.CTk):
         """Обновление стиля навигации с современными эффектами"""
         frame_to_nav_id = {
             "create": "create",
-            "download": "download", 
+            "download": "download",
             "intro": "intro",
             "intro_tsd": "intro_tsd",
-            "aggregation": "aggregation"
+            "aggregation": "aggregation",
+            "label_print": "label_print",
         }
         
         active_nav_id = frame_to_nav_id.get(active_frame, "")
@@ -624,6 +661,7 @@ class App(ctk.CTk):
         self._setup_introduction_frame()
         self._setup_introduction_tsd_frame()
         self._setup_aggregation_frame()
+        self._setup_label_print_frame()
         
         # Показываем первый фрейм по умолчанию
         self.show_content_frame("create")
@@ -685,7 +723,10 @@ class App(ctk.CTk):
         """Показать раздел кодов агрегации"""
         self.show_content_frame("aggregation")
 
-    
+    def show_label_print_frame(self):
+        """Показать раздел печати этикеток"""
+        self.show_content_frame("label_print")
+        self._refresh_label_print_data()
 
     def _get_color(self, color_name):
         """Получение цвета из текущей темы"""
@@ -2157,6 +2198,850 @@ class App(ctk.CTk):
         
         self.download_log_text = ctk.CTkTextbox(log_container, height=150)
         self.download_log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+    def _setup_label_print_frame(self):
+        """Экран печати крупных этикеток 100x180 через BarTender."""
+        self.content_frames["label_print"] = CTkScrollableFrame(self.main_content, corner_radius=0)
+
+        main_frame = ctk.CTkFrame(self.content_frames["label_print"], corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
+
+        ctk.CTkLabel(
+            header_frame,
+            text="🖨️",
+            font=("Segoe UI", 48),
+            text_color=self._get_color("primary"),
+        ).pack(side="left", padx=(0, 15))
+
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left", fill="y", expand=True)
+
+        ctk.CTkLabel(
+            title_frame,
+            text="Печать этикеток",
+            font=self.fonts["title"],
+            text_color=self._get_color("text_primary"),
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            title_frame,
+            text="Шаблоны 100x180, агрегированные коды и автозаполнение данных из заказа маркировки",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        ).pack(anchor="w")
+
+        ctk.CTkButton(
+            header_frame,
+            text="Обновить данные",
+            command=lambda: self._refresh_label_print_data(manual=True),
+            fg_color=self._get_color("secondary"),
+            hover_color=self._get_color("primary"),
+            font=self.fonts["button"],
+            width=170,
+        ).pack(side="right")
+
+        workspace_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        workspace_frame.pack(fill="both", expand=True)
+        workspace_frame.grid_columnconfigure(0, weight=4)
+        workspace_frame.grid_columnconfigure(1, weight=5)
+
+        left_column = ctk.CTkFrame(workspace_frame, corner_radius=12)
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        left_column.grid_rowconfigure(0, weight=1)
+        left_column.grid_rowconfigure(1, weight=1)
+        left_column.grid_columnconfigure(0, weight=1)
+
+        agg_container = ctk.CTkFrame(left_column, corner_radius=10)
+        agg_container.grid(row=0, column=0, sticky="nsew", padx=12, pady=(12, 6))
+        agg_container.grid_rowconfigure(2, weight=1)
+        agg_container.grid_columnconfigure(0, weight=1)
+
+        self.label_print_source_title_label = ctk.CTkLabel(
+            agg_container,
+            text='Файлы АК из папки "Агрег коды км"',
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary"),
+        )
+        self.label_print_source_title_label.grid(row=0, column=0, sticky="w", padx=14, pady=(14, 4))
+
+        self.label_print_source_hint_label = ctk.CTkLabel(
+            agg_container,
+            text="Источник переключается автоматически по выбранному шаблону.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        )
+        self.label_print_source_hint_label.grid(row=1, column=0, sticky="w", padx=14, pady=(0, 8))
+
+        agg_tree_host = ctk.CTkFrame(agg_container, fg_color="transparent")
+        agg_tree_host.grid(row=2, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        agg_tree_host.grid_rowconfigure(0, weight=1)
+        agg_tree_host.grid_columnconfigure(0, weight=1)
+
+        agg_columns = ("name", "folder", "records", "modified")
+        self.label_print_agg_tree = ttk.Treeview(
+            agg_tree_host,
+            columns=agg_columns,
+            show="headings",
+            height=10,
+            selectmode="browse",
+        )
+        self.label_print_agg_tree.heading("name", text="CSV-файл")
+        self.label_print_agg_tree.heading("folder", text="Папка")
+        self.label_print_agg_tree.heading("records", text="АК")
+        self.label_print_agg_tree.heading("modified", text="Изменен")
+        self.label_print_agg_tree.column("name", width=220)
+        self.label_print_agg_tree.column("folder", width=160)
+        self.label_print_agg_tree.column("records", width=60, anchor="center")
+        self.label_print_agg_tree.column("modified", width=125, anchor="center")
+
+        agg_scrollbar = ttk.Scrollbar(agg_tree_host, orient="vertical", command=self.label_print_agg_tree.yview)
+        self.label_print_agg_tree.configure(yscrollcommand=agg_scrollbar.set)
+        self.label_print_agg_tree.grid(row=0, column=0, sticky="nsew")
+        agg_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.label_print_agg_tree.bind("<<TreeviewSelect>>", self._update_label_print_summary)
+
+        order_container = ctk.CTkFrame(left_column, corner_radius=10)
+        order_container.grid(row=1, column=0, sticky="nsew", padx=12, pady=(6, 12))
+        order_container.grid_rowconfigure(1, weight=1)
+        order_container.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            order_container,
+            text="Заказы кодов маркировки",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary"),
+        ).grid(row=0, column=0, sticky="w", padx=14, pady=(14, 8))
+
+        order_tree_host = ctk.CTkFrame(order_container, fg_color="transparent")
+        order_tree_host.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        order_tree_host.grid_rowconfigure(0, weight=1)
+        order_tree_host.grid_columnconfigure(0, weight=1)
+
+        order_columns = ("order_name", "document_id", "size", "units", "color")
+        self.label_print_order_tree = ttk.Treeview(
+            order_tree_host,
+            columns=order_columns,
+            show="headings",
+            height=10,
+            selectmode="browse",
+        )
+        self.label_print_order_tree.heading("order_name", text="Заявка")
+        self.label_print_order_tree.heading("document_id", text="ID заказа")
+        self.label_print_order_tree.heading("size", text="Размер")
+        self.label_print_order_tree.heading("units", text="В упаковке")
+        self.label_print_order_tree.heading("color", text="Цвет")
+        self.label_print_order_tree.column("order_name", width=260)
+        self.label_print_order_tree.column("document_id", width=160)
+        self.label_print_order_tree.column("size", width=70, anchor="center")
+        self.label_print_order_tree.column("units", width=90, anchor="center")
+        self.label_print_order_tree.column("color", width=120)
+
+        order_scrollbar = ttk.Scrollbar(order_tree_host, orient="vertical", command=self.label_print_order_tree.yview)
+        self.label_print_order_tree.configure(yscrollcommand=order_scrollbar.set)
+        self.label_print_order_tree.grid(row=0, column=0, sticky="nsew")
+        order_scrollbar.grid(row=0, column=1, sticky="ns")
+        self.label_print_order_tree.bind("<<TreeviewSelect>>", self._on_label_print_order_selected)
+
+        right_column = ctk.CTkFrame(workspace_frame, corner_radius=12)
+        right_column.grid(row=0, column=1, sticky="nsew")
+
+        template_container = ctk.CTkFrame(right_column, corner_radius=10)
+        template_container.pack(fill="both", expand=True, padx=12, pady=(12, 8))
+
+        template_title = ctk.CTkFrame(template_container, fg_color="transparent")
+        template_title.pack(fill="x", padx=14, pady=(14, 8))
+
+        ctk.CTkLabel(
+            template_title,
+            text="Шаблоны BarTender 100x180",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary"),
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            template_title,
+            text="Латекс, Нитрил, HR / стерилка / Хирургия",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        ).pack(side="left", padx=(10, 0))
+
+        self.label_print_templates_frame = CTkScrollableFrame(template_container, height=260, fg_color="transparent")
+        self.label_print_templates_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        settings_container = ctk.CTkFrame(right_column, corner_radius=10)
+        settings_container.pack(fill="x", padx=12, pady=(0, 8))
+        settings_container.grid_columnconfigure(0, weight=1)
+        settings_container.grid_columnconfigure(1, weight=1)
+        settings_container.grid_columnconfigure(2, weight=1)
+
+        ctk.CTkLabel(
+            settings_container,
+            text="Параметры печати",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary"),
+        ).grid(row=0, column=0, columnspan=3, sticky="w", padx=14, pady=(14, 10))
+
+        ctk.CTkLabel(settings_container, text="Дата изготовления", font=self.fonts["normal"]).grid(
+            row=1, column=0, sticky="w", padx=(14, 8), pady=(0, 6)
+        )
+        ctk.CTkLabel(settings_container, text="Срок годности", font=self.fonts["normal"]).grid(
+            row=1, column=1, sticky="w", padx=8, pady=(0, 6)
+        )
+        ctk.CTkLabel(settings_container, text="Количество", font=self.fonts["normal"]).grid(
+            row=1, column=2, sticky="w", padx=(8, 14), pady=(0, 6)
+        )
+
+        self.label_print_mfg_entry = ctk.CTkEntry(
+            settings_container,
+            placeholder_text="2026-01",
+            font=self.fonts["normal"],
+        )
+        self.label_print_mfg_entry.grid(row=2, column=0, sticky="ew", padx=(14, 8), pady=(0, 12))
+
+        self.label_print_exp_entry = ctk.CTkEntry(
+            settings_container,
+            placeholder_text="2031-01",
+            font=self.fonts["normal"],
+        )
+        self.label_print_exp_entry.grid(row=2, column=1, sticky="ew", padx=8, pady=(0, 12))
+
+        self.label_print_quantity_entry = ctk.CTkEntry(
+            settings_container,
+            placeholder_text="Например, 500",
+            font=self.fonts["normal"],
+        )
+        self.label_print_quantity_entry.grid(row=2, column=2, sticky="ew", padx=(8, 14), pady=(0, 12))
+
+        ctk.CTkLabel(
+            settings_container,
+            text="Размер этикетки: 100x180. Для HR количество вводится вручную, для стерилки и хирургии берется из GTIN.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        ).grid(row=3, column=0, columnspan=3, sticky="w", padx=14, pady=(0, 12))
+
+        summary_container = ctk.CTkFrame(right_column, corner_radius=10)
+        summary_container.pack(fill="x", padx=12, pady=(0, 8))
+
+        ctk.CTkLabel(
+            summary_container,
+            text="Сводка автозаполнения",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary"),
+        ).pack(anchor="w", padx=14, pady=(14, 8))
+
+        self.label_print_summary_label = ctk.CTkLabel(
+            summary_container,
+            text="Выберите шаблон, CSV и заявку, затем заполните дату изготовления и срок годности.",
+            justify="left",
+            anchor="w",
+            wraplength=620,
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_secondary"),
+        )
+        self.label_print_summary_label.pack(fill="x", padx=14, pady=(0, 14))
+
+        actions_container = ctk.CTkFrame(right_column, corner_radius=10)
+        actions_container.pack(fill="x", padx=12, pady=(0, 8))
+
+        self.label_print_button = ctk.CTkButton(
+            actions_container,
+            text="Выполнить печать",
+            command=self.print_selected_100x180_labels,
+            state="disabled",
+            fg_color=self._get_color("primary"),
+            hover_color=self._get_color("secondary"),
+            font=self.fonts["button"],
+            height=42,
+        )
+        self.label_print_button.pack(side="left", padx=14, pady=14)
+
+        ctk.CTkLabel(
+            actions_container,
+            text="BarTender получит выбранный CSV АК как базу данных и распечатает каждую запись файла.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        ).pack(side="left", padx=(0, 14))
+
+        log_container = ctk.CTkFrame(right_column, corner_radius=10)
+        log_container.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+
+        ctk.CTkLabel(
+            log_container,
+            text="Лог печати этикеток",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary"),
+        ).pack(anchor="w", padx=14, pady=(14, 8))
+
+        self.label_print_log_text = ctk.CTkTextbox(log_container, height=120, font=self.fonts["normal"])
+        self.label_print_log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.label_print_log_text.configure(state="disabled")
+
+        for entry in (self.label_print_mfg_entry, self.label_print_exp_entry, self.label_print_quantity_entry):
+            self._add_entry_context_menu(entry)
+            entry.bind("<KeyRelease>", self._update_label_print_summary)
+
+        self._set_default_date_range(self.label_print_mfg_entry, self.label_print_exp_entry)
+
+    def _refresh_label_print_data(self, manual: bool = False):
+        self._refresh_label_print_templates()
+        self._refresh_label_print_aggregation_files()
+        self._refresh_label_print_orders()
+        self._apply_label_print_template_mode()
+        self._auto_select_label_print_source_for_order()
+        self._update_label_print_summary()
+
+        if manual:
+            self.label_print_log_insert(
+                f"????????? ?????? ??? ??????: ???????? {len(self.label_print_templates)}, "
+                f"CSV ?? {len(self.label_print_aggregation_files)}, CSV ?? {len(self.label_print_marking_files)}, "
+                f"??????? {len(self.label_print_orders)}"
+            )
+    def _refresh_label_print_templates(self):
+        current_path = self.label_print_selected_template_path
+        self.label_print_templates = list_100x180_templates()
+
+        if current_path and not any(template.path == current_path for template in self.label_print_templates):
+            self.label_print_selected_template_path = None
+
+        self._render_label_print_template_cards()
+    def _render_label_print_template_cards(self):
+        if self.label_print_templates_frame is None:
+            return
+
+        for child in self.label_print_templates_frame.winfo_children():
+            child.destroy()
+
+        self.label_print_template_cards = {}
+
+        if not self.label_print_templates:
+            ctk.CTkLabel(
+                self.label_print_templates_frame,
+                text='Шаблоны в папке "BarTender наклейки 100х180" не найдены.',
+                justify="left",
+                wraplength=580,
+                text_color=self._get_color("warning"),
+                font=self.fonts["normal"],
+            ).pack(anchor="w", padx=10, pady=10)
+            return
+
+        grouped_templates: dict[str, list[LabelTemplateInfo]] = {}
+        for template in self.label_print_templates:
+            grouped_templates.setdefault(template.category, []).append(template)
+
+        for category, templates in grouped_templates.items():
+            ctk.CTkLabel(
+                self.label_print_templates_frame,
+                text=category,
+                font=self.fonts["subheading"],
+                text_color=self._get_color("text_primary"),
+            ).pack(anchor="w", padx=8, pady=(8, 6))
+
+            cards_grid = ctk.CTkFrame(self.label_print_templates_frame, fg_color="transparent")
+            cards_grid.pack(fill="x", padx=4, pady=(0, 8))
+            cards_grid.grid_columnconfigure(0, weight=1)
+            cards_grid.grid_columnconfigure(1, weight=1)
+
+            for index, template in enumerate(templates):
+                is_selected = template.path == self.label_print_selected_template_path
+                row = index // 2
+                column = index % 2
+
+                card = ctk.CTkFrame(
+                    cards_grid,
+                    corner_radius=12,
+                    border_width=2,
+                    border_color=self._get_color("accent") if is_selected else self._get_color("secondary"),
+                    fg_color=self._get_color("primary") if is_selected else self._get_color("bg_secondary"),
+                    cursor="hand2",
+                )
+                card.grid(row=row, column=column, sticky="nsew", padx=6, pady=6)
+
+                title_color = "white" if is_selected else self._get_color("text_primary")
+                secondary_color = "#EAF4FF" if is_selected else self._get_color("text_secondary")
+
+                title_label = ctk.CTkLabel(
+                    card,
+                    text=template.name,
+                    justify="left",
+                    wraplength=250,
+                    font=self.fonts["button"],
+                    text_color=title_color,
+                )
+                title_label.pack(anchor="w", padx=12, pady=(12, 6))
+
+                path_label = ctk.CTkLabel(
+                    card,
+                    text=template.relative_path,
+                    justify="left",
+                    wraplength=250,
+                    font=self.fonts["small"],
+                    text_color=secondary_color,
+                )
+                path_label.pack(anchor="w", padx=12, pady=(0, 10))
+
+                source_label = ctk.CTkLabel(
+                    card,
+                    text="Источник: Коды км" if template.data_source_kind == MARKING_SOURCE_KIND else "Источник: Агрег коды км",
+                    justify="left",
+                    wraplength=250,
+                    font=self.fonts["small"],
+                    text_color=secondary_color,
+                )
+                source_label.pack(anchor="w", padx=12, pady=(0, 8))
+
+                badge_label = ctk.CTkLabel(
+                    card,
+                    text="Выбран" if is_selected else "Нажмите для выбора",
+                    font=self.fonts["small"],
+                    text_color="white" if is_selected else self._get_color("primary"),
+                    fg_color=self._get_color("accent") if is_selected else "transparent",
+                    corner_radius=8,
+                    padx=10,
+                    pady=4,
+                )
+                badge_label.pack(anchor="w", padx=12, pady=(0, 12))
+
+                for widget in (card, title_label, path_label, source_label, badge_label):
+                    widget.bind("<Button-1>", lambda event, path=template.path: self._select_label_template(path))
+
+                self.label_print_template_cards[template.path] = card
+
+    def _select_label_template(self, template_path: str):
+        self.label_print_selected_template_path = template_path
+        self._render_label_print_template_cards()
+        self._apply_label_print_template_mode()
+        self._refresh_label_print_aggregation_files()
+        self._auto_select_label_print_source_for_order()
+        self._update_label_print_summary()
+
+    def _get_selected_label_template(self) -> LabelTemplateInfo | None:
+        if not self.label_print_selected_template_path:
+            return None
+
+        for template in self.label_print_templates:
+            if template.path == self.label_print_selected_template_path:
+                return template
+
+        return None
+
+    def _get_label_print_source_kind(self) -> str:
+        selected_template = self._get_selected_label_template()
+        if selected_template is None:
+            return AGGREGATION_SOURCE_KIND
+        return selected_template.data_source_kind
+
+    def _apply_label_print_template_mode(self):
+        source_kind = self._get_label_print_source_kind()
+        if self.label_print_quantity_entry is None:
+            return
+
+        previous_state = self.label_print_quantity_entry.cget("state")
+
+        if self.label_print_source_title_label is not None:
+            if source_kind == MARKING_SOURCE_KIND:
+                self.label_print_source_title_label.configure(text='Файлы КМ из папки "Коды км"')
+            else:
+                self.label_print_source_title_label.configure(text='Файлы АК из папки "Агрег коды км"')
+
+        if self.label_print_source_hint_label is not None:
+            if source_kind == MARKING_SOURCE_KIND:
+                self.label_print_source_hint_label.configure(
+                    text="Для шаблонов из 'стерилка' и 'Хирургия' используется CSV с кодами маркировки."
+                )
+            else:
+                self.label_print_source_hint_label.configure(
+                    text="Для шаблонов из 'Латекс, Нитрил, HR' используется CSV с агрегационными кодами."
+                )
+
+        if source_kind == MARKING_SOURCE_KIND:
+            order_data, metadata_or_error = self._resolve_selected_label_order_metadata()
+            quantity_text = ""
+            if order_data and not isinstance(metadata_or_error, Exception) and metadata_or_error is not None:
+                quantity_text = str(metadata_or_error.units_per_pack)
+
+            self.label_print_quantity_entry.configure(state="normal")
+            self.label_print_quantity_entry.delete(0, "end")
+            if quantity_text:
+                self.label_print_quantity_entry.insert(0, quantity_text)
+            self.label_print_quantity_entry.configure(state="disabled", placeholder_text="Берется из GTIN")
+        else:
+            current_value = self.label_print_quantity_entry.get().strip()
+            self.label_print_quantity_entry.configure(state="normal", placeholder_text="Например, 500")
+            if previous_state == "disabled":
+                current_value = ""
+                self.label_print_quantity_entry.delete(0, "end")
+            if current_value and not current_value.isdigit():
+                self.label_print_quantity_entry.delete(0, "end")
+
+    def _on_label_print_order_selected(self, event=None):
+        self._apply_label_print_template_mode()
+        self._auto_select_label_print_source_for_order()
+        self._update_label_print_summary()
+
+    def _auto_select_label_print_source_for_order(self):
+        source_kind = self._get_label_print_source_kind()
+        if source_kind != MARKING_SOURCE_KIND or self.label_print_agg_tree is None:
+            return
+
+        selected_order = self._get_selected_label_order()
+        if selected_order is None:
+            return
+
+        resolved_path = self._resolve_order_csv_path(selected_order)
+        if not resolved_path:
+            return
+
+        for item_iid, file_info in self.label_print_agg_by_iid.items():
+            if os.path.normcase(file_info.path) == os.path.normcase(resolved_path):
+                self.label_print_agg_tree.selection_set(item_iid)
+                self.label_print_agg_tree.focus(item_iid)
+                return
+    def _refresh_label_print_aggregation_files(self):
+        if self.label_print_agg_tree is None:
+            return
+
+        current_selection = self._get_selected_aggregation_csv()
+        selected_path = current_selection.path if current_selection else None
+        source_kind = self._get_label_print_source_kind()
+
+        if source_kind == MARKING_SOURCE_KIND:
+            self.label_print_marking_files = list_marking_csv_files()
+            files_to_show = self.label_print_marking_files
+            self.label_print_agg_tree.heading("records", text="КМ")
+        else:
+            self.label_print_aggregation_files = list_aggregation_csv_files()
+            files_to_show = self.label_print_aggregation_files
+            self.label_print_agg_tree.heading("records", text="АК")
+
+        self.label_print_agg_by_iid = {}
+
+        for item_id in self.label_print_agg_tree.get_children():
+            self.label_print_agg_tree.delete(item_id)
+
+        selected_iid = None
+        for index, file_info in enumerate(files_to_show):
+            item_iid = f"source_{index}"
+            self.label_print_agg_by_iid[item_iid] = file_info
+            modified_at = datetime.fromtimestamp(file_info.modified_timestamp).strftime("%d.%m.%Y %H:%M")
+            self.label_print_agg_tree.insert(
+                "",
+                "end",
+                iid=item_iid,
+                values=(file_info.name, file_info.folder_name, file_info.record_count, modified_at),
+            )
+            if selected_path and file_info.path == selected_path:
+                selected_iid = item_iid
+
+        if selected_iid:
+            self.label_print_agg_tree.selection_set(selected_iid)
+            self.label_print_agg_tree.focus(selected_iid)
+    def _refresh_label_print_orders(self):
+        if self.label_print_order_tree is None:
+            return
+
+        current_selection = self._get_selected_label_order()
+        selected_document_id = str(current_selection.get("document_id") or "") if current_selection else ""
+
+        history_orders = self.history_db.get_all_orders()
+        self.label_print_orders = sorted(
+            history_orders,
+            key=lambda order: str(order.get("updated_at") or order.get("created_at") or ""),
+            reverse=True,
+        )
+        self.label_print_order_by_iid = {}
+
+        for item_id in self.label_print_order_tree.get_children():
+            self.label_print_order_tree.delete(item_id)
+
+        selected_iid = None
+        for index, order in enumerate(self.label_print_orders):
+            item_iid = f"order_{index}"
+            self.label_print_order_by_iid[item_iid] = order
+
+            size_value = "-"
+            units_value = "-"
+            color_value = "-"
+            try:
+                metadata = resolve_order_metadata(order, self.df)
+                size_value = metadata.size or "-"
+                units_value = str(metadata.units_per_pack or "-")
+                color_value = metadata.color or "-"
+            except Exception:
+                pass
+
+            document_id = str(order.get("document_id") or "")
+            self.label_print_order_tree.insert(
+                "",
+                "end",
+                iid=item_iid,
+                values=(
+                    str(order.get("order_name") or ""),
+                    document_id,
+                    size_value,
+                    units_value,
+                    color_value,
+                ),
+            )
+            if selected_document_id and document_id == selected_document_id:
+                selected_iid = item_iid
+
+        if selected_iid:
+            self.label_print_order_tree.selection_set(selected_iid)
+            self.label_print_order_tree.focus(selected_iid)
+
+    def _get_selected_aggregation_csv(self) -> AggregationCsvInfo | None:
+        if self.label_print_agg_tree is None:
+            return None
+
+        selected_items = self.label_print_agg_tree.selection()
+        if not selected_items:
+            return None
+
+        return self.label_print_agg_by_iid.get(selected_items[0])
+
+    def _get_selected_label_order(self) -> dict | None:
+        if self.label_print_order_tree is None:
+            return None
+
+        selected_items = self.label_print_order_tree.selection()
+        if not selected_items:
+            return None
+
+        return self.label_print_order_by_iid.get(selected_items[0])
+
+    def _resolve_selected_label_order_metadata(self):
+        order_data = self._get_selected_label_order()
+        if not order_data:
+            return None, None
+
+        try:
+            return order_data, resolve_order_metadata(order_data, self.df)
+        except Exception as exc:
+            return order_data, exc
+
+    def _update_label_print_summary(self, event=None):
+        if self.label_print_summary_label is None:
+            return
+
+        selected_template = self._get_selected_label_template()
+        source_file = self._get_selected_aggregation_csv()
+        order_data, order_metadata_or_error = self._resolve_selected_label_order_metadata()
+        source_kind = self._get_label_print_source_kind()
+        source_title = "Коды км" if source_kind == MARKING_SOURCE_KIND else "Агрег коды км"
+        record_label = "кодов маркировки" if source_kind == MARKING_SOURCE_KIND else "агрегационных кодов"
+
+        summary_lines = [
+            f"Шаблон: {selected_template.relative_path if selected_template else 'не выбран'}",
+            f"Источник CSV: {source_title} | файл: {source_file.name if source_file else 'не выбран'}",
+            f"Заявка: {str(order_data.get('order_name') or '') if order_data else 'не выбрана'}",
+        ]
+
+        if source_file:
+            summary_lines.append(
+                f"Записей в CSV: {source_file.record_count} {record_label} | папка: {source_file.folder_name}"
+            )
+
+        if order_data and isinstance(order_metadata_or_error, Exception):
+            summary_lines.append(f"Ошибка чтения заявки: {order_metadata_or_error}")
+        elif order_data and order_metadata_or_error is not None:
+            metadata = order_metadata_or_error
+            summary_lines.extend(
+                [
+                    f"Размер: {metadata.size} | Партия: {metadata.batch}",
+                    f"Цвет: {metadata.color} | Единиц в упаковке: {metadata.units_per_pack}",
+                    f"GTIN: {metadata.gtin}",
+                ]
+            )
+
+        manufacture_date = self.label_print_mfg_entry.get().strip() if self.label_print_mfg_entry else ""
+        expiration_date = self.label_print_exp_entry.get().strip() if self.label_print_exp_entry else ""
+        quantity_text = self.label_print_quantity_entry.get().strip() if self.label_print_quantity_entry else ""
+
+        summary_lines.append(
+            f"Дата изготовления: {manufacture_date or 'не заполнена'} | Срок годности: {expiration_date or 'не заполнен'}"
+        )
+
+        if source_kind == MARKING_SOURCE_KIND:
+            if order_data and not isinstance(order_metadata_or_error, Exception) and order_metadata_or_error is not None:
+                quantity_value = order_metadata_or_error.units_per_pack
+                summary_lines.append(
+                    f"Количество: {quantity_value} "
+                    f"{self._pluralize_label_print_ru(quantity_value, 'пара', 'пары', 'пар')} "
+                    "(из GTIN / nomenclature.xlsx)"
+                )
+                summary_lines.append("Сериализация: номер этикетки начнется с 1 и увеличится для каждой строки CSV.")
+            else:
+                summary_lines.append("Количество: будет взято автоматически из GTIN / nomenclature.xlsx")
+        else:
+            if quantity_text:
+                try:
+                    quantity_value = int(quantity_text.replace(" ", ""))
+                    quantity_line = (
+                        f"Количество: {quantity_value} "
+                        f"{self._pluralize_label_print_ru(quantity_value, 'пара', 'пары', 'пар')}"
+                    )
+
+                    if order_data and not isinstance(order_metadata_or_error, Exception) and order_metadata_or_error is not None:
+                        units_per_pack = order_metadata_or_error.units_per_pack
+                        if quantity_value > 0 and quantity_value % units_per_pack == 0:
+                            dispenser_count = quantity_value // units_per_pack
+                            quantity_line += (
+                                f" | ({dispenser_count} "
+                                f"{self._pluralize_label_print_ru(dispenser_count, 'диспенсер', 'диспенсера', 'диспенсеров')} "
+                                f"по {units_per_pack} {self._pluralize_label_print_ru(units_per_pack, 'пара', 'пары', 'пар')})"
+                            )
+                        else:
+                            quantity_line += f" | значение должно быть кратно {units_per_pack}"
+
+                    summary_lines.append(quantity_line)
+                except ValueError:
+                    summary_lines.append("Количество: введите целое число")
+            else:
+                summary_lines.append("Количество: не заполнено")
+
+        self.label_print_summary_label.configure(text="\n".join(summary_lines))
+        self._update_label_print_button_state()
+
+    def _pluralize_label_print_ru(self, value: int, singular: str, few: str, many: str) -> str:
+        remainder10 = value % 10
+        remainder100 = value % 100
+
+        if remainder10 == 1 and remainder100 != 11:
+            return singular
+        if remainder10 in (2, 3, 4) and remainder100 not in (12, 13, 14):
+            return few
+        return many
+
+    def _update_label_print_button_state(self, event=None):
+        if self.label_print_button is None:
+            return
+
+        source_kind = self._get_label_print_source_kind()
+        has_template = self._get_selected_label_template() is not None
+        has_source = self._get_selected_aggregation_csv() is not None
+        has_order = self._get_selected_label_order() is not None
+        has_dates = bool(
+            self.label_print_mfg_entry
+            and self.label_print_exp_entry
+            and self.label_print_mfg_entry.get().strip()
+            and self.label_print_exp_entry.get().strip()
+        )
+
+        order_is_valid = False
+        quantity_is_valid = False
+        selected_order = self._get_selected_label_order()
+        if selected_order is not None:
+            try:
+                metadata = resolve_order_metadata(selected_order, self.df)
+                order_is_valid = True
+                if source_kind == MARKING_SOURCE_KIND:
+                    quantity_is_valid = metadata.units_per_pack > 0
+                elif self.label_print_quantity_entry is not None:
+                    raw_quantity = self.label_print_quantity_entry.get().strip().replace(" ", "")
+                    if raw_quantity:
+                        parsed_quantity = int(raw_quantity)
+                        quantity_is_valid = parsed_quantity > 0 and parsed_quantity % metadata.units_per_pack == 0
+            except Exception:
+                order_is_valid = False
+                quantity_is_valid = False
+
+        button_state = (
+            "normal"
+            if has_template and has_source and has_order and has_dates and order_is_valid and quantity_is_valid and not self.label_print_in_progress
+            else "disabled"
+        )
+        self.label_print_button.configure(state=button_state)
+
+    def _set_label_print_busy(self, is_busy: bool):
+        self.label_print_in_progress = is_busy
+        if self.label_print_button is not None:
+            self.label_print_button.configure(
+                text="Печать..." if is_busy else "Выполнить печать"
+            )
+        self._update_label_print_button_state()
+
+    def label_print_log_insert(self, message: str):
+        if self.label_print_log_text is None:
+            return
+
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.label_print_log_text.configure(state="normal")
+        self.label_print_log_text.insert("end", f"[{timestamp}] {message}\n")
+        self.label_print_log_text.see("end")
+        self.label_print_log_text.configure(state="disabled")
+
+    def print_selected_100x180_labels(self):
+        template = self._get_selected_label_template()
+        template_path = self.label_print_selected_template_path
+        if template is None or not template_path:
+            mbox.showwarning("Выбор шаблона", "Сначала выберите шаблон BarTender 100x180.")
+            return
+
+        source_file = self._get_selected_aggregation_csv()
+        source_kind = template.data_source_kind
+        source_title = "кодами маркировки" if source_kind == MARKING_SOURCE_KIND else "агрегационными кодами"
+        source_short = "КМ" if source_kind == MARKING_SOURCE_KIND else "АК"
+        if source_file is None:
+            mbox.showwarning("Выбор CSV", f"Сначала выберите CSV с {source_title}.")
+            return
+
+        order_data = self._get_selected_label_order()
+        if order_data is None:
+            mbox.showwarning("Выбор заявки", "Сначала выберите заказ кодов маркировки.")
+            return
+
+        try:
+            context = build_100x180_label_print_context(
+                df=self.df,
+                order_data=order_data,
+                template_path=template_path,
+                aggregation_csv_path=source_file.path,
+                manufacture_date=self.label_print_mfg_entry.get().strip() if self.label_print_mfg_entry else "",
+                expiration_date=self.label_print_exp_entry.get().strip() if self.label_print_exp_entry else "",
+                quantity_value=(
+                    self.label_print_quantity_entry.get().strip()
+                    if source_kind == AGGREGATION_SOURCE_KIND and self.label_print_quantity_entry
+                    else None
+                ),
+            )
+        except BarTenderLabel100x180Error as exc:
+            mbox.showerror("Ошибка печати", str(exc))
+            self.label_print_log_insert(f"Ошибка подготовки печати: {exc}")
+            return
+
+        self._set_label_print_busy(True)
+        self.label_print_log_insert(
+            f"Подготовка 100x180: {context.order_name} | шаблон {os.path.basename(context.template_path)} | "
+            f"{source_short} {os.path.basename(context.aggregation_csv_path)} | записей {context.label_count}"
+        )
+        self.print_executor.submit(self._label_print_worker, context)
+
+    def _label_print_worker(self, context):
+        try:
+            print_100x180_labels(context)
+            self.after(0, lambda: self._on_label_print_completed(True, context, "Печать отправлена в BarTender"))
+        except Exception as exc:
+            self.after(0, lambda err=str(exc): self._on_label_print_completed(False, context, err))
+
+    def _on_label_print_completed(self, success: bool, context, message: str):
+        self._set_label_print_busy(False)
+        source_short = "КМ" if getattr(context, "data_source_kind", "") == MARKING_SOURCE_KIND else "АК"
+
+        if success:
+            self.label_print_log_insert(
+                f"Печать запущена: {context.order_name} | {source_short} {os.path.basename(context.aggregation_csv_path)} | "
+                f"{context.label_count} этикеток"
+            )
+            if hasattr(self, "status_bar") and self.status_bar:
+                self.status_bar.configure(text=f"Печать 100x180 отправлена: {context.order_name}")
+                self.after(3000, lambda: self._reset_status_bar())
+            return
+
+        self.label_print_log_insert(f"Ошибка печати {context.order_name}: {message}")
+        mbox.showerror("Ошибка печати", message)
 
 
     def _add_entry_context_menu(self, entry: ctk.CTkEntry):
