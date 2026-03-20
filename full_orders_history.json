@@ -1304,7 +1304,7 @@
       "gtin": "4640473505129",
       "created_at": "2026-03-13T14:12:09.568604",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.111303",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:08:21.935121",
@@ -1330,7 +1330,7 @@
       "gtin": "4640473504887",
       "created_at": "2026-03-13T14:12:09.373411",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.111303",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:08:46.019348",
@@ -1356,7 +1356,7 @@
       "gtin": "4640473504917",
       "created_at": "2026-03-13T14:12:09.278830",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.111303",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:09:04.173391",
@@ -1382,7 +1382,7 @@
       "gtin": "4640473505105",
       "created_at": "2026-03-13T14:12:06.119416",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:07:44.821148",
@@ -1400,7 +1400,7 @@
       "gtin": "4640473505112",
       "created_at": "2026-03-13T14:12:06.093986",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:07:24.866316",
@@ -1416,7 +1416,7 @@
       "gtin": "4640473505143",
       "created_at": "2026-03-13T14:12:05.961410",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:06:59.254146",
@@ -1442,7 +1442,7 @@
       "gtin": "4640473505099",
       "created_at": "2026-03-13T11:21:03.672673",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:25:15.827684",
@@ -1468,7 +1468,7 @@
       "gtin": "4640473504665",
       "created_at": "2026-03-13T11:20:55.317631",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:26:25.743015",
@@ -1494,7 +1494,7 @@
       "gtin": "4640473504894",
       "created_at": "2026-03-13T11:20:53.502192",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:26:01.726064",
@@ -1520,7 +1520,7 @@
       "gtin": "4640473504900",
       "created_at": "2026-03-13T11:20:52.349102",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:25:37.519612",
@@ -1546,7 +1546,7 @@
       "gtin": "4640473505129",
       "created_at": "2026-03-13T11:20:50.401483",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:24:24.874025",
@@ -1563,7 +1563,7 @@
       "gtin": "4640473505112",
       "created_at": "2026-03-13T11:20:50.376508",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:23:52.746753",
@@ -1589,7 +1589,7 @@
       "gtin": "4640473505099",
       "created_at": "2026-03-13T11:20:50.347425",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:24:49.638932",
@@ -1615,7 +1615,7 @@
       "gtin": "4650118040069",
       "created_at": "2026-03-12T15:20:04.908010",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1641,7 +1641,7 @@
       "gtin": "4640473509912",
       "created_at": "2026-03-12T11:49:49.290091",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1667,7 +1667,7 @@
       "gtin": "4640473504672",
       "created_at": "2026-03-12T11:19:55.240372",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-12T11:31:16.581447",
@@ -1684,7 +1684,7 @@
       "gtin": "4640473504689",
       "created_at": "2026-03-12T11:19:54.452498",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-12T11:39:16.870170",
@@ -1710,7 +1710,7 @@
       "gtin": "4640473512295",
       "created_at": "2026-03-12T09:25:40.373865",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1736,7 +1736,7 @@
       "gtin": "4640473510611",
       "created_at": "2026-03-11T13:58:33.945935",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -1753,7 +1753,7 @@
       "gtin": "4640473510611",
       "created_at": "2026-03-11T13:58:33.186983",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1779,7 +1779,7 @@
       "gtin": "4640473500179",
       "created_at": "2026-03-11T13:26:53.232684",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1805,7 +1805,7 @@
       "gtin": "4640473210269",
       "created_at": "2026-03-11T13:26:52.759812",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.113304",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1831,7 +1831,7 @@
       "gtin": "4640473505990",
       "created_at": "2026-03-11T13:06:57.801372",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1857,7 +1857,7 @@
       "gtin": "4660537617551",
       "created_at": "2026-03-11T13:06:57.553268",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1883,7 +1883,7 @@
       "gtin": "4640473212751",
       "created_at": "2026-03-11T13:06:56.866100",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1909,7 +1909,7 @@
       "gtin": "4640473504313",
       "created_at": "2026-03-11T13:06:56.227157",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1935,7 +1935,7 @@
       "gtin": "4660537614253",
       "created_at": "2026-03-11T13:06:56.183715",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "positions": [
         {
@@ -1961,7 +1961,7 @@
       "gtin": "4640473507062",
       "created_at": "2026-03-11T13:06:55.962511",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -1978,7 +1978,7 @@
       "gtin": "4640473216056",
       "created_at": "2026-03-11T13:06:55.918994",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -1995,7 +1995,7 @@
       "gtin": "4640473508823",
       "created_at": "2026-03-11T13:06:55.860985",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:00.114305",
+      "updated_at": "2026-03-20T19:36:55.363081",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -5571,7 +5571,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-20T19:36:03.824063",
+  "last_update": "2026-03-20T19:36:57.505800",
   "created_by": "sklad",
   "updated_by": "sklad",
   "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
