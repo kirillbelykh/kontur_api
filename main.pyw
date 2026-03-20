@@ -546,7 +546,7 @@ class App(ctk.CTk):
                 corner_radius=12,
                 fg_color="transparent",
                 border_width=1,
-                border_color="transparent",
+                border_color=self._get_color("bg_secondary"),
             )
             card.pack(side="left", fill="x", expand=True, padx=(10, 0))
             card.pack_propagate(False)
@@ -702,7 +702,7 @@ class App(ctk.CTk):
                 if card is not None:
                     card.configure(
                         fg_color="transparent",
-                        border_color="transparent",
+                        border_color=self._get_color("bg_secondary"),
                     )
                 if text_label is not None:
                     text_label.configure(
