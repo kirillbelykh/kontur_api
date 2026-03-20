@@ -3,9 +3,9 @@
     {
       "order_name": "577 стер латекс L 260318 10к",
       "document_id": "75139e15-b2ca-4921-991c-830ca42ae949",
-      "status": "Выполнен",
+      "status": "Ожидает",
       "filename": null,
-      "simpl": "wheelChairs",
+      "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118040069",
       "positions": [
@@ -19,12 +19,15 @@
       ],
       "created_at": "2026-03-20T17:12:52.789806",
       "created_by": "user",
-      "updated_at": "2026-03-20T17:12:52.789806",
+      "updated_at": "2026-03-20T17:12:57.341428",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": null,
+      "pdf_path": null,
+      "csv_path": null
     },
     {
       "order_name": "576 стер латекс L 260318 26к",
@@ -5299,7 +5302,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-20T17:12:55.022360",
+  "last_update": "2026-03-20T17:12:59.856735",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
