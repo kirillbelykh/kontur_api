@@ -2,6 +2,7 @@ import base64
 import concurrent.futures
 import json
 import os
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -22,6 +23,7 @@ DEFAULT_TRUE_API_PRODUCT_GROUP = "wheelchairs"
 DEFAULT_KONTUR_PRODUCT_GROUP = "wheelChairs"
 DEFAULT_BULK_AGGREGATION_MAX_WORKERS = 3
 PROCESSABLE_AGGREGATE_STATUSES = ("readyForSend", "approveFailed")
+TSD_REFILL_AGGREGATE_STATUSES = ("approveFailed", "returnedToTsd", "tsdProcessStart", "readyForSend")
 
 KONTUR_TO_TRUE_PRODUCT_GROUP = {
     "wheelChairs": "wheelchairs",
@@ -138,6 +140,12 @@ class AggregateInfo:
     product_group: str = DEFAULT_KONTUR_PRODUCT_GROUP
     includes_units_count: int = 0
     codes_check_errors_count: int = 0
+
+
+@dataclass(frozen=True)
+class AggregateDetail(AggregateInfo):
+    allow_return_to_tsd: bool = False
+    allow_save: bool = False
 
 
 @dataclass(frozen=True)
@@ -329,6 +337,74 @@ class BulkAggregationService:
             summary.skipped_not_ready,
             summary.skipped_unsupported,
             summary.disaggregated_parents,
+            summary.errors,
+        )
+        return summary
+
+    def run_tsd_refill(
+        self,
+        *,
+        kontur_session: requests.Session,
+        cert_provider: Callable[[], Any],
+        sign_base64_func: Callable[[Any, str, bool], str],
+        tsd_token: str,
+        log_callback: Optional[Callable[[str], None]] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        comment_filter: Optional[str] = None,
+    ) -> BulkAggregationSummary:
+        cert = cert_provider()
+        if not cert:
+            raise RuntimeError("Сертификат для подписи не найден")
+
+        normalized_tsd_token = str(tsd_token or "").strip()
+        if not normalized_tsd_token:
+            raise RuntimeError("Не указан TSD токен для повторного наполнения")
+
+        self.set_cookie_value(kontur_session, "tsdToken", normalized_tsd_token)
+        logger.info(
+            "Запуск повторного наполнения АК: comment_filter=%r, statuses=%s",
+            comment_filter,
+            ", ".join(TSD_REFILL_AGGREGATE_STATUSES),
+        )
+
+        log = log_callback or (lambda message: None)
+        progress = progress_callback or (lambda processed, total: None)
+        summary = BulkAggregationSummary()
+        replay_aggregates = self.list_ready_aggregates(
+            kontur_session,
+            comment_filter=comment_filter,
+            status_filters=TSD_REFILL_AGGREGATE_STATUSES,
+        )
+        summary.ready_found = len(replay_aggregates)
+        total = summary.ready_found or 1
+        progress(0, total)
+
+        for aggregate in replay_aggregates:
+            try:
+                self._process_tsd_refill_aggregate(
+                    kontur_session=kontur_session,
+                    aggregate=aggregate,
+                    cert=cert,
+                    sign_base64_func=sign_base64_func,
+                    log=log,
+                    summary=summary,
+                )
+            except Exception as exc:
+                summary.errors += 1
+                logger.exception("Ошибка повторного наполнения АК %s", aggregate.aggregate_code)
+                log(f"❌ {aggregate.aggregate_code}: {exc}")
+            finally:
+                summary.processed += 1
+                progress(summary.processed, total)
+
+        logger.info(
+            "Повторное наполнение АК завершено: matched=%s, processed=%s, sent_for_approve=%s, skipped_empty=%s, skipped_not_ready=%s, skipped_unsupported=%s, errors=%s",
+            summary.ready_found,
+            summary.processed,
+            summary.sent_for_approve,
+            summary.skipped_empty,
+            summary.skipped_not_ready,
+            summary.skipped_unsupported,
             summary.errors,
         )
         return summary
@@ -554,17 +630,23 @@ class BulkAggregationService:
         kontur_session: requests.Session,
         *,
         comment_filter: Optional[str] = None,
+        status_filters: Optional[Sequence[str]] = None,
     ) -> List[AggregateInfo]:
         matched: List[AggregateInfo] = []
         normalized_filter = self._normalize_comment_filter(comment_filter)
+        active_status_filters = tuple(
+            str(status)
+            for status in (status_filters or PROCESSABLE_AGGREGATE_STATUSES)
+            if str(status)
+        )
         logger.info(
             "Начинаем загрузку АК для проведения из Контур.Маркировки: statuses=%s, comment_filter=%r",
-            ", ".join(PROCESSABLE_AGGREGATE_STATUSES),
+            ", ".join(active_status_filters),
             normalized_filter,
         )
         seen_document_ids: set[str] = set()
 
-        for status_filter in PROCESSABLE_AGGREGATE_STATUSES:
+        for status_filter in active_status_filters:
             offset = 0
             while True:
                 aggregates, total = self.fetch_ready_aggregates_page(
@@ -622,7 +704,7 @@ class BulkAggregationService:
 
         logger.info(
             "Загрузка АК для проведения завершена: statuses=%s, matched=%s",
-            ", ".join(PROCESSABLE_AGGREGATE_STATUSES),
+            ", ".join(active_status_filters),
             len(matched),
         )
         return matched
@@ -744,6 +826,7 @@ class BulkAggregationService:
             summary.skipped_not_ready += 1
             log(f"⏭️ {aggregate.aggregate_code}: статус уже изменился на {detail.status}")
             return
+        is_recovery_required = detail.status == "approveFailed"
 
         raw_codes, reaggregation_codes = self.fetch_aggregate_codes(kontur_session, aggregate.document_id)
         logger.info(
@@ -881,6 +964,37 @@ class BulkAggregationService:
             )
             return
 
+        if is_recovery_required:
+            if not detail.allow_return_to_tsd:
+                raise RuntimeError(
+                    f"АК {aggregate.aggregate_code}: Контур не разрешает возврат на ТСД (allowReturnToTsd=false)"
+                )
+
+            log(f"↩️ {aggregate.aggregate_code}: возвращаем на ТСД")
+            self.return_aggregate_to_tsd(kontur_session, aggregate.document_id)
+
+            tsd_token = self.get_cookie_value(kontur_session, "tsdToken")
+            if not tsd_token:
+                raise RuntimeError(
+                    f"АК {aggregate.aggregate_code}: в текущей сессии нет tsdToken. "
+                    "Обновите сессию так, чтобы в cookies был TSD-cookie, и повторите."
+                )
+
+            log(f"⇄ {aggregate.aggregate_code}: отправляем состав как ТСД")
+            self.send_aggregate_codes_from_tsd(
+                kontur_session=kontur_session,
+                document_id=aggregate.document_id,
+                raw_codes=raw_codes,
+            )
+
+            log(f"⏳ {aggregate.aggregate_code}: ожидаем возврат в readyForSend")
+            detail = self.wait_for_aggregate_status(
+                kontur_session=kontur_session,
+                document_id=aggregate.document_id,
+                expected_statuses={"readyForSend"},
+                allowed_statuses={"returnedToTsd", "tsdProcessStart", "readyForSend"},
+            )
+
         logger.info("АК %s: отправляем в Контур на подпись", aggregate.aggregate_code)
         final_detail = self.send_aggregate_for_approve(
             kontur_session=kontur_session,
@@ -899,18 +1013,127 @@ class BulkAggregationService:
             f"текущий статус {final_detail.status}"
         )
 
+    def _process_tsd_refill_aggregate(
+        self,
+        *,
+        kontur_session: requests.Session,
+        aggregate: AggregateInfo,
+        cert: Any,
+        sign_base64_func: Callable[[Any, str, bool], str],
+        log: Callable[[str], None],
+        summary: BulkAggregationSummary,
+    ) -> None:
+        log(f"↻ Проверяем АК {aggregate.aggregate_code} ({aggregate.comment or 'без названия'})")
+        detail = self.fetch_aggregate_detail(kontur_session, aggregate.document_id)
+        logger.info(
+            "АК %s: старт повторного наполнения, document_id=%s, status=%s, comment=%r",
+            aggregate.aggregate_code,
+            aggregate.document_id,
+            detail.status,
+            detail.comment,
+        )
+
+        if detail.status in {"sentForApprove", "approved"}:
+            summary.skipped_not_ready += 1
+            log(f"ℹ️ {aggregate.aggregate_code}: уже обработан, текущий статус {detail.status}")
+            return
+
+        if detail.status not in TSD_REFILL_AGGREGATE_STATUSES:
+            summary.skipped_not_ready += 1
+            log(f"⏭️ {aggregate.aggregate_code}: статус {detail.status} не подходит для повторного наполнения")
+            return
+
+        raw_codes, reaggregation_codes = self.fetch_aggregate_codes(kontur_session, aggregate.document_id)
+        logger.info(
+            "АК %s: для повторного наполнения загружены коды, km_count=%s, nested_ak_count=%s",
+            aggregate.aggregate_code,
+            len(raw_codes),
+            len(reaggregation_codes),
+        )
+        if reaggregation_codes:
+            summary.skipped_unsupported += 1
+            log(
+                f"⏭️ {aggregate.aggregate_code}: содержит вложенные АК "
+                f"({len(reaggregation_codes)} шт.), повторное наполнение не поддержано"
+            )
+            return
+        if not raw_codes:
+            summary.skipped_empty += 1
+            log(f"⏭️ {aggregate.aggregate_code}: в Контуре нет кодов для повторного наполнения")
+            return
+
+        log(f"• {aggregate.aggregate_code}: найдено КМ {len(raw_codes)}")
+
+        if detail.status == "approveFailed":
+            if not detail.allow_return_to_tsd:
+                raise RuntimeError(
+                    f"АК {aggregate.aggregate_code}: Контур не разрешает возврат на ТСД (allowReturnToTsd=false)"
+                )
+            log(f"↩️ {aggregate.aggregate_code}: возвращаем на ТСД")
+            detail = self.return_aggregate_to_tsd(kontur_session, aggregate.document_id)
+
+        if detail.status in {"approveFailed", "returnedToTsd", "tsdProcessStart"}:
+            tsd_token = self.get_cookie_value(kontur_session, "tsdToken")
+            if not tsd_token:
+                raise RuntimeError(
+                    f"АК {aggregate.aggregate_code}: в текущей сессии нет tsdToken. "
+                    "Укажите TSD токен и повторите."
+                )
+
+            log(f"⇄ {aggregate.aggregate_code}: отправляем состав как ТСД")
+            self.send_aggregate_codes_from_tsd(
+                kontur_session=kontur_session,
+                document_id=aggregate.document_id,
+                raw_codes=raw_codes,
+            )
+
+            log(f"⏳ {aggregate.aggregate_code}: ожидаем возврат в readyForSend")
+            detail = self.wait_for_aggregate_status(
+                kontur_session=kontur_session,
+                document_id=aggregate.document_id,
+                expected_statuses={"readyForSend"},
+                allowed_statuses={"returnedToTsd", "tsdProcessStart", "readyForSend"},
+            )
+
+        if detail.status != "readyForSend":
+            summary.skipped_not_ready += 1
+            log(f"⏭️ {aggregate.aggregate_code}: не удалось довести до readyForSend, текущий статус {detail.status}")
+            return
+
+        logger.info("АК %s: после повторного наполнения отправляем в Контур на подпись", aggregate.aggregate_code)
+        final_detail = self.send_aggregate_for_approve(
+            kontur_session=kontur_session,
+            aggregate=AggregateInfo(
+                document_id=aggregate.document_id,
+                aggregate_code=aggregate.aggregate_code,
+                comment=detail.comment,
+                status=detail.status,
+                product_group=detail.product_group,
+                includes_units_count=detail.includes_units_count,
+                codes_check_errors_count=detail.codes_check_errors_count,
+            ),
+            cert=cert,
+            sign_base64_func=sign_base64_func,
+        )
+        summary.sent_for_approve += 1
+        log(
+            f"✅ {aggregate.aggregate_code}: повторно наполнен и отправлен в Контур, "
+            f"текущий статус {final_detail.status}"
+        )
+
     def fetch_aggregate_detail(
         self,
         kontur_session: requests.Session,
         document_id: str,
-    ) -> AggregateInfo:
+    ) -> AggregateDetail:
         response = kontur_session.get(
             f"{self.kontur_base_url}/api/v1/aggregates/{document_id}",
             timeout=30,
         )
         response.raise_for_status()
         item = response.json()
-        return AggregateInfo(
+        actions = item.get("actions") if isinstance(item.get("actions"), dict) else {}
+        return AggregateDetail(
             document_id=str(item.get("documentId") or document_id),
             aggregate_code=str(item.get("aggregateCode") or ""),
             comment=str(item.get("comment") or ""),
@@ -918,6 +1141,8 @@ class BulkAggregationService:
             product_group=str(item.get("productGroup") or DEFAULT_KONTUR_PRODUCT_GROUP),
             includes_units_count=int(item.get("includesUnitsCount") or 0),
             codes_check_errors_count=int(item.get("codesCheckErrorsCount") or 0),
+            allow_return_to_tsd=bool(actions.get("allowReturnToTsd")),
+            allow_save=bool(actions.get("allowSave")),
         )
 
     def fetch_aggregate_codes(
@@ -1081,14 +1306,21 @@ class BulkAggregationService:
         aggregate: AggregateInfo,
         states: Sequence[CodeState],
     ) -> str:
-        sign_content = self.fetch_content_for_sign(kontur_session, aggregate.document_id)
-        if sign_content.participant_id:
-            logger.info(
-                "АК %s: participantId определён из content-for-sign: %s",
+        try:
+            sign_content = self.fetch_content_for_sign(kontur_session, aggregate.document_id)
+        except requests.HTTPError:
+            logger.warning(
+                "АК %s: content-for-sign недоступен при поиске participantId, переходим к ownerInn КМ",
                 aggregate.aggregate_code,
-                sign_content.participant_id,
             )
-            return sign_content.participant_id
+        else:
+            if sign_content.participant_id:
+                logger.info(
+                    "АК %s: participantId определён из content-for-sign: %s",
+                    aggregate.aggregate_code,
+                    sign_content.participant_id,
+                )
+                return sign_content.participant_id
 
         owner_inns = sorted({
             state.owner_inn
@@ -1106,6 +1338,118 @@ class BulkAggregationService:
         raise RuntimeError(
             f"Не удалось определить participantId для АК {aggregate.aggregate_code}"
         )
+
+    def get_cookie_value(
+        self,
+        session: requests.Session,
+        name: str,
+    ) -> Optional[str]:
+        cookie_jar = getattr(session, "cookies", None)
+        if cookie_jar is None:
+            return None
+
+        for cookie in cookie_jar:
+            if cookie.name != name:
+                continue
+            domain = (cookie.domain or "").lstrip(".").lower()
+            if not domain or domain.endswith("mk.kontur.ru"):
+                return cookie.value
+        return None
+
+    def set_cookie_value(
+        self,
+        session: requests.Session,
+        name: str,
+        value: str,
+        *,
+        domain: str = "mk.kontur.ru",
+        path: str = "/",
+    ) -> None:
+        cookie_jar = getattr(session, "cookies", None)
+        if cookie_jar is None or not hasattr(cookie_jar, "set"):
+            raise RuntimeError("Сессия не поддерживает установку cookies для TSD токена")
+        cookie_jar.set(name, value, domain=domain, path=path)
+
+    def wait_for_aggregate_status(
+        self,
+        *,
+        kontur_session: requests.Session,
+        document_id: str,
+        expected_statuses: Sequence[str],
+        allowed_statuses: Optional[Sequence[str]] = None,
+    ) -> AggregateDetail:
+        expected = {str(status) for status in expected_statuses if str(status)}
+        if not expected:
+            raise ValueError("expected_statuses must not be empty")
+        allowed = {str(status) for status in (allowed_statuses or []) if str(status)}
+        allowed.update(expected)
+
+        deadline = time.monotonic() + self.kontur_send_timeout_seconds
+        last_status = ""
+        last_detail: Optional[AggregateDetail] = None
+
+        while time.monotonic() <= deadline:
+            last_detail = self.fetch_aggregate_detail(kontur_session, document_id)
+            if last_detail.status != last_status:
+                logger.info(
+                    "Контур: АК %s сменил статус %s -> %s в ожидании %s",
+                    last_detail.aggregate_code or document_id,
+                    last_status or "-",
+                    last_detail.status,
+                    ", ".join(sorted(expected)),
+                )
+                last_status = last_detail.status
+
+            if last_detail.status in expected:
+                return last_detail
+            if last_detail.status not in allowed:
+                raise RuntimeError(
+                    f"Контур вернул неожиданный статус {last_detail.status} для АК {last_detail.aggregate_code or document_id}"
+                )
+            if self.poll_interval_seconds > 0:
+                self.sleep_func(self.poll_interval_seconds)
+
+        raise TimeoutError(
+            f"Контур не перевёл АК {last_detail.aggregate_code if last_detail else document_id} "
+            f"в {'/'.join(sorted(expected))}, последний статус {last_status or 'UNKNOWN'}"
+        )
+
+    def return_aggregate_to_tsd(
+        self,
+        kontur_session: requests.Session,
+        document_id: str,
+    ) -> AggregateDetail:
+        response = kontur_session.post(
+            f"{self.kontur_base_url}/api/v1/aggregates/{document_id}/return-to-tsd",
+            timeout=30,
+        )
+        response.raise_for_status()
+        return self.wait_for_aggregate_status(
+            kontur_session=kontur_session,
+            document_id=document_id,
+            expected_statuses={"returnedToTsd", "readyForSend"},
+            allowed_statuses={"approveFailed", "returnedToTsd", "readyForSend", "tsdProcessStart"},
+        )
+
+    def send_aggregate_codes_from_tsd(
+        self,
+        *,
+        kontur_session: requests.Session,
+        document_id: str,
+        raw_codes: Sequence[str],
+    ) -> None:
+        response = kontur_session.post(
+            f"{self.kontur_base_url}/tsd/api/v1/documents/aggregates/{document_id}",
+            json={"codes": list(raw_codes)},
+            headers={
+                "Accept": "*/*",
+                "Content-Type": "application/json; charset=utf-8",
+                "Origin": self.kontur_base_url,
+                "Referer": f"{self.kontur_base_url}/tsd/aggregate/{document_id}",
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
 
     def fetch_content_for_sign(
         self,
@@ -1359,11 +1703,11 @@ class BulkAggregationService:
         aggregate: AggregateInfo,
         cert: Any,
         sign_base64_func: Callable[[Any, str, bool], str],
-    ) -> AggregateInfo:
+    ) -> AggregateDetail:
         detail = self.fetch_aggregate_detail(kontur_session, aggregate.document_id)
-        if detail.status not in PROCESSABLE_AGGREGATE_STATUSES:
+        if detail.status != "readyForSend":
             raise RuntimeError(
-                f"АК {aggregate.aggregate_code} больше не доступен для проведения, текущий статус {detail.status}"
+                f"АК {aggregate.aggregate_code} не готов к отправке на подпись, текущий статус {detail.status}"
             )
 
         sign_content = self.fetch_content_for_sign(kontur_session, aggregate.document_id)
@@ -1380,31 +1724,11 @@ class BulkAggregationService:
             timeout=30,
         )
         response.raise_for_status()
-
-        deadline = time.monotonic() + self.kontur_send_timeout_seconds
-        last_detail = detail
-        last_status = detail.status
-        while time.monotonic() <= deadline:
-            last_detail = self.fetch_aggregate_detail(kontur_session, aggregate.document_id)
-            if last_detail.status != last_status:
-                logger.info(
-                    "Контур: АК %s сменил статус %s -> %s после send",
-                    aggregate.aggregate_code,
-                    last_status,
-                    last_detail.status,
-                )
-                last_status = last_detail.status
-            if last_detail.status in {"approved", "sentForApprove"}:
-                return last_detail
-            if last_detail.status not in set(PROCESSABLE_AGGREGATE_STATUSES) | {"returnedToTsd"}:
-                raise RuntimeError(
-                    f"Контур вернул неожиданный статус {last_detail.status} после отправки АК"
-                )
-            if self.poll_interval_seconds > 0:
-                self.sleep_func(self.poll_interval_seconds)
-
-        raise TimeoutError(
-            f"Контур не перевёл АК {aggregate.aggregate_code} в sentForApprove, последний статус {last_detail.status}"
+        return self.wait_for_aggregate_status(
+            kontur_session=kontur_session,
+            document_id=aggregate.document_id,
+            expected_statuses={"approved", "sentForApprove"},
+            allowed_statuses={"readyForSend", "sentForApprove", "approved"},
         )
 
     @staticmethod
@@ -1583,4 +1907,27 @@ class BulkAggregationService:
 
     @staticmethod
     def _matches_comment_filter(comment: str, normalized_filter: str) -> bool:
-        return normalized_filter in str(comment or "").strip().lower()
+        normalized_comment = str(comment or "").strip().lower()
+        if not normalized_filter:
+            return True
+        if normalized_filter in normalized_comment:
+            return True
+
+        filter_tokens = BulkAggregationService._extract_search_tokens(normalized_filter)
+        if len(filter_tokens) < 2:
+            return False
+        comment_tokens = set(BulkAggregationService._extract_search_tokens(normalized_comment))
+        return all(token in comment_tokens for token in filter_tokens)
+
+    @staticmethod
+    def _extract_search_tokens(value: str) -> List[str]:
+        tokens = re.findall(r"[a-z0-9]+", str(value or "").lower())
+        prepared: List[str] = []
+        for token in tokens:
+            if len(token) == 1 and not token.isdigit():
+                prepared.append(token)
+                continue
+            if len(token) >= 2:
+                prepared.append(token)
+        return list(dict.fromkeys(prepared))
+

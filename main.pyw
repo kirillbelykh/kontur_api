@@ -377,6 +377,9 @@ class App(ctk.CTk):
         self.bulk_agg_btn = None
         self.bulk_agg_name_entry = None
         self.bulk_agg_by_name_btn = None
+        self.bulk_agg_refill_name_entry = None
+        self.bulk_agg_tsd_token_entry = None
+        self.bulk_agg_refill_btn = None
         self.agg_tabview = None
         self.agg_progress = None
         self.agg_log_text = None
@@ -1179,12 +1182,17 @@ class App(ctk.CTk):
 
         # Таб проведения
         conduct_tab = self.agg_tabview.tab("Проведение АК")
-        conduct_card = ctk.CTkFrame(conduct_tab, corner_radius=12)
-        conduct_card.pack(fill="x", padx=10, pady=10)
+        conduct_cards_frame = ctk.CTkFrame(conduct_tab, fg_color="transparent")
+        conduct_cards_frame.pack(fill="x", padx=10, pady=10)
+        conduct_cards_frame.grid_columnconfigure(0, weight=1, uniform="agg-actions")
+        conduct_cards_frame.grid_columnconfigure(1, weight=1, uniform="agg-actions")
+
+        conduct_card = ctk.CTkFrame(conduct_cards_frame, corner_radius=12)
+        conduct_card.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
 
         ctk.CTkLabel(
             conduct_card,
-            text="Проведение readyForSend АК",
+            text="Проведение АК",
             font=self.fonts["subheading"],
             text_color=self._get_color("text_primary")
         ).pack(anchor="w", padx=20, pady=(20, 10))
@@ -1250,6 +1258,91 @@ class App(ctk.CTk):
             border_width=0
         )
         self.bulk_agg_btn.pack(side="left")
+
+        refill_card = ctk.CTkFrame(conduct_cards_frame, corner_radius=12)
+        refill_card.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+
+        ctk.CTkLabel(
+            refill_card,
+            text="Повторное наполнение",
+            font=self.fonts["subheading"],
+            text_color=self._get_color("text_primary")
+        ).pack(anchor="w", padx=20, pady=(20, 10))
+
+        ctk.CTkLabel(
+            refill_card,
+            text="Повторно наполняет и проводит АК в статусе «Не зарегистрирован» по названию и TSD токену.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+            justify="left",
+            wraplength=420
+        ).pack(anchor="w", padx=20)
+
+        refill_form_frame = ctk.CTkFrame(refill_card, fg_color="transparent")
+        refill_form_frame.pack(fill="x", padx=20, pady=(15, 20))
+        configure_form_grid(refill_form_frame)
+
+        ctk.CTkLabel(
+            refill_form_frame,
+            text="Название:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=0, column=0, sticky="w", padx=(0, 18))
+
+        self.bulk_agg_refill_name_entry = ctk.CTkEntry(
+            refill_form_frame,
+            width=420,
+            placeholder_text="Введите название заявки...",
+            font=self.fonts["normal"],
+            height=40,
+            corner_radius=8,
+            border_color=self._get_color("secondary")
+        )
+        self.bulk_agg_refill_name_entry.grid(row=0, column=1, sticky="ew")
+
+        ctk.CTkLabel(
+            refill_form_frame,
+            text="Токен ТСД:",
+            font=self.fonts["normal"],
+            text_color=self._get_color("text_primary"),
+            anchor="w",
+            width=label_width
+        ).grid(row=1, column=0, sticky="w", padx=(0, 18), pady=(14, 0))
+
+        self.bulk_agg_tsd_token_entry = ctk.CTkEntry(
+            refill_form_frame,
+            width=420,
+            placeholder_text="Вставьте tsdToken...",
+            font=self.fonts["normal"],
+            height=40,
+            corner_radius=8,
+            border_color=self._get_color("secondary"),
+            show="•",
+        )
+        self.bulk_agg_tsd_token_entry.grid(row=1, column=1, sticky="ew", pady=(14, 0))
+
+        refill_actions_frame = ctk.CTkFrame(refill_form_frame, fg_color="transparent")
+        refill_actions_frame.grid(row=2, column=1, sticky="w", pady=(16, 0))
+
+        self.bulk_agg_refill_btn = ctk.CTkButton(
+            refill_actions_frame,
+            text="↻ Повторное наполнение",
+            command=self.start_bulk_aggregation_refill_by_name,
+            width=250,
+            height=45,
+            font=self.fonts["button"],
+            fg_color=self._get_color("warning"),
+            hover_color=self._get_color("accent"),
+            corner_radius=8,
+            border_width=0
+        )
+        self.bulk_agg_refill_btn.pack(side="left")
+
+        self._add_entry_context_menu(self.bulk_agg_name_entry)
+        self._add_entry_context_menu(self.bulk_agg_refill_name_entry)
+        self._add_entry_context_menu(self.bulk_agg_tsd_token_entry)
 
         progress_card = ctk.CTkFrame(main_frame, corner_radius=12)
         progress_card.pack(fill="x", pady=(0, 20))
@@ -1401,6 +1494,19 @@ class App(ctk.CTk):
                     state="disabled" if running else "normal",
                     text="Проведение..." if running and active_action == "all" else "✅ Провести все АК",
                 )
+            if self.bulk_agg_refill_name_entry is not None:
+                self.bulk_agg_refill_name_entry.configure(state="disabled" if running else "normal")
+            if self.bulk_agg_tsd_token_entry is not None:
+                self.bulk_agg_tsd_token_entry.configure(state="disabled" if running else "normal")
+            if self.bulk_agg_refill_btn is not None:
+                self.bulk_agg_refill_btn.configure(
+                    state="disabled" if running else "normal",
+                    text=(
+                        "Повторное наполнение..."
+                        if running and active_action == "replay"
+                        else "↻ Повторное наполнение"
+                    ),
+                )
 
         self._run_in_ui_thread(apply_state)
 
@@ -1506,7 +1612,7 @@ class App(ctk.CTk):
             self.set_bulk_aggregation_ui_state(False)
 
     def start_bulk_aggregation_approve_by_name(self):
-        """Запуск проведения АК readyForSend/approveFailed по наименованию."""
+        """Запуск проведения АК readyForSend и approveFailed по наименованию."""
         try:
             if self.bulk_agg_name_entry is None or self.bulk_agg_by_name_btn is None:
                 self.log_aggregation_message("❌ Ошибка: интерфейс проведения по наименованию не инициализирован")
@@ -1519,7 +1625,7 @@ class App(ctk.CTk):
 
             self.set_bulk_aggregation_ui_state(True, active_action="by_name")
             self.log_aggregation_message(
-                f"🚀 Запускаем проведение АК readyForSend/approveFailed по наименованию: {comment_filter}"
+                f"🚀 Запускаем проведение АК readyForSend и approveFailed по наименованию: {comment_filter}"
             )
             self.update_aggregation_progress(0)
             self.download_executor.submit(self.bulk_aggregation_approve_process, comment_filter)
@@ -1528,11 +1634,47 @@ class App(ctk.CTk):
             self.log_aggregation_message(f"❌ Критическая ошибка запуска: {e}")
             self.set_bulk_aggregation_ui_state(False)
 
+    def start_bulk_aggregation_refill_by_name(self):
+        """Запуск повторного наполнения АК по наименованию и TSD токену."""
+        try:
+            if (
+                self.bulk_agg_refill_name_entry is None
+                or self.bulk_agg_tsd_token_entry is None
+                or self.bulk_agg_refill_btn is None
+            ):
+                self.log_aggregation_message("❌ Ошибка: интерфейс повторного наполнения не инициализирован")
+                return
+
+            comment_filter = self.bulk_agg_refill_name_entry.get().strip()
+            if not comment_filter:
+                self.log_aggregation_message("❌ Ошибка: введите название для повторного наполнения АК")
+                return
+
+            tsd_token = self.bulk_agg_tsd_token_entry.get().strip()
+            if not tsd_token:
+                self.log_aggregation_message("❌ Ошибка: вставьте TSD токен")
+                return
+
+            self.set_bulk_aggregation_ui_state(True, active_action="replay")
+            self.log_aggregation_message(
+                f"↻ Запускаем повторное наполнение АК по названию: {comment_filter}"
+            )
+            self.update_aggregation_progress(0)
+            self.download_executor.submit(
+                self.bulk_aggregation_refill_process,
+                comment_filter,
+                tsd_token,
+            )
+        except Exception as e:
+            logger.exception("Критическая ошибка запуска повторного наполнения АК")
+            self.log_aggregation_message(f"❌ Критическая ошибка запуска: {e}")
+            self.set_bulk_aggregation_ui_state(False)
+
     def bulk_aggregation_approve_process(self, comment_filter=None):
         """Фоновый процесс проверки и проведения АК."""
         try:
             self.log_aggregation_message_threadsafe("🔐 Получаем сессию Контур.Маркировки...")
-            status_message = "Проведение АК readyForSend/approveFailed..."
+            status_message = "Проведение АК readyForSend и approveFailed..."
             if comment_filter:
                 status_message = f"Проведение АК по наименованию: {comment_filter}"
             self.set_status_bar_threadsafe(status_message)
@@ -1559,7 +1701,7 @@ class App(ctk.CTk):
 
             if summary.ready_found == 0:
                 self.log_aggregation_message_threadsafe(
-                    "ℹ️ АК в статусах readyForSend/approveFailed для проведения не найдены"
+                    "ℹ️ АК в статусах readyForSend и approveFailed для проведения не найдены"
                 )
             else:
                 self.log_aggregation_message_threadsafe("📌 Итоги проведения АК:")
@@ -1578,6 +1720,55 @@ class App(ctk.CTk):
             self.log_aggregation_message_threadsafe(f"❌ Ошибка проведения АК: {e}")
             self.set_status_bar_threadsafe("Ошибка проведения АК")
             self.show_error_threadsafe("Ошибка проведения АК", str(e))
+        finally:
+            self.set_bulk_aggregation_ui_state(False)
+            self._run_in_ui_thread(lambda: self.update_aggregation_progress(0))
+
+    def bulk_aggregation_refill_process(self, comment_filter, tsd_token):
+        """Фоновый процесс повторного наполнения АК через TSD replay."""
+        try:
+            self.log_aggregation_message_threadsafe("🔐 Получаем сессию Контур.Маркировки...")
+            self.set_status_bar_threadsafe(f"Повторное наполнение АК: {comment_filter}")
+            session = SessionManager.get_session()
+
+            if not session:
+                raise RuntimeError("Не удалось получить сессию Контур.Маркировки")
+
+            summary = self.bulk_aggregation_service.run_tsd_refill(
+                kontur_session=session,
+                cert_provider=lambda: find_certificate_by_thumbprint(THUMBPRINT),
+                sign_base64_func=sign_data,
+                tsd_token=tsd_token,
+                log_callback=self.log_aggregation_message_threadsafe,
+                progress_callback=self.update_aggregation_progress_threadsafe,
+                comment_filter=comment_filter,
+            )
+
+            self.log_aggregation_message_threadsafe(
+                f"🔎 Повторное наполнение по названию: {comment_filter}"
+            )
+
+            if summary.ready_found == 0:
+                self.log_aggregation_message_threadsafe(
+                    "ℹ️ АК для повторного наполнения не найдены"
+                )
+            else:
+                self.log_aggregation_message_threadsafe("📌 Итоги повторного наполнения АК:")
+                for line in summary.to_lines():
+                    self.log_aggregation_message_threadsafe(f"• {line}")
+
+            self.set_status_bar_threadsafe(
+                f"Повторное наполнение АК: отправлено {summary.sent_for_approve}, ошибок {summary.errors}"
+            )
+            self.show_info_threadsafe(
+                "Повторное наполнение завершено",
+                "\n".join(summary.to_lines()),
+            )
+        except Exception as e:
+            logger.exception("Ошибка повторного наполнения АК")
+            self.log_aggregation_message_threadsafe(f"❌ Ошибка повторного наполнения АК: {e}")
+            self.set_status_bar_threadsafe("Ошибка повторного наполнения АК")
+            self.show_error_threadsafe("Ошибка повторного наполнения АК", str(e))
         finally:
             self.set_bulk_aggregation_ui_state(False)
             self._run_in_ui_thread(lambda: self.update_aggregation_progress(0))
@@ -6024,3 +6215,4 @@ if __name__ == "__main__":
         ctk.set_default_color_theme("dark-blue")
         app = App(df)
         app.mainloop()
+

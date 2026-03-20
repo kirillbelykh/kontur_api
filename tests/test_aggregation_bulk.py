@@ -48,6 +48,13 @@ def make_content_for_sign(participant_id, unit_serial_number, sntins):
     }
 
 
+def make_kontur_session(get_func, post_func, tsd_token=None):
+    jar = requests.cookies.RequestsCookieJar()
+    if tsd_token:
+        jar.set("tsdToken", tsd_token, domain="mk.kontur.ru", path="/")
+    return SimpleNamespace(get=get_func, post=post_func, cookies=jar)
+
+
 class BulkAggregationServiceTests(unittest.TestCase):
     def build_service(self, true_api_session, max_workers=1):
         return BulkAggregationService(
@@ -690,11 +697,47 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertEqual(len(confirm_calls), 1)
         self.assertIn("04650118042603180000000099", confirm_calls[0][1])
 
-    def test_approve_failed_aggregate_is_retried_via_send(self):
+    def test_approve_failed_aggregate_uses_tsd_recovery_before_send(self):
         raw_code = "01046501180412952156bej,nSIQ*?="
         sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", [raw_code])
-        detail_calls = {"count": 0}
-        send_calls = []
+        detail_payloads = iter([
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "approveFailed",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "returnedToTsd",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "sentForApprove",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+        ])
+        post_calls = []
 
         def kontur_get(url, params=None, timeout=None):
             path = url.split("https://mk.kontur.ru", 1)[1]
@@ -713,22 +756,15 @@ class BulkAggregationServiceTests(unittest.TestCase):
                         "total": 1,
                     })
             if path == "/api/v1/aggregates/doc-1":
-                detail_calls["count"] += 1
-                status = "approveFailed" if detail_calls["count"] < 3 else "sentForApprove"
-                return FakeResponse(json_data={
-                    "documentId": "doc-1",
-                    "aggregateCode": "04650118042603180000000007",
-                    "status": status,
-                    "productGroup": "wheelChairs",
-                })
+                return FakeResponse(json_data=next(detail_payloads))
             if path == "/api/v1/aggregates/doc-1/codes":
                 return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
             if path == "/api/v1/aggregates/doc-1/content-for-sign":
                 return FakeResponse(json_data=sign_content)
             raise AssertionError(f"Unexpected GET {url} {params}")
 
-        def kontur_post(url, json=None, timeout=None):
-            send_calls.append((url, json))
+        def kontur_post(url, json=None, headers=None, timeout=None):
+            post_calls.append((url, json, headers))
             return FakeResponse(json_data={"ok": True})
 
         def true_get(url, params=None, headers=None, timeout=None):
@@ -752,7 +788,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
 
         service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
         summary = service.run(
-            kontur_session=SimpleNamespace(get=kontur_get, post=kontur_post),
+            kontur_session=make_kontur_session(kontur_get, kontur_post, tsd_token="tsd-1"),
             cert_provider=lambda: object(),
             sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
             sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
@@ -762,8 +798,535 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertEqual(summary.ready_found, 1)
         self.assertEqual(summary.sent_for_approve, 1)
         self.assertEqual(summary.errors, 0)
-        self.assertEqual(len(send_calls), 1)
-        self.assertEqual(send_calls[0][1], {"signedContent": "BASE64_SIGNATURE"})
+        self.assertEqual(len(post_calls), 3)
+        self.assertTrue(post_calls[0][0].endswith("/api/v1/aggregates/doc-1/return-to-tsd"))
+        self.assertTrue(post_calls[1][0].endswith("/tsd/api/v1/documents/aggregates/doc-1"))
+        self.assertEqual(post_calls[1][1], {"codes": [raw_code]})
+        self.assertEqual(post_calls[1][2]["Accept"], "*/*")
+        self.assertTrue(post_calls[2][0].endswith("/api/v1/aggregates/doc-1/send"))
+        self.assertEqual(post_calls[2][1], {"signedContent": "BASE64_SIGNATURE"})
+
+    def test_ready_for_send_does_not_use_tsd_recovery(self):
+        raw_code = "01046501180412952156bej,nSIQ*?="
+        sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", [raw_code])
+        detail_payloads = iter([
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "sentForApprove",
+                "productGroup": "wheelChairs",
+            },
+        ])
+        post_calls = []
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                status_filter = params["statuses"]
+                if status_filter == "readyForSend":
+                    return FakeResponse(json_data={
+                        "items": [{
+                            "documentId": "doc-1",
+                            "aggregateCode": "04650118042603180000000007",
+                            "status": "readyForSend",
+                            "productGroup": "wheelChairs",
+                        }],
+                        "total": 1,
+                    })
+                if status_filter == "approveFailed":
+                    return FakeResponse(json_data={"items": [], "total": 0})
+            if path == "/api/v1/aggregates/doc-1":
+                return FakeResponse(json_data=next(detail_payloads))
+            if path == "/api/v1/aggregates/doc-1/codes":
+                return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
+            if path == "/api/v1/aggregates/doc-1/content-for-sign":
+                return FakeResponse(json_data=sign_content)
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def kontur_post(url, json=None, headers=None, timeout=None):
+            post_calls.append((url, json))
+            return FakeResponse(json_data={"ok": True})
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH"})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/cises/short/list"):
+                return FakeResponse(json_data=[{
+                    "result": {
+                        "requestedCis": raw_code,
+                        "cis": raw_code,
+                        "status": "INTRODUCED",
+                        "ownerInn": "7843316794",
+                    }
+                }])
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        summary = service.run(
+            kontur_session=make_kontur_session(kontur_get, kontur_post),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            confirm_callback=lambda title, message: True,
+        )
+
+        self.assertEqual(summary.sent_for_approve, 1)
+        self.assertEqual(summary.errors, 0)
+        self.assertEqual(post_calls, [
+            ("https://mk.kontur.ru/api/v1/aggregates/doc-1/send", {"signedContent": "BASE64_SIGNATURE"})
+        ])
+
+    def test_approve_failed_without_tsd_token_fails_before_tsd_post(self):
+        raw_code = "01046501180412952156bej,nSIQ*?="
+        detail_payloads = iter([
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "approveFailed",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "returnedToTsd",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+        ])
+        post_calls = []
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                status_filter = params["statuses"]
+                if status_filter == "readyForSend":
+                    return FakeResponse(json_data={"items": [], "total": 0})
+                if status_filter == "approveFailed":
+                    return FakeResponse(json_data={
+                        "items": [{
+                            "documentId": "doc-1",
+                            "aggregateCode": "04650118042603180000000007",
+                            "status": "approveFailed",
+                            "productGroup": "wheelChairs",
+                        }],
+                        "total": 1,
+                    })
+            if path == "/api/v1/aggregates/doc-1":
+                return FakeResponse(json_data=next(detail_payloads))
+            if path == "/api/v1/aggregates/doc-1/codes":
+                return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def kontur_post(url, json=None, headers=None, timeout=None):
+            post_calls.append((url, json))
+            return FakeResponse(json_data={"ok": True})
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH"})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/cises/short/list"):
+                return FakeResponse(json_data=[{
+                    "result": {
+                        "requestedCis": raw_code,
+                        "cis": raw_code,
+                        "status": "INTRODUCED",
+                        "ownerInn": "7843316794",
+                    }
+                }])
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        summary = service.run(
+            kontur_session=make_kontur_session(kontur_get, kontur_post),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            confirm_callback=lambda title, message: True,
+        )
+
+        self.assertEqual(summary.sent_for_approve, 0)
+        self.assertEqual(summary.errors, 1)
+        self.assertEqual(post_calls, [
+            ("https://mk.kontur.ru/api/v1/aggregates/doc-1/return-to-tsd", None)
+        ])
+
+    def test_approve_failed_without_allow_return_to_tsd_fails(self):
+        raw_code = "01046501180412952156bej,nSIQ*?="
+        post_calls = []
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                status_filter = params["statuses"]
+                if status_filter == "readyForSend":
+                    return FakeResponse(json_data={"items": [], "total": 0})
+                if status_filter == "approveFailed":
+                    return FakeResponse(json_data={
+                        "items": [{
+                            "documentId": "doc-1",
+                            "aggregateCode": "04650118042603180000000007",
+                            "status": "approveFailed",
+                            "productGroup": "wheelChairs",
+                        }],
+                        "total": 1,
+                    })
+            if path == "/api/v1/aggregates/doc-1":
+                return FakeResponse(json_data={
+                    "documentId": "doc-1",
+                    "aggregateCode": "04650118042603180000000007",
+                    "status": "approveFailed",
+                    "productGroup": "wheelChairs",
+                    "actions": {"allowReturnToTsd": False, "allowSave": True},
+                })
+            if path == "/api/v1/aggregates/doc-1/codes":
+                return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def kontur_post(url, json=None, headers=None, timeout=None):
+            post_calls.append((url, json))
+            return FakeResponse(json_data={"ok": True})
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH"})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/cises/short/list"):
+                return FakeResponse(json_data=[{
+                    "result": {
+                        "requestedCis": raw_code,
+                        "cis": raw_code,
+                        "status": "INTRODUCED",
+                        "ownerInn": "7843316794",
+                    }
+                }])
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        summary = service.run(
+            kontur_session=make_kontur_session(kontur_get, kontur_post, tsd_token="tsd-1"),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            confirm_callback=lambda title, message: True,
+        )
+
+        self.assertEqual(summary.sent_for_approve, 0)
+        self.assertEqual(summary.errors, 1)
+        self.assertEqual(post_calls, [])
+
+    def test_approve_failed_tsd_recovery_times_out_before_ready_for_send(self):
+        raw_code = "01046501180412952156bej,nSIQ*?="
+        detail_calls = {"count": 0}
+        post_calls = []
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                status_filter = params["statuses"]
+                if status_filter == "readyForSend":
+                    return FakeResponse(json_data={"items": [], "total": 0})
+                if status_filter == "approveFailed":
+                    return FakeResponse(json_data={
+                        "items": [{
+                            "documentId": "doc-1",
+                            "aggregateCode": "04650118042603180000000007",
+                            "status": "approveFailed",
+                            "productGroup": "wheelChairs",
+                        }],
+                        "total": 1,
+                    })
+            if path == "/api/v1/aggregates/doc-1":
+                detail_calls["count"] += 1
+                status = "approveFailed" if detail_calls["count"] == 1 else "returnedToTsd"
+                return FakeResponse(json_data={
+                    "documentId": "doc-1",
+                    "aggregateCode": "04650118042603180000000007",
+                    "status": status,
+                    "productGroup": "wheelChairs",
+                    "actions": {"allowReturnToTsd": True, "allowSave": True},
+                })
+            if path == "/api/v1/aggregates/doc-1/codes":
+                return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def kontur_post(url, json=None, headers=None, timeout=None):
+            post_calls.append((url, json))
+            return FakeResponse(json_data={"ok": True})
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH"})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/cises/short/list"):
+                return FakeResponse(json_data=[{
+                    "result": {
+                        "requestedCis": raw_code,
+                        "cis": raw_code,
+                        "status": "INTRODUCED",
+                        "ownerInn": "7843316794",
+                    }
+                }])
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        summary = service.run(
+            kontur_session=make_kontur_session(kontur_get, kontur_post, tsd_token="tsd-1"),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            confirm_callback=lambda title, message: True,
+        )
+
+        self.assertEqual(summary.sent_for_approve, 0)
+        self.assertEqual(summary.errors, 1)
+        self.assertEqual(len(post_calls), 2)
+        self.assertTrue(post_calls[0][0].endswith("/return-to-tsd"))
+        self.assertTrue(post_calls[1][0].endswith("/tsd/api/v1/documents/aggregates/doc-1"))
+
+    def test_approve_failed_recovery_starts_after_foreign_parent_disaggregation(self):
+        raw_code = "01046501180412952156bej,nSIQ*?="
+        sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", [raw_code])
+        detail_payloads = iter([
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "approveFailed",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "returnedToTsd",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "sentForApprove",
+                "productGroup": "wheelChairs",
+                "actions": {"allowReturnToTsd": True, "allowSave": True},
+            },
+        ])
+        post_calls = []
+        created_docs = []
+        cis_requests = {"count": 0}
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                status_filter = params["statuses"]
+                if status_filter == "readyForSend":
+                    return FakeResponse(json_data={"items": [], "total": 0})
+                if status_filter == "approveFailed":
+                    return FakeResponse(json_data={
+                        "items": [{
+                            "documentId": "doc-1",
+                            "aggregateCode": "04650118042603180000000007",
+                            "status": "approveFailed",
+                            "productGroup": "wheelChairs",
+                        }],
+                        "total": 1,
+                    })
+            if path == "/api/v1/aggregates/doc-1":
+                return FakeResponse(json_data=next(detail_payloads))
+            if path == "/api/v1/aggregates/doc-1/codes":
+                return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
+            if path == "/api/v1/aggregates/doc-1/content-for-sign":
+                return FakeResponse(json_data=sign_content)
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def kontur_post(url, json=None, headers=None, timeout=None):
+            post_calls.append((url, json))
+            return FakeResponse(json_data={"ok": True})
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH"})
+            if "/doc/" in url and url.endswith("/info"):
+                return FakeResponse(json_data={"status": "CHECKED_OK"})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/cises/short/list"):
+                cis_requests["count"] += 1
+                parent = "04650118042603180000000099" if cis_requests["count"] == 1 else None
+                return FakeResponse(json_data=[{
+                    "result": {
+                        "requestedCis": raw_code,
+                        "cis": raw_code,
+                        "status": "INTRODUCED",
+                        "ownerInn": "7843316794",
+                        "parent": parent,
+                    }
+                }])
+            if url.endswith("/lk/documents/create"):
+                created_docs.append(json)
+                return FakeResponse(json_data={"id": "doc-disagg-1"})
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        summary = service.run(
+            kontur_session=make_kontur_session(kontur_get, kontur_post, tsd_token="tsd-1"),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            confirm_callback=lambda title, message: True,
+        )
+
+        self.assertEqual(summary.sent_for_approve, 1)
+        self.assertEqual(summary.errors, 0)
+        self.assertEqual(len(created_docs), 1)
+        self.assertTrue(post_calls[0][0].endswith("/return-to-tsd"))
+        self.assertTrue(post_calls[1][0].endswith("/tsd/api/v1/documents/aggregates/doc-1"))
+
+    def test_matches_comment_filter_by_stable_tokens_when_comment_is_mojibake(self):
+        self.assertTrue(
+            BulkAggregationService._matches_comment_filter(
+                "כאע הטאד S 260316 (249ך)",
+                "лат диаг s 260316 (249к)",
+            )
+        )
+        self.assertFalse(
+            BulkAggregationService._matches_comment_filter(
+                "כאע הטאד M 260316 (249ך)",
+                "лат диаг s 260316 (249к)",
+            )
+        )
+
+    def test_run_tsd_refill_by_name_replays_returned_to_tsd_aggregate(self):
+        raw_code = "01046501180412952156bej,nSIQ*?="
+        sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", [raw_code])
+        detail_payloads = iter([
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "returnedToTsd",
+                "productGroup": "wheelChairs",
+                "comment": "כאע הטאד S 260316 (249ך)",
+                "actions": {"allowReturnToTsd": False, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+                "comment": "כאע הטאד S 260316 (249ך)",
+                "actions": {"allowReturnToTsd": False, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "readyForSend",
+                "productGroup": "wheelChairs",
+                "comment": "כאע הטאד S 260316 (249ך)",
+                "actions": {"allowReturnToTsd": False, "allowSave": True},
+            },
+            {
+                "documentId": "doc-1",
+                "aggregateCode": "04650118042603180000000007",
+                "status": "sentForApprove",
+                "productGroup": "wheelChairs",
+                "comment": "כאע הטאד S 260316 (249ך)",
+                "actions": {"allowReturnToTsd": False, "allowSave": True},
+            },
+        ])
+        post_calls = []
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                status_filter = params["statuses"]
+                if status_filter == "returnedToTsd":
+                    return FakeResponse(json_data={
+                        "items": [{
+                            "documentId": "doc-1",
+                            "aggregateCode": "04650118042603180000000007",
+                            "status": "returnedToTsd",
+                            "productGroup": "wheelChairs",
+                            "comment": "כאע הטאד S 260316 (249ך)",
+                        }],
+                        "total": 1,
+                    })
+                return FakeResponse(json_data={"items": [], "total": 0})
+            if path == "/api/v1/aggregates/doc-1":
+                return FakeResponse(json_data=next(detail_payloads))
+            if path == "/api/v1/aggregates/doc-1/codes":
+                return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
+            if path == "/api/v1/aggregates/doc-1/content-for-sign":
+                return FakeResponse(json_data=sign_content)
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def kontur_post(url, json=None, headers=None, timeout=None):
+            post_calls.append((url, json))
+            return FakeResponse(json_data={"ok": True})
+
+        service = self.build_service(SimpleNamespace(get=lambda *args, **kwargs: None, post=lambda *args, **kwargs: None))
+        kontur_session = make_kontur_session(kontur_get, kontur_post)
+
+        summary = service.run_tsd_refill(
+            kontur_session=kontur_session,
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
+            tsd_token="tsd-123",
+            comment_filter="лат диаг S 260316 (249к)",
+        )
+
+        self.assertEqual(service.get_cookie_value(kontur_session, "tsdToken"), "tsd-123")
+        self.assertEqual(summary.ready_found, 1)
+        self.assertEqual(summary.sent_for_approve, 1)
+        self.assertEqual(summary.errors, 0)
+        self.assertEqual(len(post_calls), 2)
+        self.assertTrue(post_calls[0][0].endswith("/tsd/api/v1/documents/aggregates/doc-1"))
+        self.assertTrue(post_calls[1][0].endswith("/api/v1/aggregates/doc-1/send"))
 
 
 if __name__ == "__main__":
