@@ -698,8 +698,11 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041370",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XL, цвет натуральный",
-          "gtin": "4650118041370"
+          "tnvedCode": "4015120009",
+          "quantity": 20,
+          "cisType": "unit"
         }
       ]
     },
@@ -721,8 +724,11 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041257",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
-          "gtin": "4650118041257"
+          "tnvedCode": "4015120009",
+          "quantity": 2490,
+          "cisType": "unit"
         }
       ]
     },
@@ -767,8 +773,11 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041332",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
-          "gtin": "4650118041332"
+          "tnvedCode": "4015120009",
+          "quantity": 1750,
+          "cisType": "unit"
         }
       ]
     },
@@ -786,8 +795,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118041219",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XS, цвет натуральный",
-          "gtin": "4650118041219"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -809,8 +821,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 690,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -836,8 +851,11 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118046245",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р S",
-          "gtin": "4650118046245"
+          "tnvedCode": "4015120009",
+          "quantity": 48,
+          "cisType": "unit"
         }
       ]
     },
@@ -905,8 +923,11 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041257",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
-          "gtin": "4650118041257"
+          "tnvedCode": "4015120009",
+          "quantity": 200,
+          "cisType": "unit"
         }
       ]
     },
@@ -928,8 +949,11 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 310,
+          "cisType": "unit"
         }
       ]
     },
@@ -951,8 +975,11 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041332",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
-          "gtin": "4650118041332"
+          "tnvedCode": "4015120009",
+          "quantity": 90,
+          "cisType": "unit"
         }
       ]
     },
@@ -970,8 +997,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118041332",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
-          "gtin": "4650118041332"
+          "tnvedCode": "4015120009",
+          "quantity": 2,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -993,8 +1023,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4660537612716",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
-          "gtin": "4660537612716"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1016,8 +1049,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118041332",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
-          "gtin": "4650118041332"
+          "tnvedCode": "4015120009",
+          "quantity": 80,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1039,8 +1075,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 100,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1062,8 +1101,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 5,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1085,8 +1127,11 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4650118041257",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
-          "gtin": "4650118041257"
+          "tnvedCode": "4015120009",
+          "quantity": 100,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1108,8 +1153,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473509936",
           "name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 8,0",
-          "gtin": "4640473509936"
+          "tnvedCode": "4015120001",
+          "quantity": 14,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1131,8 +1179,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473511267",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
-          "gtin": "4640473511267"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1154,8 +1205,11 @@
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473512264",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
-          "gtin": "4640473512264"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1176,14 +1230,18 @@
       "updated_by": "User",
       "positions": [
         {
+          "gtin": "4640473514473",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
-          "gtin": "4640473514473"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "80ef6ce0-db5b-416a-81bc-110f20acf135",
@@ -1198,14 +1256,18 @@
       "updated_by": "User",
       "positions": [
         {
+          "gtin": "4640473514473",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
-          "gtin": "4640473514473"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "0735a8c8-ec8f-4e35-b01d-035540509117",
@@ -1221,8 +1283,11 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
@@ -1239,7 +1304,7 @@
       "gtin": "4640473505129",
       "created_at": "2026-03-13T14:12:09.568604",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.268514",
+      "updated_at": "2026-03-20T19:36:00.111303",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:08:21.935121",
@@ -1247,30 +1312,37 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473505129",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,0",
-          "gtin": "4640473505129"
+          "tnvedCode": "4015120009",
+          "quantity": 120,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "bcfa6dbd-a41b-4be4-8822-cc2f3d7751ea",
       "order_name": "542 микро 7,0 260315 -9шт",
-      "status": "Скачан",
+      "status": "Выполнен",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 7,0",
       "gtin": "4640473504887",
       "created_at": "2026-03-13T14:12:09.373411",
       "created_by": "sklad",
-      "updated_at": "2026-03-19T13:19:44.135636",
-      "updated_by": "user",
+      "updated_at": "2026-03-20T19:36:00.111303",
+      "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:08:46.019348",
       "tsd_intro_number": "48b5a56e-ad76-4328-9b47-fad376609ffc",
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473504887",
           "name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 7,0",
-          "gtin": "4640473504887"
+          "tnvedCode": "4015120001",
+          "quantity": 9,
+          "cisType": "unit"
         }
       ],
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\542 микро 70 260315 -9шт\\542 микро 70 260315 -9шт.pdf, C:\\Users\\user\\Desktop\\Коды км\\542 микро 70 260315 -9шт\\542 микро 7,0 260315 -9шт_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\542 микро 70 260315 -9шт\\542 микро 7,0 260315 -9шт.xls"
@@ -1278,22 +1350,25 @@
     {
       "document_id": "d33e3eee-ad04-4dc0-97f5-3b0a03048f76",
       "order_name": "543 микро 8,5 260315 -14шт",
-      "status": "Скачан",
+      "status": "Выполнен",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 8,5",
       "gtin": "4640473504917",
       "created_at": "2026-03-13T14:12:09.278830",
       "created_by": "sklad",
-      "updated_at": "2026-03-19T13:19:53.065431",
-      "updated_by": "user",
+      "updated_at": "2026-03-20T19:36:00.111303",
+      "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:09:04.173391",
       "tsd_intro_number": "dacdc928-b8ac-445c-a063-c6b6f9964e02",
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473504917",
           "name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 8,5",
-          "gtin": "4640473504917"
+          "tnvedCode": "4015120001",
+          "quantity": 14,
+          "cisType": "unit"
         }
       ],
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\543 микро 85 260315 -14шт\\543 микро 85 260315 -14шт.pdf, C:\\Users\\user\\Desktop\\Коды км\\543 микро 85 260315 -14шт\\543 микро 8,5 260315 -14шт_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\543 микро 85 260315 -14шт\\543 микро 8,5 260315 -14шт.xls"
@@ -1301,14 +1376,14 @@
     {
       "document_id": "b481cea3-5062-47f6-9fc2-0c920f9aae9b",
       "order_name": "540 орто 7,0 260315 -168шт",
-      "status": "Скачан",
+      "status": "Ожидает",
       "simpl": "ортопедия",
       "full_name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 7,0",
       "gtin": "4640473505105",
       "created_at": "2026-03-13T14:12:06.119416",
       "created_by": "sklad",
-      "updated_at": "2026-03-19T12:54:33.120729",
-      "updated_by": "user",
+      "updated_at": "2026-03-20T19:36:00.112304",
+      "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:07:44.821148",
       "tsd_intro_number": "c0e697ea-7d47-4bd3-8d55-d0d388ead06f",
@@ -1325,7 +1400,7 @@
       "gtin": "4640473505112",
       "created_at": "2026-03-13T14:12:06.093986",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.269071",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:07:24.866316",
@@ -1341,7 +1416,7 @@
       "gtin": "4640473505143",
       "created_at": "2026-03-13T14:12:05.961410",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.269610",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:06:59.254146",
@@ -1349,10 +1424,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473505143",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 9,0",
-          "gtin": "4640473505143"
+          "tnvedCode": "4015120009",
+          "quantity": 42,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "1d0d1a17-a09b-4070-8c65-1aa741eceac5",
@@ -1363,7 +1442,7 @@
       "gtin": "4640473505099",
       "created_at": "2026-03-13T11:21:03.672673",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.269610",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:25:15.827684",
@@ -1371,10 +1450,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473505099",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 6,5",
-          "gtin": "4640473505099"
+          "tnvedCode": "4015120009",
+          "quantity": 97,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "0e5ea27a-08d6-4de2-b7cb-be3bdd8557e4",
@@ -1385,7 +1468,7 @@
       "gtin": "4640473504665",
       "created_at": "2026-03-13T11:20:55.317631",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.269610",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:26:25.743015",
@@ -1393,10 +1476,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473504665",
           "name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,0",
-          "gtin": "4640473504665"
+          "tnvedCode": "4015120009",
+          "quantity": 5,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "6e9f7e53-067c-47c8-a24a-ef30a1ad800b",
@@ -1407,7 +1494,7 @@
       "gtin": "4640473504894",
       "created_at": "2026-03-13T11:20:53.502192",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.269610",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:26:01.726064",
@@ -1415,10 +1502,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473504894",
           "name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 7,5",
-          "gtin": "4640473504894"
+          "tnvedCode": "4015120001",
+          "quantity": 75,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "d3ae7dc4-8533-4db2-bfc5-5b07c3c2e01b",
@@ -1429,7 +1520,7 @@
       "gtin": "4640473504900",
       "created_at": "2026-03-13T11:20:52.349102",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.269610",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:25:37.519612",
@@ -1437,10 +1528,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473504900",
           "name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 8,0",
-          "gtin": "4640473504900"
+          "tnvedCode": "4015120001",
+          "quantity": 50,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "6f8a2079-7634-4954-bc21-5cb61ac4d762",
@@ -1451,12 +1546,13 @@
       "gtin": "4640473505129",
       "created_at": "2026-03-13T11:20:50.401483",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270138",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:24:24.874025",
       "tsd_intro_number": "ba6ed7b2-4c0a-4375-bfec-f9554d203ec5",
-      "tsd_created_by": "sklad"
+      "tsd_created_by": "sklad",
+      "filename": null
     },
     {
       "document_id": "523fc7db-631d-4c22-9b6d-4dc34587d04b",
@@ -1467,7 +1563,7 @@
       "gtin": "4640473505112",
       "created_at": "2026-03-13T11:20:50.376508",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270138",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:23:52.746753",
@@ -1475,10 +1571,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473505112",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 7,5",
-          "gtin": "4640473505112"
+          "tnvedCode": "4015120009",
+          "quantity": 60,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "88ff6b66-7c98-4305-a625-6b02d57c0974",
@@ -1489,7 +1589,7 @@
       "gtin": "4640473505099",
       "created_at": "2026-03-13T11:20:50.347425",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270138",
+      "updated_at": "2026-03-20T19:36:00.112304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T12:24:49.638932",
@@ -1497,10 +1597,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473505099",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 6,5",
-          "gtin": "4640473505099"
+          "tnvedCode": "4015120009",
+          "quantity": 62,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "984e918f-6db2-4d8d-a3c6-3d73440e7929",
@@ -1511,18 +1615,22 @@
       "gtin": "4650118040069",
       "created_at": "2026-03-12T15:20:04.908010",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270138",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4650118040069",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
-          "gtin": "4650118040069"
+          "tnvedCode": "4015120009",
+          "quantity": 2,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "added53e-d8f6-4cff-a24d-17a029d5dfe2",
@@ -1533,18 +1641,22 @@
       "gtin": "4640473509912",
       "created_at": "2026-03-12T11:49:49.290091",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270649",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473509912",
           "name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 7,5",
-          "gtin": "4640473509912"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "bd882632-c011-4436-a9ed-512080eea515",
@@ -1555,12 +1667,13 @@
       "gtin": "4640473504672",
       "created_at": "2026-03-12T11:19:55.240372",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270649",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-12T11:31:16.581447",
       "tsd_intro_number": "b5104ee9-c92d-44e8-a49d-a20a5b912374",
-      "tsd_created_by": "sklad"
+      "tsd_created_by": "sklad",
+      "filename": null
     },
     {
       "document_id": "2d243da4-5a1d-4c6f-8b98-52b49cc1614f",
@@ -1571,7 +1684,7 @@
       "gtin": "4640473504689",
       "created_at": "2026-03-12T11:19:54.452498",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270649",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "tsd_created": true,
       "tsd_created_at": "2026-03-12T11:39:16.870170",
@@ -1579,10 +1692,14 @@
       "tsd_created_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473504689",
           "name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 8,0",
-          "gtin": "4640473504689"
+          "tnvedCode": "4015120009",
+          "quantity": 4,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "76a14c34-ad27-4599-bc45-f45649be4539",
@@ -1593,18 +1710,22 @@
       "gtin": "4640473512295",
       "created_at": "2026-03-12T09:25:40.373865",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270649",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473512295",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р XL",
-          "gtin": "4640473512295"
+          "tnvedCode": "4015120009",
+          "quantity": 8,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "5ba2f314-09b7-402c-a01b-e05f54cc3bd9",
@@ -1615,12 +1736,13 @@
       "gtin": "4640473510611",
       "created_at": "2026-03-11T13:58:33.945935",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.270649",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "bce76e95-f9c5-4ec5-8cec-4302c25acf53",
@@ -1631,18 +1753,22 @@
       "gtin": "4640473510611",
       "created_at": "2026-03-11T13:58:33.186983",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271192",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473510611",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
-          "gtin": "4640473510611"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "f5bf89d7-f21e-4726-a60e-063b61d11e91",
@@ -1653,18 +1779,22 @@
       "gtin": "4640473500179",
       "created_at": "2026-03-11T13:26:53.232684",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271192",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473500179",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,0",
-          "gtin": "4640473500179"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "3d90c615-4d7a-46e1-930c-956690317729",
@@ -1675,18 +1805,22 @@
       "gtin": "4640473210269",
       "created_at": "2026-03-11T13:26:52.759812",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271192",
+      "updated_at": "2026-03-20T19:36:00.113304",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473210269",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,0",
-          "gtin": "4640473210269"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "1c4a7da5-10d2-4c29-9505-0454157532fd",
@@ -1697,18 +1831,22 @@
       "gtin": "4640473505990",
       "created_at": "2026-03-11T13:06:57.801372",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271192",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473505990",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
-          "gtin": "4640473505990"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "cc9c748e-6a97-4ab9-be9e-5ba3bb7a4230",
@@ -1719,18 +1857,22 @@
       "gtin": "4660537617551",
       "created_at": "2026-03-11T13:06:57.553268",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271726",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4660537617551",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4660537617551"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "605eabd7-1688-48c7-be1b-df6ba1d34090",
@@ -1741,18 +1883,22 @@
       "gtin": "4640473212751",
       "created_at": "2026-03-11T13:06:56.866100",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271726",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473212751",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473212751"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "8cb79e5a-aa20-4f9e-bdfc-ecc8138045a4",
@@ -1763,18 +1909,22 @@
       "gtin": "4640473504313",
       "created_at": "2026-03-11T13:06:56.227157",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271726",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4640473504313",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473504313"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "db914bfc-bcc3-4217-a66f-7b6d0b2baace",
@@ -1785,18 +1935,22 @@
       "gtin": "4660537614253",
       "created_at": "2026-03-11T13:06:56.183715",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271726",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "positions": [
         {
+          "gtin": "4660537614253",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4660537614253"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "9cb317fd-0ccf-46bc-a49a-83980c327f8d",
@@ -1807,12 +1961,13 @@
       "gtin": "4640473507062",
       "created_at": "2026-03-11T13:06:55.962511",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.271726",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "af33ada8-f773-4e84-8433-991abba3c4eb",
@@ -1823,12 +1978,13 @@
       "gtin": "4640473216056",
       "created_at": "2026-03-11T13:06:55.918994",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.272266",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "9a0e53e1-b0aa-4d69-8aa5-817e650aa9a3",
@@ -1839,12 +1995,13 @@
       "gtin": "4640473508823",
       "created_at": "2026-03-11T13:06:55.860985",
       "created_by": "sklad",
-      "updated_at": "2026-03-17T18:10:36.272266",
+      "updated_at": "2026-03-20T19:36:00.114305",
       "updated_by": "sklad",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "3cda47f6-666a-428f-9344-efa122c319db",
@@ -1859,14 +2016,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473500179",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,0",
-          "gtin": "4640473500179"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "88a09f84-b22c-45d3-a0d7-0ba97f202631",
@@ -1881,14 +2042,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473210269",
           "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,0",
-          "gtin": "4640473210269"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "73b081df-ba5d-4ef8-be08-49b714252972",
@@ -1907,10 +2072,14 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4640473504672",
           "name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,5",
-          "gtin": "4640473504672"
+          "tnvedCode": "4015120009",
+          "quantity": 8,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "01ebfb7d-08a8-4eb4-97f4-fc492dbe6914",
@@ -1925,14 +2094,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473505884",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 7,5",
-          "gtin": "4640473505884"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "4f58f734-76f8-41de-8969-b99ed230cdbb",
@@ -1947,14 +2120,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473504207",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473504207"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "785aa42c-0a3b-4922-b8ad-a8602f3673cd",
@@ -1969,14 +2146,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4660537617445",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4660537617445"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "47785121-ad8c-4e0d-9d94-49b6564d248e",
@@ -1991,14 +2172,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4660537614147",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4660537614147"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "93f908ae-4982-43b8-ba70-24b9a9c8d1c1",
@@ -2013,14 +2198,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473510505",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 7,5",
-          "gtin": "4640473510505"
+          "tnvedCode": "4015120001",
+          "quantity": 2,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "1e1b748a-0963-4e0d-b4eb-9bf22b35a29f",
@@ -2035,14 +2224,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473510505",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 7,5",
-          "gtin": "4640473510505"
+          "tnvedCode": "4015120001",
+          "quantity": 2,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "5d2c0ade-71d3-4bc3-8520-5412b0f8f1a5",
@@ -2057,14 +2250,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473500940",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 8,0",
-          "gtin": "4640473500940"
+          "tnvedCode": "4015120001",
+          "quantity": 2,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "3286e93b-5f09-4133-94fa-f806d20441c8",
@@ -2079,14 +2276,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473211037",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 8,0",
-          "gtin": "4640473211037"
+          "tnvedCode": "4015120001",
+          "quantity": 2,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "d668d47d-128f-4a24-9683-90c7aa4b92ab",
@@ -2101,14 +2302,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473505891",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 8,0",
-          "gtin": "4640473505891"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "7b63d912-37b7-4b0a-9261-02de7e1ebcfc",
@@ -2123,14 +2328,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473505884",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 7,5",
-          "gtin": "4640473505884"
+          "tnvedCode": "4015120001",
+          "quantity": 2,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "55a0fa1d-0e4b-4c33-a178-8b7fc1626c5d",
@@ -2145,14 +2354,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4650118043053",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4650118043053"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "e373818d-dc20-4c57-978f-8340e78c47ae",
@@ -2167,14 +2380,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473500902",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473500902"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "ac6259d1-0962-4e1f-ad0d-14ae43033355",
@@ -2189,14 +2406,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473500902",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473500902"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "0ed3535c-a493-425f-9287-a20137ff36ad",
@@ -2211,14 +2432,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473217596",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473217596"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "278cdcfc-fc20-4d55-a9a8-bd2dff29131a",
@@ -2233,14 +2458,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473510475",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473510475"
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "8ee6a2d2-a0d9-431f-8e89-3e5d6e582e3b",
@@ -2255,14 +2484,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473510475",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473510475"
+          "tnvedCode": "4015120001",
+          "quantity": 5,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "8a53560d-0347-411e-9005-2ac47874f56e",
@@ -2277,14 +2510,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4640473510475",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 6,0",
-          "gtin": "4640473510475"
+          "tnvedCode": "4015120001",
+          "quantity": 8,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "1839f593-38b9-4539-861e-0245fe3fcf1a",
@@ -2303,10 +2540,14 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4640473514084",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р S",
-          "gtin": "4640473514084"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "bc2c6261-ae75-4e55-842c-dd94800f5930",
@@ -2325,10 +2566,14 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4640473510529",
           "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 8,5",
-          "gtin": "4640473510529"
+          "tnvedCode": "4015120001",
+          "quantity": 105,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "93e40f40-bf6e-473d-a2e3-af8524249ef0",
@@ -2347,10 +2592,14 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "d3a39b75-78a6-4f64-b393-c351d780ffdd",
@@ -2365,14 +2614,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "b92b24dd-51e2-451d-8f52-08410babcd8e",
@@ -2391,10 +2644,14 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041332",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
-          "gtin": "4650118041332"
+          "tnvedCode": "4015120009",
+          "quantity": 500,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "991b088b-e43b-4bcf-8a3d-79502b09cc01",
@@ -2413,10 +2670,14 @@
       "tsd_created_by": "user",
       "positions": [
         {
+          "gtin": "4650118041257",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
-          "gtin": "4650118041257"
+          "tnvedCode": "4015120009",
+          "quantity": 500,
+          "cisType": "unit"
         }
-      ]
+      ],
+      "filename": null
     },
     {
       "document_id": "6daeec8f-68b6-4d12-895b-56419ae976e7",
@@ -2431,14 +2692,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4650118041295",
           "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
-          "gtin": "4650118041295"
+          "tnvedCode": "4015120009",
+          "quantity": 377,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "537752a4-81c1-4166-a2fc-da5c614ef414",
@@ -2453,14 +2718,18 @@
       "updated_by": "user",
       "positions": [
         {
+          "gtin": "4650118040083",
           "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
-          "gtin": "4650118040083"
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
         }
       ],
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "filename": null
     },
     {
       "document_id": "e9c5b3fe-4040-4a0f-9a03-fea7184907b3",
@@ -5302,8 +5571,8 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-20T19:32:20.760531",
+  "last_update": "2026-03-20T19:36:03.824063",
   "created_by": "sklad",
-  "updated_by": "user",
-  "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
+  "updated_by": "sklad",
+  "storage_path": "C:\\Users\\sklad\\Desktop\\crypto\\.history_sync_cache\\full_orders_history.json"
 }
