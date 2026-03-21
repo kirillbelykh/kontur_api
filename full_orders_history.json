@@ -48,11 +48,11 @@
       ],
       "created_at": "2026-03-20T17:12:52.789806",
       "created_by": "user",
-      "updated_at": "2026-03-20T18:23:39.595903",
+      "updated_at": "2026-03-21T11:42:57.122750",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-20T18:23:39.595903",
-      "tsd_intro_number": "83c51cfe-05c9-47b0-bfdf-3a766f5a34e4",
+      "tsd_created_at": "2026-03-21T11:42:57.122750",
+      "tsd_intro_number": "915a68dd-6fbc-4269-a401-b5ab2942a532",
       "tsd_created_by": "user",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\577 стер латекс L 260318 10к\\577 стер латекс L 260318 10к.xls",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\577 стер латекс L 260318 10к\\577 стер латекс L 260318 10к.pdf",
@@ -5453,7 +5453,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-21T11:38:45.361050",
+  "last_update": "2026-03-21T11:42:59.751359",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
