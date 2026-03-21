@@ -2,6 +2,32 @@
   "orders": [
     {
       "order_name": "579 лат диаг M 260316 1400д",
+      "document_id": "ab28bc8f-a53c-4d21-9769-bd1e526968fa",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041295",
+      "positions": [
+        {
+          "gtin": "4650118041295",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 1400,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-21T18:24:51.368468",
+      "created_by": "user",
+      "updated_at": "2026-03-21T18:24:51.368468",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
+      "order_name": "579 лат диаг M 260316 1400д",
       "document_id": "7d328468-8799-4b9f-9b9e-196de6bf7fc1",
       "status": "Скачан",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\579 лат диаг M 260316 1400д\\579 лат диаг M 260316 1400д.pdf, C:\\Users\\user\\Desktop\\Коды км\\579 лат диаг M 260316 1400д\\579 лат диаг M 260316 1400д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\579 лат диаг M 260316 1400д\\579 лат диаг M 260316 1400д.xls",
@@ -5511,7 +5537,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-21T18:23:14.157879",
+  "last_update": "2026-03-21T18:24:54.367135",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
