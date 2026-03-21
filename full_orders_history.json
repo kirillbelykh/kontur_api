@@ -135,10 +135,10 @@
       ],
       "created_at": "2026-03-20T13:40:30.461032",
       "created_by": "user",
-      "updated_at": "2026-03-21T11:37:44.800316",
+      "updated_at": "2026-03-21T11:37:50.768834",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-21T11:37:44.800316",
+      "tsd_created_at": "2026-03-21T11:37:50.768834",
       "tsd_intro_number": "65146956-1daa-43b3-b55b-15cf055464da",
       "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\574 лат диаг 2хлор S 260320 97д\\574 лат диаг 2хлор S 260320 97д.pdf",
@@ -5453,7 +5453,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-21T11:37:46.683080",
+  "last_update": "2026-03-21T11:37:53.218134",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
