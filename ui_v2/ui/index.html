@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KonturTestAPI [TEST]</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body data-theme="dark">
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-title-row">
+          <h1>Kontur v2</h1>
+          <span class="test-badge">TEST</span>
+        </div>
+        <p>Тестовый UI на PyWebView для полного рабочего контура.</p>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <button class="nav-item is-active" data-route="orders">📋 <span>Заказ кодов</span></button>
+        <button class="nav-item" data-route="download">⏬ <span>Загрузка кодов</span></button>
+        <button class="nav-item" data-route="intro">🔄 <span>Ввод в оборот</span></button>
+        <button class="nav-item" data-route="tsd">📲 <span>Задание на ТСД</span></button>
+        <button class="nav-item" data-route="aggregation">📦 <span>Коды агрегации</span></button>
+        <button class="nav-item" data-route="labels">🖨️ <span>Печать этикеток</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="session-card">
+          <span class="muted-label">Сессия</span>
+          <span id="sidebar-session-state">Не обновлялась</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-shell">
+      <header class="topbar">
+        <div>
+          <h2 id="view-title">Заказ кодов</h2>
+          <p id="view-subtitle">Создание, очередь и история заказов кодов маркировки.</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary-btn" id="refresh-session-btn">Обновить сессию</button>
+          <button class="secondary-btn" id="theme-toggle-btn">Светлая тема</button>
+        </div>
+      </header>
+
+      <div class="content-area">
+        <section class="view is-active" id="view-orders">
+          <div class="grid two-col">
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Форма заказа</h3>
+                <div class="segmented" id="orders-mode-toggle">
+                  <button class="segment is-active" data-mode="params">По параметрам</button>
+                  <button class="segment" data-mode="gtin">По GTIN</button>
+                </div>
+              </div>
+
+              <div class="form-grid">
+                <label class="field">
+                  <span>Название заявки</span>
+                  <input id="order-name-input" type="text" placeholder="Например: лат диаг S 260316 249к">
+                </label>
+                <label class="field">
+                  <span>Название товара</span>
+                  <input id="product-name-input" type="text" list="product-options" placeholder="Выберите товар">
+                  <datalist id="product-options"></datalist>
+                </label>
+                <label class="field">
+                  <span>GTIN</span>
+                  <input id="gtin-input" type="text" placeholder="Введите GTIN">
+                </label>
+                <label class="field">
+                  <span>Размер</span>
+                  <select id="size-select"></select>
+                </label>
+                <label class="field">
+                  <span>Цвет</span>
+                  <select id="color-select"></select>
+                </label>
+                <label class="field">
+                  <span>Венчик</span>
+                  <select id="venchik-select"></select>
+                </label>
+                <label class="field">
+                  <span>Единиц в упаковке</span>
+                  <select id="units-select"></select>
+                </label>
+                <label class="field">
+                  <span>Количество кодов</span>
+                  <input id="codes-count-input" type="number" min="1" step="1" value="1">
+                </label>
+              </div>
+
+              <div class="inline-actions">
+                <button class="secondary-btn" id="lookup-gtin-btn">Найти GTIN</button>
+                <button class="secondary-btn" id="lookup-by-code-btn">Найти по GTIN</button>
+                <button class="secondary-btn" id="add-order-btn">Добавить в очередь</button>
+                <button id="create-order-now-btn">Создать сразу</button>
+              </div>
+
+              <div class="info-grid">
+                <div class="info-card">
+                  <span class="muted-label">GTIN</span>
+                  <strong id="lookup-gtin-result">—</strong>
+                </div>
+                <div class="info-card">
+                  <span class="muted-label">Полное наименование</span>
+                  <strong id="lookup-full-name-result">—</strong>
+                </div>
+                <div class="info-card">
+                  <span class="muted-label">ТН ВЭД</span>
+                  <strong id="lookup-tnved-result">—</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Очередь и результаты</h3>
+                <div class="inline-actions compact">
+                  <button class="secondary-btn" id="submit-queue-btn">Выполнить очередь</button>
+                  <button class="secondary-btn" id="clear-queue-btn">Очистить очередь</button>
+                </div>
+              </div>
+              <div class="table-card">
+                <h4>Очередь</h4>
+                <div class="table-host" id="orders-queue-table"></div>
+              </div>
+              <div class="table-card">
+                <h4>Заказы этой сессии</h4>
+                <div class="table-host" id="orders-session-table"></div>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h3>История заказов</h3>
+              <div class="inline-actions compact">
+                <button class="secondary-btn" id="orders-delete-btn">Удалить</button>
+                <button class="secondary-btn" id="orders-toggle-deleted-btn">Удаленные</button>
+              </div>
+            </div>
+            <div class="table-host" id="orders-history-table"></div>
+          </article>
+
+          <article class="panel is-hidden" id="orders-deleted-panel">
+            <div class="panel-header">
+              <h3>Удаленные заказы</h3>
+              <button class="secondary-btn" id="orders-restore-deleted-btn">Восстановить</button>
+            </div>
+            <div class="table-host" id="orders-deleted-table"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Лог операций</h3>
+              <button class="secondary-btn" data-clear-log="orders">Очистить лог</button>
+            </div>
+            <pre class="log-box" id="orders-log"></pre>
+          </article>
+        </section>
+
+        <section class="view" id="view-download">
+          <div class="grid">
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Активные загрузки</h3>
+                <div class="inline-actions compact">
+                  <button class="secondary-btn" id="download-refresh-btn">Обновить статусы</button>
+                  <label class="checkbox-inline">
+                    <input type="checkbox" id="download-auto-checkbox" checked>
+                    <span>Автоскачивание</span>
+                  </label>
+                </div>
+              </div>
+              <div class="form-grid narrow">
+                <label class="field">
+                  <span>Принтер термоэтикеток</span>
+                  <select id="download-printer-select"></select>
+                </label>
+              </div>
+              <div class="inline-actions">
+                <button class="secondary-btn" id="download-manual-btn">Скачать выбранный</button>
+                <button id="download-print-btn">Печать термоэтикеток</button>
+              </div>
+              <div class="table-host" id="download-items-table"></div>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Лог загрузки</h3>
+              <button class="secondary-btn" data-clear-log="download">Очистить лог</button>
+            </div>
+            <pre class="log-box" id="download-log"></pre>
+          </article>
+        </section>
+
+        <section class="view" id="view-intro">
+          <div class="grid two-col">
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Параметры ввода в оборот</h3>
+              </div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Дата производства</span>
+                  <input id="intro-production-date" type="text" placeholder="YYYY-MM-DD">
+                </label>
+                <label class="field">
+                  <span>Срок годности</span>
+                  <input id="intro-expiration-date" type="text" placeholder="YYYY-MM-DD">
+                </label>
+                <label class="field">
+                  <span>Номер партии</span>
+                  <input id="intro-batch-number" type="text" placeholder="Номер партии">
+                </label>
+              </div>
+              <div class="inline-actions">
+                <button id="intro-run-btn">Выполнить ввод в оборот</button>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Готовые заявки</h3>
+              </div>
+              <div class="table-host" id="intro-items-table"></div>
+            </article>
+          </div>
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Лог ввода в оборот</h3>
+              <button class="secondary-btn" data-clear-log="intro">Очистить лог</button>
+            </div>
+            <pre class="log-box" id="intro-log"></pre>
+          </article>
+        </section>
+
+        <section class="view" id="view-tsd">
+          <div class="grid">
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Задание на ТСД</h3>
+                <div class="inline-actions compact">
+                  <button class="success-btn" id="tsd-run-btn">Создать задания</button>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Ввод в оборот №</span>
+                  <input id="tsd-intro-number" type="text" placeholder="Номер ввода в оборот">
+                </label>
+                <label class="field">
+                  <span>Дата производства</span>
+                  <input id="tsd-production-date" type="text" placeholder="YYYY-MM-DD">
+                </label>
+                <label class="field">
+                  <span>Срок годности</span>
+                  <input id="tsd-expiration-date" type="text" placeholder="YYYY-MM-DD">
+                </label>
+                <label class="field">
+                  <span>Номер партии</span>
+                  <input id="tsd-batch-number" type="text" placeholder="Номер партии">
+                </label>
+              </div>
+              <div class="table-card">
+                <h4>Активные заявки</h4>
+                <div class="table-host" id="tsd-items-table"></div>
+              </div>
+            </article>
+          </div>
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Лог ТСД</h3>
+              <button class="secondary-btn" data-clear-log="tsd">Очистить лог</button>
+            </div>
+            <pre class="log-box" id="tsd-log"></pre>
+          </article>
+        </section>
+
+        <section class="view" id="view-aggregation">
+          <div class="grid three-col">
+            <article class="panel">
+              <div class="panel-header"><h3>Создание АК</h3></div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Название</span>
+                  <input id="agg-create-comment" type="text" placeholder="Например: лат диаг S 260316 (249к)">
+                </label>
+                <label class="field">
+                  <span>Количество агрегатов</span>
+                  <input id="agg-create-count" type="number" min="1" step="1" value="1">
+                </label>
+              </div>
+              <div class="inline-actions">
+                <button id="agg-create-btn">Создать коды агрегации</button>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Скачивание АК</h3>
+                <div class="segmented" id="agg-download-mode-toggle">
+                  <button class="segment is-active" data-mode="comment">По названию</button>
+                  <button class="segment" data-mode="count">По количеству</button>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Значение</span>
+                  <input id="agg-download-target" type="text" placeholder="Название или количество">
+                </label>
+                <label class="field">
+                  <span>Статус</span>
+                  <input id="agg-download-status" type="text" value="tsdProcessStart">
+                </label>
+              </div>
+              <div class="inline-actions">
+                <button id="agg-download-btn">Скачать коды агрегации</button>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header"><h3>Проведение и повторное наполнение</h3></div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Название</span>
+                  <input id="agg-approve-filter" type="text" placeholder="Фильтр по названию, можно пусто">
+                </label>
+                <label class="field">
+                  <span>TSD токен</span>
+                  <input id="agg-refill-token" type="text" placeholder="Вставьте токен ТСД">
+                </label>
+              </div>
+              <label class="checkbox-inline">
+                <input type="checkbox" id="agg-allow-disaggregate">
+                <span>Разрешить расформирование чужих АК</span>
+              </label>
+              <div class="inline-actions">
+                <button class="secondary-btn" id="agg-approve-btn">Провести АК</button>
+                <button id="agg-refill-btn">Повторное наполнение</button>
+              </div>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Последние CSV агрегации</h3>
+            </div>
+            <div class="table-host" id="agg-csv-table"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Лог агрегации</h3>
+              <button class="secondary-btn" data-clear-log="aggregation">Очистить лог</button>
+            </div>
+            <pre class="log-box" id="aggregation-log"></pre>
+          </article>
+        </section>
+
+        <section class="view" id="view-labels">
+          <div class="grid two-col">
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Параметры печати 100x180</h3>
+                <div class="inline-actions compact">
+                  <button class="secondary-btn" id="labels-preview-btn">Показать контекст</button>
+                  <button id="labels-print-btn">Выполнить печать</button>
+                </div>
+              </div>
+              <div class="form-grid">
+                <label class="field">
+                  <span>Принтер</span>
+                  <select id="labels-printer-select"></select>
+                </label>
+                <label class="field">
+                  <span>Дата изготовления</span>
+                  <input id="labels-manufacture-date" type="text" placeholder="YYYY-MM или DD-MM-YYYY">
+                </label>
+                <label class="field">
+                  <span>Срок годности</span>
+                  <input id="labels-expiration-date" type="text" placeholder="YYYY-MM или DD-MM-YYYY">
+                </label>
+                <label class="field">
+                  <span>Количество</span>
+                  <input id="labels-quantity-value" type="number" min="1" step="1" placeholder="Для шаблонов Латекс, Нитрил, HR">
+                </label>
+              </div>
+              <div class="preview-box" id="labels-preview-box">Выберите шаблон, файл и заказ, затем нажмите «Показать контекст».</div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Шаблоны BarTender</h3>
+                <div class="inline-actions compact">
+                  <button class="secondary-btn" id="labels-template-prev">Назад</button>
+                  <span class="template-page" id="labels-template-page">0-0 из 0</span>
+                  <button class="secondary-btn" id="labels-template-next">Вперед</button>
+                </div>
+              </div>
+              <div class="template-grid" id="labels-template-grid"></div>
+            </article>
+          </div>
+
+          <div class="grid three-col">
+            <article class="panel">
+              <div class="panel-header"><h3>Заказы</h3></div>
+              <div class="table-host" id="labels-orders-table"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-header"><h3>Агрег коды км</h3></div>
+              <div class="table-host" id="labels-aggregation-files-table"></div>
+            </article>
+            <article class="panel">
+              <div class="panel-header"><h3>Коды км</h3></div>
+              <div class="table-host" id="labels-marking-files-table"></div>
+            </article>
+          </div>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Лог печати этикеток</h3>
+              <button class="secondary-btn" data-clear-log="labels">Очистить лог</button>
+            </div>
+            <pre class="log-box" id="labels-log"></pre>
+          </article>
+        </section>
+      </div>
+
+      <footer class="statusbar">
+        <span id="status-text">Инициализация интерфейса...</span>
+        <span class="status-connection" id="status-connection">Оффлайн</span>
+      </footer>
+    </main>
+  </div>
+
+  <div id="toast-host"></div>
+  <script src="./app.js"></script>
+</body>
+</html>
