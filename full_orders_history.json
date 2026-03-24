@@ -1,6 +1,64 @@
 {
   "orders": [
     {
+      "order_name": "581 дв пара 8,0 260322 10к",
+      "document_id": "3f46855d-57de-4979-a7e5-b8bd1572079e",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\581 дв пара 80 260322 10к\\581 дв пара 8,0 260322 10к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\581 дв пара 80 260322 10к\\581 дв пара 8,0 260322 10к.xls",
+      "simpl": "двойная пара",
+      "full_name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 8,0",
+      "gtin": "4640473504689",
+      "positions": [
+        {
+          "gtin": "4640473504689",
+          "name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 8,0",
+          "tnvedCode": "4015120009",
+          "quantity": 10,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-24T10:53:20.949413",
+      "created_by": "user",
+      "updated_at": "2026-03-24T12:03:11.277332",
+      "updated_by": "user",
+      "tsd_created": true,
+      "tsd_created_at": "2026-03-24T12:03:11.277332",
+      "tsd_intro_number": "63dbb118-da00-426c-83c7-cfc3060cf9ee",
+      "tsd_created_by": "user",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\581 дв пара 80 260322 10к\\581 дв пара 8,0 260322 10к_csv.csv",
+      "pdf_path": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\581 дв пара 80 260322 10к\\581 дв пара 8,0 260322 10к.xls"
+    },
+    {
+      "order_name": "580 дв пара 7,0 260322 10к",
+      "document_id": "1f5e2851-eb6e-49e2-b2d1-9d43738a9aeb",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\580 дв пара 70 260322 10к\\580 дв пара 70 260322 10к.pdf, C:\\Users\\user\\Desktop\\Коды км\\580 дв пара 70 260322 10к\\580 дв пара 7,0 260322 10к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\580 дв пара 70 260322 10к\\580 дв пара 7,0 260322 10к.xls",
+      "simpl": "двойная пара",
+      "full_name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,0",
+      "gtin": "4640473504665",
+      "positions": [
+        {
+          "gtin": "4640473504665",
+          "name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,0",
+          "tnvedCode": "4015120009",
+          "quantity": 10,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-24T10:53:20.014514",
+      "created_by": "user",
+      "updated_at": "2026-03-24T12:01:04.144131",
+      "updated_by": "user",
+      "tsd_created": true,
+      "tsd_created_at": "2026-03-24T12:01:04.144131",
+      "tsd_intro_number": "04150bc6-339c-4c1e-aca4-738a05230de5",
+      "tsd_created_by": "user",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\580 дв пара 70 260322 10к\\580 дв пара 7,0 260322 10к_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\580 дв пара 70 260322 10к\\580 дв пара 70 260322 10к.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\580 дв пара 70 260322 10к\\580 дв пара 7,0 260322 10к.xls"
+    },
+    {
       "order_name": "579 лат диаг M 260316 1400д",
       "document_id": "ab28bc8f-a53c-4d21-9769-bd1e526968fa",
       "status": "Скачан",
@@ -1662,7 +1720,7 @@
     {
       "document_id": "984e918f-6db2-4d8d-a3c6-3d73440e7929",
       "order_name": "530 стер лат L 260228 заявка 5332",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118040069",
@@ -1683,12 +1741,15 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\530 стер лат L 260228 заявка 5332\\530 стер лат L 260228 заявка 5332.pdf, C:\\Users\\user\\Desktop\\Коды км\\530 стер лат L 260228 заявка 5332\\530 стер лат L 260228 заявка 5332_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\530 стер лат L 260228 заявка 5332\\530 стер лат L 260228 заявка 5332.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\530 стер лат L 260228 заявка 5332\\530 стер лат L 260228 заявка 5332_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\530 стер лат L 260228 заявка 5332\\530 стер лат L 260228 заявка 5332.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\530 стер лат L 260228 заявка 5332\\530 стер лат L 260228 заявка 5332.pdf"
     },
     {
       "document_id": "added53e-d8f6-4cff-a24d-17a029d5dfe2",
       "order_name": "528 ультра 7,5",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 7,5",
       "gtin": "4640473509912",
@@ -1709,7 +1770,10 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\528 ультра 75\\528 ультра 75.pdf, C:\\Users\\user\\Desktop\\Коды км\\528 ультра 75\\528 ультра 7,5_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\528 ультра 75\\528 ультра 7,5.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\528 ультра 75\\528 ультра 7,5_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\528 ультра 75\\528 ультра 7,5.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\528 ультра 75\\528 ультра 75.pdf"
     },
     {
       "document_id": "bd882632-c011-4436-a9ed-512080eea515",
@@ -1757,7 +1821,7 @@
     {
       "document_id": "76a14c34-ad27-4599-bc45-f45649be4539",
       "order_name": "525 стер лат XL 8х10 пар",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р XL",
       "gtin": "4640473512295",
@@ -1778,12 +1842,15 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\525 стер лат XL 8х10 пар\\525 стер лат XL 8х10 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\525 стер лат XL 8х10 пар\\525 стер лат XL 8х10 пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\525 стер лат XL 8х10 пар\\525 стер лат XL 8х10 пар.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\525 стер лат XL 8х10 пар\\525 стер лат XL 8х10 пар_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\525 стер лат XL 8х10 пар\\525 стер лат XL 8х10 пар.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\525 стер лат XL 8х10 пар\\525 стер лат XL 8х10 пар.pdf"
     },
     {
       "document_id": "5ba2f314-09b7-402c-a01b-e05f54cc3bd9",
       "order_name": "5330 хир 7,5 100 пар",
-      "status": "Ожидает",
+      "status": "Скачан",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473510611",
@@ -1795,12 +1862,15 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар\\5330 хир 75 100 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар\\5330 хир 7,5 100 пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар\\5330 хир 7,5 100 пар.xls",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар\\5330 хир 7,5 100 пар.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар\\5330 хир 7,5 100 пар_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар\\5330 хир 75 100 пар.pdf"
     },
     {
       "document_id": "bce76e95-f9c5-4ec5-8cec-4302c25acf53",
       "order_name": "5330 хир 7,5 100 пар_1",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473510611",
@@ -1821,7 +1891,10 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар_1\\5330 хир 75 100 пар_1.pdf, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар_1\\5330 хир 7,5 100 пар_1_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар_1\\5330 хир 7,5 100 пар_1.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар_1\\5330 хир 7,5 100 пар_1_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар_1\\5330 хир 7,5 100 пар_1.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 100 пар_1\\5330 хир 75 100 пар_1.pdf"
     },
     {
       "document_id": "f5bf89d7-f21e-4726-a60e-063b61d11e91",
@@ -1878,7 +1951,7 @@
     {
       "document_id": "1c4a7da5-10d2-4c29-9505-0454157532fd",
       "order_name": "5330 хир 7,5 50 пар",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473505990",
@@ -1899,12 +1972,15 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 50 пар\\5330 хир 75 50 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 50 пар\\5330 хир 7,5 50 пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 50 пар\\5330 хир 7,5 50 пар.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 50 пар\\5330 хир 7,5 50 пар_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 50 пар\\5330 хир 7,5 50 пар.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 75 50 пар\\5330 хир 75 50 пар.pdf"
     },
     {
       "document_id": "cc9c748e-6a97-4ab9-be9e-5ba3bb7a4230",
       "order_name": "5330 хир 6,0 4 пар",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
       "gtin": "4660537617551",
@@ -1925,12 +2001,15 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 4 пар\\5330 хир 60 4 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 4 пар\\5330 хир 6,0 4 пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 4 пар\\5330 хир 6,0 4 пар.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 4 пар\\5330 хир 6,0 4 пар_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 4 пар\\5330 хир 6,0 4 пар.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 4 пар\\5330 хир 60 4 пар.pdf"
     },
     {
       "document_id": "605eabd7-1688-48c7-be1b-df6ba1d34090",
       "order_name": "5330 хир 6,0 6 пар",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
       "gtin": "4640473212751",
@@ -1951,12 +2030,15 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 6 пар\\5330 хир 60 6 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 6 пар\\5330 хир 6,0 6 пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 6 пар\\5330 хир 6,0 6 пар.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 6 пар\\5330 хир 6,0 6 пар_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 6 пар\\5330 хир 6,0 6 пар.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 6 пар\\5330 хир 60 6 пар.pdf"
     },
     {
       "document_id": "8cb79e5a-aa20-4f9e-bdfc-ecc8138045a4",
       "order_name": "5330 хир 6,0 40 пар",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
       "gtin": "4640473504313",
@@ -1977,7 +2059,10 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 40 пар\\5330 хир 60 40 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 40 пар\\5330 хир 6,0 40 пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 40 пар\\5330 хир 6,0 40 пар.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 40 пар\\5330 хир 6,0 40 пар_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 40 пар\\5330 хир 6,0 40 пар.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\5330 хир 60 40 пар\\5330 хир 60 40 пар.pdf"
     },
     {
       "document_id": "db914bfc-bcc3-4217-a66f-7b6d0b2baace",
@@ -5540,7 +5625,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-24T09:56:22.632175",
+  "last_update": "2026-03-24T12:03:16.211167",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
