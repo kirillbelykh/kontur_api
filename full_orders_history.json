@@ -1608,14 +1608,14 @@
     {
       "document_id": "bbab6e16-8d66-47ba-af29-64f27d176966",
       "order_name": "538 орто 9,0 260315 -42шт",
-      "status": "Выполнен",
+      "status": "Скачан",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 9,0",
       "gtin": "4640473505143",
       "created_at": "2026-03-13T14:12:05.961410",
       "created_by": "sklad",
-      "updated_at": "2026-03-20T19:36:55.363081",
-      "updated_by": "sklad",
+      "updated_at": "2026-03-24T13:56:52.570692",
+      "updated_by": "user",
       "tsd_created": true,
       "tsd_created_at": "2026-03-13T16:06:59.254146",
       "tsd_intro_number": "9c479868-1d70-4d7c-af10-2fb56e6ae3e0",
@@ -1629,7 +1629,10 @@
           "cisType": "unit"
         }
       ],
-      "filename": null
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\538 орто 90 260315 -42шт\\538 орто 90 260315 -42шт.pdf, C:\\Users\\user\\Desktop\\Коды км\\538 орто 90 260315 -42шт\\538 орто 9,0 260315 -42шт_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\538 орто 90 260315 -42шт\\538 орто 9,0 260315 -42шт.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\538 орто 90 260315 -42шт\\538 орто 9,0 260315 -42шт_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\538 орто 90 260315 -42шт\\538 орто 90 260315 -42шт.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\538 орто 90 260315 -42шт\\538 орто 9,0 260315 -42шт.xls"
     },
     {
       "document_id": "1d0d1a17-a09b-4070-8c65-1aa741eceac5",
@@ -5712,7 +5715,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-24T13:55:04.738088",
+  "last_update": "2026-03-24T13:56:54.900636",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
