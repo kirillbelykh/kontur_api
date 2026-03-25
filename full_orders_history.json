@@ -48,10 +48,10 @@
       ],
       "created_at": "2026-03-25T16:06:41.348008",
       "created_by": "user",
-      "updated_at": "2026-03-25T17:06:11.480192",
+      "updated_at": "2026-03-25T17:06:16.784012",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-25T17:06:11.480192",
+      "tsd_created_at": "2026-03-25T17:06:16.784012",
       "tsd_intro_number": "e0f8f3f2-4bbc-4041-ac86-4518b77a798f",
       "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\587 нитрил диаг L 260325 2140д\\587 нитрил диаг L 260325 2140д.pdf",
@@ -5834,7 +5834,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-25T17:06:12.812280",
+  "last_update": "2026-03-25T17:06:18.221470",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
