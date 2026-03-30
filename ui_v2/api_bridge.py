@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 import uuid
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
@@ -21,13 +21,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 os.environ.setdefault("HISTORY_SYNC_ENABLED", "0")
 
 import api as api_module
-from aggregation_bulk import BulkAggregationService
+import cookies as cookies_module
+from aggregation_bulk import AggregateInfo, BulkAggregationService, BulkAggregationSummary, extract_sntin
 from api import (
     check_order_status,
     codes_order,
     download_codes,
     make_task_on_tsd,
-    mark_order_as_tsd_created,
     put_into_circulation,
 )
 from bartender_label_100x180 import (
@@ -83,6 +83,7 @@ STATUS_LABELS = {
     "approveFailed": "Не зарегистрирован",
     "approved": "Зарегистрирован",
     "readyForSend": "Готов к проведению",
+    "readyForSendAfterApproved": "Состав изменен после регистрации",
     "returnedToTsd": "Возвращен на ТСД",
     "tsdProcessStart": "На ТСД",
     "tsd_created": "Отправлено на ТСД",
@@ -93,8 +94,23 @@ STATUS_LABELS = {
     "WRITTEN_OFF": "Выведен из оборота",
     "RETIRED": "Выведен из оборота",
     "DISAGGREGATED": "Расформирован",
+    "disaggregated": "Расформирован",
     "UNKNOWN": "Неизвестно",
 }
+
+AGGREGATION_TABLE_STATUSES = (
+    "tsdProcessStart",
+    "readyForSend",
+    "approveFailed",
+    "returnedToTsd",
+    "sentForApprove",
+    "approved",
+    "disaggregated",
+)
+
+AGGREGATION_FETCH_STATUSES = tuple(
+    status for status in AGGREGATION_TABLE_STATUSES if status != "disaggregated"
+)
 
 
 def _translate_status(value: Any) -> str:
@@ -109,6 +125,17 @@ def _format_status_counts(counts: Counter[str]) -> str:
     for raw_status, count in counts.items():
         parts.append(f"{_translate_status(raw_status)}: {count}")
     return ", ".join(parts)
+
+
+def _format_datetime_value(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    normalized = text.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized).strftime("%d.%m.%Y %H:%M")
+    except ValueError:
+        return text[:19].replace("T", " ")
 
 
 class _BridgeRuntime:
@@ -128,6 +155,9 @@ class _BridgeRuntime:
         self.cached_thumbprint: Optional[str] = os.getenv("THUMBPRINT") or None
         self.document_status_cache: Dict[str, Dict[str, Any]] = {}
         self.code_status_cache: Dict[str, Dict[str, Any]] = {}
+        self.aggregation_cache_items: List[Dict[str, Any]] = []
+        self.aggregation_cache_at = 0.0
+        self.aggregation_cache_ttl_seconds = 90.0
         self.load_download_items_from_history()
 
     def load_download_items_from_history(self) -> None:
@@ -545,12 +575,23 @@ class ApiBridge:
             runtime.nomenclature_df = pd.read_excel(path)
         return runtime.nomenclature_df
 
-    def _ensure_session(self, force_refresh: bool = False) -> requests.Session:
+    def _ensure_session(
+        self,
+        force_refresh: bool = False,
+        *,
+        force_browser_refresh: bool = False,
+    ) -> requests.Session:
         runtime = _get_runtime()
         with runtime.lock:
             age = time.time() - runtime.session_created_at if runtime.session_created_at else 0.0
             if force_refresh or runtime.session is None or age >= runtime.session_ttl_seconds:
-                cookies = get_valid_cookies()
+                cookies: Optional[Dict[str, str]]
+                if force_browser_refresh:
+                    cookies = cookies_module.get_cookies()
+                elif force_refresh:
+                    cookies = get_valid_cookies() or cookies_module.get_cookies()
+                else:
+                    cookies = get_valid_cookies()
                 if not cookies:
                     raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
                 runtime.session = make_session_with_cookies(cookies)
@@ -773,6 +814,103 @@ class ApiBridge:
         _get_runtime().history_db.add_order(base_record)
         item["history_data"] = base_record
 
+    def _mark_tsd_created_local(self, document_id: str, intro_number: str = "") -> None:
+        runtime = _get_runtime()
+        normalized_id = str(document_id or "").strip()
+        if not normalized_id:
+            return
+        runtime.history_db.mark_tsd_created(normalized_id, intro_number)
+        for collection in (runtime.download_items, runtime.session_orders):
+            for item in collection:
+                if str(item.get("document_id") or "").strip() != normalized_id:
+                    continue
+                item["tsd_created"] = True
+                item["tsd_intro_number"] = intro_number
+                history_data = item.get("history_data")
+                if isinstance(history_data, dict):
+                    history_data["tsd_created"] = True
+                    history_data["tsd_intro_number"] = intro_number
+                break
+
+    @staticmethod
+    def _looks_like_session_error_message(error_text: str) -> bool:
+        normalized = str(error_text or "").strip().lower()
+        if not normalized:
+            return False
+        return any(
+            token in normalized
+            for token in (
+                "401",
+                "403",
+                "forbidden",
+                "unauthorized",
+                "cookie",
+                "cookies",
+                "сесс",
+                "авториз",
+                "csrf",
+                "access denied",
+            )
+        )
+
+    def _should_retry_tsd_creation(
+        self,
+        result: Dict[str, Any],
+        *,
+        attempt: int,
+    ) -> bool:
+        if attempt > 0:
+            return False
+        if not isinstance(result, dict):
+            return True
+        if str(result.get("introduction_id") or "").strip():
+            return False
+        errors = result.get("errors") or []
+        if not isinstance(errors, list):
+            return True
+        if not errors:
+            return True
+        return any(self._looks_like_session_error_message(error_text) for error_text in errors) or True
+
+    def _create_tsd_task_with_retry(
+        self,
+        *,
+        item: Dict[str, Any],
+        intro_number: str,
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+    ) -> tuple[bool, Dict[str, Any]]:
+        positions_data, production_patch = self._build_tsd_payload(
+            item,
+            intro_number,
+            production_date,
+            expiration_date,
+            batch_number,
+        )
+        last_result: Dict[str, Any] = {"errors": []}
+        for attempt in range(2):
+            force_refresh = attempt > 0
+            force_browser_refresh = attempt > 0
+            if attempt > 0:
+                self._log("tsd", f"Повторяем создание задания после обновления сессии: {item.get('order_name')}")
+            session = self._ensure_session(
+                force_refresh=force_refresh,
+                force_browser_refresh=force_browser_refresh,
+            )
+            ok, result = make_task_on_tsd(
+                session=session,
+                codes_order_id=str(item.get("document_id") or ""),
+                positions_data=positions_data,
+                production_patch=production_patch,
+            )
+            last_result = result
+            if ok:
+                return True, result
+            if not self._should_retry_tsd_creation(result, attempt=attempt):
+                return False, result
+        return False, last_result
+
     def _resolve_order_csv_path(self, item: Dict[str, Any]) -> Optional[str]:
         candidate_paths = [
             item.get("csv_path"),
@@ -837,6 +975,11 @@ class ApiBridge:
         text = str(value or "").strip()
         if not text:
             raise RuntimeError(f"Укажите поле '{field_name}'.")
+        for pattern in ("%Y-%m", "%Y/%m", "%m.%Y"):
+            try:
+                return datetime.strptime(text, pattern).strftime("%Y-%m-01")
+            except ValueError:
+                continue
         for pattern in ("%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y"):
             try:
                 return datetime.strptime(text, pattern).strftime("%Y-%m-%d")
@@ -883,6 +1026,820 @@ class ApiBridge:
             "TnvedCode": get_tnved_code(str(item.get("simpl") or "").strip()),
         }
         return positions_data, production_patch
+
+    @staticmethod
+    def _set_cookie_value(session: requests.Session, name: str, value: str) -> None:
+        normalized_value = str(value or "").strip()
+        if not normalized_value:
+            return
+        session.cookies.set(name, normalized_value, domain="mk.kontur.ru", path="/")
+
+    @staticmethod
+    def _normalize_full_marking_code(value: str) -> str:
+        normalized = str(value or "").strip().replace("\\x1d", "\x1d")
+        if normalized.startswith("^1"):
+            normalized = normalized[2:]
+        if normalized.startswith("]C1"):
+            normalized = normalized[3:]
+        return normalized.strip()
+
+    def _iter_saved_marking_rows(self, csv_path: Path):
+        encodings = ("utf-8-sig", "utf-8", "cp1251")
+        last_error: Optional[Exception] = None
+        for encoding in encodings:
+            try:
+                with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                    reader = csv.reader(csv_file, delimiter="\t")
+                    for row in reader:
+                        prepared = list(row)
+                        if len(prepared) == 1:
+                            raw_line = str(prepared[0] or "")
+                            if "\t" in raw_line:
+                                prepared = raw_line.split("\t")
+                            elif ";" in raw_line:
+                                prepared = raw_line.split(";")
+                            elif "," in raw_line:
+                                prepared = raw_line.split(",")
+                        if not prepared:
+                            continue
+                        raw_code = str(prepared[0] or "").strip()
+                        normalized_code = self._normalize_full_marking_code(raw_code)
+                        if not normalized_code or not normalized_code.startswith("01"):
+                            continue
+                        gtin = str(prepared[1] or "").strip() if len(prepared) > 1 else ""
+                        full_name = str(prepared[2] or "").strip() if len(prepared) > 2 else ""
+                        yield {
+                            "full_code": normalized_code,
+                            "gtin": gtin or normalized_code[2:16],
+                            "full_name": full_name,
+                        }
+                return
+            except UnicodeDecodeError as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+
+    def _match_saved_marking_codes(self, raw_codes: Sequence[str]) -> Dict[str, Any]:
+        desktop_dir = Path.home() / "Desktop" / "Коды км"
+        if not desktop_dir.exists():
+            raise RuntimeError(f"Папка с кодами маркировки не найдена: {desktop_dir}")
+
+        targets: Dict[str, str] = {}
+        for raw_code in raw_codes:
+            sntin = extract_sntin(str(raw_code or "").strip())
+            if sntin:
+                targets[sntin] = str(raw_code or "").strip()
+        if not targets:
+            raise RuntimeError("Не найдены коды маркировки для поиска в папке 'Коды км'.")
+
+        matched: Dict[str, Dict[str, Any]] = {}
+        scanned_files = 0
+        for csv_path in sorted(desktop_dir.rglob("*.csv")):
+            scanned_files += 1
+            for row in self._iter_saved_marking_rows(csv_path):
+                sntin = extract_sntin(row["full_code"])
+                if sntin not in targets or sntin in matched:
+                    continue
+                matched[sntin] = {
+                    "sntin": sntin,
+                    "partial_code": targets[sntin],
+                    "full_code": row["full_code"],
+                    "gtin": str(row.get("gtin") or "").strip(),
+                    "full_name": str(row.get("full_name") or "").strip(),
+                    "source_path": str(csv_path),
+                    "order_name": csv_path.parent.name,
+                }
+                if len(matched) >= len(targets):
+                    break
+            if len(matched) >= len(targets):
+                break
+
+        unmatched = [targets[sntin] for sntin in targets.keys() if sntin not in matched]
+        groups: Dict[tuple[str, str, str, str], List[Dict[str, Any]]] = defaultdict(list)
+        for item in matched.values():
+            key = (
+                str(item.get("source_path") or ""),
+                str(item.get("order_name") or ""),
+                str(item.get("gtin") or ""),
+                str(item.get("full_name") or ""),
+            )
+            groups[key].append(item)
+
+        grouped_payload = [
+            {
+                "source_path": source_path,
+                "order_name": order_name,
+                "gtin": gtin,
+                "full_name": full_name,
+                "codes": sorted(items, key=lambda row: row["sntin"]),
+            }
+            for (source_path, order_name, gtin, full_name), items in groups.items()
+        ]
+        grouped_payload.sort(key=lambda item: (item["order_name"], item["gtin"], item["source_path"]))
+
+        return {
+            "matched": matched,
+            "groups": grouped_payload,
+            "unmatched": unmatched,
+            "scanned_files": scanned_files,
+        }
+
+    def _lookup_intro_product_metadata(self, gtin: str, fallback_name: str) -> Dict[str, str]:
+        normalized_gtin = str(gtin or "").strip()
+        full_name = str(fallback_name or "").strip()
+        simpl_name = ""
+        if normalized_gtin:
+            try:
+                looked_up_name, looked_up_simpl = lookup_by_gtin(self._load_nomenclature_df(), normalized_gtin)
+                if looked_up_name:
+                    full_name = looked_up_name
+                if looked_up_simpl:
+                    simpl_name = looked_up_simpl
+            except Exception:
+                pass
+        tnved_code = get_tnved_code(simpl_name or full_name)
+        return {
+            "gtin": normalized_gtin,
+            "full_name": full_name,
+            "simpl_name": simpl_name,
+            "tnved_code": tnved_code,
+        }
+
+    def _build_aggregate_intro_document_number(self, order_name: str, group_index: int) -> str:
+        safe_order_name = " ".join(str(order_name or "").strip().split()) or "АК"
+        timestamp = datetime.now().strftime("%d.%m %H:%M")
+        return f"Ввод АК {safe_order_name} [{group_index}] {timestamp}"[:180]
+
+    def _get_intro_production_state(self, session: requests.Session, introduction_id: str) -> Dict[str, Any]:
+        response = session.get(
+            f"{str(os.getenv('BASE_URL') or 'https://mk.kontur.ru').rstrip('/')}/api/v1/codes-introduction/{introduction_id}/production",
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {}
+
+    def _wait_for_intro_document_status(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+        *,
+        expected_statuses: Sequence[str],
+        timeout_seconds: float = 180.0,
+    ) -> Dict[str, Any]:
+        deadline = time.time() + timeout_seconds
+        expected = {str(status) for status in expected_statuses if str(status)}
+        last_payload: Dict[str, Any] = {}
+        last_status = ""
+        while time.time() < deadline:
+            payload = self._get_intro_production_state(session, introduction_id)
+            status = str(payload.get("documentStatus") or "").strip()
+            if status != last_status:
+                self._log("aggregation", f"Статус ввода в оборот {introduction_id}: {status or 'неизвестно'}")
+                last_status = status
+            last_payload = payload
+            if status in expected:
+                return payload
+            time.sleep(2)
+        raise RuntimeError(
+            f"Документ ввода в оборот {introduction_id} не перешёл в статусы {', '.join(sorted(expected))}. "
+            f"Последний статус: {last_status or 'неизвестно'}."
+        )
+
+    def _wait_for_intro_codes_check(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+        *,
+        timeout_seconds: float = 180.0,
+    ) -> Dict[str, Any]:
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        deadline = time.time() + timeout_seconds
+        last_payload: Dict[str, Any] = {}
+        last_status = ""
+        terminal_statuses = {"doesNotHaveErrors", "hasErrors", "checked", "noErrors"}
+        while time.time() < deadline:
+            response = session.get(f"{base_url}/api/v1/codes-checking/{introduction_id}", timeout=30)
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, dict):
+                last_payload = payload
+            status = str(payload.get("status") or "").strip()
+            if status != last_status:
+                self._log("aggregation", f"Проверка кодов {introduction_id}: {status or 'неизвестно'}")
+                last_status = status
+            if status in terminal_statuses:
+                return last_payload
+            time.sleep(2)
+        raise RuntimeError(
+            f"Проверка кодов для документа {introduction_id} не завершилась. "
+            f"Последний статус: {last_status or 'неизвестно'}."
+        )
+
+    def _fill_intro_document_from_tsd(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+        *,
+        tsd_token: str = "",
+        full_codes: Sequence[str],
+    ) -> None:
+        normalized_token = str(tsd_token or "").strip()
+        if not normalized_token:
+            raise RuntimeError("Введите TSD токен для ввода в оборот АК.")
+        codes_payload = [{"code": self._normalize_full_marking_code(code)} for code in full_codes if self._normalize_full_marking_code(code)]
+        if not codes_payload:
+            raise RuntimeError("Не удалось подготовить полный список кодов для отправки на ТСД.")
+
+        self._set_cookie_value(session, "tsdToken", normalized_token)
+        payload = {
+            "positionsSave": [
+                {
+                    "position": 1,
+                    "markingCodeModels": codes_payload,
+                }
+            ]
+        }
+        headers = {
+            "Accept": "*/*",
+            "Content-Type": "application/json; charset=utf-8",
+            "Origin": "https://mk.kontur.ru",
+            "Referer": f"https://mk.kontur.ru/tsd/enrichment/{introduction_id}",
+        }
+        response = session.post(
+            f"https://mk.kontur.ru/tsd/api/v1/documents/enrichments/{introduction_id}/result",
+            json=payload,
+            headers=headers,
+            timeout=60,
+        )
+        response.raise_for_status()
+
+    def _create_exact_intro_file_document(
+        self,
+        session: requests.Session,
+        *,
+        product_group: str,
+        order_name: str,
+        document_number: str,
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+    ) -> str:
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        warehouse_id = str(api_module.WAREHOUSE_ID or "").strip()
+        if not warehouse_id:
+            raise RuntimeError("Не задан WAREHOUSE_ID для создания документа ввода в оборот.")
+
+        create_payload = {
+            "introductionType": "introduction",
+            "productGroup": str(product_group or api_module.PRODUCT_GROUP or "wheelChairs"),
+        }
+        create_response = session.post(
+            f"{base_url}/api/v1/codes-introduction?warehouseId={warehouse_id}",
+            json=create_payload,
+            timeout=30,
+        )
+        create_response.raise_for_status()
+        introduction_id = create_response.text.strip().strip('"')
+        if not introduction_id:
+            raise RuntimeError(f"{order_name}: API не вернул id документа ввода в оборот.")
+
+        production_payload = {
+            "comment": f"Ввод по кодам из АК: {order_name}"[:500],
+            "documentNumber": document_number,
+            "producerInn": "",
+            "ownerInn": "",
+            "productionDate": f"{production_date}T00:00:00.000+03:00",
+            "productionType": "ownProduction",
+            "warehouseId": warehouse_id,
+            "expirationType": "milkMoreThan72",
+            "expirationDate": f"{expiration_date}T00:00:00.000+03:00",
+            "containsUtilisationReport": True,
+            "usageType": "verified",
+            "cisType": "unit",
+            "fillingMethod": "file",
+            "batchNumber": batch_number,
+            "isAutocompletePositionsDataNeeded": True,
+            "productsHasSameDates": True,
+            "productGroup": str(product_group or api_module.PRODUCT_GROUP or "wheelChairs"),
+        }
+        production_response = session.patch(
+            f"{base_url}/api/v1/codes-introduction/{introduction_id}/production",
+            json=production_payload,
+            timeout=30,
+        )
+        production_response.raise_for_status()
+        return introduction_id
+
+    def _build_intro_upload_rows(
+        self,
+        *,
+        metadata: Dict[str, str],
+        full_codes: Sequence[str],
+        fallback_name: str,
+    ) -> Dict[str, Any]:
+        normalized_gtin = str(metadata.get("gtin") or "").strip()
+        if normalized_gtin and not normalized_gtin.startswith("0"):
+            normalized_gtin = f"0{normalized_gtin}"
+        full_name = str(metadata.get("full_name") or "").strip() or str(fallback_name or "").strip()
+        tnved_code = str(metadata.get("tnved_code") or "").strip()
+
+        rows: List[Dict[str, Any]] = []
+        for code in full_codes:
+            normalized_code = self._normalize_full_marking_code(code)
+            if not normalized_code:
+                continue
+            rows.append(
+                {
+                    "name": full_name,
+                    "code": normalized_code,
+                    "gtin": normalized_gtin,
+                    "tnvedCode": tnved_code,
+                }
+            )
+        if not rows:
+            raise RuntimeError("Не удалось подготовить строки для ввода в оборот по кодам из АК.")
+        return {"rows": rows}
+
+    def _upload_intro_positions_from_file(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+        *,
+        rows_payload: Dict[str, Any],
+    ) -> None:
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        response = session.post(
+            f"{base_url}/api/v1/codes-introduction/{introduction_id}/positions",
+            json=rows_payload,
+            timeout=60,
+        )
+        response.raise_for_status()
+
+    def _sign_and_send_intro_document(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+        *,
+        cert: Any,
+    ) -> Dict[str, Any]:
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        generated = session.get(
+            f"{base_url}/api/v1/codes-introduction/{introduction_id}/generate-multiple",
+            timeout=30,
+        )
+        generated.raise_for_status()
+        items = generated.json()
+        if not isinstance(items, list) or not items:
+            raise RuntimeError(f"generate-multiple вернул пустой список для документа {introduction_id}")
+
+        signed_payload: List[Dict[str, str]] = []
+        for item in items:
+            base64_content = str(item.get("base64Content") or "").strip()
+            document_id = str(item.get("documentId") or item.get("id") or "").strip()
+            if not document_id or not base64_content:
+                raise RuntimeError(f"Некорректный элемент generate-multiple для документа {introduction_id}")
+            signature = sign_data(cert, base64_content, b_detached=True)
+            if isinstance(signature, tuple):
+                signature = signature[0]
+            signed_payload.append(
+                {
+                    "documentId": document_id,
+                    "signedContent": str(signature or "").strip(),
+                }
+            )
+
+        send_response = session.post(
+            f"{base_url}/api/v1/codes-introduction/{introduction_id}/send-multiple",
+            json=signed_payload,
+            timeout=30,
+        )
+        send_response.raise_for_status()
+        final_intro = session.get(f"{base_url}/api/v1/codes-introduction/{introduction_id}", timeout=30)
+        final_intro.raise_for_status()
+        final_check = session.get(f"{base_url}/api/v1/codes-checking/{introduction_id}", timeout=30)
+        final_check.raise_for_status()
+        try:
+            send_payload = send_response.json() if send_response.content else {}
+        except Exception:
+            send_payload = {"raw": send_response.text}
+        return {
+            "generated_count": len(items),
+            "send_response": send_payload,
+            "final_introduction": final_intro.json(),
+            "final_check": final_check.json(),
+        }
+
+    def _introduce_aggregations_via_exact_codes(
+        self,
+        session: requests.Session,
+        *,
+        comment_filter: str,
+        tsd_token: str,
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+        cert: Any,
+    ) -> Dict[str, Any]:
+        service = _get_runtime().bulk_aggregation_service
+        normalized_filter = str(comment_filter or "").strip() or None
+        ready_aggregates = service.list_ready_aggregates(
+            session,
+            comment_filter=normalized_filter,
+            status_filters=("readyForSend",),
+        )
+        if not ready_aggregates:
+            if normalized_filter:
+                raise RuntimeError(f"Не найдены АК readyForSend по фильтру '{normalized_filter}'.")
+            raise RuntimeError("Не найдены АК readyForSend для ввода в оборот.")
+
+        aggregate_codes: List[str] = []
+        skipped_nested: List[str] = []
+        product_group = ready_aggregates[0].product_group or "wheelChairs"
+        for aggregate in ready_aggregates:
+            raw_codes, reaggregation_codes = service.fetch_aggregate_codes(session, aggregate.document_id)
+            if reaggregation_codes:
+                skipped_nested.append(aggregate.aggregate_code or aggregate.document_id)
+                self._log(
+                    "aggregation",
+                    f"Пропускаем АК {aggregate.aggregate_code or aggregate.document_id}: обнаружены вложенные АК ({len(reaggregation_codes)}).",
+                )
+                continue
+            aggregate_codes.extend(raw_codes)
+
+        unique_codes = list(dict.fromkeys(code for code in aggregate_codes if str(code or "").strip()))
+        if not unique_codes:
+            raise RuntimeError("В найденных АК нет кодов маркировки для ввода в оборот.")
+
+        self._log(
+            "aggregation",
+            f"Найдены КМ в readyForSend АК: {len(unique_codes)} шт., начинаем проверку статусов в Честном Знаке.",
+        )
+        true_product_group = service._resolve_true_product_group(product_group)
+        states = service.fetch_code_states(
+            cert=cert,
+            sign_text_func=sign_text_data,
+            product_group=true_product_group,
+            raw_codes=unique_codes,
+        )
+        status_counts = Counter(state.status or "UNKNOWN" for state in states)
+        api_errors = [state for state in states if state.api_error]
+        if api_errors:
+            preview = ", ".join(state.sntin for state in api_errors[:5])
+            raise RuntimeError(
+                f"Не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. "
+                f"Примеры: {preview}"
+            )
+
+        target_codes: List[str] = []
+        already_introduced = 0
+        unsupported_states: List[CodeState] = []
+        for state in states:
+            normalized_status = str(state.status or "").upper()
+            if normalized_status in {"INTRODUCED", "APPLIED"}:
+                already_introduced += 1
+                continue
+            if normalized_status == "EMITTED":
+                target_codes.append(state.raw_code)
+                continue
+            unsupported_states.append(state)
+        self._log(
+            "aggregation",
+            f"Статусы КМ из АК: {_format_status_counts(status_counts)}. Уже введено в оборот: {already_introduced}.",
+        )
+        if unsupported_states:
+            preview = ", ".join(
+                f"{state.sntin} ({state.status})"
+                for state in unsupported_states[:5]
+            )
+            raise RuntimeError(
+                f"Часть кодов из АК нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. "
+                f"Примеры: {preview}"
+            )
+        if not target_codes:
+            raise RuntimeError("Все коды из найденных АК уже введены в оборот.")
+
+        match_result = self._match_saved_marking_codes(target_codes)
+        unmatched = match_result["unmatched"]
+        if unmatched:
+            preview = ", ".join(extract_sntin(code) for code in unmatched[:5])
+            raise RuntimeError(
+                f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. "
+                f"Примеры: {preview}"
+            )
+
+        groups = match_result["groups"]
+        introduced_results: List[Dict[str, Any]] = []
+        total_sent_codes = 0
+        self._log(
+            "aggregation",
+            f"Полные коды найдены в папке 'Коды км': {len(match_result['matched'])} шт., файлов просмотрено: {match_result['scanned_files']}.",
+        )
+        for index, group in enumerate(groups, start=1):
+            source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
+            codes = [row["full_code"] for row in group.get("codes", [])]
+            if not codes:
+                continue
+            metadata = self._lookup_intro_product_metadata(
+                str(group.get("gtin") or "").strip(),
+                str(group.get("full_name") or "").strip(),
+            )
+            document_number = self._build_aggregate_intro_document_number(source_order_name, index)
+            positions_data = [
+                {
+                    "name": metadata["full_name"] or source_order_name,
+                    "gtin": metadata["gtin"] if str(metadata["gtin"]).startswith("0") else f"0{metadata['gtin']}",
+                }
+            ]
+            production_patch = {
+                "documentNumber": document_number,
+                "productionDate": production_date,
+                "expirationDate": expiration_date,
+                "batchNumber": batch_number,
+                "TnvedCode": metadata["tnved_code"],
+            }
+            self._log(
+                "aggregation",
+                f"Создаём ввод в оборот по АК: заказ '{source_order_name}', кодов {len(codes)}, GTIN {metadata['gtin']}.",
+            )
+            ok, create_result = make_task_on_tsd(
+                session=session,
+                codes_order_id=source_order_name,
+                positions_data=positions_data,
+                production_patch=production_patch,
+            )
+            if not ok:
+                error_text = "; ".join(create_result.get("errors", [])) or "Не удалось создать документ ввода в оборот"
+                raise RuntimeError(f"{source_order_name}: {error_text}")
+
+            introduction_id = str(create_result.get("introduction_id") or "").strip()
+            if not introduction_id:
+                raise RuntimeError(f"{source_order_name}: API не вернул id документа ввода в оборот.")
+            self._log("aggregation", f"Документ ввода в оборот создан: {introduction_id}. Отправляем точные коды через ТСД.")
+            self._fill_intro_document_from_tsd(
+                session,
+                introduction_id,
+                tsd_token=tsd_token,
+                full_codes=codes,
+            )
+            production_state = self._wait_for_intro_document_status(
+                session,
+                introduction_id,
+                expected_statuses=("readyForSend", "introduced"),
+            )
+            if str(production_state.get("documentStatus") or "").strip() != "introduced":
+                codes_check = self._wait_for_intro_codes_check(session, introduction_id)
+                if str(codes_check.get("status") or "").strip() == "hasErrors":
+                    broken_count = 0
+                    positions = production_state.get("positions") or []
+                    if positions:
+                        broken_count = int(positions[0].get("brokenCodesCount") or 0)
+                    raise RuntimeError(
+                        f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
+                    )
+                send_result = self._sign_and_send_intro_document(
+                    session,
+                    introduction_id,
+                    cert=cert,
+                )
+            else:
+                send_result = {
+                    "generated_count": 0,
+                    "send_response": {},
+                    "final_introduction": {"documentId": introduction_id, "documentStatus": "introduced"},
+                    "final_check": {},
+                }
+
+            introduced_results.append(
+                {
+                    "introduction_id": introduction_id,
+                    "order_name": source_order_name,
+                    "source_path": str(group.get("source_path") or ""),
+                    "gtin": metadata["gtin"],
+                    "codes_count": len(codes),
+                    "result": send_result,
+                }
+            )
+            total_sent_codes += len(codes)
+            self._log(
+                "aggregation",
+                f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+            )
+
+        return {
+            "ready_aggregates": len(ready_aggregates),
+            "skipped_nested": skipped_nested,
+            "checked_codes": len(unique_codes),
+            "already_introduced_codes": already_introduced,
+            "introduced_codes": total_sent_codes,
+            "groups": introduced_results,
+            "status_counts": dict(status_counts),
+            "scanned_saved_files": int(match_result["scanned_files"]),
+        }
+
+    def _introduce_aggregations_via_exact_codes_file(
+        self,
+        session: requests.Session,
+        *,
+        comment_filter: str,
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+        cert: Any,
+    ) -> Dict[str, Any]:
+        service = _get_runtime().bulk_aggregation_service
+        normalized_filter = str(comment_filter or "").strip() or None
+        ready_aggregates = service.list_ready_aggregates(
+            session,
+            comment_filter=normalized_filter,
+            status_filters=("readyForSend",),
+        )
+        if not ready_aggregates:
+            if normalized_filter:
+                raise RuntimeError(f"Не найдены АК readyForSend по фильтру '{normalized_filter}'.")
+            raise RuntimeError("Не найдены АК readyForSend для ввода в оборот.")
+
+        aggregate_codes: List[str] = []
+        skipped_nested: List[str] = []
+        product_group = ready_aggregates[0].product_group or "wheelChairs"
+        for aggregate in ready_aggregates:
+            raw_codes, reaggregation_codes = service.fetch_aggregate_codes(session, aggregate.document_id)
+            if reaggregation_codes:
+                skipped_nested.append(aggregate.aggregate_code or aggregate.document_id)
+                self._log(
+                    "aggregation",
+                    f"Пропускаем АК {aggregate.aggregate_code or aggregate.document_id}: обнаружены вложенные АК ({len(reaggregation_codes)}).",
+                )
+                continue
+            aggregate_codes.extend(raw_codes)
+
+        unique_codes = list(dict.fromkeys(code for code in aggregate_codes if str(code or "").strip()))
+        if not unique_codes:
+            raise RuntimeError("В найденных АК нет кодов маркировки для ввода в оборот.")
+
+        self._log(
+            "aggregation",
+            f"Найдены КМ в readyForSend АК: {len(unique_codes)} шт., начинаем проверку статусов в Честном Знаке.",
+        )
+        true_product_group = service._resolve_true_product_group(product_group)
+        states = service.fetch_code_states(
+            cert=cert,
+            sign_text_func=sign_text_data,
+            product_group=true_product_group,
+            raw_codes=unique_codes,
+        )
+        status_counts = Counter(state.status or "UNKNOWN" for state in states)
+        api_errors = [state for state in states if state.api_error]
+        if api_errors:
+            preview = ", ".join(state.sntin for state in api_errors[:5])
+            raise RuntimeError(
+                f"Не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. "
+                f"Примеры: {preview}"
+            )
+
+        target_codes: List[str] = []
+        already_introduced = 0
+        unsupported_states: List[CodeState] = []
+        for state in states:
+            normalized_status = str(state.status or "").upper()
+            if normalized_status in {"INTRODUCED", "APPLIED"}:
+                already_introduced += 1
+                continue
+            if normalized_status == "EMITTED":
+                target_codes.append(state.raw_code)
+                continue
+            unsupported_states.append(state)
+
+        self._log(
+            "aggregation",
+            f"Статусы КМ из АК: {_format_status_counts(status_counts)}. Уже введено в оборот: {already_introduced}.",
+        )
+        if unsupported_states:
+            preview = ", ".join(
+                f"{state.sntin} ({state.status})"
+                for state in unsupported_states[:5]
+            )
+            raise RuntimeError(
+                f"Часть кодов из АК нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. "
+                f"Примеры: {preview}"
+            )
+        if not target_codes:
+            raise RuntimeError("Все коды из найденных АК уже введены в оборот.")
+
+        match_result = self._match_saved_marking_codes(target_codes)
+        unmatched = match_result["unmatched"]
+        if unmatched:
+            preview = ", ".join(extract_sntin(code) for code in unmatched[:5])
+            raise RuntimeError(
+                f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. "
+                f"Примеры: {preview}"
+            )
+
+        groups = match_result["groups"]
+        introduced_results: List[Dict[str, Any]] = []
+        total_sent_codes = 0
+        self._log(
+            "aggregation",
+            f"Полные коды найдены в папке 'Коды км': {len(match_result['matched'])} шт., файлов просмотрено: {match_result['scanned_files']}.",
+        )
+        for index, group in enumerate(groups, start=1):
+            source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
+            codes = [row["full_code"] for row in group.get("codes", []) if str(row.get("full_code") or "").strip()]
+            if not codes:
+                continue
+
+            metadata = self._lookup_intro_product_metadata(
+                str(group.get("gtin") or "").strip(),
+                str(group.get("full_name") or "").strip(),
+            )
+            document_number = self._build_aggregate_intro_document_number(source_order_name, index)
+            self._log(
+                "aggregation",
+                f"Создаём ввод в оборот по АК: заказ '{source_order_name}', кодов {len(codes)}, GTIN {metadata['gtin']}.",
+            )
+
+            introduction_id = self._create_exact_intro_file_document(
+                session,
+                product_group=product_group,
+                order_name=source_order_name,
+                document_number=document_number,
+                production_date=production_date,
+                expiration_date=expiration_date,
+                batch_number=batch_number,
+            )
+            self._log(
+                "aggregation",
+                f"Документ ввода в оборот создан: {introduction_id}. Загружаем точные коды как файл.",
+            )
+
+            rows_payload = self._build_intro_upload_rows(
+                metadata=metadata,
+                full_codes=codes,
+                fallback_name=source_order_name,
+            )
+            self._upload_intro_positions_from_file(
+                session,
+                introduction_id,
+                rows_payload=rows_payload,
+            )
+
+            codes_check = self._wait_for_intro_codes_check(session, introduction_id)
+            production_state = self._wait_for_intro_document_status(
+                session,
+                introduction_id,
+                expected_statuses=("readyForSend", "introduced"),
+            )
+            if str(codes_check.get("status") or "").strip() == "hasErrors":
+                refreshed_state = self._get_intro_production_state(session, introduction_id)
+                positions = refreshed_state.get("positions") or production_state.get("positions") or []
+                broken_count = 0
+                if positions:
+                    broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
+                raise RuntimeError(
+                    f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
+                )
+
+            if str(production_state.get("documentStatus") or "").strip() != "introduced":
+                send_result = self._sign_and_send_intro_document(
+                    session,
+                    introduction_id,
+                    cert=cert,
+                )
+            else:
+                send_result = {
+                    "generated_count": 0,
+                    "send_response": {},
+                    "final_introduction": {"documentId": introduction_id, "documentStatus": "introduced"},
+                    "final_check": codes_check,
+                }
+
+            introduced_results.append(
+                {
+                    "introduction_id": introduction_id,
+                    "order_name": source_order_name,
+                    "source_path": str(group.get("source_path") or ""),
+                    "gtin": metadata["gtin"],
+                    "codes_count": len(codes),
+                    "result": send_result,
+                }
+            )
+            total_sent_codes += len(codes)
+            self._log(
+                "aggregation",
+                f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+            )
+
+        return {
+            "ready_aggregates": len(ready_aggregates),
+            "skipped_nested": skipped_nested,
+            "checked_codes": len(unique_codes),
+            "already_introduced_codes": already_introduced,
+            "introduced_codes": total_sent_codes,
+            "groups": introduced_results,
+            "status_counts": dict(status_counts),
+            "scanned_saved_files": int(match_result["scanned_files"]),
+        }
 
     def _create_aggregate_codes(self, session: requests.Session, comment: str, count: int) -> List[Dict[str, Any]]:
         base_url = f"{str(os.getenv('BASE_URL') or 'https://mk.kontur.ru').rstrip('/')}/api/v1/aggregates"
@@ -1016,6 +1973,24 @@ class ApiBridge:
             "lines": list(summary.to_lines()) if hasattr(summary, "to_lines") else [],
         }
 
+    def _raise_if_aggregation_action_noop(self, summary: Dict[str, Any], *, action_label: str) -> None:
+        processed = int(summary.get("processed") or 0)
+        errors = int(summary.get("errors") or 0)
+        sent_for_approve = int(summary.get("sent_for_approve") or 0)
+        skipped_not_ready = int(summary.get("skipped_not_ready") or 0)
+        skipped_empty = int(summary.get("skipped_empty") or 0)
+        skipped_unsupported = int(summary.get("skipped_unsupported") or 0)
+        skipped_due_to_status = int(summary.get("skipped_due_to_status") or 0)
+
+        if processed <= 0 or errors > 0 or sent_for_approve > 0:
+            return
+        if skipped_not_ready == processed and not any((skipped_empty, skipped_unsupported, skipped_due_to_status)):
+            raise RuntimeError(
+                f"{action_label}: Контур не разрешает обработать выбранные АК в их текущем состоянии. "
+                "Если АК уже был зарегистрирован в ГИС МТ, повторная отправка того же состава не создаёт пакет "
+                "на регистрацию: для такого случая нужна отдельная переагрегация только по изменяемым кодам."
+            )
+
     def get_bootstrap(self) -> Dict[str, Any]:
         try:
             return {
@@ -1111,7 +2086,7 @@ class ApiBridge:
 
     def refresh_session(self) -> Dict[str, Any]:
         try:
-            self._ensure_session(force_refresh=True)
+            self._ensure_session(force_refresh=True, force_browser_refresh=True)
             return {"success": True, "session": self.get_session_info()}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -1492,19 +2467,23 @@ class ApiBridge:
     def get_intro_state(self) -> Dict[str, Any]:
         try:
             runtime = _get_runtime()
-            runtime.load_download_items_from_history()
             session = self._ensure_session_safely("intro")
             deleted_ids = self._get_deleted_document_ids()
-            ready_items = [item for item in runtime.download_items if is_order_ready_for_intro(item)]
+            intro_items: List[Dict[str, Any]] = []
+            for item in runtime.history_db.get_all_orders():
+                document_id = str(item.get("document_id") or "").strip()
+                if not document_id or document_id in deleted_ids:
+                    continue
+                intro_items.append(item)
+            intro_items.sort(key=lambda row: str(row.get("created_at") or ""), reverse=True)
             return {
                 "items": [
-                    self._serialize_download_item(
+                    self._normalize_history_item(
                         item,
                         session=session,
                         include_marking_status=self._should_include_marking_status(item),
                     )
-                    for item in ready_items
-                    if str(item.get("document_id") or "").strip() not in deleted_ids
+                    for item in intro_items
                 ]
             }
         except Exception as exc:
@@ -1528,7 +2507,12 @@ class ApiBridge:
             errors = []
 
             for document_id in document_ids:
-                item = self._find_download_item(str(document_id or "").strip())
+                normalized_id = str(document_id or "").strip()
+                item = self._find_download_item(normalized_id)
+                if not item:
+                    history_order = _get_runtime().history_db.get_order_by_document_id(normalized_id)
+                    if isinstance(history_order, dict):
+                        item = _history_order_to_download_item(history_order)
                 if not item:
                     errors.append({"document_id": document_id, "error": "Заказ не найден"})
                     continue
@@ -1570,11 +2554,11 @@ class ApiBridge:
             self._log("intro", f"Ошибка ввода в оборот: {exc}")
             return {"success": False, "error": str(exc)}
 
-    def get_tsd_state(self) -> Dict[str, Any]:
+    def get_tsd_state(self, live: bool = False) -> Dict[str, Any]:
         try:
             runtime = _get_runtime()
             deleted_ids = self._get_deleted_document_ids()
-            session = self._ensure_session_safely("tsd")
+            session = self._ensure_session_safely("tsd") if live else None
             orders: List[Dict[str, Any]] = []
             for item in runtime.history_db.get_all_orders():
                 document_id = str(item.get("document_id") or "").strip()
@@ -1590,10 +2574,11 @@ class ApiBridge:
                     self._normalize_history_item(
                         item,
                         session=session,
-                        include_marking_status=self._should_include_marking_status(item),
+                        include_marking_status=bool(live) and self._should_include_marking_status(item),
                     )
                     for item in orders[:120]
                 ],
+                "live": bool(live),
             }
         except Exception as exc:
             return {"error": str(exc)}
@@ -1615,16 +2600,18 @@ class ApiBridge:
             if not str(intro_number or "").strip():
                 raise RuntimeError("Укажите номер ввода в оборот.")
 
-            session = self._ensure_session()
             prod = self._parse_iso_date(production_date, field_name="Дата производства")
             exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
             results = []
             errors = []
+            normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
+            total = len(normalized_ids)
 
-            for document_id in document_ids:
-                item = self._find_download_item(str(document_id or "").strip())
+            for index, document_id in enumerate(normalized_ids, start=1):
+                self._log("tsd", f"Прогресс создания заданий: {index - 1}/{total}")
+                item = self._find_download_item(document_id)
                 if not item:
-                    history_order = _get_runtime().history_db.get_order_by_document_id(str(document_id or "").strip())
+                    history_order = _get_runtime().history_db.get_order_by_document_id(document_id)
                     if history_order:
                         item = _history_order_to_download_item(history_order)
                     else:
@@ -1638,23 +2625,24 @@ class ApiBridge:
                     continue
 
                 self._log("tsd", f"Создаём задание на ТСД: {item.get('order_name')}")
-                positions_data, production_patch = self._build_tsd_payload(
-                    item,
-                    str(intro_number or "").strip(),
-                    prod,
-                    exp,
-                    str(batch_number or "").strip(),
-                )
-                ok, result = make_task_on_tsd(
-                    session=session,
-                    codes_order_id=str(item.get("document_id") or ""),
-                    positions_data=positions_data,
-                    production_patch=production_patch,
-                )
+                try:
+                    ok, result = self._create_tsd_task_with_retry(
+                        item=item,
+                        intro_number=str(intro_number or "").strip(),
+                        production_date=prod,
+                        expiration_date=exp,
+                        batch_number=str(batch_number or "").strip(),
+                    )
+                except Exception as exc:
+                    error_text = str(exc)
+                    self._log("tsd", f"Ошибка ТСД: {item.get('order_name')} - {error_text}")
+                    errors.append({"document_id": document_id, "error": error_text})
+                    continue
                 if ok:
                     introduction_id = result.get("introduction_id", "")
-                    mark_order_as_tsd_created(str(item.get("document_id") or ""), introduction_id)
+                    self._mark_tsd_created_local(str(item.get("document_id") or ""), introduction_id)
                     remove_order_by_document_id(_get_runtime().download_items, str(item.get("document_id") or ""))
+                    _get_runtime().document_status_cache.pop(document_id, None)
                     self._log("tsd", f"Задание на ТСД создано: {item.get('order_name')} ({introduction_id})")
                     results.append({"document_id": document_id, "result": result})
                 else:
@@ -1666,26 +2654,199 @@ class ApiBridge:
                 "success": not errors,
                 "results": results,
                 "errors": errors,
-                "state": self.get_tsd_state(),
-                "download_state": self.get_download_state(),
+                "processed": len(results) + len(errors),
+                "total": total,
             }
         except Exception as exc:
             self._log("tsd", f"Ошибка создания заданий на ТСД: {exc}")
             return {"success": False, "error": str(exc)}
 
-    def get_aggregation_state(self) -> Dict[str, Any]:
-        try:
-            return {
-                "csv_files": [
-                    {
-                        "name": item.name,
-                        "folder_name": item.folder_name,
-                        "path": item.path,
-                        "record_count": item.record_count,
-                        "modified_timestamp": item.modified_timestamp,
+    def _list_aggregation_documents(
+        self,
+        session: requests.Session,
+        *,
+        status_filters: Sequence[str] | None = None,
+    ) -> List[Dict[str, Any]]:
+        base_url = f"{str(os.getenv('BASE_URL') or 'https://mk.kontur.ru').rstrip('/')}/api/v1/aggregates"
+        warehouse_id = str(os.getenv("WAREHOUSE_ID") or getattr(api_module, "WAREHOUSE_ID", ""))
+        statuses = [
+            str(status).strip()
+            for status in (status_filters or AGGREGATION_FETCH_STATUSES)
+            if str(status).strip()
+        ]
+        if not warehouse_id:
+            raise RuntimeError("Не задан WAREHOUSE_ID для загрузки списка АК.")
+
+        rows: List[Dict[str, Any]] = []
+        seen_document_ids: set[str] = set()
+        page_size = 1000
+        status_batches: List[Optional[str]] = statuses or [None]
+        for status_filter in status_batches:
+            offset = 0
+            status_label = _translate_status(status_filter) if status_filter else "всех статусов"
+            while True:
+                try:
+                    params = {
+                        "warehouseId": warehouse_id,
+                        "limit": page_size,
+                        "offset": offset,
+                        "sortField": "createDate",
+                        "sortOrder": "descending",
                     }
-                    for item in list_aggregation_csv_files()[:100]
+                    if status_filter:
+                        params["statuses"] = status_filter
+                    response = session.get(
+                        base_url,
+                        params=params,
+                        timeout=30,
+                    )
+                except requests.RequestException as exc:
+                    self._log(
+                        "aggregation",
+                        (
+                            f"Контур не отдал страницу списка АК для "
+                            f"{status_label} (offset {offset}): {exc}. "
+                            f"Показываем уже загруженные АК."
+                        ),
+                    )
+                    break
+                if response.status_code in {400, 404}:
+                    break
+                if response.status_code >= 500:
+                    self._log(
+                        "aggregation",
+                        (
+                            f"Контур вернул {response.status_code} при загрузке АК "
+                            f"для {status_label} "
+                            f"(offset {offset}). Показываем уже загруженные АК."
+                        ),
+                    )
+                    break
+                response.raise_for_status()
+                try:
+                    payload = response.json()
+                except ValueError as exc:
+                    self._log(
+                        "aggregation",
+                        (
+                            f"Контур вернул некорректный JSON для статуса "
+                            f"{status_label} (offset {offset}): {exc}. "
+                            f"Показываем уже загруженные АК."
+                        ),
+                    )
+                    break
+                items = payload.get("items") or []
+                for item in items:
+                    document_id = str(item.get("documentId") or "").strip()
+                    aggregate_code = str(item.get("aggregateCode") or "").strip()
+                    if not document_id or not aggregate_code or document_id in seen_document_ids:
+                        continue
+                    seen_document_ids.add(document_id)
+                    raw_status = str(item.get("status") or "").strip()
+                    comment = str(item.get("comment") or "").strip()
+                    created_at = str(item.get("createdDate") or item.get("createDate") or "").strip()
+                    rows.append(
+                        {
+                            "document_id": document_id,
+                            "aggregate_code": aggregate_code,
+                            "comment": comment,
+                            "status": raw_status,
+                            "status_label": _translate_status(raw_status),
+                            "created_at": created_at,
+                            "created_at_label": _format_datetime_value(created_at),
+                            "product_group": str(item.get("productGroup") or "").strip(),
+                            "includes_units_count": int(item.get("includesUnitsCount") or 0),
+                            "codes_check_errors_count": int(item.get("codesCheckErrorsCount") or 0),
+                        }
+                    )
+                total = int(payload.get("total") or len(items))
+                offset += len(items)
+                if not items or offset >= total:
+                    break
+
+        rows.sort(
+            key=lambda row: (
+                str(row.get("created_at") or ""),
+                str(row.get("comment") or ""),
+                str(row.get("aggregate_code") or ""),
+            ),
+            reverse=True,
+        )
+        return rows
+
+    def _get_aggregation_items_cached(
+        self,
+        session: Optional[requests.Session],
+        *,
+        force_refresh: bool = False,
+    ) -> List[Dict[str, Any]]:
+        runtime = _get_runtime()
+        now = time.time()
+        cache_is_fresh = (
+            bool(runtime.aggregation_cache_items)
+            and runtime.aggregation_cache_at > 0
+            and (now - runtime.aggregation_cache_at) <= runtime.aggregation_cache_ttl_seconds
+        )
+        if not force_refresh and cache_is_fresh:
+            return list(runtime.aggregation_cache_items)
+        if not session:
+            return list(runtime.aggregation_cache_items)
+        items = self._list_aggregation_documents(session)
+        runtime.aggregation_cache_items = list(items)
+        runtime.aggregation_cache_at = now
+        return list(items)
+
+    def _invalidate_aggregation_cache(self) -> None:
+        runtime = _get_runtime()
+        runtime.aggregation_cache_items = []
+        runtime.aggregation_cache_at = 0.0
+
+    def _resolve_aggregate_infos_by_ids(
+        self,
+        session: requests.Session,
+        document_ids: Sequence[str],
+    ) -> List[AggregateInfo]:
+        service = _get_runtime().bulk_aggregation_service
+        aggregates: List[AggregateInfo] = []
+        seen_document_ids: set[str] = set()
+        for raw_document_id in document_ids:
+            document_id = str(raw_document_id or "").strip()
+            if not document_id or document_id in seen_document_ids:
+                continue
+            seen_document_ids.add(document_id)
+            detail = service.fetch_aggregate_detail(session, document_id)
+            aggregates.append(
+                AggregateInfo(
+                    document_id=detail.document_id,
+                    aggregate_code=detail.aggregate_code,
+                    comment=detail.comment,
+                    status=detail.status,
+                    product_group=detail.product_group,
+                    includes_units_count=detail.includes_units_count,
+                    codes_check_errors_count=detail.codes_check_errors_count,
+                )
+            )
+        return aggregates
+
+    def get_aggregation_state(self, force_refresh: bool = False) -> Dict[str, Any]:
+        try:
+            session = self._ensure_session_safely("aggregation")
+            items = self._get_aggregation_items_cached(session, force_refresh=bool(force_refresh))
+            cache_age = 0
+            runtime = _get_runtime()
+            if runtime.aggregation_cache_at > 0:
+                cache_age = max(0, int(time.time() - runtime.aggregation_cache_at))
+            return {
+                "items": items,
+                "status_options": [
+                    {"value": "", "label": "Все статусы"},
+                    *[
+                        {"value": status, "label": _translate_status(status)}
+                        for status in AGGREGATION_TABLE_STATUSES
+                    ],
                 ],
+                "cache_age_seconds": cache_age,
+                "total_items": len(items),
                 "logs": list(_get_runtime().logs["aggregation"]),
             }
         except Exception as exc:
@@ -1753,6 +2914,305 @@ class ApiBridge:
             self._log("aggregation", f"Ошибка скачивания АК: {exc}")
             return {"success": False, "error": str(exc)}
 
+    def download_selected_aggregations(self, document_ids: Sequence[str]) -> Dict[str, Any]:
+        try:
+            normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
+            if not normalized_ids:
+                raise RuntimeError("Выберите хотя бы один АК.")
+
+            def _run(session: requests.Session) -> Dict[str, Any]:
+                aggregates = self._resolve_aggregate_infos_by_ids(session, normalized_ids)
+                if not aggregates:
+                    raise RuntimeError("Не удалось загрузить выбранные АК из Контур.Маркировки.")
+                items = [
+                    {
+                        "aggregateCode": aggregate.aggregate_code,
+                        "documentId": aggregate.document_id,
+                        "createdDate": None,
+                        "status": aggregate.status,
+                        "updatedDate": None,
+                        "includesUnitsCount": aggregate.includes_units_count,
+                        "comment": aggregate.comment,
+                        "productGroup": aggregate.product_group,
+                        "aggregationType": "gs1GlnAggregate",
+                        "codesChecked": None,
+                        "codesCheckErrorsCount": aggregate.codes_check_errors_count,
+                    }
+                    for aggregate in aggregates
+                    if str(aggregate.aggregate_code or "").strip()
+                ]
+                if not items:
+                    raise RuntimeError("У выбранных АК нет кодов агрегации для скачивания.")
+
+                unique_comments = sorted({str(item.get("comment") or "").strip() for item in items if str(item.get("comment") or "").strip()})
+                if len(unique_comments) == 1:
+                    safe_comment = "".join(char for char in unique_comments[0] if char.isalnum() or char in " -_").strip()[:80]
+                    filename = f"{safe_comment}_{len(items)}.csv"
+                else:
+                    filename = f"selected_aggregations_{len(items)}.csv"
+                saved_path = self._save_simple_aggregation_csv(items, filename)
+                self._log("aggregation", f"Скачано выбранных АК: {len(items)}, сохранено в {saved_path}")
+                return {
+                    "count": len(items),
+                    "items": items,
+                    "saved_path": saved_path,
+                }
+
+            result = self._run_with_session_retry(
+                _run,
+                log_channel="aggregation",
+                retry_message="Обновляем сессию перед повторным скачиванием выбранных АК",
+            )
+            return {"success": True, **result}
+        except Exception as exc:
+            self._log("aggregation", f"Ошибка скачивания выбранных АК: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    def approve_selected_aggregations(
+        self,
+        document_ids: Sequence[str],
+        allow_disaggregate: bool = False,
+    ) -> Dict[str, Any]:
+        try:
+            normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
+            if not normalized_ids:
+                raise RuntimeError("Выберите хотя бы один АК.")
+
+            cert = self._get_certificate()
+            if not cert:
+                raise RuntimeError("Не найден сертификат для подписи.")
+
+            self._log("aggregation", f"Запускаем проведение выбранных АК: {len(normalized_ids)} шт.")
+
+            def _run(session: requests.Session) -> Dict[str, Any]:
+                service = _get_runtime().bulk_aggregation_service
+                aggregates = self._resolve_aggregate_infos_by_ids(session, normalized_ids)
+                summary = BulkAggregationSummary()
+                summary.ready_found = len(aggregates)
+                service._run_sequential(
+                    ready_aggregates=aggregates,
+                    kontur_session=session,
+                    cert_provider=lambda: cert,
+                    sign_base64_func=sign_data,
+                    sign_text_func=sign_text_data,
+                    log=lambda message: self._log("aggregation", message),
+                    progress=lambda processed, total: self._log("aggregation", f"Прогресс проведения: {processed}/{total}"),
+                    confirm=lambda _title, _message: bool(allow_disaggregate),
+                    summary=summary,
+                )
+                return self._serialize_summary(summary)
+
+            summary = self._run_with_session_retry(
+                _run,
+                log_channel="aggregation",
+                retry_message="Обновляем сессию перед повторным проведением выбранных АК",
+            )
+            self._raise_if_aggregation_action_noop(summary, action_label="Проведение АК")
+            return {"success": True, "summary": summary}
+        except Exception as exc:
+            self._log("aggregation", f"Ошибка проведения выбранных АК: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    def introduce_selected_aggregations(
+        self,
+        document_ids: Sequence[str],
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+    ) -> Dict[str, Any]:
+        try:
+            normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
+            if not normalized_ids:
+                raise RuntimeError("Выберите хотя бы один АК.")
+
+            cert = self._get_certificate()
+            if not cert:
+                raise RuntimeError("Не найден сертификат для подписи.")
+
+            normalized_batch = str(batch_number or "").strip()
+            if not normalized_batch:
+                raise RuntimeError("Укажите номер партии.")
+
+            prod = self._parse_iso_date(production_date, field_name="Дата производства")
+            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            self._log("aggregation", f"Запускаем ввод в оборот кодов из выбранных АК: {len(normalized_ids)} шт.")
+
+            def _run(session: requests.Session) -> Dict[str, Any]:
+                aggregates = self._resolve_aggregate_infos_by_ids(session, normalized_ids)
+                if not aggregates:
+                    raise RuntimeError("Не удалось загрузить выбранные АК из Контур.Маркировки.")
+
+                aggregate_codes: List[str] = []
+                skipped_nested: List[str] = []
+                service = _get_runtime().bulk_aggregation_service
+                for aggregate in aggregates:
+                    raw_codes, reaggregation_codes = service.fetch_aggregate_codes(session, aggregate.document_id)
+                    if reaggregation_codes:
+                        skipped_nested.append(aggregate.aggregate_code or aggregate.document_id)
+                        self._log(
+                            "aggregation",
+                            f"Пропускаем АК {aggregate.aggregate_code or aggregate.document_id}: обнаружены вложенные АК ({len(reaggregation_codes)}).",
+                        )
+                        continue
+                    aggregate_codes.extend(raw_codes)
+
+                unique_codes = list(dict.fromkeys(code for code in aggregate_codes if str(code or "").strip()))
+                if not unique_codes:
+                    raise RuntimeError("В выбранных АК нет кодов маркировки для ввода в оборот.")
+
+                product_group = next((aggregate.product_group for aggregate in aggregates if aggregate.product_group), "wheelChairs")
+                true_product_group = service._resolve_true_product_group(product_group)
+                states = service.fetch_code_states(
+                    cert=cert,
+                    sign_text_func=sign_text_data,
+                    product_group=true_product_group,
+                    raw_codes=unique_codes,
+                )
+                status_counts = Counter(state.status or "UNKNOWN" for state in states)
+                api_errors = [state for state in states if state.api_error]
+                if api_errors:
+                    preview = ", ".join(state.sntin for state in api_errors[:5])
+                    raise RuntimeError(
+                        f"Не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}"
+                    )
+
+                target_codes: List[str] = []
+                already_introduced = 0
+                unsupported_states: List[Any] = []
+                for state in states:
+                    normalized_status = str(state.status or "").upper()
+                    if normalized_status in {"INTRODUCED", "APPLIED"}:
+                        already_introduced += 1
+                        continue
+                    if normalized_status == "EMITTED":
+                        target_codes.append(state.raw_code)
+                        continue
+                    unsupported_states.append(state)
+
+                self._log(
+                    "aggregation",
+                    f"Статусы КМ из выбранных АК: {_format_status_counts(status_counts)}. Уже введено в оборот: {already_introduced}.",
+                )
+                if unsupported_states:
+                    preview = ", ".join(f"{state.sntin} ({state.status})" for state in unsupported_states[:5])
+                    raise RuntimeError(
+                        f"Часть кодов из выбранных АК нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. Примеры: {preview}"
+                    )
+                if not target_codes:
+                    raise RuntimeError("Все коды из выбранных АК уже введены в оборот.")
+
+                match_result = self._match_saved_marking_codes(target_codes)
+                unmatched = match_result["unmatched"]
+                if unmatched:
+                    preview = ", ".join(extract_sntin(code) for code in unmatched[:5])
+                    raise RuntimeError(
+                        f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. Примеры: {preview}"
+                    )
+
+                introduced_results: List[Dict[str, Any]] = []
+                total_sent_codes = 0
+                self._log(
+                    "aggregation",
+                    f"Полные коды найдены в папке 'Коды км': {len(match_result['matched'])} шт., файлов просмотрено: {match_result['scanned_files']}.",
+                )
+                groups = match_result["groups"]
+                for index, group in enumerate(groups, start=1):
+                    source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
+                    codes = [row["full_code"] for row in group.get("codes", []) if str(row.get("full_code") or "").strip()]
+                    if not codes:
+                        continue
+
+                    metadata = self._lookup_intro_product_metadata(
+                        str(group.get("gtin") or "").strip(),
+                        str(group.get("full_name") or "").strip(),
+                    )
+                    document_number = self._build_aggregate_intro_document_number(source_order_name, index)
+                    introduction_id = self._create_exact_intro_file_document(
+                        session,
+                        product_group=product_group,
+                        order_name=source_order_name,
+                        document_number=document_number,
+                        production_date=prod,
+                        expiration_date=exp,
+                        batch_number=normalized_batch,
+                    )
+                    rows_payload = self._build_intro_upload_rows(
+                        metadata=metadata,
+                        full_codes=codes,
+                        fallback_name=source_order_name,
+                    )
+                    self._upload_intro_positions_from_file(
+                        session,
+                        introduction_id,
+                        rows_payload=rows_payload,
+                    )
+                    codes_check = self._wait_for_intro_codes_check(session, introduction_id)
+                    production_state = self._wait_for_intro_document_status(
+                        session,
+                        introduction_id,
+                        expected_statuses=("readyForSend", "introduced"),
+                    )
+                    if str(codes_check.get("status") or "").strip() == "hasErrors":
+                        refreshed_state = self._get_intro_production_state(session, introduction_id)
+                        positions = refreshed_state.get("positions") or production_state.get("positions") or []
+                        broken_count = 0
+                        if positions:
+                            broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
+                        raise RuntimeError(
+                            f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
+                        )
+
+                    if str(production_state.get("documentStatus") or "").strip() != "introduced":
+                        send_result = self._sign_and_send_intro_document(
+                            session,
+                            introduction_id,
+                            cert=cert,
+                        )
+                    else:
+                        send_result = {
+                            "generated_count": 0,
+                            "send_response": {},
+                            "final_introduction": {"documentId": introduction_id, "documentStatus": "introduced"},
+                            "final_check": codes_check,
+                        }
+
+                    introduced_results.append(
+                        {
+                            "introduction_id": introduction_id,
+                            "order_name": source_order_name,
+                            "source_path": str(group.get("source_path") or ""),
+                            "gtin": metadata["gtin"],
+                            "codes_count": len(codes),
+                            "result": send_result,
+                        }
+                    )
+                    total_sent_codes += len(codes)
+                    self._log(
+                        "aggregation",
+                        f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+                    )
+
+                return {
+                    "selected_aggregates": len(aggregates),
+                    "skipped_nested": skipped_nested,
+                    "checked_codes": len(unique_codes),
+                    "already_introduced_codes": already_introduced,
+                    "introduced_codes": total_sent_codes,
+                    "groups": introduced_results,
+                    "status_counts": dict(status_counts),
+                    "scanned_saved_files": int(match_result["scanned_files"]),
+                }
+
+            summary = self._run_with_session_retry(
+                _run,
+                log_channel="aggregation",
+                retry_message="Обновляем сессию перед повторной отправкой ввода в оборот выбранных АК",
+            )
+            return {"success": True, "summary": summary}
+        except Exception as exc:
+            self._log("aggregation", f"Ошибка ввода в оборот выбранных АК: {exc}")
+            return {"success": False, "error": str(exc)}
+
     def approve_aggregations(self, comment_filter: str = "", allow_disaggregate: bool = False) -> Dict[str, Any]:
         try:
             cert = self._get_certificate()
@@ -1774,7 +3234,9 @@ class ApiBridge:
                 log_channel="aggregation",
                 retry_message="Обновляем сессию перед повторным проведением АК",
             )
-            return {"success": True, "summary": self._serialize_summary(summary)}
+            serialized_summary = self._serialize_summary(summary)
+            self._raise_if_aggregation_action_noop(serialized_summary, action_label="Проведение АК")
+            return {"success": True, "summary": serialized_summary}
         except Exception as exc:
             self._log("aggregation", f"Ошибка проведения АК: {exc}")
             return {"success": False, "error": str(exc)}
@@ -1805,9 +3267,99 @@ class ApiBridge:
                 log_channel="aggregation",
                 retry_message="Обновляем сессию перед повторным наполнением АК",
             )
-            return {"success": True, "summary": self._serialize_summary(summary)}
+            serialized_summary = self._serialize_summary(summary)
+            self._raise_if_aggregation_action_noop(serialized_summary, action_label="Повторное наполнение АК")
+            return {"success": True, "summary": serialized_summary}
         except Exception as exc:
             self._log("aggregation", f"Ошибка повторного наполнения АК: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    def introduce_aggregations(
+        self,
+        comment_filter: str,
+        tsd_token: str,
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+    ) -> Dict[str, Any]:
+        try:
+            cert = self._get_certificate()
+            if not cert:
+                raise RuntimeError("Не найден сертификат для подписи.")
+
+            normalized_token = str(tsd_token or "").strip()
+            normalized_batch = str(batch_number or "").strip()
+            if not normalized_token:
+                raise RuntimeError("Введите TSD токен.")
+            if not normalized_batch:
+                raise RuntimeError("Укажите номер партии.")
+
+            prod = self._parse_iso_date(production_date, field_name="Дата производства")
+            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            normalized_filter = str(comment_filter or "").strip()
+            if normalized_filter:
+                self._log("aggregation", f"Запускаем ввод в оборот АК по фильтру '{normalized_filter}'.")
+            else:
+                self._log("aggregation", "Запускаем ввод в оборот для всех АК в статусе readyForSend.")
+
+            summary = self._run_with_session_retry(
+                lambda session: self._introduce_aggregations_via_exact_codes(
+                    session,
+                    comment_filter=normalized_filter,
+                    tsd_token=normalized_token,
+                    production_date=prod,
+                    expiration_date=exp,
+                    batch_number=normalized_batch,
+                    cert=cert,
+                ),
+                log_channel="aggregation",
+                retry_message="Обновляем сессию перед повторной отправкой ввода в оборот АК",
+            )
+            return {"success": True, "summary": summary}
+        except Exception as exc:
+            self._log("aggregation", f"Ошибка ввода в оборот АК: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    def introduce_aggregations(
+        self,
+        comment_filter: str,
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+        tsd_token: str = "",
+    ) -> Dict[str, Any]:
+        try:
+            cert = self._get_certificate()
+            if not cert:
+                raise RuntimeError("Не найден сертификат для подписи.")
+
+            normalized_batch = str(batch_number or "").strip()
+            if not normalized_batch:
+                raise RuntimeError("Укажите номер партии.")
+
+            prod = self._parse_iso_date(production_date, field_name="Дата производства")
+            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            normalized_filter = str(comment_filter or "").strip()
+            if normalized_filter:
+                self._log("aggregation", f"Запускаем ввод в оборот АК по фильтру '{normalized_filter}'.")
+            else:
+                self._log("aggregation", "Запускаем ввод в оборот для всех АК в статусе readyForSend.")
+
+            summary = self._run_with_session_retry(
+                lambda session: self._introduce_aggregations_via_exact_codes_file(
+                    session,
+                    comment_filter=normalized_filter,
+                    production_date=prod,
+                    expiration_date=exp,
+                    batch_number=normalized_batch,
+                    cert=cert,
+                ),
+                log_channel="aggregation",
+                retry_message="Обновляем сессию перед повторной отправкой ввода в оборот АК",
+            )
+            return {"success": True, "summary": summary}
+        except Exception as exc:
+            self._log("aggregation", f"Ошибка ввода в оборот АК: {exc}")
             return {"success": False, "error": str(exc)}
 
     def get_labels_state(self) -> Dict[str, Any]:
