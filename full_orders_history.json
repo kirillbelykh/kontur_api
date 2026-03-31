@@ -106,10 +106,10 @@
       ],
       "created_at": "2026-03-31T09:41:51.356515",
       "created_by": "user",
-      "updated_at": "2026-03-31T10:23:53.315780",
+      "updated_at": "2026-03-31T10:23:59.203717",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-31T10:23:53.315780",
+      "tsd_created_at": "2026-03-31T10:23:59.203717",
       "tsd_intro_number": "7ef1b588-d3c9-49c1-83ce-0b260e4f2b77",
       "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\591 нитрил диаг S 260325 - 300д\\591 нитрил диаг S 260325 - 300д.pdf",
@@ -6008,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T10:23:55.242178",
+  "last_update": "2026-03-31T10:24:01.087009",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
