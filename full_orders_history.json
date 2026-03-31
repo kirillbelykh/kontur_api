@@ -1,6 +1,93 @@
 {
   "orders": [
     {
+      "order_name": "597 лат диаг М 260330 2500д",
+      "document_id": "e38b6b29-afc7-446b-ab96-8a8079825e79",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "латекс диаг",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041295",
+      "positions": [
+        {
+          "gtin": "4650118041295",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 2500,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T12:58:27.004776",
+      "created_by": "user",
+      "updated_at": "2026-03-31T12:58:27.041698",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": null,
+      "pdf_path": null,
+      "csv_path": null
+    },
+    {
+      "order_name": "596 лат диаг S 260330 2000д",
+      "document_id": "49f49f7b-a2eb-4414-ad6e-8ece0c9c6822",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "латекс диаг",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+      "gtin": "4650118041257",
+      "positions": [
+        {
+          "gtin": "4650118041257",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 2000,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T12:58:25.973763",
+      "created_by": "user",
+      "updated_at": "2026-03-31T12:58:25.994993",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": null,
+      "pdf_path": null,
+      "csv_path": null
+    },
+    {
+      "order_name": "595 лат диаг L 260330 2500д",
+      "document_id": "20931909-fbe4-490b-b82d-13871047f926",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "латекс диаг",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
+      "gtin": "4650118041332",
+      "positions": [
+        {
+          "gtin": "4650118041332",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 2500,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T12:58:24.180802",
+      "created_by": "user",
+      "updated_at": "2026-03-31T12:58:24.205348",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": null,
+      "pdf_path": null,
+      "csv_path": null
+    },
+    {
       "order_name": "594 нитрил диаг M 260325 - 680д",
       "document_id": "dc58a1b2-22db-4434-9bdd-c1711c982beb",
       "status": "Скачан",
@@ -6008,7 +6095,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T10:25:55.394592",
+  "last_update": "2026-03-31T13:03:09.550715",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
