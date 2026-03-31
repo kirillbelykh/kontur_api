@@ -119,8 +119,8 @@
     {
       "order_name": "590 нитрил диаг S 260325 2 кода",
       "document_id": "6205eac0-ded5-4237-904c-53a492753019",
-      "status": "sendForRelease",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\590 нитрил диаг S 260325 2 кода\\590 нитрил диаг S 260325 2 кода.pdf, C:\\Users\\user\\Desktop\\Коды км\\590 нитрил диаг S 260325 2 кода\\590 нитрил диаг S 260325 2 кода_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\590 нитрил диаг S 260325 2 кода\\590 нитрил диаг S 260325 2 кода.xls",
       "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
       "gtin": "4650118044012",
@@ -135,15 +135,15 @@
       ],
       "created_at": "2026-03-31T09:37:20.160358",
       "created_by": "user",
-      "updated_at": "2026-03-31T09:37:20.177942",
+      "updated_at": "2026-03-31T09:50:08.305465",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "csv_path": null,
-      "xls_path": null,
-      "pdf_path": null
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\590 нитрил диаг S 260325 2 кода\\590 нитрил диаг S 260325 2 кода_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\590 нитрил диаг S 260325 2 кода\\590 нитрил диаг S 260325 2 кода.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\590 нитрил диаг S 260325 2 кода\\590 нитрил диаг S 260325 2 кода.pdf"
     },
     {
       "order_name": "589 лат диаг S 260210 добивка 355",
@@ -6008,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T09:48:37.803075",
+  "last_update": "2026-03-31T09:50:10.202119",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
