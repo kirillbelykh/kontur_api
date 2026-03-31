@@ -32,8 +32,8 @@
     {
       "order_name": "593 нитрил диаг XL 260325 - 160д",
       "document_id": "0f5d2c0e-8e8c-47d7-a9f9-a02a481bee34",
-      "status": "sendForRelease",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\593 нитрил диаг XL 260325 - 160д\\593 нитрил диаг XL 260325 - 160д.pdf, C:\\Users\\user\\Desktop\\Коды км\\593 нитрил диаг XL 260325 - 160д\\593 нитрил диаг XL 260325 - 160д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\593 нитрил диаг XL 260325 - 160д\\593 нитрил диаг XL 260325 - 160д.xls",
       "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р XL, цвет синий",
       "gtin": "4650118045347",
@@ -48,15 +48,15 @@
       ],
       "created_at": "2026-03-31T09:41:53.508848",
       "created_by": "user",
-      "updated_at": "2026-03-31T09:41:53.532250",
+      "updated_at": "2026-03-31T09:50:48.193262",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "pdf_path": null,
-      "csv_path": null,
-      "xls_path": null
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\593 нитрил диаг XL 260325 - 160д\\593 нитрил диаг XL 260325 - 160д.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\593 нитрил диаг XL 260325 - 160д\\593 нитрил диаг XL 260325 - 160д_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\593 нитрил диаг XL 260325 - 160д\\593 нитрил диаг XL 260325 - 160д.xls"
     },
     {
       "order_name": "592 нитрил диаг L 260325 - 980д",
@@ -6008,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T09:50:14.035591",
+  "last_update": "2026-03-31T09:51:06.146185",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
