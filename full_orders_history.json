@@ -77,10 +77,10 @@
       ],
       "created_at": "2026-03-31T09:41:52.502789",
       "created_by": "user",
-      "updated_at": "2026-03-31T10:24:09.654791",
+      "updated_at": "2026-03-31T10:24:17.445574",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-31T10:24:09.654791",
+      "tsd_created_at": "2026-03-31T10:24:17.445574",
       "tsd_intro_number": "5aa28dd2-1f17-4994-b1df-28abf314d70a",
       "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\592 нитрил диаг L 260325 - 980д\\592 нитрил диаг L 260325 - 980д.pdf",
@@ -6008,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T10:24:11.182202",
+  "last_update": "2026-03-31T10:24:19.361526",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
