@@ -1,6 +1,151 @@
 {
   "orders": [
     {
+      "order_name": "594 нитрил диаг M 260325 - 680д",
+      "document_id": "dc58a1b2-22db-4434-9bdd-c1711c982beb",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "нитрил диаг",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет синий",
+      "gtin": "4650118044074",
+      "positions": [
+        {
+          "gtin": "4650118044074",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 680,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T09:41:54.486194",
+      "created_by": "user",
+      "updated_at": "2026-03-31T09:41:54.505303",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "pdf_path": null,
+      "csv_path": null,
+      "xls_path": null
+    },
+    {
+      "order_name": "593 нитрил диаг XL 260325 - 160д",
+      "document_id": "0f5d2c0e-8e8c-47d7-a9f9-a02a481bee34",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "нитрил диаг",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р XL, цвет синий",
+      "gtin": "4650118045347",
+      "positions": [
+        {
+          "gtin": "4650118045347",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р XL, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 160,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T09:41:53.508848",
+      "created_by": "user",
+      "updated_at": "2026-03-31T09:41:53.532250",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "pdf_path": null,
+      "csv_path": null,
+      "xls_path": null
+    },
+    {
+      "order_name": "592 нитрил диаг L 260325 - 980д",
+      "document_id": "5bfa44da-ce20-49aa-aa6f-8e1949b73bfd",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "нитрил диаг",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р L, цвет синий",
+      "gtin": "4650118044135",
+      "positions": [
+        {
+          "gtin": "4650118044135",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р L, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 980,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T09:41:52.502789",
+      "created_by": "user",
+      "updated_at": "2026-03-31T09:41:52.523816",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "pdf_path": null,
+      "csv_path": null,
+      "xls_path": null
+    },
+    {
+      "order_name": "591 нитрил диаг S 260325 - 300д",
+      "document_id": "80aa4426-0422-44b6-bc6d-da682d3370af",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "нитрил диаг",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
+      "gtin": "4650118044012",
+      "positions": [
+        {
+          "gtin": "4650118044012",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 300,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T09:41:51.356515",
+      "created_by": "user",
+      "updated_at": "2026-03-31T09:41:51.379475",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "pdf_path": null,
+      "csv_path": null,
+      "xls_path": null
+    },
+    {
+      "order_name": "590 нитрил диаг S 260325 2 кода",
+      "document_id": "6205eac0-ded5-4237-904c-53a492753019",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "нитрил диаг",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
+      "gtin": "4650118044012",
+      "positions": [
+        {
+          "gtin": "4650118044012",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 2,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-03-31T09:37:20.160358",
+      "created_by": "user",
+      "updated_at": "2026-03-31T09:37:20.177942",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "csv_path": null,
+      "xls_path": null,
+      "pdf_path": null
+    },
+    {
       "order_name": "589 лат диаг S 260210 добивка 355",
       "document_id": "56b7bf70-f350-4f6e-9b89-48b5cd1e572a",
       "status": "Введен в оборот",
@@ -5863,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-30T09:55:35.224883",
+  "last_update": "2026-03-31T09:48:33.596253",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
