@@ -61,8 +61,8 @@
     {
       "order_name": "595 лат диаг L 260330 2500д",
       "document_id": "20931909-fbe4-490b-b82d-13871047f926",
-      "status": "sendForRelease",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\595 лат диаг L 260330 2500д\\595 лат диаг L 260330 2500д.pdf, C:\\Users\\user\\Desktop\\Коды км\\595 лат диаг L 260330 2500д\\595 лат диаг L 260330 2500д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\595 лат диаг L 260330 2500д\\595 лат диаг L 260330 2500д.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041332",
@@ -77,15 +77,15 @@
       ],
       "created_at": "2026-03-31T12:58:24.180802",
       "created_by": "user",
-      "updated_at": "2026-03-31T12:58:24.205348",
+      "updated_at": "2026-03-31T13:05:23.138058",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": null,
-      "pdf_path": null,
-      "csv_path": null
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\595 лат диаг L 260330 2500д\\595 лат диаг L 260330 2500д.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\595 лат диаг L 260330 2500д\\595 лат диаг L 260330 2500д.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\595 лат диаг L 260330 2500д\\595 лат диаг L 260330 2500д_csv.csv"
     },
     {
       "order_name": "594 нитрил диаг M 260325 - 680д",
@@ -6095,7 +6095,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T13:04:35.960811",
+  "last_update": "2026-03-31T13:05:24.606840",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
