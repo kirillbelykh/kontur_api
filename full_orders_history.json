@@ -19,12 +19,12 @@
       ],
       "created_at": "2026-03-31T09:41:54.486194",
       "created_by": "user",
-      "updated_at": "2026-03-31T09:51:59.365544",
+      "updated_at": "2026-03-31T10:24:43.135252",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "tsd_created": true,
+      "tsd_created_at": "2026-03-31T10:24:43.135252",
+      "tsd_intro_number": "3c5828f2-5572-49e9-8273-00ccc6e8510c",
+      "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\594 нитрил диаг M 260325 - 680д\\594 нитрил диаг M 260325 - 680д.pdf",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\594 нитрил диаг M 260325 - 680д\\594 нитрил диаг M 260325 - 680д_csv.csv",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\594 нитрил диаг M 260325 - 680д\\594 нитрил диаг M 260325 - 680д.xls"
@@ -6008,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T10:24:34.367174",
+  "last_update": "2026-03-31T10:24:44.777457",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
