@@ -48,10 +48,10 @@
       ],
       "created_at": "2026-03-31T09:41:53.508848",
       "created_by": "user",
-      "updated_at": "2026-03-31T10:24:27.470452",
+      "updated_at": "2026-03-31T10:24:32.458251",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-31T10:24:27.470452",
+      "tsd_created_at": "2026-03-31T10:24:32.458251",
       "tsd_intro_number": "f5e4a2f3-523f-462c-a1aa-cbbe4f4044a5",
       "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\593 нитрил диаг XL 260325 - 160д\\593 нитрил диаг XL 260325 - 160д.pdf",
@@ -6008,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T10:24:29.200196",
+  "last_update": "2026-03-31T10:24:34.367174",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
