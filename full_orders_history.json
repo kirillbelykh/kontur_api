@@ -251,11 +251,11 @@
       ],
       "created_at": "2026-03-25T16:06:40.554588",
       "created_by": "user",
-      "updated_at": "2026-03-29T12:07:30.445748",
+      "updated_at": "2026-03-31T10:16:41.831177",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-03-29T12:07:30.445748",
-      "tsd_intro_number": "32b9e29b-cd70-48ff-85ae-83e0477da30e",
+      "tsd_created_at": "2026-03-31T10:16:41.831177",
+      "tsd_intro_number": "682ac2da-e53e-449e-904a-bd5b1bca2b85",
       "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\586 нитрил диаг M 260325 5490д\\586 нитрил диаг M 260325 5490д.pdf",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\586 нитрил диаг M 260325 5490д\\586 нитрил диаг M 260325 5490д_csv.csv",
@@ -6008,7 +6008,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-03-31T10:15:28.250399",
+  "last_update": "2026-03-31T10:16:43.348105",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
