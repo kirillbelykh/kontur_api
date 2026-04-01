@@ -19,10 +19,10 @@
       ],
       "created_at": "2026-04-01T17:15:48.119035",
       "created_by": "user",
-      "updated_at": "2026-04-01T17:28:24.526571",
+      "updated_at": "2026-04-01T17:28:33.791119",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-04-01T17:28:24.526571",
+      "tsd_created_at": "2026-04-01T17:28:33.791119",
       "tsd_intro_number": "a3cf5e6a-6298-47c0-9a9a-e84db3cbc905",
       "tsd_created_by": "user",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\609 лат HR L 260331 80д\\609 лат HR L 260331 80д.xls",
@@ -6443,7 +6443,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-01T17:28:27.673247",
+  "last_update": "2026-04-01T17:28:36.526102",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
