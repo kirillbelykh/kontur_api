@@ -77,10 +77,10 @@
       ],
       "created_at": "2026-04-01T13:00:15.433456",
       "created_by": "user",
-      "updated_at": "2026-04-01T15:17:19.471338",
+      "updated_at": "2026-04-01T15:17:25.643359",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-04-01T15:17:19.471338",
+      "tsd_created_at": "2026-04-01T15:17:25.643359",
       "tsd_intro_number": "fcb2214f-6dff-458c-acbf-29ec19a082de",
       "tsd_created_by": "user",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\606 лат диаг M 260330 220д\\606 лат диаг M 260330 220д.xls",
@@ -6414,7 +6414,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-01T15:17:21.366627",
+  "last_update": "2026-04-01T15:17:28.336532",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
