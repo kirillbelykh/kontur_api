@@ -90,7 +90,7 @@
     {
       "order_name": "600 хир хунда 8,5 250623 20к",
       "document_id": "dc225a58-7cff-4765-b733-146185fb600c",
-      "status": "Введен в оборот",
+      "status": "Скачан",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\600 хир хунда 85 250623 20к\\600 хир хунда 85 250623 20к.pdf, C:\\Users\\user\\Desktop\\Коды км\\600 хир хунда 85 250623 20к\\600 хир хунда 8,5 250623 20к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\600 хир хунда 85 250623 20к\\600 хир хунда 8,5 250623 20к.xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,5",
@@ -106,7 +106,7 @@
       ],
       "created_at": "2026-04-01T10:10:55.565603",
       "created_by": "user",
-      "updated_at": "2026-04-01T10:10:55.585966",
+      "updated_at": "2026-04-01T10:49:43.152373",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -6269,7 +6269,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-01T10:48:59.640139",
+  "last_update": "2026-04-01T10:49:45.209084",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
