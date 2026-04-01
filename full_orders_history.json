@@ -1,6 +1,151 @@
 {
   "orders": [
     {
+      "order_name": "608 лат диаг XL 260330 180д",
+      "document_id": "b36e8b38-7166-415c-a110-493c12705e9d",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "латекс диаг",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041295",
+      "positions": [
+        {
+          "gtin": "4650118041295",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 180,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-04-01T13:00:17.642279",
+      "created_by": "user",
+      "updated_at": "2026-04-01T13:00:17.663015",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": null,
+      "csv_path": null,
+      "pdf_path": null
+    },
+    {
+      "order_name": "607 лат диаг L 260330 300д",
+      "document_id": "171846e5-3b44-4525-8726-6f39bb2c29ec",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "латекс диаг",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041295",
+      "positions": [
+        {
+          "gtin": "4650118041295",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 300,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-04-01T13:00:16.392467",
+      "created_by": "user",
+      "updated_at": "2026-04-01T13:00:16.419844",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": null,
+      "csv_path": null,
+      "pdf_path": null
+    },
+    {
+      "order_name": "606 лат диаг M 260330 220д",
+      "document_id": "0f99cc24-acf7-47f5-aca0-6465e1a733f0",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "латекс диаг",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041295",
+      "positions": [
+        {
+          "gtin": "4650118041295",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 220,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-04-01T13:00:15.433456",
+      "created_by": "user",
+      "updated_at": "2026-04-01T13:00:15.454391",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": null,
+      "csv_path": null,
+      "pdf_path": null
+    },
+    {
+      "order_name": "605 лат диаг S 260330 200д",
+      "document_id": "0c0fd424-0dcc-4c07-96e3-66e52400ccf5",
+      "status": "sendForRelease",
+      "filename": null,
+      "simpl": "латекс диаг",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+      "gtin": "4650118041257",
+      "positions": [
+        {
+          "gtin": "4650118041257",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 200,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-04-01T13:00:14.398461",
+      "created_by": "user",
+      "updated_at": "2026-04-01T13:00:14.419376",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": null,
+      "csv_path": null,
+      "pdf_path": null
+    },
+    {
+      "order_name": "604 хир 9,5 250917",
+      "document_id": "3585d5c2-f5fb-4313-b795-7f95768b5764",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\604 хир 95 250917\\604 хир 95 250917.pdf, C:\\Users\\user\\Desktop\\Коды км\\604 хир 95 250917\\604 хир 9,5 250917_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\604 хир 95 250917\\604 хир 9,5 250917.xls",
+      "simpl": "хир с полимерным",
+      "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,5",
+      "gtin": "4640473212829",
+      "positions": [
+        {
+          "gtin": "4640473212829",
+          "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,5",
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-04-01T12:03:57.735081",
+      "created_by": "user",
+      "updated_at": "2026-04-01T12:03:57.756365",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\604 хир 95 250917\\604 хир 9,5 250917.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\604 хир 95 250917\\604 хир 9,5 250917_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\604 хир 95 250917\\604 хир 95 250917.pdf"
+    },
+    {
       "order_name": "603 хир хунда 8,5 250623 12к",
       "document_id": "eff79e85-43e3-4045-9e07-1415fc4b7f4e",
       "status": "Скачан",
@@ -6269,7 +6414,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-01T10:50:10.940798",
+  "last_update": "2026-04-01T13:01:39.291144",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
