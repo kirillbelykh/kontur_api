@@ -3,8 +3,8 @@
     {
       "order_name": "609 лат HR L 260331 80д",
       "document_id": "9f164bb4-2588-454d-b5f7-2a66cb125c5f",
-      "status": "sendForRelease",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\609 лат HR L 260331 80д\\609 лат HR L 260331 80д.pdf, C:\\Users\\user\\Desktop\\Коды км\\609 лат HR L 260331 80д\\609 лат HR L 260331 80д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\609 лат HR L 260331 80д\\609 лат HR L 260331 80д.xls",
       "simpl": "латекс hr",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р L, цвет синий",
       "gtin": "4650118040564",
@@ -19,15 +19,15 @@
       ],
       "created_at": "2026-04-01T17:15:48.119035",
       "created_by": "user",
-      "updated_at": "2026-04-01T17:15:48.141620",
+      "updated_at": "2026-04-01T17:20:26.447092",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": null,
-      "csv_path": null,
-      "pdf_path": null
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\609 лат HR L 260331 80д\\609 лат HR L 260331 80д.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\609 лат HR L 260331 80д\\609 лат HR L 260331 80д_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\609 лат HR L 260331 80д\\609 лат HR L 260331 80д.pdf"
     },
     {
       "order_name": "608 лат диаг XL 260330 180д",
@@ -6443,7 +6443,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-01T17:19:44.629085",
+  "last_update": "2026-04-01T17:20:30.562312",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
