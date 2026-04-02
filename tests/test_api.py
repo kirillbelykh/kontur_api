@@ -64,6 +64,57 @@ class FakeResponse:
 
 
 class ApiTests(unittest.TestCase):
+    def test_split_document_numbers_supports_spaces_newlines_and_deduplicates(self):
+        self.assertEqual(
+            api.split_document_numbers("703\n704 705 703;706,707\n\n708"),
+            ["703", "704", "705", "706", "707", "708"],
+        )
+
+    def test_select_document_search_item_prefers_single_actionable_exact_match(self):
+        selected, error = api._select_document_search_item(
+            "717",
+            [
+                {
+                    "id": "doc-1",
+                    "documentNumber": "717",
+                    "status": "success",
+                    "actions": {"allowCreateDraftInDiadoc": False},
+                },
+                {
+                    "id": "doc-2",
+                    "documentNumber": "717",
+                    "status": "readyForSend",
+                    "actions": {"allowCreateDraftInDiadoc": True},
+                },
+            ],
+        )
+
+        self.assertIsNone(error)
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected["id"], "doc-2")
+
+    def test_select_document_search_item_reports_ambiguous_exact_matches(self):
+        selected, error = api._select_document_search_item(
+            "717",
+            [
+                {
+                    "id": "doc-1",
+                    "documentNumber": "717",
+                    "status": "readyForSend",
+                    "actions": {"allowCreateDraftInDiadoc": True},
+                },
+                {
+                    "id": "doc-2",
+                    "documentNumber": "717",
+                    "status": "readyForSend",
+                    "actions": {"allowCreateDraftInDiadoc": True},
+                },
+            ],
+        )
+
+        self.assertIsNone(selected)
+        self.assertEqual(error, "ambiguous")
+
     def test_codes_order_waits_until_document_becomes_available(self):
         session = Mock()
         session.post.side_effect = [

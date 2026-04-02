@@ -11,7 +11,13 @@ import pandas as pd # type: ignore
 from dataclasses import dataclass, asdict
 from typing import List, Tuple, Dict, Any
 from get_gtin import lookup_gtin, lookup_by_gtin
-from api import codes_order, download_codes, make_task_on_tsd
+from api import (
+    codes_order,
+    download_codes,
+    make_task_on_tsd,
+    send_utd_documents_to_diadoc,
+    split_document_numbers,
+)
 from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 from date_defaults import get_default_production_window
@@ -302,6 +308,7 @@ class App(ctk.CTk):
         self.execute_all_executor = ThreadPoolExecutor(max_workers=3)
         self.intro_executor = ThreadPoolExecutor(max_workers=3)
         self.intro_tsd_executor = ThreadPoolExecutor(max_workers=3)
+        self.utd_executor = ThreadPoolExecutor(max_workers=1)
         self.bulk_aggregation_service = BulkAggregationService()
         
         self.start_auto_status_check()
@@ -313,6 +320,8 @@ class App(ctk.CTk):
         self.exp_date_entry: ctk.CTkEntry | None = None
         self.intro_number_entry: ctk.CTkEntry | None = None
         self.batch_entry: ctk.CTkEntry | None = None
+        self.utd_numbers_text: ctk.CTkTextbox | None = None
+        self.utd_log_text: ctk.CTkTextbox | None = None
 
     def toggle_fullscreen(self, event=None):
         """Переключение полноэкранного режима"""
@@ -418,6 +427,17 @@ class App(ctk.CTk):
         self.label_print_agg_by_iid = {}
         self.label_print_order_by_iid = {}
         self.label_print_in_progress = False
+
+        # Атрибуты для УПД
+        self.utd_numbers_text = None
+        self.utd_sign_btn = None
+        self.utd_clear_input_btn = None
+        self.utd_clear_report_btn = None
+        self.utd_clear_log_btn = None
+        self.utd_report_tree = None
+        self.utd_summary_label = None
+        self.utd_log_text = None
+        self.utd_in_progress = False
         
         # Атрибуты для навигации
         self.sidebar_frame = None
@@ -522,6 +542,7 @@ class App(ctk.CTk):
             ("download", "ЗК", "Загрузка кодов", self.show_download_frame),
             ("intro", "ВО", "Ввод в оборот", self.show_intro_frame),
             ("intro_tsd", "ТС", "Задание на ТСД", self.show_intro_tsd_frame),
+            ("utd", "УП", "УПД", self.show_utd_frame),
             ("aggregation", "АК", "Коды агрегации", self.show_aggregation_frame),
             ("label_print", "ПЭ", "Печать этикеток", self.show_label_print_frame),
         ]
@@ -677,6 +698,7 @@ class App(ctk.CTk):
             "download": "download",
             "intro": "intro",
             "intro_tsd": "intro_tsd",
+            "utd": "utd",
             "aggregation": "aggregation",
             "label_print": "label_print",
         }
@@ -732,6 +754,7 @@ class App(ctk.CTk):
         self._setup_download_frame()
         self._setup_introduction_frame()
         self._setup_introduction_tsd_frame()
+        self._setup_utd_frame()
         self._setup_aggregation_frame()
         self._setup_label_print_frame()
         
@@ -792,6 +815,10 @@ class App(ctk.CTk):
     def show_intro_tsd_frame(self):
         """Показать раздел введения TSD"""
         self.show_content_frame("intro_tsd")
+
+    def show_utd_frame(self):
+        """Показать раздел УПД"""
+        self.show_content_frame("utd")
 
     def show_aggregation_frame(self):
         """Показать раздел кодов агрегации"""
@@ -4547,7 +4574,8 @@ class App(ctk.CTk):
     def on_closing(self):
         self.auto_download_active = False
         for executor in [self.download_executor, self.status_check_executor, self.print_executor,
-                        self.execute_all_executor, self.intro_executor, self.intro_tsd_executor]:
+                        self.execute_all_executor, self.intro_executor, self.intro_tsd_executor,
+                        self.utd_executor]:
             executor.shutdown(wait=False, cancel_futures=True)
         self.destroy()
         
@@ -5354,6 +5382,339 @@ class App(ctk.CTk):
                 
         except Exception as e:
             self.intro_log_insert(f"❌ Ошибка при обработке результата: {e}")
+
+    def _setup_utd_frame(self):
+        """Экран массовой отправки УПД в Диадок."""
+        self.content_frames["utd"] = CTkScrollableFrame(self.main_content, corner_radius=0)
+
+        main_frame = ctk.CTkFrame(self.content_frames["utd"], corner_radius=15)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        header_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(0, 20))
+
+        ctk.CTkLabel(
+            header_frame,
+            text="🧾",
+            font=("Segoe UI", 48),
+            text_color=self._get_color("primary"),
+        ).pack(side="left", padx=(0, 15))
+
+        title_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_frame.pack(side="left", fill="y")
+
+        ctk.CTkLabel(
+            title_frame,
+            text="УПД",
+            font=self.fonts["title"],
+            text_color=self._get_color("text_primary"),
+        ).pack(anchor="w")
+
+        ctk.CTkLabel(
+            title_frame,
+            text="Массовая отправка черновиков УПД в Диадок по номерам документов",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        ).pack(anchor="w")
+
+        columns_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        columns_frame.pack(fill="both", expand=True)
+        columns_frame.grid_columnconfigure(0, weight=1)
+        columns_frame.grid_columnconfigure(1, weight=1)
+        columns_frame.grid_rowconfigure(0, weight=1)
+
+        left_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        left_column.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+
+        right_column = ctk.CTkFrame(columns_frame, corner_radius=12)
+        right_column.grid(row=0, column=1, sticky="nsew", padx=(10, 0))
+
+        form_container = ctk.CTkFrame(left_column, corner_radius=8)
+        form_container.pack(fill="x", pady=(0, 10))
+
+        ctk.CTkLabel(
+            form_container,
+            text="Номера УПД",
+            font=self.fonts["subheading"],
+        ).pack(anchor="w", pady=(15, 6), padx=15)
+
+        ctk.CTkLabel(
+            form_container,
+            text="Вставьте номера через пробел, запятую или с новой строки.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        ).pack(anchor="w", padx=15)
+
+        self.utd_numbers_text = ctk.CTkTextbox(
+            form_container,
+            height=180,
+            font=self.fonts["monospace"],
+        )
+        self.utd_numbers_text.pack(fill="x", expand=True, padx=15, pady=(10, 12))
+
+        btn_frame = ctk.CTkFrame(form_container, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=15, pady=(0, 15))
+
+        self.utd_sign_btn = ctk.CTkButton(
+            btn_frame,
+            text="🖋 Подписать УПД",
+            command=self.on_sign_utd_clicked,
+            fg_color=self._get_color("success"),
+            hover_color="#228B69",
+            font=self.fonts["button"],
+            corner_radius=6,
+        )
+        self.utd_sign_btn.pack(side="left", padx=5)
+
+        self.utd_clear_input_btn = ctk.CTkButton(
+            btn_frame,
+            text="🧹 Очистить поле",
+            command=self.clear_utd_input,
+            font=self.fonts["button"],
+            corner_radius=6,
+        )
+        self.utd_clear_input_btn.pack(side="left", padx=5)
+
+        self.utd_clear_report_btn = ctk.CTkButton(
+            btn_frame,
+            text="📋 Очистить отчет",
+            command=self.clear_utd_report,
+            font=self.fonts["button"],
+            corner_radius=6,
+        )
+        self.utd_clear_report_btn.pack(side="left", padx=5)
+
+        self.utd_clear_log_btn = ctk.CTkButton(
+            btn_frame,
+            text="🧽 Очистить лог",
+            command=self.clear_utd_log,
+            font=self.fonts["button"],
+            corner_radius=6,
+        )
+        self.utd_clear_log_btn.pack(side="left", padx=5)
+
+        report_container = ctk.CTkFrame(left_column, corner_radius=8)
+        report_container.pack(fill="both", expand=True, pady=(10, 0))
+
+        ctk.CTkLabel(
+            report_container,
+            text="Отчет по обработке",
+            font=self.fonts["subheading"],
+        ).pack(anchor="w", pady=(15, 8), padx=15)
+
+        self.utd_summary_label = ctk.CTkLabel(
+            report_container,
+            text="Документы еще не обрабатывались.",
+            font=self.fonts["small"],
+            text_color=self._get_color("text_secondary"),
+        )
+        self.utd_summary_label.pack(anchor="w", padx=15, pady=(0, 10))
+
+        report_inner_frame = ctk.CTkFrame(report_container, fg_color="transparent")
+        report_inner_frame.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+
+        utd_columns = ("requested_number", "document_id", "counteragent", "status_before", "result_status", "message")
+        self.utd_report_tree = ttk.Treeview(
+            report_inner_frame,
+            columns=utd_columns,
+            show="headings",
+            height=12,
+        )
+
+        headers = {
+            "requested_number": "Номер УПД",
+            "document_id": "ID документа",
+            "counteragent": "Контрагент",
+            "status_before": "Статус",
+            "result_status": "Результат",
+            "message": "Комментарий",
+        }
+        widths = {
+            "requested_number": 110,
+            "document_id": 220,
+            "counteragent": 240,
+            "status_before": 110,
+            "result_status": 120,
+            "message": 280,
+        }
+
+        for column, text in headers.items():
+            self.utd_report_tree.heading(column, text=text)
+            self.utd_report_tree.column(column, width=widths[column], anchor="w")
+
+        self.utd_report_tree.tag_configure("success", foreground="#1B5E20")
+        self.utd_report_tree.tag_configure("warning", foreground="#8A6D1D")
+        self.utd_report_tree.tag_configure("error", foreground="#A94442")
+
+        report_scrollbar = ttk.Scrollbar(report_inner_frame, orient="vertical", command=self.utd_report_tree.yview)
+        self.utd_report_tree.configure(yscrollcommand=report_scrollbar.set)
+        self.utd_report_tree.pack(side="left", fill="both", expand=True)
+        report_scrollbar.pack(side="right", fill="y")
+
+        log_container = ctk.CTkFrame(right_column, corner_radius=8)
+        log_container.pack(fill="both", expand=True)
+
+        ctk.CTkLabel(
+            log_container,
+            text="Лог операций",
+            font=self.fonts["subheading"],
+        ).pack(anchor="w", pady=(15, 10), padx=15)
+
+        self.utd_log_text = ctk.CTkTextbox(log_container, font=self.fonts["normal"])
+        self.utd_log_text.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        self.utd_log_text.configure(state="disabled")
+
+    def _format_utd_result_status(self, status: str) -> str:
+        mapping = {
+            "sent": "Отправлен",
+            "already_sent": "Уже отправлен",
+            "not_found": "Не найден",
+            "ambiguous": "Неоднозначно",
+            "skipped": "Пропущен",
+            "error": "Ошибка",
+            "pending": "Ожидается",
+        }
+        return mapping.get(str(status or ""), str(status or ""))
+
+    def _build_utd_summary_text(self, summary: dict) -> str:
+        return (
+            f"Всего: {summary.get('requested', 0)} | "
+            f"отправлено: {summary.get('sent', 0)} | "
+            f"уже отправлено: {summary.get('already_sent', 0)} | "
+            f"пропущено: {summary.get('skipped', 0)} | "
+            f"не найдено: {summary.get('not_found', 0)} | "
+            f"неоднозначно: {summary.get('ambiguous', 0)} | "
+            f"ошибок: {summary.get('errors', 0)} | "
+            f"ожидание: {summary.get('pending', 0)}"
+        )
+
+    def clear_utd_input(self):
+        if self.utd_numbers_text is None:
+            return
+        self.utd_numbers_text.delete("1.0", "end")
+
+    def clear_utd_report(self):
+        if self.utd_report_tree is not None:
+            for item in self.utd_report_tree.get_children():
+                self.utd_report_tree.delete(item)
+        if self.utd_summary_label is not None:
+            self.utd_summary_label.configure(text="Документы еще не обрабатывались.")
+
+    def clear_utd_log(self):
+        if self.utd_log_text is None:
+            return
+        self.utd_log_text.configure(state="normal")
+        self.utd_log_text.delete("1.0", "end")
+        self.utd_log_text.configure(state="disabled")
+
+    def utd_log_insert(self, text: str):
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self._append_textbox_message(self.utd_log_text, f"{now} - {text}\n")
+
+    def _set_utd_busy(self, is_busy: bool):
+        self.utd_in_progress = is_busy
+        if self.utd_sign_btn is not None:
+            self.utd_sign_btn.configure(
+                state="disabled" if is_busy else "normal",
+                text="⏳ Обработка УПД..." if is_busy else "🖋 Подписать УПД",
+            )
+        if self.utd_numbers_text is not None:
+            self.utd_numbers_text.configure(state="disabled" if is_busy else "normal")
+
+        for button in (self.utd_clear_input_btn, self.utd_clear_report_btn, self.utd_clear_log_btn):
+            if button is not None:
+                button.configure(state="disabled" if is_busy else "normal")
+
+    def _populate_utd_report(self, rows: List[dict]):
+        self.clear_utd_report()
+        if self.utd_report_tree is None:
+            return
+
+        for index, row in enumerate(rows, start=1):
+            status = str(row.get("result_status") or "")
+            tag = "success" if status in {"sent", "already_sent"} else "warning" if status in {"pending", "skipped"} else "error"
+            values = (
+                row.get("requested_number", ""),
+                row.get("document_id", ""),
+                row.get("counteragent", ""),
+                row.get("status_before", ""),
+                self._format_utd_result_status(status),
+                row.get("message", ""),
+            )
+            self.utd_report_tree.insert("", "end", iid=f"utd_report_{index}", values=values, tags=(tag,))
+
+    def on_sign_utd_clicked(self):
+        if self.utd_numbers_text is None:
+            return
+
+        raw_numbers = self.utd_numbers_text.get("1.0", "end")
+        document_numbers = split_document_numbers(raw_numbers)
+        if not document_numbers:
+            mbox.showwarning("Номера УПД", "Вставьте хотя бы один номер УПД для обработки.")
+            return
+
+        self.clear_utd_report()
+        self.utd_log_insert(f"🚀 Запуск обработки УПД: {len(document_numbers)} номер(ов)")
+        self._set_utd_busy(True)
+        if self.status_bar is not None:
+            self.status_bar.configure(text=f"Обработка УПД: {len(document_numbers)} шт.")
+
+        future = self.utd_executor.submit(self._utd_batch_worker, document_numbers)
+        future.add_done_callback(lambda completed_future: self.after(0, self._on_utd_batch_finished, completed_future))
+
+    def _utd_batch_worker(self, document_numbers: List[str]):
+        session = SessionManager.get_session()
+        if session is None:
+            raise RuntimeError("Не удалось получить активную сессию Контур.Маркировки")
+
+        return send_utd_documents_to_diadoc(
+            session=session,
+            document_numbers=document_numbers,
+            organization_id=os.getenv("ORGANIZATION_ID") or "",
+            warehouse_id=os.getenv("WAREHOUSE_ID") or "",
+            log_callback=self.utd_log_insert,
+        )
+
+    def _on_utd_batch_finished(self, future):
+        self._set_utd_busy(False)
+
+        try:
+            ok, result = future.result()
+        except Exception as exc:
+            logger.exception("Ошибка фоновой обработки УПД")
+            self.utd_log_insert(f"❌ Критическая ошибка обработки УПД: {exc}")
+            if self.status_bar is not None:
+                self.status_bar.configure(text="Ошибка обработки УПД")
+                self.after(5000, self._reset_status_bar)
+            return
+
+        rows = result.get("items") or []
+        summary = result.get("summary") or {}
+        summary_text = self._build_utd_summary_text(summary)
+        self._populate_utd_report(rows)
+        if self.utd_summary_label is not None:
+            self.utd_summary_label.configure(text=summary_text)
+
+        for row in rows:
+            draft_url = str(row.get("draft_url") or "").strip()
+            if draft_url and str(row.get("result_status") or "") in {"sent", "already_sent"}:
+                self.utd_log_insert(f"🔗 УПД №{row.get('requested_number')}: {draft_url}")
+
+        if ok:
+            self.utd_log_insert(f"✅ Обработка УПД завершена. {summary_text}")
+            if self.status_bar is not None:
+                self.status_bar.configure(text=f"УПД обработаны. {summary_text}")
+        else:
+            errors = result.get("errors") or []
+            if errors:
+                for error in errors[:5]:
+                    self.utd_log_insert(f"❌ {error}")
+            self.utd_log_insert(f"⚠️ Обработка УПД завершена с замечаниями. {summary_text}")
+            if self.status_bar is not None:
+                self.status_bar.configure(text=f"УПД завершены с замечаниями. {summary_text}")
+
+        if self.status_bar is not None:
+            self.after(5000, self._reset_status_bar)
 
     def _setup_introduction_tsd_frame(self):
         """Современный фрейм введения TSD"""

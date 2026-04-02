@@ -1,7 +1,7 @@
 import os
 import socket
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -65,6 +65,384 @@ def _summarize_document_ids(items: List[Dict[str, Any]], field_name: str) -> str
     if len(document_ids) > 3:
         preview += f", +{len(document_ids) - 3} ещё"
     return preview
+
+
+def _emit_log(log_callback: Optional[Callable[[str], None]], message: str) -> None:
+    if log_callback is None:
+        return
+    try:
+        log_callback(message)
+    except Exception:
+        logger.exception("Не удалось передать сообщение в log_callback: %s", message)
+
+
+def split_document_numbers(raw_value: str) -> List[str]:
+    seen: set[str] = set()
+    result: List[str] = []
+    for chunk in str(raw_value or "").replace(",", " ").replace(";", " ").split():
+        value = chunk.strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def _select_document_search_item(
+    requested_number: str,
+    exact_items: List[Dict[str, Any]],
+) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    if not exact_items:
+        return None, "not_found"
+
+    actionable_items = [
+        item
+        for item in exact_items
+        if bool((item.get("actions") or {}).get("allowCreateDraftInDiadoc"))
+    ]
+    if len(actionable_items) == 1:
+        return actionable_items[0], None
+    if len(actionable_items) > 1:
+        return None, "ambiguous"
+
+    ready_items = [item for item in exact_items if str(item.get("status") or "") == "readyForSend"]
+    if len(ready_items) == 1:
+        return ready_items[0], None
+    if len(exact_items) == 1:
+        return exact_items[0], None
+    return None, "ambiguous"
+
+
+def _fetch_documents_by_number(
+    session: requests.Session,
+    base_url: str,
+    warehouse_id: str,
+    document_number: str,
+    limit: int = 100,
+    max_pages: int = 20,
+) -> List[Dict[str, Any]]:
+    offset = 0
+    pages_read = 0
+    collected: List[Dict[str, Any]] = []
+
+    while pages_read < max_pages:
+        response = session.get(
+            f"{base_url}/api/v1/documents",
+            params={
+                "limit": limit,
+                "warehouseId": warehouse_id,
+                "searchText": document_number,
+                "offset": offset,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        items = payload.get("items") or []
+        if not isinstance(items, list):
+            raise RuntimeError("Некорректный формат ответа search documents")
+
+        collected.extend(item for item in items if isinstance(item, dict))
+        total = int(payload.get("total") or 0)
+        offset += limit
+        pages_read += 1
+
+        if not items or offset >= total:
+            break
+
+    return collected
+
+
+def _get_document_detail(session: requests.Session, base_url: str, document_id: str) -> Dict[str, Any]:
+    response = session.get(f"{base_url}/api/v1/documents/{document_id}", timeout=30)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Некорректный формат деталей документа {document_id}")
+    return payload
+
+
+def _get_document_positions(session: requests.Session, base_url: str, document_id: str) -> List[Dict[str, Any]]:
+    response = session.get(f"{base_url}/api/v1/documents/{document_id}/positions", timeout=30)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise RuntimeError(f"Некорректный формат позиций документа {document_id}")
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def _get_codes_check_status(
+    session: requests.Session,
+    base_url: str,
+    document_id: str,
+) -> Dict[str, Any]:
+    response = session.get(f"{base_url}/api/v1/codes-checking/{document_id}", timeout=30)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Некорректный формат codes-checking для {document_id}")
+    return payload
+
+
+def _get_connected_diadoc_boxes(
+    session: requests.Session,
+    base_url: str,
+    organization_id: str,
+) -> List[Dict[str, Any]]:
+    response = session.get(
+        f"{base_url}/api/v1/organizations/{organization_id}/settings/diadoc-boxes",
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, list):
+        raise RuntimeError("Некорректный формат diadoc-boxes")
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def _post_draft_to_diadoc(
+    session: requests.Session,
+    base_url: str,
+    document_id: str,
+) -> str:
+    response = session.post(f"{base_url}/api/v1/documents/{document_id}/post-draft-to-diadoc", timeout=30)
+    response.raise_for_status()
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = response.text.strip().strip('"')
+    if isinstance(payload, str):
+        return payload
+    return str(payload or "")
+
+
+def _poll_document_processing(
+    session: requests.Session,
+    base_url: str,
+    document_id: str,
+    attempts: int,
+    interval_seconds: int,
+) -> Dict[str, Any]:
+    previous_status = None
+    detail: Dict[str, Any] = {}
+
+    for attempt in range(1, attempts + 1):
+        detail = _get_document_detail(session, base_url, document_id)
+        combined_status = (
+            f"{detail.get('status') or 'unknown'} / {detail.get('enrichmentStatus') or 'unknown'}"
+        )
+        previous_status = _log_status_change(
+            "documents",
+            document_id,
+            previous_status,
+            combined_status,
+        )
+        if (
+            detail.get("status") == "success"
+            or detail.get("enrichmentStatus") == "sentToDiadoc"
+            or detail.get("draftInDiadocUrl")
+        ):
+            return detail
+        if attempt < attempts:
+            time.sleep(interval_seconds)
+
+    return detail
+
+
+def send_utd_documents_to_diadoc(
+    session: requests.Session,
+    document_numbers: List[str],
+    organization_id: str = ORGANIZATION_ID,
+    warehouse_id: str = WAREHOUSE_ID,
+    poll_attempts: int = 12,
+    poll_interval_seconds: int = 2,
+    log_callback: Optional[Callable[[str], None]] = None,
+) -> Tuple[bool, Dict[str, Any]]:
+    result: Dict[str, Any] = {
+        "items": [],
+        "errors": [],
+        "summary": {
+            "requested": len(document_numbers),
+            "sent": 0,
+            "already_sent": 0,
+            "not_found": 0,
+            "ambiguous": 0,
+            "skipped": 0,
+            "errors": 0,
+            "pending": 0,
+        },
+    }
+    try:
+        base_url = _require_base_url()
+        normalized_numbers = split_document_numbers(" ".join(str(item) for item in document_numbers))
+        result["requested_numbers"] = normalized_numbers
+        result["summary"]["requested"] = len(normalized_numbers)
+
+        if not normalized_numbers:
+            result["errors"].append("Не переданы номера УПД для обработки")
+            return False, result
+
+        boxes = _get_connected_diadoc_boxes(session, base_url, organization_id)
+        result["diadoc_boxes"] = boxes
+        if not boxes:
+            msg = "В организации не найден ни один подключенный ящик Диадока"
+            result["errors"].append(msg)
+            _emit_log(log_callback, f"❌ {msg}")
+            return False, result
+
+        _emit_log(
+            log_callback,
+            f"📦 Подключен ящик Диадока: {boxes[0].get('name') or boxes[0].get('boxId')}",
+        )
+
+        total = len(normalized_numbers)
+        for index, document_number in enumerate(normalized_numbers, start=1):
+            row: Dict[str, Any] = {
+                "requested_number": document_number,
+                "document_number": document_number,
+                "document_id": "",
+                "counteragent": "",
+                "positions_count": 0,
+                "marks_count": 0,
+                "status_before": "",
+                "status_after": "",
+                "codes_check_status": "",
+                "result_status": "",
+                "message": "",
+                "draft_url": "",
+                "success": False,
+            }
+            result["items"].append(row)
+            _emit_log(log_callback, f"🔎 [{index}/{total}] Поиск УПД №{document_number}")
+
+            try:
+                search_items = _fetch_documents_by_number(session, base_url, warehouse_id, document_number)
+                exact_items = [
+                    item
+                    for item in search_items
+                    if str(item.get("documentNumber") or "").strip() == document_number
+                ]
+                row["exact_matches"] = len(exact_items)
+
+                selected_item, selection_error = _select_document_search_item(document_number, exact_items)
+                if selected_item is None:
+                    if selection_error == "not_found":
+                        row["result_status"] = "not_found"
+                        row["message"] = "Документ с точным номером не найден"
+                        result["summary"]["not_found"] += 1
+                        _emit_log(log_callback, f"❌ УПД №{document_number}: точное совпадение не найдено")
+                    else:
+                        row["result_status"] = "ambiguous"
+                        row["message"] = f"Найдено несколько документов с номером {document_number}"
+                        result["summary"]["ambiguous"] += 1
+                        _emit_log(log_callback, f"❌ УПД №{document_number}: найдено несколько точных совпадений")
+                    continue
+
+                document_id = str(selected_item.get("id") or "")
+                row["document_id"] = document_id
+                row["document_number"] = str(selected_item.get("documentNumber") or document_number)
+                row["marks_count"] = int(selected_item.get("marksCount") or 0)
+                counteragent = selected_item.get("counteragent") or {}
+                row["counteragent"] = str(counteragent.get("name") or "")
+
+                detail = _get_document_detail(session, base_url, document_id)
+                positions = _get_document_positions(session, base_url, document_id)
+                check_status = _get_codes_check_status(session, base_url, document_id)
+
+                row["positions_count"] = len(positions)
+                row["status_before"] = str(detail.get("status") or "")
+                row["status_after"] = row["status_before"]
+                row["codes_check_status"] = str(
+                    check_status.get("status")
+                    or detail.get("codesCheckStatus")
+                    or selected_item.get("codesCheckStatus")
+                    or ""
+                )
+                row["draft_url"] = str(detail.get("draftInDiadocUrl") or "")
+
+                if detail.get("status") == "success" or detail.get("enrichmentStatus") == "sentToDiadoc":
+                    row["result_status"] = "already_sent"
+                    row["message"] = "УПД уже отправлен в Диадок"
+                    result["summary"]["already_sent"] += 1
+                    _emit_log(log_callback, f"ℹ️ УПД №{document_number}: уже отправлен в Диадок")
+                    continue
+
+                if row["codes_check_status"] == "inProgress":
+                    row["result_status"] = "skipped"
+                    row["message"] = "Проверка кодов еще не завершена"
+                    result["summary"]["skipped"] += 1
+                    _emit_log(log_callback, f"⏳ УПД №{document_number}: проверка кодов еще выполняется")
+                    continue
+
+                if row["codes_check_status"] in {"hasErrors", "doesHaveErrors", "failed"}:
+                    row["result_status"] = "skipped"
+                    row["message"] = "По документу есть ошибки проверки кодов"
+                    result["summary"]["skipped"] += 1
+                    _emit_log(log_callback, f"❌ УПД №{document_number}: есть ошибки проверки кодов")
+                    continue
+
+                actions = detail.get("actions") or {}
+                if not bool(actions.get("allowCreateDraftInDiadoc")):
+                    row["result_status"] = "skipped"
+                    row["message"] = "Создание черновика в Диадоке недоступно для документа"
+                    result["summary"]["skipped"] += 1
+                    _emit_log(log_callback, f"⏭️ УПД №{document_number}: действие недоступно")
+                    continue
+
+                _emit_log(log_callback, f"🚀 УПД №{document_number}: отправка черновика в Диадок")
+                draft_url = _post_draft_to_diadoc(session, base_url, document_id)
+                if draft_url:
+                    row["draft_url"] = draft_url
+
+                final_detail = _poll_document_processing(
+                    session=session,
+                    base_url=base_url,
+                    document_id=document_id,
+                    attempts=poll_attempts,
+                    interval_seconds=poll_interval_seconds,
+                )
+                row["status_after"] = str(final_detail.get("status") or "")
+                row["draft_url"] = str(final_detail.get("draftInDiadocUrl") or row["draft_url"] or "")
+                row["message"] = "Черновик УПД отправлен в Диадок"
+
+                if (
+                    final_detail.get("status") == "success"
+                    or final_detail.get("enrichmentStatus") == "sentToDiadoc"
+                    or row["draft_url"]
+                ):
+                    row["result_status"] = "sent"
+                    row["success"] = True
+                    result["summary"]["sent"] += 1
+                    _emit_log(log_callback, f"✅ УПД №{document_number}: отправлен в Диадок")
+                else:
+                    row["result_status"] = "pending"
+                    row["message"] = "Черновик отправлен, но итоговый статус еще не подтвержден"
+                    result["summary"]["pending"] += 1
+                    _emit_log(log_callback, f"⚠️ УПД №{document_number}: отправлен, ожидается подтверждение статуса")
+            except Exception as exc:
+                row["result_status"] = "error"
+                row["message"] = str(exc)
+                result["summary"]["errors"] += 1
+                result["errors"].append(f"{document_number}: {exc}")
+                logger.exception("Ошибка при обработке УПД %s", document_number)
+                _emit_log(log_callback, f"❌ УПД №{document_number}: {exc}")
+
+        ok = (
+            result["summary"]["errors"] == 0
+            and result["summary"]["not_found"] == 0
+            and result["summary"]["ambiguous"] == 0
+            and result["summary"]["skipped"] == 0
+            and result["summary"]["pending"] == 0
+        )
+        return ok, result
+    except RuntimeError as exc:
+        result["errors"].append(str(exc))
+        logger.error(str(exc))
+        return False, result
+    except Exception as exc:
+        result["errors"].append(str(exc))
+        logger.exception("Ошибка в send_utd_documents_to_diadoc")
+        return False, result
 
 
 def _wait_for_order_availability(
