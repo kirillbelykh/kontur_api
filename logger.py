@@ -15,8 +15,18 @@ logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 logger.propagate = False
 
 
+class SafeRotatingFileHandler(RotatingFileHandler):
+    def doRollover(self):
+        try:
+            super().doRollover()
+        except OSError:
+            # На Windows старое и новое приложение могут держать lookup.log одновременно.
+            # Пропускаем ротацию, чтобы логирование не ломало основной сценарий.
+            pass
+
+
 if not logger.handlers:
-    file_handler = RotatingFileHandler(
+    file_handler = SafeRotatingFileHandler(
         LOG_FILE,
         maxBytes=LOG_MAX_BYTES,
         backupCount=LOG_BACKUP_COUNT,

@@ -13,6 +13,7 @@ from logger import logger
 DEFAULT_HISTORY_FILE = "full_orders_history.json"
 LEGACY_HISTORY_FILE = "orders_history.json"
 LEGACY_NETWORK_HISTORY = r"\\192.168.100.2\!files\orders_history.json"
+LEGACY_NETWORK_ENABLED_ENV = "HISTORY_ENABLE_LEGACY_NETWORK"
 
 DEFAULT_SYNC_BRANCH = "orders-history"
 SYNC_BRANCH_ENV = "HISTORY_SYNC_BRANCH"
@@ -86,7 +87,7 @@ class OrderHistoryDB:
     def _resolve_sync_enabled(self, explicit: Optional[bool]) -> bool:
         if explicit is not None:
             return explicit
-        value = os.getenv(SYNC_ENABLED_ENV, "1").strip().lower()
+        value = os.getenv(SYNC_ENABLED_ENV, "0").strip().lower()
         return value not in {"0", "false", "no", "off"}
 
     def _resolve_sync_relative_path(self) -> Optional[Path]:
@@ -101,10 +102,10 @@ class OrderHistoryDB:
 
     def _build_legacy_paths(self, legacy_db_files: Optional[Iterable[str]]) -> List[Path]:
         if legacy_db_files is None:
-            candidates = [
-                LEGACY_NETWORK_HISTORY,
-                LEGACY_HISTORY_FILE,
-            ]
+            candidates = [LEGACY_HISTORY_FILE]
+            enable_network_legacy = os.getenv(LEGACY_NETWORK_ENABLED_ENV, "0").strip().lower()
+            if enable_network_legacy in {"1", "true", "yes", "on"}:
+                candidates.insert(0, LEGACY_NETWORK_HISTORY)
         else:
             candidates = list(legacy_db_files)
 

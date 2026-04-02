@@ -2303,7 +2303,9 @@ class ApiBridge:
             "gtin": item["gtin"],
             "positions": positions,
         }
-        _get_runtime().history_db.add_order(history_entry)
+        existing_history_entry = _get_runtime().history_db.get_order_by_document_id(document_id)
+        if existing_history_entry is None:
+            _get_runtime().history_db.add_order(history_entry)
         download_item = self._add_download_item(item, document_id)
 
         result = {

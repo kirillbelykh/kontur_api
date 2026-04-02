@@ -3,6 +3,8 @@ import os
 import copy
 import uuid
 import threading
+import logging
+import weakref
 from concurrent.futures import ThreadPoolExecutor
 import time
 from datetime import datetime
@@ -185,6 +187,94 @@ class SessionManager:
                 "age_seconds": age,
                 "minutes_until_update": max(0, cls._lifetime - age) / 60
             }
+
+def _session_manager_background_update_worker(cls):
+    while True:
+        try:
+            update_triggered = cls._update_event.wait(timeout=cls._lifetime)
+            logger.info(
+                "Сессия: фоновое обновление cookies (%s)",
+                "принудительное" if update_triggered else "плановое",
+            )
+
+            cookies = get_valid_cookies(force_refresh=bool(update_triggered))
+            if not cookies:
+                logger.warning("Сессия: новые cookies не получены, сохраняем текущую сессию")
+                cls._update_event.clear()
+                time.sleep(5)
+                continue
+
+            new_session = make_session_with_cookies(cookies)
+            with cls._lock:
+                cls._session = new_session
+                cls._last_update = time.time()
+
+            logger.info("Сессия: cookies успешно обновлены")
+            cls._update_event.clear()
+        except Exception as exc:
+            logger.exception("Сессия: ошибка фонового обновления cookies: %s", exc)
+            time.sleep(60)
+
+
+def _session_manager_get_session(cls):
+    cls.initialize()
+
+    with cls._lock:
+        now = time.time()
+        needs_refresh = cls._session is None or now - cls._last_update > cls._lifetime
+        if needs_refresh:
+            logger.info("Сессия: синхронно запрашиваем cookies")
+            cookies = get_valid_cookies()
+            if not cookies:
+                if cls._session is not None:
+                    logger.warning("Сессия: cookies не обновились, используем предыдущую сессию")
+                    return cls._session
+                raise RuntimeError("Не удалось получить валидные cookies для создания сессии")
+            cls._session = make_session_with_cookies(cookies)
+            cls._last_update = now
+            cls._update_event.set()
+        elif now - cls._last_update > cls._lifetime * 0.8:
+            cls._update_event.set()
+
+        return cls._session
+
+
+def _session_manager_trigger_immediate_update(cls):
+    cls._update_event.set()
+    logger.info("Сессия: принудительное обновление cookies запущено")
+
+
+SessionManager._background_update_worker = classmethod(_session_manager_background_update_worker)
+SessionManager.get_session = classmethod(_session_manager_get_session)
+SessionManager.trigger_immediate_update = classmethod(_session_manager_trigger_immediate_update)
+
+
+class _TkTextboxLogHandler(logging.Handler):
+    def __init__(self, app: "App"):
+        super().__init__(level=logging.INFO)
+        self._app_ref = weakref.ref(app)
+        self.setFormatter(logging.Formatter("%(asctime)s | %(levelname)-7s | %(message)s"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        app = self._app_ref()
+        if app is None:
+            return
+        try:
+            if not app.winfo_exists():
+                return
+        except Exception:
+            return
+
+        try:
+            message = self.format(record)
+        except Exception:
+            message = record.getMessage()
+
+        try:
+            app._append_textbox_message(app.log_text, f"{message}\n")
+        except Exception:
+            pass
+
 
 def make_order_to_kontur(it, session) -> Tuple[bool, str]:
     """
@@ -2322,6 +2412,7 @@ class App(ctk.CTk):
         self.log_text = ctk.CTkTextbox(log_container, font=self.fonts["normal"])
         self.log_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))  # Уменьшены отступы
         self.log_text.configure(state="disabled")
+        self._install_ui_log_handler()
 
         # Контекстное меню для лога
         self.log_text.bind("<Button-3>", self._show_log_context_menu)
@@ -3495,6 +3586,26 @@ class App(ctk.CTk):
         except Exception as exc:
             logger.error(f"Не удалось запланировать запись в текстовое поле: {exc}")
 
+    def _install_ui_log_handler(self):
+        existing_handler = getattr(self, "_ui_log_handler", None)
+        if existing_handler is not None:
+            return
+
+        handler = _TkTextboxLogHandler(self)
+        logger.addHandler(handler)
+        self._ui_log_handler = handler
+
+    def _remove_ui_log_handler(self):
+        handler = getattr(self, "_ui_log_handler", None)
+        if handler is None:
+            return
+
+        try:
+            logger.removeHandler(handler)
+        except Exception:
+            pass
+        self._ui_log_handler = None
+
     def label_print_log_insert(self, message: str):
         if self.label_print_log_text is None:
             return
@@ -3954,9 +4065,18 @@ class App(ctk.CTk):
                 self.download_list.append(download_item)
 
                 #Сохраняем в историю
-                history_item = download_item.copy()
-                history_item['gtin'] = order_item.gtin
-                self.history_db.add_order(history_item)
+                existing_history_item = self.history_db.get_order_by_document_id(document_id)
+                if existing_history_item is None:
+                    history_item = download_item.copy()
+                    history_item['gtin'] = order_item.gtin
+                    history_item['positions'] = [{
+                        'gtin': order_item.gtin,
+                        'name': order_item.full_name,
+                        'tnvedCode': order_item.tnved_code,
+                        'quantity': order_item.codes_count,
+                        'cisType': order_item.cisType,
+                    }]
+                    self.history_db.add_order(history_item)
 
                 self.update_download_tree()
             except Exception as e:
@@ -4571,6 +4691,7 @@ class App(ctk.CTk):
 
     def on_closing(self):
         self.auto_download_active = False
+        self._remove_ui_log_handler()
         for executor in [self.download_executor, self.status_check_executor, self.print_executor,
                         self.execute_all_executor, self.intro_executor, self.intro_tsd_executor,
                         self.utd_executor]:
