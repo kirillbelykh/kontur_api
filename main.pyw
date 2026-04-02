@@ -320,8 +320,6 @@ class App(ctk.CTk):
         self.exp_date_entry: ctk.CTkEntry | None = None
         self.intro_number_entry: ctk.CTkEntry | None = None
         self.batch_entry: ctk.CTkEntry | None = None
-        self.utd_numbers_text: ctk.CTkTextbox | None = None
-        self.utd_log_text: ctk.CTkTextbox | None = None
 
     def toggle_fullscreen(self, event=None):
         """Переключение полноэкранного режима"""
