@@ -222,12 +222,12 @@
       ],
       "created_at": "2026-04-02T10:06:17.592784",
       "created_by": "user",
-      "updated_at": "2026-04-02T10:09:06.390938",
+      "updated_at": "2026-04-02T10:24:17.313925",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "tsd_created": true,
+      "tsd_created_at": "2026-04-02T10:24:17.313925",
+      "tsd_intro_number": "6d0fe9bb-270f-4799-9be4-8531a2806a81",
+      "tsd_created_by": "user",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\608 лат диаг XL 260330 180д\\608 лат диаг XL 260330 180д.xls",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\608 лат диаг XL 260330 180д\\608 лат диаг XL 260330 180д.pdf",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\608 лат диаг XL 260330 180д\\608 лат диаг XL 260330 180д_csv.csv"
@@ -6675,7 +6675,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-02T10:23:50.717583",
+  "last_update": "2026-04-02T10:24:19.102097",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
