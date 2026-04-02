@@ -55,9 +55,9 @@
     {
       "order_name": "614 хир 8,0 260328 100пар",
       "document_id": "5650ba9a-6b4f-44e6-9201-78d814928c96",
-      "status": "Выполнен",
+      "status": "Ожидает",
       "filename": null,
-      "simpl": "wheelChairs",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
       "gtin": "4640473510628",
       "positions": [
@@ -71,12 +71,15 @@
       ],
       "created_at": "2026-04-02T17:25:07.342223",
       "created_by": "user",
-      "updated_at": "2026-04-02T17:25:07.342223",
+      "updated_at": "2026-04-02T17:25:41.273796",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": null,
+      "xls_path": null,
+      "csv_path": null
     },
     {
       "order_name": "613 хир 7.0 260328 602к",
@@ -6782,7 +6785,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-02T17:25:37.887964",
+  "last_update": "2026-04-02T17:25:44.228682",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
