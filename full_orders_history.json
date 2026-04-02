@@ -32,8 +32,8 @@
     {
       "order_name": "612 стер нитрил L 260327 272к",
       "document_id": "b1ef0c0c-49d7-48e7-bcb6-beebf4462de1",
-      "status": "Ожидает",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\612 стер нитрил L 260327 272к\\612 стер нитрил L 260327 272к.pdf, C:\\Users\\user\\Desktop\\Коды км\\612 стер нитрил L 260327 272к\\612 стер нитрил L 260327 272к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\612 стер нитрил L 260327 272к\\612 стер нитрил L 260327 272к.xls",
       "simpl": "стер нитрил",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118046276",
@@ -48,15 +48,15 @@
       ],
       "created_at": "2026-04-02T10:21:26.319944",
       "created_by": "user",
-      "updated_at": "2026-04-02T10:21:45.250396",
+      "updated_at": "2026-04-02T10:25:12.910880",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": null,
-      "pdf_path": null,
-      "csv_path": null
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\612 стер нитрил L 260327 272к\\612 стер нитрил L 260327 272к.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\612 стер нитрил L 260327 272к\\612 стер нитрил L 260327 272к.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\612 стер нитрил L 260327 272к\\612 стер нитрил L 260327 272к_csv.csv"
     },
     {
       "order_name": "611 стер нитрил L 260326 272к",
@@ -6675,7 +6675,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-04-02T10:24:32.546712",
+  "last_update": "2026-04-02T10:25:14.915042",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
