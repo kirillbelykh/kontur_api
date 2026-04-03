@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from collections import Counter, defaultdict
@@ -3494,6 +3495,177 @@ class ApiBridge:
         except Exception as exc:
             return {"error": str(exc)}
 
+    def _read_label_csv_rows(self, csv_path: Path) -> tuple[list[list[str]], str]:
+        encodings = ("utf-8-sig", "utf-8", "cp1251")
+        last_error: Optional[Exception] = None
+        for encoding in encodings:
+            try:
+                sample_line = ""
+                with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                    for raw_line in csv_file:
+                        if str(raw_line or "").strip():
+                            sample_line = raw_line
+                            break
+
+                delimiter = "\t"
+                if ";" in sample_line and "\t" not in sample_line:
+                    delimiter = ";"
+                elif "," in sample_line and "\t" not in sample_line and ";" not in sample_line:
+                    delimiter = ","
+
+                rows: list[list[str]] = []
+                with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                    reader = csv.reader(csv_file, delimiter=delimiter)
+                    for row in reader:
+                        prepared = [str(cell or "") for cell in row]
+                        if len(prepared) == 1:
+                            raw_line = str(prepared[0] or "")
+                            if delimiter == "\t" and "\t" in raw_line:
+                                prepared = raw_line.split("\t")
+                            elif delimiter == ";" and ";" in raw_line:
+                                prepared = raw_line.split(";")
+                            elif delimiter == "," and "," in raw_line:
+                                prepared = raw_line.split(",")
+                        if any(cell.strip() for cell in prepared):
+                            rows.append(prepared)
+                return rows, delimiter
+            except UnicodeDecodeError as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"Не удалось прочитать CSV для печати: {csv_path}")
+
+    @staticmethod
+    def _shorten_label_preview_value(value: str, *, limit: int = 96) -> str:
+        prepared = str(value or "").replace("\x1d", "\\x1d").strip()
+        if len(prepared) <= limit:
+            return prepared
+        head = max(24, limit // 2 - 8)
+        tail = max(16, limit - head - 1)
+        return f"{prepared[:head]}…{prepared[-tail:]}"
+
+    def _build_label_record_preview(self, row: Sequence[str], data_source_kind: str) -> Dict[str, Any]:
+        first_value = str(row[0] or "").strip() if row else ""
+        if data_source_kind == MARKING_SOURCE_KIND:
+            normalized_code = self._normalize_full_marking_code(first_value)
+            gtin = str(row[1] or "").strip() if len(row) > 1 else ""
+            if not gtin and normalized_code.startswith("01") and len(normalized_code) >= 16:
+                gtin = normalized_code[2:16]
+            full_name = str(row[2] or "").strip() if len(row) > 2 else ""
+            return {
+                "kind": "marking",
+                "label": "Код маркировки",
+                "value": normalized_code or first_value,
+                "value_short": self._shorten_label_preview_value(normalized_code or first_value),
+                "gtin": gtin,
+                "full_name": full_name,
+            }
+
+        aggregate_code = first_value
+        return {
+            "kind": "aggregation",
+            "label": "Агрегационный код",
+            "value": aggregate_code,
+            "value_short": self._shorten_label_preview_value(aggregate_code, limit=64),
+            "gtin": "",
+            "full_name": "",
+        }
+
+    def _resolve_label_print_selection(self, *, base_context, payload: Dict[str, Any]) -> Dict[str, Any]:
+        print_scope = str(payload.get("print_scope") or "all").strip().lower()
+        if print_scope not in {"all", "single"}:
+            print_scope = "all"
+
+        total_record_count = int(base_context.label_count or 0)
+        if print_scope != "single":
+            return {
+                "print_scope": "all",
+                "csv_path": base_context.aggregation_csv_path,
+                "cleanup_path": None,
+                "total_record_count": total_record_count,
+                "selected_record_number": None,
+                "record_preview": None,
+            }
+
+        raw_record_number = payload.get("record_number")
+        try:
+            selected_record_number = int(str(raw_record_number or "").strip())
+        except (TypeError, ValueError):
+            raise RuntimeError("Укажите корректный номер этикетки для печати.")
+
+        if selected_record_number < 1 or selected_record_number > total_record_count:
+            raise RuntimeError(
+                f"Номер этикетки должен быть в диапазоне от 1 до {total_record_count}."
+            )
+
+        rows, delimiter = self._read_label_csv_rows(Path(base_context.aggregation_csv_path))
+        if selected_record_number > len(rows):
+            raise RuntimeError(
+                f"Не удалось найти запись №{selected_record_number} в CSV для печати."
+            )
+
+        selected_row = rows[selected_record_number - 1]
+        record_preview = self._build_label_record_preview(selected_row, base_context.data_source_kind)
+
+        temp_csv_path = Path(tempfile.gettempdir()) / f"kontur_ui_v2_label_{uuid.uuid4().hex}.csv"
+        with temp_csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
+            writer = csv.writer(csv_file, delimiter=delimiter, lineterminator="\n")
+            writer.writerow(selected_row)
+
+        return {
+            "print_scope": "single",
+            "csv_path": str(temp_csv_path),
+            "cleanup_path": str(temp_csv_path),
+            "total_record_count": total_record_count,
+            "selected_record_number": selected_record_number,
+            "record_preview": record_preview,
+        }
+
+    @staticmethod
+    def _cleanup_label_selection(selection: Dict[str, Any]) -> None:
+        cleanup_path = str(selection.get("cleanup_path") or "").strip()
+        if not cleanup_path:
+            return
+        try:
+            Path(cleanup_path).unlink()
+        except OSError:
+            pass
+
+    @staticmethod
+    def _serialize_label_preview(context, selection: Dict[str, Any]) -> Dict[str, Any]:
+        record_preview = selection.get("record_preview") or {}
+        return {
+            "document_id": context.document_id,
+            "order_name": context.order_name,
+            "template_path": context.template_path,
+            "aggregation_csv_path": context.aggregation_csv_path,
+            "printer_name": context.printer_name,
+            "data_source_kind": context.data_source_kind,
+            "template_category": context.template_category,
+            "label_count": context.label_count,
+            "gtin": context.gtin,
+            "size": context.size,
+            "batch": context.batch,
+            "color": context.color,
+            "manufacture_date": context.manufacture_date,
+            "expiration_date": context.expiration_date,
+            "quantity_pairs": context.quantity_pairs,
+            "quantity_pairs_word": context.quantity_pairs_word,
+            "units_per_pack": context.units_per_pack,
+            "dispenser_count": context.dispenser_count,
+            "package_text": context.package_text,
+            "print_scope": selection.get("print_scope") or "all",
+            "print_scope_label": "Одна этикетка" if selection.get("print_scope") == "single" else "Весь файл",
+            "total_record_count": int(selection.get("total_record_count") or context.label_count or 0),
+            "selected_record_number": selection.get("selected_record_number"),
+            "selected_code_label": record_preview.get("label") or "",
+            "selected_code_value": record_preview.get("value") or "",
+            "selected_code_value_short": record_preview.get("value_short") or "",
+            "selected_code_gtin": record_preview.get("gtin") or "",
+            "selected_code_name": record_preview.get("full_name") or "",
+        }
+
     def preview_100x180_label(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             order_id = str(payload.get("document_id") or "").strip()
@@ -3503,7 +3675,7 @@ class ApiBridge:
             order_data = _get_runtime().history_db.get_order_by_document_id(order_id)
             if not order_data:
                 raise RuntimeError("Заказ не найден в истории.")
-            context = build_label_print_context(
+            base_context = build_label_print_context(
                 df=self._load_nomenclature_df(),
                 order_data=order_data,
                 template_path=template_path,
@@ -3513,29 +3685,26 @@ class ApiBridge:
                 expiration_date=str(payload.get("expiration_date") or ""),
                 quantity_value=payload.get("quantity_value"),
             )
+            selection = self._resolve_label_print_selection(base_context=base_context, payload=payload)
+            try:
+                context = base_context
+                if selection.get("print_scope") == "single":
+                    context = build_label_print_context(
+                        df=self._load_nomenclature_df(),
+                        order_data=order_data,
+                        template_path=template_path,
+                        aggregation_csv_path=str(selection.get("csv_path") or ""),
+                        printer_name=printer_name,
+                        manufacture_date=str(payload.get("manufacture_date") or ""),
+                        expiration_date=str(payload.get("expiration_date") or ""),
+                        quantity_value=payload.get("quantity_value"),
+                    )
+                preview_payload = self._serialize_label_preview(context, selection)
+            finally:
+                self._cleanup_label_selection(selection)
             return {
                 "success": True,
-                "preview": {
-                    "document_id": context.document_id,
-                    "order_name": context.order_name,
-                    "template_path": context.template_path,
-                    "aggregation_csv_path": context.aggregation_csv_path,
-                    "printer_name": context.printer_name,
-                    "data_source_kind": context.data_source_kind,
-                    "template_category": context.template_category,
-                    "label_count": context.label_count,
-                    "gtin": context.gtin,
-                    "size": context.size,
-                    "batch": context.batch,
-                    "color": context.color,
-                    "manufacture_date": context.manufacture_date,
-                    "expiration_date": context.expiration_date,
-                    "quantity_pairs": context.quantity_pairs,
-                    "quantity_pairs_word": context.quantity_pairs_word,
-                    "units_per_pack": context.units_per_pack,
-                    "dispenser_count": context.dispenser_count,
-                    "package_text": context.package_text,
-                },
+                "preview": preview_payload,
             }
         except Exception as exc:
             self._log("labels", f"Ошибка подготовки контекста 100x180: {exc}")
@@ -3548,18 +3717,44 @@ class ApiBridge:
                 return preview_result
             order_id = str(payload.get("document_id") or "").strip()
             order_data = _get_runtime().history_db.get_order_by_document_id(order_id)
-            context = build_label_print_context(
+            template_path = str(payload.get("template_path") or "").strip()
+            printer_name = str(payload.get("printer_name") or "").strip()
+            base_context = build_label_print_context(
                 df=self._load_nomenclature_df(),
                 order_data=order_data,
-                template_path=str(payload.get("template_path") or "").strip(),
+                template_path=template_path,
                 aggregation_csv_path=str(payload.get("csv_path") or "").strip(),
-                printer_name=str(payload.get("printer_name") or "").strip(),
+                printer_name=printer_name,
                 manufacture_date=str(payload.get("manufacture_date") or ""),
                 expiration_date=str(payload.get("expiration_date") or ""),
                 quantity_value=payload.get("quantity_value"),
             )
-            print_100x180_labels(context)
-            self._log("labels", f"Печать 100x180 запущена: {context.order_name}")
+            selection = self._resolve_label_print_selection(base_context=base_context, payload=payload)
+            try:
+                context = base_context
+                if selection.get("print_scope") == "single":
+                    context = build_label_print_context(
+                        df=self._load_nomenclature_df(),
+                        order_data=order_data,
+                        template_path=template_path,
+                        aggregation_csv_path=str(selection.get("csv_path") or ""),
+                        printer_name=printer_name,
+                        manufacture_date=str(payload.get("manufacture_date") or ""),
+                        expiration_date=str(payload.get("expiration_date") or ""),
+                        quantity_value=payload.get("quantity_value"),
+                    )
+                print_100x180_labels(context)
+                if selection.get("print_scope") == "single":
+                    self._log(
+                        "labels",
+                        "Печать одной этикетки 100x180 запущена: "
+                        f"{context.order_name}, запись №{selection.get('selected_record_number')} "
+                        f"({(selection.get('record_preview') or {}).get('value_short') or 'код не распознан'})",
+                    )
+                else:
+                    self._log("labels", f"Печать 100x180 запущена: {context.order_name}")
+            finally:
+                self._cleanup_label_selection(selection)
             return {"success": True, "preview": preview_result.get("preview")}
         except Exception as exc:
             self._log("labels", f"Ошибка печати 100x180: {exc}")

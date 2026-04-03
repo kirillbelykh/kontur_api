@@ -125,6 +125,8 @@ const state = {
     selectedOrderId: '',
     selectedAggregationPath: '',
     selectedMarkingPath: '',
+    printScope: 'all',
+    selectedRecordNumber: 1,
     preview: null,
     templatePage: 0,
     templatePageSize: 3,
@@ -690,18 +692,35 @@ function formatPreview(preview) {
   if (!preview) {
     return 'Выберите шаблон, файл и заказ, затем нажмите «Показать контекст».';
   }
-  return [
-    `Заказ: ${preview.order_name}`,
-    `Шаблон: ${preview.template_category} / ${preview.data_source_kind}`,
-    `Размер: ${preview.size}`,
-    `Партия: ${preview.batch}`,
-    `Цвет: ${preview.color || '—'}`,
-    `Дата изготовления: ${preview.manufacture_date}`,
-    `Срок годности: ${preview.expiration_date}`,
-    `Количество: ${preview.quantity_pairs} ${preview.quantity_pairs_word}`,
-    `Упаковка: ${preview.package_text || 'не используется'}`,
-    `Этикеток к печати: ${preview.label_count}`,
-  ].join('\n');
+  const lines = [
+    `Заказ: ${preview.order_name}` ,
+    `Шаблон: ${preview.template_category} / ${preview.data_source_kind}` ,
+    `Режим печати: ${preview.print_scope_label || 'Весь файл'}` ,
+    `Размер: ${preview.size}` ,
+    `Партия: ${preview.batch}` ,
+    `Цвет: ${preview.color || '—'}` ,
+    `Дата изготовления: ${preview.manufacture_date}` ,
+    `Срок годности: ${preview.expiration_date}` ,
+    `Количество: ${preview.quantity_pairs} ${preview.quantity_pairs_word}` ,
+    `Упаковка: ${preview.package_text || 'не используется'}` ,
+    `Этикеток к печати: ${preview.label_count}` ,
+  ];
+  if (preview.total_record_count) {
+    lines.push(`Записей в файле: ${preview.total_record_count}`);
+  }
+  if (preview.selected_record_number) {
+    lines.push(`Выбрана запись: ${preview.selected_record_number} из ${preview.total_record_count || preview.label_count}`);
+  }
+  if (preview.selected_code_label && preview.selected_code_value_short) {
+    lines.push(`${preview.selected_code_label}: ${preview.selected_code_value_short}`);
+  }
+  if (preview.selected_code_gtin) {
+    lines.push(`GTIN выбранной записи: ${preview.selected_code_gtin}`);
+  }
+  if (preview.selected_code_name) {
+    lines.push(`Наименование выбранной записи: ${preview.selected_code_name}`);
+  }
+  return lines.join('\n');
 }
 
 function setTheme(theme) {
@@ -1034,20 +1053,21 @@ const Views = {
   },
   labels: {
     render() {
-      fillSelect($('#labels-printer-select'), state.labels.printers, 'Выберите принтер');
+      ensureLabelsSelectivePrintUi();
+      fillSelect($("#labels-printer-select"), state.labels.printers, "Выберите принтер");
       if (state.labels.selectedPrinter) {
-        $('#labels-printer-select').value = state.labels.selectedPrinter;
+        $("#labels-printer-select").value = state.labels.selectedPrinter;
       }
 
-      const templateHost = $('#labels-template-grid');
+      const templateHost = $("#labels-template-grid");
       const pageSize = state.labels.templatePageSize || 3;
       const totalPages = Math.max(1, Math.ceil(state.labels.templates.length / pageSize));
       state.labels.templatePage = Math.min(state.labels.templatePage, totalPages - 1);
       const pageStart = state.labels.templatePage * pageSize;
       const visibleTemplates = state.labels.templates.slice(pageStart, pageStart + pageSize);
-      $('#labels-template-page').textContent = `${state.labels.templates.length ? pageStart + 1 : 0}-${Math.min(pageStart + visibleTemplates.length, state.labels.templates.length)} из ${state.labels.templates.length}`;
-      $('#labels-template-prev').disabled = state.labels.templatePage <= 0;
-      $('#labels-template-next').disabled = state.labels.templatePage >= totalPages - 1;
+      $("#labels-template-page").textContent = `${state.labels.templates.length ? pageStart + 1 : 0}-${Math.min(pageStart + visibleTemplates.length, state.labels.templates.length)} из ${state.labels.templates.length}`;
+      $("#labels-template-prev").disabled = state.labels.templatePage <= 0;
+      $("#labels-template-next").disabled = state.labels.templatePage >= totalPages - 1;
 
       templateHost.innerHTML = visibleTemplates.map((template) => `
         <button class="template-card ${state.labels.selectedTemplatePath === template.path ? 'is-selected' : ''}" data-template-path="${escapeHtml(template.path)}">
@@ -1057,78 +1077,107 @@ const Views = {
           <small>${escapeHtml(template.source_label || template.data_source_kind)}</small>
         </button>
       `).join('');
-      templateHost.querySelectorAll('[data-template-path]').forEach((button) => {
-        button.addEventListener('click', () => {
+      templateHost.querySelectorAll("[data-template-path]").forEach((button) => {
+        button.addEventListener("click", () => {
           state.labels.selectedTemplatePath = button.dataset.templatePath;
+          invalidateLabelsPreview();
           Views.labels.render();
         });
       });
 
       createTable(
-        $('#labels-orders-table'),
+        $("#labels-orders-table"),
         [
-          { label: 'Заявка', key: 'order_name' },
-          { label: 'Полное наименование', key: 'full_name' },
-          { label: 'GTIN', key: 'gtin' },
-          { label: 'Размер', key: 'size' },
-          { label: 'Партия', key: 'batch' },
+          { label: "Заявка", key: "order_name" },
+          { label: "Полное наименование", key: "full_name" },
+          { label: "GTIN", key: "gtin" },
+          { label: "Размер", key: "size" },
+          { label: "Партия", key: "batch" },
         ],
         state.labels.orders,
         {
           single: true,
           compact: true,
-          maxHeight: '260px',
+          maxHeight: "260px",
           selectedIds: state.labels.selectedOrderId,
           onRowClick: (id) => {
             state.labels.selectedOrderId = id;
+            invalidateLabelsPreview();
             Views.labels.render();
           },
         },
       );
 
       createTable(
-        $('#labels-aggregation-files-table'),
+        $("#labels-aggregation-files-table"),
         [
-          { label: 'Файл', key: 'name' },
-          { label: 'Папка', key: 'folder_name' },
-          { label: 'Строк', key: 'record_count' },
+          { label: "Файл", key: "name" },
+          { label: "Папка", key: "folder_name" },
+          { label: "Строк", key: "record_count" },
         ],
         state.labels.aggregationFiles,
         {
           single: true,
           compact: true,
-          maxHeight: '260px',
+          maxHeight: "260px",
           selectedIds: state.labels.selectedAggregationPath,
           rowId: (row) => row.path,
           onRowClick: (id) => {
             state.labels.selectedAggregationPath = id;
+            invalidateLabelsPreview();
             Views.labels.render();
           },
         },
       );
 
       createTable(
-        $('#labels-marking-files-table'),
+        $("#labels-marking-files-table"),
         [
-          { label: 'Файл', key: 'name' },
-          { label: 'Папка', key: 'folder_name' },
-          { label: 'Строк', key: 'record_count' },
+          { label: "Файл", key: "name" },
+          { label: "Папка", key: "folder_name" },
+          { label: "Строк", key: "record_count" },
         ],
         state.labels.markingFiles,
         {
           single: true,
           compact: true,
-          maxHeight: '260px',
+          maxHeight: "260px",
           selectedIds: state.labels.selectedMarkingPath,
           rowId: (row) => row.path,
           onRowClick: (id) => {
             state.labels.selectedMarkingPath = id;
+            invalidateLabelsPreview();
             Views.labels.render();
           },
         },
       );
 
-      $('#labels-preview-box').textContent = formatPreview(state.labels.preview);
+      const { total, selectedRecordNumber } = normalizeLabelsRecordSelection();
+      const printScopeSelect = $("#labels-print-scope");
+      const recordInput = $("#labels-record-number");
+      const prevButton = $("#labels-record-prev");
+      const nextButton = $("#labels-record-next");
+      const infoBox = $("#labels-record-info");
+      if (printScopeSelect) {
+        printScopeSelect.value = state.labels.printScope || "all";
+      }
+      if (recordInput) {
+        recordInput.value = String(selectedRecordNumber || 1);
+        recordInput.min = total > 0 ? "1" : "0";
+        recordInput.max = total > 0 ? String(total) : "";
+        recordInput.disabled = state.labels.printScope !== "single" || total <= 0;
+      }
+      if (prevButton) {
+        prevButton.disabled = state.labels.printScope !== "single" || total <= 0 || selectedRecordNumber <= 1;
+      }
+      if (nextButton) {
+        nextButton.disabled = state.labels.printScope !== "single" || total <= 0 || selectedRecordNumber >= total;
+      }
+      if (infoBox) {
+        infoBox.textContent = labelsRecordInfoText();
+      }
+
+      $("#labels-preview-box").textContent = formatPreview(state.labels.preview);
     },
   },
 };
@@ -1373,6 +1422,123 @@ function selectedLabelCsvPath() {
     return state.labels.selectedAggregationPath;
   }
   return state.labels.selectedMarkingPath;
+}
+
+function selectedLabelFileMeta() {
+  const template = selectedTemplate();
+  if (!template) {
+    return null;
+  }
+  if (template.data_source_kind === 'aggregation') {
+    return state.labels.aggregationFiles.find((item) => item.path === state.labels.selectedAggregationPath) || null;
+  }
+  return state.labels.markingFiles.find((item) => item.path === state.labels.selectedMarkingPath) || null;
+}
+
+function invalidateLabelsPreview() {
+  state.labels.preview = null;
+}
+
+function normalizeLabelsRecordSelection() {
+  const file = selectedLabelFileMeta();
+  const total = Math.max(0, Number(file?.record_count || 0));
+  let selectedRecordNumber = Math.max(1, Number.parseInt(state.labels.selectedRecordNumber || 1, 10) || 1);
+  if (total > 0) {
+    selectedRecordNumber = Math.min(selectedRecordNumber, total);
+  }
+  state.labels.selectedRecordNumber = selectedRecordNumber;
+  return { file, total, selectedRecordNumber };
+}
+
+function labelsRecordInfoText() {
+  const { total, selectedRecordNumber } = normalizeLabelsRecordSelection();
+  if (!total) {
+    return 'Сначала выберите файл с кодами для печати.';
+  }
+  if (state.labels.printScope !== 'single') {
+    return `Сейчас на печать пойдёт весь файл: ${total} этикеток.`;
+  }
+  let text = `Выбрана запись №${selectedRecordNumber} из ${total}. Нажмите «Показать контекст», чтобы проверить код перед печатью.`;
+  const preview = state.labels.preview;
+  if (
+    preview
+    && preview.print_scope === 'single'
+    && Number(preview.selected_record_number || 0) === selectedRecordNumber
+    && preview.selected_code_value_short
+  ) {
+    text += ` ${preview.selected_code_label || 'Код'}: ${preview.selected_code_value_short}.`;
+  }
+  return text;
+}
+
+function ensureLabelsSelectivePrintUi() {
+  const panel = document.querySelector('#view-labels .panel');
+  const formGrid = panel?.querySelector('.form-grid');
+  if (!panel || !formGrid) {
+    return;
+  }
+  if (!$('#labels-selective-print-controls')) {
+    formGrid.insertAdjacentHTML('afterend', `
+      <div class="form-grid" id="labels-selective-print-controls">
+        <label class="field">
+          <span>Что печатать</span>
+          <select id="labels-print-scope">
+            <option value="all">Весь файл</option>
+            <option value="single">Одну этикетку по порядку</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Номер этикетки по порядку</span>
+          <input id="labels-record-number" type="number" min="1" step="1" placeholder="1">
+        </label>
+      </div>
+      <div class="inline-actions compact wrap" id="labels-record-stepper">
+        <button class="secondary-btn" type="button" id="labels-record-prev">Предыдущая</button>
+        <button class="secondary-btn" type="button" id="labels-record-next">Следующая</button>
+      </div>
+      <div class="inline-note" id="labels-record-info">Сначала выберите файл с кодами для печати.</div>
+    `);
+  }
+
+  const scopeSelect = $('#labels-print-scope');
+  const recordInput = $('#labels-record-number');
+  const prevButton = $('#labels-record-prev');
+  const nextButton = $('#labels-record-next');
+  if (!scopeSelect || scopeSelect.dataset.bound === '1') {
+    return;
+  }
+
+  scopeSelect.dataset.bound = '1';
+  scopeSelect.addEventListener('change', () => {
+    state.labels.printScope = scopeSelect.value === 'single' ? 'single' : 'all';
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  recordInput.addEventListener('change', () => {
+    state.labels.selectedRecordNumber = Number.parseInt(recordInput.value || '1', 10) || 1;
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  prevButton.addEventListener('click', () => {
+    state.labels.printScope = 'single';
+    state.labels.selectedRecordNumber = Math.max(1, (Number(state.labels.selectedRecordNumber || 1) || 1) - 1);
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  nextButton.addEventListener('click', () => {
+    const { total } = normalizeLabelsRecordSelection();
+    state.labels.printScope = 'single';
+    if (total > 0) {
+      state.labels.selectedRecordNumber = Math.min(total, (Number(state.labels.selectedRecordNumber || 1) || 1) + 1);
+    } else {
+      state.labels.selectedRecordNumber = (Number(state.labels.selectedRecordNumber || 1) || 1) + 1;
+    }
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
 }
 
 async function refreshCurrentRouteState(options = {}) {
@@ -1846,6 +2012,8 @@ async function bindEvents() {
         manufacture_date: $('#labels-manufacture-date').value,
         expiration_date: $('#labels-expiration-date').value,
         quantity_value: $('#labels-quantity-value').value,
+        print_scope: state.labels.printScope,
+        record_number: state.labels.printScope === 'single' ? state.labels.selectedRecordNumber : null,
       });
       state.labels.preview = result.preview;
       Views.labels.render();
@@ -1863,6 +2031,8 @@ async function bindEvents() {
         manufacture_date: $('#labels-manufacture-date').value,
         expiration_date: $('#labels-expiration-date').value,
         quantity_value: $('#labels-quantity-value').value,
+        print_scope: state.labels.printScope,
+        record_number: state.labels.printScope === 'single' ? state.labels.selectedRecordNumber : null,
       });
       state.labels.preview = result.preview || state.labels.preview;
       Views.labels.render();
