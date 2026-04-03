@@ -76,6 +76,7 @@ const state = {
     items: [],
     printers: [],
     defaultPrinter: '',
+    selectedPrinter: '',
     selectedItemId: '',
     selectedIds: new Set(),
     autoDownload: false,
@@ -119,6 +120,7 @@ const state = {
     orders: [],
     printers: [],
     defaultPrinter: '',
+    selectedPrinter: '',
     selectedTemplatePath: '',
     selectedOrderId: '',
     selectedAggregationPath: '',
@@ -709,13 +711,36 @@ function setTheme(theme) {
   $('#theme-toggle-btn').textContent = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
 }
 
-function getDefaultMonthValue(offsetMonths = -3) {
-  const now = new Date();
-  now.setDate(1);
-  now.setMonth(now.getMonth() + offsetMonths);
-  const year = now.getFullYear();
-  const month = `${now.getMonth() + 1}`.padStart(2, '0');
-  return `${year}-${month}`;
+function applyDefaultDateWindow(dateWindow) {
+  const productionDate = String(dateWindow?.production_date || '').trim();
+  const expirationDate = String(dateWindow?.expiration_date || '').trim();
+  if (!productionDate || !expirationDate) {
+    return;
+  }
+
+  [
+    '#intro-production-date',
+    '#tsd-production-date',
+    '#agg-intro-production-date',
+    '#labels-manufacture-date',
+  ].forEach((selector) => {
+    const element = $(selector);
+    if (element && !String(element.value || '').trim()) {
+      element.value = productionDate;
+    }
+  });
+
+  [
+    '#intro-expiration-date',
+    '#tsd-expiration-date',
+    '#agg-intro-expiration-date',
+    '#labels-expiration-date',
+  ].forEach((selector) => {
+    const element = $(selector);
+    if (element && !String(element.value || '').trim()) {
+      element.value = expirationDate;
+    }
+  });
 }
 
 function fillSelect(select, values, placeholder = 'Выберите значение') {
@@ -908,8 +933,8 @@ const Views = {
   download: {
     render() {
       fillSelect($('#download-printer-select'), state.download.printers, 'Выберите принтер');
-      if (state.download.defaultPrinter) {
-        $('#download-printer-select').value = state.download.defaultPrinter;
+      if (state.download.selectedPrinter) {
+        $('#download-printer-select').value = state.download.selectedPrinter;
       }
       updateDownloadSelectionMeta();
       updateDownloadProgressUi();
@@ -1010,8 +1035,8 @@ const Views = {
   labels: {
     render() {
       fillSelect($('#labels-printer-select'), state.labels.printers, 'Выберите принтер');
-      if (state.labels.defaultPrinter) {
-        $('#labels-printer-select').value = state.labels.defaultPrinter;
+      if (state.labels.selectedPrinter) {
+        $('#labels-printer-select').value = state.labels.selectedPrinter;
       }
 
       const templateHost = $('#labels-template-grid');
@@ -1183,6 +1208,13 @@ async function loadDownloadState(options = {}) {
     state.download.items = result.items || [];
     state.download.printers = result.printers || [];
     state.download.defaultPrinter = result.default_printer || state.download.defaultPrinter;
+    if (!state.download.printers.includes(state.download.selectedPrinter)) {
+      if (state.download.defaultPrinter && state.download.printers.includes(state.download.defaultPrinter)) {
+        state.download.selectedPrinter = state.download.defaultPrinter;
+      } else {
+        state.download.selectedPrinter = state.download.printers[0] || '';
+      }
+    }
     state.download.selectedIds = new Set(
       [...state.download.selectedIds].filter((id) => state.download.items.some((item) => item.document_id === id)),
     );
@@ -1294,6 +1326,13 @@ async function loadLabelsState(options = {}) {
     state.labels.orders = result.orders || [];
     state.labels.printers = result.printers || [];
     state.labels.defaultPrinter = result.default_printer || state.labels.defaultPrinter;
+    if (!state.labels.printers.includes(state.labels.selectedPrinter)) {
+      if (state.labels.defaultPrinter && state.labels.printers.includes(state.labels.defaultPrinter)) {
+        state.labels.selectedPrinter = state.labels.defaultPrinter;
+      } else {
+        state.labels.selectedPrinter = state.labels.printers[0] || '';
+      }
+    }
     if (!state.labels.templates.some((item) => item.path === state.labels.selectedTemplatePath)) {
       state.labels.selectedTemplatePath = state.labels.templates[0]?.path || '';
     }
@@ -1584,6 +1623,10 @@ async function bindEvents() {
     }, 'Печать термоэтикеток запущена.');
   });
 
+  $('#download-printer-select').addEventListener('change', () => {
+    state.download.selectedPrinter = $('#download-printer-select').value;
+  });
+
   $('#intro-run-btn').addEventListener('click', async () => {
     await runAction('Выполняем ввод в оборот...', async () => {
       const result = await API.call(
@@ -1827,6 +1870,10 @@ async function bindEvents() {
     }, 'Печать этикеток запущена.');
   });
 
+  $('#labels-printer-select').addEventListener('change', () => {
+    state.labels.selectedPrinter = $('#labels-printer-select').value;
+  });
+
   document.querySelectorAll('[data-clear-log]').forEach((button) => {
     button.addEventListener('click', async () => {
       const channel = button.dataset.clearLog;
@@ -1883,14 +1930,6 @@ async function init() {
   }
   appInitialized = true;
   setTheme(state.theme);
-  $('#intro-production-date').value = getDefaultMonthValue(-3);
-  $('#intro-expiration-date').value = getDefaultMonthValue(-3);
-  $('#tsd-production-date').value = getDefaultMonthValue(-3);
-  $('#tsd-expiration-date').value = getDefaultMonthValue(-3);
-  $('#agg-intro-production-date').value = getDefaultMonthValue(-3);
-  $('#agg-intro-expiration-date').value = getDefaultMonthValue(-3);
-  $('#labels-manufacture-date').value = getDefaultMonthValue(-3);
-  $('#labels-expiration-date').value = getDefaultMonthValue(-3);
 
   await bindEvents();
 
@@ -1898,7 +1937,9 @@ async function init() {
     setStatusText('Загружаем интерфейс...', true);
     state.options = await API.call('get_options');
     const session = await API.call('get_session_info');
+    const defaultDateWindow = await API.call('get_default_date_window');
     applySessionInfo(session || {});
+    applyDefaultDateWindow(defaultDateWindow);
     applyOptions();
     updateOrderModeUi();
     bindPerformanceEvents();

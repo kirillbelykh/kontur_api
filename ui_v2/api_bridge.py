@@ -43,6 +43,7 @@ from bartender_label_100x180 import (
 from bartender_print import build_print_context, list_installed_printers, print_labels
 from cookies import get_valid_cookies
 from cryptopro import find_certificate_by_thumbprint, sign_data, sign_text_data
+from date_defaults import get_default_production_window
 from get_gtin import lookup_by_gtin, lookup_gtin
 from get_thumb import find_certificate_thumbprint
 from history_db import OrderHistoryDB
@@ -2084,6 +2085,13 @@ class ApiBridge:
         except Exception as exc:
             return {"error": str(exc)}
 
+    def get_default_date_window(self) -> Dict[str, str]:
+        production_date, expiration_date = get_default_production_window()
+        return {
+            "production_date": production_date,
+            "expiration_date": expiration_date,
+        }
+
     def refresh_session(self) -> Dict[str, Any]:
         try:
             self._ensure_session(force_refresh=True, force_browser_refresh=True)
@@ -2862,13 +2870,44 @@ class ApiBridge:
                 raise RuntimeError("Введите название агрегации.")
             if normalized_count <= 0:
                 raise RuntimeError("Количество агрегатов должно быть больше нуля.")
-            data = self._run_with_session_retry(
-                lambda session: self._create_aggregate_codes(session, normalized_comment, normalized_count),
-                log_channel="aggregation",
-                retry_message="Получили ошибку создания АК, обновляем cookies и повторяем",
-            )
-            self._log("aggregation", f"Создано АК: {normalized_comment}, количество {len(data)}")
-            return {"success": True, "created_count": len(data), "items": data}
+            batch_limit = 99
+            remaining = normalized_count
+            batch_counts: List[int] = []
+            while remaining > 0:
+                batch_size = min(batch_limit, remaining)
+                batch_counts.append(batch_size)
+                remaining -= batch_size
+
+            total_batches = len(batch_counts)
+            created_items: List[Any] = []
+            for batch_index, batch_count in enumerate(batch_counts, start=1):
+                self._log(
+                    "aggregation",
+                    f"Запрос {batch_index}/{total_batches}: создаем {batch_count} кодов агрегации",
+                )
+                batch_items = self._run_with_session_retry(
+                    lambda session, current_count=batch_count: self._create_aggregate_codes(
+                        session,
+                        normalized_comment,
+                        current_count,
+                    ),
+                    log_channel="aggregation",
+                    retry_message="Получили ошибку создания АК, обновляем cookies и повторяем",
+                )
+                created_items.extend(batch_items)
+                self._log(
+                    "aggregation",
+                    f"Запрос {batch_index}/{total_batches} выполнен: получено {len(batch_items)} кодов",
+                )
+
+            self._invalidate_aggregation_cache()
+            self._log("aggregation", f"Создано АК: {normalized_comment}, количество {len(created_items)}")
+            return {
+                "success": True,
+                "created_count": len(created_items),
+                "batch_count": total_batches,
+                "items": created_items,
+            }
         except Exception as exc:
             self._log("aggregation", f"Ошибка создания АК: {exc}")
             return {"success": False, "error": str(exc)}
@@ -3369,11 +3408,15 @@ class ApiBridge:
             df = self._load_nomenclature_df()
             printers, default_printer = list_installed_printers()
             deleted_ids = self._get_deleted_document_ids()
-            orders = [
-                item
-                for item in _get_runtime().history_db.get_all_orders()
-                if str(item.get("document_id") or "").strip() not in deleted_ids
-            ]
+            orders = sorted(
+                [
+                    item
+                    for item in _get_runtime().history_db.get_all_orders()
+                    if str(item.get("document_id") or "").strip() not in deleted_ids
+                ],
+                key=lambda order: str(order.get("updated_at") or order.get("created_at") or ""),
+                reverse=True,
+            )
             serialized_orders = []
             for order in orders[:300]:
                 try:
