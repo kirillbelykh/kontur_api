@@ -1821,7 +1821,6 @@ async function bindEvents() {
       );
       const successfulIds = new Set((result.results || []).map((item) => item.document_id));
       const failedIds = new Set((result.errors || []).map((item) => item.document_id));
-      state.tsd.items = state.tsd.items.filter((item) => !successfulIds.has(item.document_id));
       state.tsd.selectedIds = new Set(
         selectedIds.filter((documentId) => failedIds.has(documentId)),
       );

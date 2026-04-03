@@ -549,7 +549,7 @@ class ApiBridge:
             "tsd_intro_number": merged.get("tsd_intro_number") or "",
             "tsd_status": _translate_status("tsd_created" if tsd_created else "tsd_not_created"),
             "can_intro": is_order_ready_for_intro(merged),
-            "can_tsd": is_order_ready_for_tsd(merged) and not tsd_created,
+            "can_tsd": is_order_ready_for_tsd(merged) or tsd_created,
         }
 
     def _run_with_session_retry(
@@ -2628,14 +2628,18 @@ class ApiBridge:
                     else:
                         errors.append({"document_id": document_id, "error": "Заказ не найден"})
                         continue
-                if item.get("tsd_created") or (item.get("history_data") or {}).get("tsd_created"):
-                    errors.append({"document_id": document_id, "error": "Задание на ТСД уже создано"})
-                    continue
-                if not is_order_ready_for_tsd(item):
+
+                retry_tsd = bool(item.get("tsd_created") or (item.get("history_data") or {}).get("tsd_created"))
+                if retry_tsd:
+                    item = dict(item)
+                    item["status"] = "Готов для ТСД"
+
+                if not retry_tsd and not is_order_ready_for_tsd(item):
                     errors.append({"document_id": document_id, "error": "Заказ ещё не готов для задания на ТСД"})
                     continue
 
-                self._log("tsd", f"Создаём задание на ТСД: {item.get('order_name')}")
+                action_label = "Повторно создаём задание на ТСД" if retry_tsd else "Создаём задание на ТСД"
+                self._log("tsd", f"{action_label}: {item.get('order_name')}")
                 try:
                     ok, result = self._create_tsd_task_with_retry(
                         item=item,
