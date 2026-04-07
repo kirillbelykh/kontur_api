@@ -1147,6 +1147,43 @@ class ApiBridge:
             "scanned_files": scanned_files,
         }
 
+    def _prepare_marking_match_result(
+        self,
+        match_result: Dict[str, Any],
+        *,
+        action_label: str,
+    ) -> Dict[str, Any]:
+        matched = match_result.get("matched") or {}
+        groups = match_result.get("groups") or []
+        unmatched = [
+            str(code or "").strip()
+            for code in (match_result.get("unmatched") or [])
+            if str(code or "").strip()
+        ]
+        scanned_files = int(match_result.get("scanned_files") or 0)
+        unmatched_preview = [extract_sntin(code) for code in unmatched[:5]]
+
+        if unmatched:
+            preview_text = ", ".join(unmatched_preview)
+            if not matched:
+                raise RuntimeError(
+                    f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. Примеры: {preview_text}"
+                )
+            self._log(
+                "aggregation",
+                f"{action_label}: не удалось найти полные коды в папке 'Коды км' для {len(unmatched)} шт. "
+                f"Примеры: {preview_text}. Продолжаем обработку найденных кодов.",
+            )
+
+        return {
+            "matched": matched,
+            "groups": groups,
+            "matched_count": len(matched),
+            "unmatched_count": len(unmatched),
+            "unmatched_preview": unmatched_preview,
+            "scanned_files": scanned_files,
+        }
+
     def _lookup_intro_product_metadata(self, gtin: str, fallback_name: str) -> Dict[str, str]:
         normalized_gtin = str(gtin or "").strip()
         full_name = str(fallback_name or "").strip()
@@ -1554,20 +1591,17 @@ class ApiBridge:
             raise RuntimeError("Все коды из найденных АК уже введены в оборот.")
 
         match_result = self._match_saved_marking_codes(target_codes)
-        unmatched = match_result["unmatched"]
-        if unmatched:
-            preview = ", ".join(extract_sntin(code) for code in unmatched[:5])
-            raise RuntimeError(
-                f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. "
-                f"Примеры: {preview}"
-            )
-
-        groups = match_result["groups"]
+        prepared_match = self._prepare_marking_match_result(
+            match_result,
+            action_label="Ввод в оборот АК",
+        )
+        groups = prepared_match["groups"]
         introduced_results: List[Dict[str, Any]] = []
         total_sent_codes = 0
         self._log(
             "aggregation",
-            f"Полные коды найдены в папке 'Коды км': {len(match_result['matched'])} шт., файлов просмотрено: {match_result['scanned_files']}.",
+            f"Полные коды найдены в папке 'Коды км': {prepared_match['matched_count']} шт., "
+            f"не найдено: {prepared_match['unmatched_count']} шт., файлов просмотрено: {prepared_match['scanned_files']}.",
         )
         for index, group in enumerate(groups, start=1):
             source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
@@ -1664,11 +1698,14 @@ class ApiBridge:
             "ready_aggregates": len(ready_aggregates),
             "skipped_nested": skipped_nested,
             "checked_codes": len(unique_codes),
+            "matched_codes": prepared_match["matched_count"],
+            "missing_full_codes": prepared_match["unmatched_count"],
+            "missing_full_codes_preview": prepared_match["unmatched_preview"],
             "already_introduced_codes": already_introduced,
             "introduced_codes": total_sent_codes,
             "groups": introduced_results,
             "status_counts": dict(status_counts),
-            "scanned_saved_files": int(match_result["scanned_files"]),
+            "scanned_saved_files": prepared_match["scanned_files"],
         }
 
     def _introduce_aggregations_via_exact_codes_file(
@@ -1761,20 +1798,17 @@ class ApiBridge:
             raise RuntimeError("Все коды из найденных АК уже введены в оборот.")
 
         match_result = self._match_saved_marking_codes(target_codes)
-        unmatched = match_result["unmatched"]
-        if unmatched:
-            preview = ", ".join(extract_sntin(code) for code in unmatched[:5])
-            raise RuntimeError(
-                f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. "
-                f"Примеры: {preview}"
-            )
-
-        groups = match_result["groups"]
+        prepared_match = self._prepare_marking_match_result(
+            match_result,
+            action_label="Ввод в оборот АК",
+        )
+        groups = prepared_match["groups"]
         introduced_results: List[Dict[str, Any]] = []
         total_sent_codes = 0
         self._log(
             "aggregation",
-            f"Полные коды найдены в папке 'Коды км': {len(match_result['matched'])} шт., файлов просмотрено: {match_result['scanned_files']}.",
+            f"Полные коды найдены в папке 'Коды км': {prepared_match['matched_count']} шт., "
+            f"не найдено: {prepared_match['unmatched_count']} шт., файлов просмотрено: {prepared_match['scanned_files']}.",
         )
         for index, group in enumerate(groups, start=1):
             source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
@@ -1867,11 +1901,14 @@ class ApiBridge:
             "ready_aggregates": len(ready_aggregates),
             "skipped_nested": skipped_nested,
             "checked_codes": len(unique_codes),
+            "matched_codes": prepared_match["matched_count"],
+            "missing_full_codes": prepared_match["unmatched_count"],
+            "missing_full_codes_preview": prepared_match["unmatched_preview"],
             "already_introduced_codes": already_introduced,
             "introduced_codes": total_sent_codes,
             "groups": introduced_results,
             "status_counts": dict(status_counts),
-            "scanned_saved_files": int(match_result["scanned_files"]),
+            "scanned_saved_files": prepared_match["scanned_files"],
         }
 
     def _create_aggregate_codes(self, session: requests.Session, comment: str, count: int) -> List[Dict[str, Any]]:
@@ -3179,20 +3216,19 @@ class ApiBridge:
                     raise RuntimeError("Все коды из выбранных АК уже введены в оборот.")
 
                 match_result = self._match_saved_marking_codes(target_codes)
-                unmatched = match_result["unmatched"]
-                if unmatched:
-                    preview = ", ".join(extract_sntin(code) for code in unmatched[:5])
-                    raise RuntimeError(
-                        f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. Примеры: {preview}"
-                    )
+                prepared_match = self._prepare_marking_match_result(
+                    match_result,
+                    action_label="Ввод в оборот выбранных АК",
+                )
 
                 introduced_results: List[Dict[str, Any]] = []
                 total_sent_codes = 0
                 self._log(
                     "aggregation",
-                    f"Полные коды найдены в папке 'Коды км': {len(match_result['matched'])} шт., файлов просмотрено: {match_result['scanned_files']}.",
+                    f"Полные коды найдены в папке 'Коды км': {prepared_match['matched_count']} шт., "
+                    f"не найдено: {prepared_match['unmatched_count']} шт., файлов просмотрено: {prepared_match['scanned_files']}.",
                 )
-                groups = match_result["groups"]
+                groups = prepared_match["groups"]
                 for index, group in enumerate(groups, start=1):
                     source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
                     codes = [row["full_code"] for row in group.get("codes", []) if str(row.get("full_code") or "").strip()]
@@ -3273,11 +3309,14 @@ class ApiBridge:
                     "selected_aggregates": len(aggregates),
                     "skipped_nested": skipped_nested,
                     "checked_codes": len(unique_codes),
+                    "matched_codes": prepared_match["matched_count"],
+                    "missing_full_codes": prepared_match["unmatched_count"],
+                    "missing_full_codes_preview": prepared_match["unmatched_preview"],
                     "already_introduced_codes": already_introduced,
                     "introduced_codes": total_sent_codes,
                     "groups": introduced_results,
                     "status_counts": dict(status_counts),
-                    "scanned_saved_files": int(match_result["scanned_files"]),
+                    "scanned_saved_files": prepared_match["scanned_files"],
                 }
 
             summary = self._run_with_session_retry(

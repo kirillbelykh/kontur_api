@@ -119,6 +119,40 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertEqual(upload_call.kwargs["json"], {"rows": [{"code": "010000000000000021ABC"}]})
         self.assertTrue(autocomplete_call.args[0].endswith("/api/v1/codes-introduction/intro-123/positions/autocomplete"))
 
+    def test_prepare_marking_match_result_allows_partial_matches(self):
+        match_result = {
+            "matched": {"010000000000000021ABC": {"full_code": "010000000000000021ABC\x1d91EE11\x1d92TAIL"}},
+            "groups": [{"order_name": "test", "codes": [{"full_code": "010000000000000021ABC\x1d91EE11\x1d92TAIL"}]}],
+            "unmatched": ["010000000000000021MISS"],
+            "scanned_files": 12,
+        }
+
+        with mock.patch.object(self.bridge, "_log") as log_mock:
+            result = self.bridge._prepare_marking_match_result(
+                match_result,
+                action_label="Ввод в оборот выбранных АК",
+            )
+
+        self.assertEqual(result["matched_count"], 1)
+        self.assertEqual(result["unmatched_count"], 1)
+        self.assertEqual(result["unmatched_preview"], ["010000000000000021MISS"])
+        self.assertEqual(result["scanned_files"], 12)
+        log_mock.assert_called_once()
+
+    def test_prepare_marking_match_result_raises_when_no_full_codes_found(self):
+        match_result = {
+            "matched": {},
+            "groups": [],
+            "unmatched": ["010000000000000021MISS"],
+            "scanned_files": 4,
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "Не удалось найти полные коды"):
+            self.bridge._prepare_marking_match_result(
+                match_result,
+                action_label="Ввод в оборот выбранных АК",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
