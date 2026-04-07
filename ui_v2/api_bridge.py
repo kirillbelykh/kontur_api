@@ -1219,6 +1219,15 @@ class ApiBridge:
         payload = response.json()
         return payload if isinstance(payload, dict) else {}
 
+    def _get_intro_document_state(self, session: requests.Session, introduction_id: str) -> Dict[str, Any]:
+        response = session.get(
+            f"{str(os.getenv('BASE_URL') or 'https://mk.kontur.ru').rstrip('/')}/api/v1/codes-introduction/{introduction_id}",
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {}
+
     def _wait_for_intro_document_status(
         self,
         session: requests.Session,
@@ -1273,6 +1282,36 @@ class ApiBridge:
             time.sleep(2)
         raise RuntimeError(
             f"Проверка кодов для документа {introduction_id} не завершилась. "
+            f"Последний статус: {last_status or 'неизвестно'}."
+        )
+
+    def _wait_for_intro_final_status(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+        *,
+        timeout_seconds: float = 300.0,
+    ) -> Dict[str, Any]:
+        deadline = time.time() + timeout_seconds
+        last_payload: Dict[str, Any] = {}
+        last_status = ""
+        failed_statuses = {"introductionFailed", "crptSendingError", "relatedDocumentFailed"}
+        while time.time() < deadline:
+            payload = self._get_intro_document_state(session, introduction_id)
+            status = str(payload.get("documentStatus") or payload.get("status") or "").strip()
+            if status != last_status:
+                self._log("aggregation", f"Финальный статус ввода в оборот {introduction_id}: {status or 'неизвестно'}")
+                last_status = status
+            last_payload = payload
+            if status == "introduced":
+                return payload
+            if status in failed_statuses:
+                raise RuntimeError(
+                    f"Документ ввода в оборот {introduction_id} завершился ошибкой: {status}."
+                )
+            time.sleep(5)
+        raise RuntimeError(
+            f"Документ ввода в оборот {introduction_id} не перешёл в финальный статус introduced. "
             f"Последний статус: {last_status or 'неизвестно'}."
         )
 
@@ -1486,8 +1525,7 @@ class ApiBridge:
             timeout=30,
         )
         send_response.raise_for_status()
-        final_intro = session.get(f"{base_url}/api/v1/codes-introduction/{introduction_id}", timeout=30)
-        final_intro.raise_for_status()
+        final_intro = self._wait_for_intro_final_status(session, introduction_id)
         final_check = session.get(f"{base_url}/api/v1/codes-checking/{introduction_id}", timeout=30)
         final_check.raise_for_status()
         try:
@@ -1497,7 +1535,7 @@ class ApiBridge:
         return {
             "generated_count": len(items),
             "send_response": send_payload,
-            "final_introduction": final_intro.json(),
+            "final_introduction": final_intro,
             "final_check": final_check.json(),
         }
 
@@ -1650,21 +1688,24 @@ class ApiBridge:
                 tsd_token=tsd_token,
                 full_codes=codes,
             )
-            production_state = self._wait_for_intro_document_status(
-                session,
-                introduction_id,
-                expected_statuses=("readyForSend", "introduced"),
+            codes_check = self._wait_for_intro_codes_check(session, introduction_id)
+            production_state = self._get_intro_production_state(session, introduction_id)
+            if str(codes_check.get("status") or "").strip() == "hasErrors":
+                refreshed_state = self._get_intro_production_state(session, introduction_id)
+                positions = refreshed_state.get("positions") or production_state.get("positions") or []
+                broken_count = 0
+                if positions:
+                    broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
+                raise RuntimeError(
+                    f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
+                )
+            document_state = self._get_intro_document_state(session, introduction_id)
+            document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
+            self._log(
+                "aggregation",
+                f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
             )
-            if str(production_state.get("documentStatus") or "").strip() != "introduced":
-                codes_check = self._wait_for_intro_codes_check(session, introduction_id)
-                if str(codes_check.get("status") or "").strip() == "hasErrors":
-                    broken_count = 0
-                    positions = production_state.get("positions") or []
-                    if positions:
-                        broken_count = int(positions[0].get("brokenCodesCount") or 0)
-                    raise RuntimeError(
-                        f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
-                    )
+            if document_status != "introduced":
                 send_result = self._sign_and_send_intro_document(
                     session,
                     introduction_id,
@@ -1674,8 +1715,8 @@ class ApiBridge:
                 send_result = {
                     "generated_count": 0,
                     "send_response": {},
-                    "final_introduction": {"documentId": introduction_id, "documentStatus": "introduced"},
-                    "final_check": {},
+                    "final_introduction": document_state or {"documentId": introduction_id, "documentStatus": "introduced"},
+                    "final_check": codes_check,
                 }
 
             introduced_results.append(
@@ -1852,11 +1893,7 @@ class ApiBridge:
             )
 
             codes_check = self._wait_for_intro_codes_check(session, introduction_id)
-            production_state = self._wait_for_intro_document_status(
-                session,
-                introduction_id,
-                expected_statuses=("readyForSend", "introduced"),
-            )
+            production_state = self._get_intro_production_state(session, introduction_id)
             if str(codes_check.get("status") or "").strip() == "hasErrors":
                 refreshed_state = self._get_intro_production_state(session, introduction_id)
                 positions = refreshed_state.get("positions") or production_state.get("positions") or []
@@ -1867,7 +1904,13 @@ class ApiBridge:
                     f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
                 )
 
-            if str(production_state.get("documentStatus") or "").strip() != "introduced":
+            document_state = self._get_intro_document_state(session, introduction_id)
+            document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
+            self._log(
+                "aggregation",
+                f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+            )
+            if document_status != "introduced":
                 send_result = self._sign_and_send_intro_document(
                     session,
                     introduction_id,
@@ -1877,7 +1920,7 @@ class ApiBridge:
                 send_result = {
                     "generated_count": 0,
                     "send_response": {},
-                    "final_introduction": {"documentId": introduction_id, "documentStatus": "introduced"},
+                    "final_introduction": document_state or {"documentId": introduction_id, "documentStatus": "introduced"},
                     "final_check": codes_check,
                 }
 
@@ -3260,11 +3303,7 @@ class ApiBridge:
                         rows_payload=rows_payload,
                     )
                     codes_check = self._wait_for_intro_codes_check(session, introduction_id)
-                    production_state = self._wait_for_intro_document_status(
-                        session,
-                        introduction_id,
-                        expected_statuses=("readyForSend", "introduced"),
-                    )
+                    production_state = self._get_intro_production_state(session, introduction_id)
                     if str(codes_check.get("status") or "").strip() == "hasErrors":
                         refreshed_state = self._get_intro_production_state(session, introduction_id)
                         positions = refreshed_state.get("positions") or production_state.get("positions") or []
@@ -3275,7 +3314,13 @@ class ApiBridge:
                             f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
                         )
 
-                    if str(production_state.get("documentStatus") or "").strip() != "introduced":
+                    document_state = self._get_intro_document_state(session, introduction_id)
+                    document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
+                    self._log(
+                        "aggregation",
+                        f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+                    )
+                    if document_status != "introduced":
                         send_result = self._sign_and_send_intro_document(
                             session,
                             introduction_id,
@@ -3285,7 +3330,7 @@ class ApiBridge:
                         send_result = {
                             "generated_count": 0,
                             "send_response": {},
-                            "final_introduction": {"documentId": introduction_id, "documentStatus": "introduced"},
+                            "final_introduction": document_state or {"documentId": introduction_id, "documentStatus": "introduced"},
                             "final_check": codes_check,
                         }
 

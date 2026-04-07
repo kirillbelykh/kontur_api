@@ -153,6 +153,78 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 action_label="Ввод в оборот выбранных АК",
             )
 
+    def test_introduce_selected_aggregations_sends_when_document_stays_created_after_codes_check(self):
+        aggregate = types.SimpleNamespace(
+            document_id="agg-doc-1",
+            aggregate_code="AGG-1",
+            product_group="wheelChairs",
+            status="readyForSend",
+            comment="test",
+            includes_units_count=1,
+            codes_check_errors_count=0,
+        )
+        fake_state = types.SimpleNamespace(
+            status="EMITTED",
+            api_error=None,
+            raw_code="010000000000000021ABC",
+            sntin="010000000000000021ABC",
+        )
+        fake_service = types.SimpleNamespace(
+            fetch_aggregate_codes=lambda _session, _document_id: (["010000000000000021ABC"], []),
+            _resolve_true_product_group=lambda product_group: product_group,
+            fetch_code_states=lambda **_kwargs: [fake_state],
+        )
+        fake_runtime = types.SimpleNamespace(bulk_aggregation_service=fake_service)
+
+        with (
+            mock.patch.object(self.bridge, "_get_certificate", return_value=object()),
+            mock.patch.object(self.bridge, "_parse_iso_date", side_effect=lambda value, **_kwargs: value),
+            mock.patch.object(self.bridge, "_resolve_aggregate_infos_by_ids", return_value=[aggregate]),
+            mock.patch.object(self.bridge, "_match_saved_marking_codes", return_value={
+                "matched": {"010000000000000021ABC": {"full_code": "010000000000000021ABC\x1d91EE11\x1d92TAIL"}},
+                "groups": [{
+                    "order_name": "order-1",
+                    "gtin": "04650118041257",
+                    "full_name": "Перчатки",
+                    "source_path": "codes.csv",
+                    "codes": [{"full_code": "010000000000000021ABC\x1d91EE11\x1d92TAIL"}],
+                }],
+                "unmatched": [],
+                "scanned_files": 1,
+            }),
+            mock.patch.object(self.bridge, "_lookup_intro_product_metadata", return_value={
+                "gtin": "04650118041257",
+                "full_name": "Перчатки",
+                "simpl_name": "Перчатки",
+                "tnved_code": "EE11",
+            }),
+            mock.patch.object(self.bridge, "_create_exact_intro_file_document", return_value="intro-123"),
+            mock.patch.object(self.bridge, "_build_intro_upload_rows", return_value={"rows": [{"code": "010000000000000021ABC"}]}),
+            mock.patch.object(self.bridge, "_upload_intro_positions_from_file"),
+            mock.patch.object(self.bridge, "_wait_for_intro_codes_check", return_value={"status": "doesNotHaveErrors"}),
+            mock.patch.object(self.bridge, "_get_intro_production_state", return_value={"documentStatus": "created", "positions": []}),
+            mock.patch.object(self.bridge, "_get_intro_document_state", return_value={"documentStatus": "created"}),
+            mock.patch.object(self.bridge, "_sign_and_send_intro_document", return_value={
+                "generated_count": 1,
+                "send_response": {"ok": True},
+                "final_introduction": {"documentStatus": "introduced"},
+                "final_check": {"status": "doesNotHaveErrors"},
+            }) as sign_mock,
+            mock.patch.object(self.bridge, "_log"),
+            mock.patch.object(self.bridge, "_run_with_session_retry", side_effect=lambda action, **_kwargs: action(object())),
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+        ):
+            result = self.bridge.introduce_selected_aggregations(
+                ["agg-doc-1"],
+                "01-01-2026",
+                "01-01-2031",
+                "260318",
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["summary"]["introduced_codes"], 1)
+        sign_mock.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
