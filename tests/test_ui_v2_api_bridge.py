@@ -91,6 +91,34 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         mark_mock.assert_called_once_with("doc-1", "intro-2")
         remove_mock.assert_called_once_with(fake_runtime.download_items, "doc-1")
 
+    def test_upload_intro_positions_from_file_runs_autocomplete(self):
+        upload_response = mock.Mock()
+        upload_response.raise_for_status.return_value = None
+        upload_response.status_code = 201
+        upload_response.content = b""
+
+        autocomplete_response = mock.Mock()
+        autocomplete_response.status_code = 204
+        autocomplete_response.content = b""
+
+        session = mock.Mock()
+        session.post.side_effect = [upload_response, autocomplete_response]
+
+        with mock.patch.object(self.bridge, "_log"):
+            result = self.bridge._upload_intro_positions_from_file(
+                session,
+                "intro-123",
+                rows_payload={"rows": [{"code": "010000000000000021ABC"}]},
+            )
+
+        self.assertIsNone(result)
+        self.assertEqual(session.post.call_count, 2)
+        upload_call = session.post.call_args_list[0]
+        autocomplete_call = session.post.call_args_list[1]
+        self.assertTrue(upload_call.args[0].endswith("/api/v1/codes-introduction/intro-123/positions"))
+        self.assertEqual(upload_call.kwargs["json"], {"rows": [{"code": "010000000000000021ABC"}]})
+        self.assertTrue(autocomplete_call.args[0].endswith("/api/v1/codes-introduction/intro-123/positions/autocomplete"))
+
 
 if __name__ == "__main__":
     unittest.main()

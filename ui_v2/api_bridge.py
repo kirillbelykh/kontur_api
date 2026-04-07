@@ -1378,6 +1378,37 @@ class ApiBridge:
             timeout=60,
         )
         response.raise_for_status()
+        self._autocomplete_intro_positions(session, introduction_id)
+
+    def _autocomplete_intro_positions(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+    ) -> Dict[str, Any]:
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        response = session.post(
+            f"{base_url}/api/v1/codes-introduction/{introduction_id}/positions/autocomplete",
+            timeout=30,
+        )
+        status_code = int(response.status_code or 0)
+        if status_code in {200, 201, 204}:
+            self._log("aggregation", f"Автозаполнение позиций для {introduction_id}: HTTP {status_code}")
+        else:
+            self._log(
+                "aggregation",
+                f"Автозаполнение позиций для {introduction_id} вернуло HTTP {status_code}, продолжаем проверку документа.",
+            )
+        if response.content:
+            try:
+                payload = response.json()
+            except Exception:
+                payload = {"raw": response.text}
+        else:
+            payload = {}
+        return {
+            "status_code": status_code,
+            "payload": payload,
+        }
 
     def _sign_and_send_intro_document(
         self,
