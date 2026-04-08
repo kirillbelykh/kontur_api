@@ -15,6 +15,15 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         broken = "\u00c7\u00e0\u00e3\u00f0\u00f3\u00e6\u00e0\u00e5\u00ec"
         self.assertEqual(api_bridge._normalize_ui_text(broken), "\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c")
 
+    def test_normalize_ui_text_repairs_cp1251_utf8_mojibake(self):
+        correct = "\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u044f\u0432\u043a\u0438."
+        broken = correct.encode("utf-8").decode("cp1251")
+        self.assertEqual(api_bridge._normalize_ui_text(broken), correct)
+
+    def test_normalize_ui_text_keeps_correct_russian(self):
+        correct = "\u0417\u0430\u043f\u0443\u0441\u043a\u0430\u0435\u043c \u0432\u0432\u043e\u0434 \u0432 \u043e\u0431\u043e\u0440\u043e\u0442"
+        self.assertEqual(api_bridge._normalize_ui_text(correct), correct)
+
     def test_desktop_data_dir_resolves_existing_marking_codes_folder(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
