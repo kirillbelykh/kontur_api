@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import csv
 import json
@@ -69,6 +69,8 @@ CODE_STATUS_SAMPLE_SIZE = 25
 TRUE_STATUS_WORKER_TIMEOUT_SECONDS = 25
 DELETED_ORDERS_DIRNAME = "Удаленные"
 DELETED_ORDERS_FILE = "deleted_orders.json"
+MARKING_CODES_DIRNAME = "\u041a\u043e\u0434\u044b \u043a\u043c"
+AGGREGATION_CODES_DIRNAME = "\u0410\u0433\u0440\u0435\u0433 \u043a\u043e\u0434\u044b \u043a\u043c"
 
 STATUS_LABELS = {
     "available": "Доступен для скачивания",
@@ -115,11 +117,84 @@ AGGREGATION_FETCH_STATUSES = tuple(
 )
 
 
+def _text_quality_score(text: str) -> int:
+    cyrillic_letters = sum(1 for char in text if "\u0400" <= char <= "\u04FF")
+    latin_letters = sum(1 for char in text if ("A" <= char <= "Z") or ("a" <= char <= "z"))
+    control_chars = sum(1 for char in text if ord(char) < 32 and char not in "\r\n\t")
+    replacement_chars = text.count("\ufffd")
+    mojibake_pairs = sum(
+        1
+        for index in range(len(text) - 1)
+        if text[index] in "РСÐÑÃÂÇÊ"
+        and text[index + 1] not in " \r\n\t.,:;!?)]}\"'"
+    )
+    return (cyrillic_letters * 4) + latin_letters - (control_chars * 6) - (replacement_chars * 4) - (mojibake_pairs * 3)
+
+
+def _decode_text_candidate(text: str, source_encoding: str, target_encoding: str) -> Optional[str]:
+    try:
+        return text.encode(source_encoding).decode(target_encoding)
+    except (UnicodeEncodeError, UnicodeDecodeError, LookupError):
+        return None
+
+
+def _normalize_ui_text(value: Any) -> str:
+    text = str(value or "")
+    if not text:
+        return ""
+    best = text
+    best_score = _text_quality_score(text)
+    seen = {text}
+    queue = [text]
+    transforms = (
+        ("cp1251", "utf-8"),
+        ("latin1", "cp1251"),
+        ("cp1252", "cp1251"),
+        ("latin1", "cp866"),
+    )
+    for _ in range(3):
+        next_queue: List[str] = []
+        for current in queue:
+            for source_encoding, target_encoding in transforms:
+                candidate = _decode_text_candidate(current, source_encoding, target_encoding)
+                if not candidate or candidate in seen or candidate == current:
+                    continue
+                seen.add(candidate)
+                next_queue.append(candidate)
+                candidate_score = _text_quality_score(candidate)
+                if candidate_score > best_score:
+                    best = candidate
+                    best_score = candidate_score
+        if not next_queue:
+            break
+        queue = next_queue
+    return best
+
+
+def _desktop_data_dir(*dirnames: str) -> Path:
+    desktop_root = Path.home() / "Desktop"
+    candidates: List[str] = []
+    for dirname in dirnames:
+        raw_name = str(dirname or "").strip()
+        normalized_name = _normalize_ui_text(raw_name)
+        for candidate in (normalized_name, raw_name):
+            if candidate and candidate not in candidates:
+                candidates.append(candidate)
+    if not candidates:
+        return desktop_root
+    for candidate in candidates:
+        path = desktop_root / candidate
+        if path.exists():
+            return path
+    return desktop_root / candidates[0]
+
+
 def _translate_status(value: Any) -> str:
-    raw = str(value or "").strip()
+    raw = _normalize_ui_text(str(value or "").strip())
     if not raw:
         return "Неизвестно"
-    return STATUS_LABELS.get(raw, STATUS_LABELS.get(raw.lower(), raw))
+    translated = STATUS_LABELS.get(raw, STATUS_LABELS.get(raw.lower(), raw))
+    return _normalize_ui_text(translated)
 
 
 def _format_status_counts(counts: Counter[str]) -> str:
@@ -234,32 +309,33 @@ class ApiBridge:
         runtime = _get_runtime()
         normalized = self._normalize_order_name_key(order_name)
         if not normalized:
-            raise RuntimeError("Укажите название заявки.")
+            raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ Р·Р°СЏРІРєРё.")
 
         for item in runtime.order_queue:
             if ignore_uid and str(item.get("uid") or "") == ignore_uid:
                 continue
             if self._normalize_order_name_key(item.get("order_name")) == normalized:
-                raise RuntimeError(f"Заявка с названием '{order_name}' уже есть в очереди.")
+                raise RuntimeError(f"Р—Р°СЏРІРєР° СЃ РЅР°Р·РІР°РЅРёРµРј '{order_name}' СѓР¶Рµ РµСЃС‚СЊ РІ РѕС‡РµСЂРµРґРё.")
 
         for item in runtime.session_orders:
             if self._normalize_order_name_key(item.get("order_name")) == normalized:
-                raise RuntimeError(f"Заявка с названием '{order_name}' уже была создана в этой сессии.")
+                raise RuntimeError(f"Р—Р°СЏРІРєР° СЃ РЅР°Р·РІР°РЅРёРµРј '{order_name}' СѓР¶Рµ Р±С‹Р»Р° СЃРѕР·РґР°РЅР° РІ СЌС‚РѕР№ СЃРµСЃСЃРёРё.")
 
         for item in runtime.download_items:
             if self._normalize_order_name_key(item.get("order_name")) == normalized:
-                raise RuntimeError(f"Заявка с названием '{order_name}' уже существует в активных заказах.")
+                raise RuntimeError(f"Р—Р°СЏРІРєР° СЃ РЅР°Р·РІР°РЅРёРµРј '{order_name}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ Р°РєС‚РёРІРЅС‹С… Р·Р°РєР°Р·Р°С….")
 
         for item in runtime.history_db.get_all_orders():
             if self._normalize_order_name_key(item.get("order_name")) == normalized:
-                raise RuntimeError(f"Заявка с названием '{order_name}' уже существует в истории заказов.")
+                raise RuntimeError(f"Р—Р°СЏРІРєР° СЃ РЅР°Р·РІР°РЅРёРµРј '{order_name}' СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ РёСЃС‚РѕСЂРёРё Р·Р°РєР°Р·РѕРІ.")
 
     def _log(self, channel: str, message: str) -> None:
         runtime = _get_runtime()
         if channel not in runtime.logs:
             return
         timestamp = datetime.now().strftime("%H:%M:%S")
-        runtime.logs[channel].append(f"[{timestamp}] {message}")
+        normalized_message = _normalize_ui_text(message)
+        runtime.logs[channel].append(f"[{timestamp}] {normalized_message}")
         if len(runtime.logs[channel]) > MAX_LOG_LINES:
             runtime.logs[channel] = runtime.logs[channel][-MAX_LOG_LINES:]
 
@@ -363,7 +439,7 @@ class ApiBridge:
                     value = str(cell or "").strip()
                     if not value:
                         continue
-                    if re.search(r"[А-Яа-яA-Za-z]", value) and len(value) < 24:
+                    if re.search(r"[Рђ-РЇР°-СЏA-Za-z]", value) and len(value) < 24:
                         continue
                     if value in seen:
                         continue
@@ -378,11 +454,11 @@ class ApiBridge:
         normalized_id = str(document_id or "").strip()
         translated_fallback = _translate_status(fallback_status)
         if translated_fallback in {
-            "Скачан",
-            "Введен в оборот",
-            "Ошибка ввода",
-            "Ошибка ТСД",
-            "Отправлено на ТСД",
+            "РЎРєР°С‡Р°РЅ",
+            "Р’РІРµРґРµРЅ РІ РѕР±РѕСЂРѕС‚",
+            "РћС€РёР±РєР° РІРІРѕРґР°",
+            "РћС€РёР±РєР° РўРЎР”",
+            "РћС‚РїСЂР°РІР»РµРЅРѕ РЅР° РўРЎР”",
         }:
             return {
                 "raw": str(fallback_status or "").strip(),
@@ -487,7 +563,7 @@ class ApiBridge:
     ) -> Dict[str, Any]:
         fallback_status = str(order_data.get("status") or "").strip()
         translated_fallback = _translate_status(fallback_status)
-        if order_data.get("tsd_created") and translated_fallback in {"Ожидает", "Выполнен", "Отправлено на ТСД"}:
+        if order_data.get("tsd_created") and translated_fallback in {"РћР¶РёРґР°РµС‚", "Р’С‹РїРѕР»РЅРµРЅ", "РћС‚РїСЂР°РІР»РµРЅРѕ РЅР° РўРЎР”"}:
             document_status = {
                 "raw": fallback_status,
                 "label": translated_fallback,
@@ -512,7 +588,7 @@ class ApiBridge:
         translated_status = _translate_status(item.get("status"))
         return bool(
             item.get("tsd_created")
-            or translated_status in {"Введен в оборот", "Ошибка ввода"}
+            or translated_status in {"Р’РІРµРґРµРЅ РІ РѕР±РѕСЂРѕС‚", "РћС€РёР±РєР° РІРІРѕРґР°"}
         )
 
     def _serialize_order_record(
@@ -558,7 +634,7 @@ class ApiBridge:
         *,
         retry_statuses: Sequence[int] = (400, 401, 403),
         log_channel: str | None = None,
-        retry_message: str = "Обновляем сессию и повторяем запрос",
+        retry_message: str = "РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ Рё РїРѕРІС‚РѕСЂСЏРµРј Р·Р°РїСЂРѕСЃ",
     ):
         try:
             return action(self._ensure_session())
@@ -569,6 +645,37 @@ class ApiBridge:
             if log_channel:
                 self._log(log_channel, f"{retry_message} (HTTP {status_code})")
             return action(self._ensure_session(force_refresh=True))
+
+    def _run_with_transient_network_retry(
+        self,
+        action,
+        *,
+        attempts: int = 3,
+        log_channel: str | None = None,
+        retry_message: str = "Повторяем запрос после сетевого обрыва",
+    ):
+        last_error: Exception | None = None
+        total_attempts = max(int(attempts or 1), 1)
+        for attempt in range(1, total_attempts + 1):
+            try:
+                return action()
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                last_error = exc
+                if attempt >= total_attempts:
+                    raise
+                if log_channel:
+                    self._log(
+                        log_channel,
+                        f"{retry_message} ({attempt}/{total_attempts - 1}): {exc}",
+                    )
+                try:
+                    self._ensure_session(force_refresh=True, force_browser_refresh=True)
+                except Exception as refresh_exc:
+                    if log_channel:
+                        self._log(log_channel, f"Не удалось обновить сессию перед повтором: {refresh_exc}")
+                time.sleep(min(1.5 * attempt, 4.0))
+        if last_error is not None:
+            raise last_error
 
     def _load_nomenclature_df(self) -> pd.DataFrame:
         runtime = _get_runtime()
@@ -595,7 +702,7 @@ class ApiBridge:
                 else:
                     cookies = get_valid_cookies()
                 if not cookies:
-                    raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
+                    raise RuntimeError("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РІР°Р»РёРґРЅС‹Рµ cookies РґР»СЏ РљРѕРЅС‚СѓСЂ.РњР°СЂРєРёСЂРѕРІРєРё.")
                 runtime.session = make_session_with_cookies(cookies)
                 runtime.session_created_at = time.time()
             return runtime.session
@@ -605,7 +712,7 @@ class ApiBridge:
             return self._ensure_session()
         except Exception as exc:
             if log_channel:
-                self._log(log_channel, f"Не удалось обновить live-статусы: {exc}")
+                self._log(log_channel, f"РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ live-СЃС‚Р°С‚СѓСЃС‹: {exc}")
             return None
 
     def _get_thumbprint(self) -> Optional[str]:
@@ -682,7 +789,7 @@ class ApiBridge:
             venchik or None,
         )
         if not gtin:
-            raise RuntimeError("GTIN не найден для выбранных параметров.")
+            raise RuntimeError("GTIN РЅРµ РЅР°Р№РґРµРЅ РґР»СЏ РІС‹Р±СЂР°РЅРЅС‹С… РїР°СЂР°РјРµС‚СЂРѕРІ.")
         return {
             "gtin": gtin,
             "full_name": full_name or name,
@@ -692,7 +799,7 @@ class ApiBridge:
     def _lookup_by_gtin(self, gtin_value: str) -> Dict[str, str]:
         full_name, simpl_name = lookup_by_gtin(self._load_nomenclature_df(), gtin_value)
         if not full_name:
-            raise RuntimeError(f"GTIN {gtin_value} не найден в nomenclature.xlsx.")
+            raise RuntimeError(f"GTIN {gtin_value} РЅРµ РЅР°Р№РґРµРЅ РІ nomenclature.xlsx.")
         return {
             "gtin": gtin_value,
             "full_name": full_name,
@@ -711,14 +818,14 @@ class ApiBridge:
         venchik = str(payload.get("venchik") or "").strip()
 
         if not order_name:
-            raise RuntimeError("Укажите название заявки.")
+            raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ Р·Р°СЏРІРєРё.")
         if codes_count <= 0:
-            raise RuntimeError("Количество кодов должно быть больше нуля.")
+            raise RuntimeError("РљРѕР»РёС‡РµСЃС‚РІРѕ РєРѕРґРѕРІ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ.")
 
         if mode == "gtin":
             gtin_value = str(payload.get("gtin") or "").strip()
             if not gtin_value:
-                raise RuntimeError("Укажите GTIN.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ GTIN.")
             gtin_payload = self._lookup_by_gtin(gtin_value)
             simpl_name = str(payload.get("name") or gtin_payload["simpl_name"] or "").strip()
             full_name = gtin_payload["full_name"]
@@ -727,11 +834,11 @@ class ApiBridge:
         else:
             simpl_name = str(payload.get("name") or payload.get("simplified_name") or "").strip()
             if not simpl_name:
-                raise RuntimeError("Укажите наименование товара.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅР°РёРјРµРЅРѕРІР°РЅРёРµ С‚РѕРІР°СЂР°.")
             if not size:
-                raise RuntimeError("Укажите размер.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ СЂР°Р·РјРµСЂ.")
             if not units_per_pack:
-                raise RuntimeError("Укажите количество единиц в упаковке.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РєРѕР»РёС‡РµСЃС‚РІРѕ РµРґРёРЅРёС† РІ СѓРїР°РєРѕРІРєРµ.")
             lookup_payload = self._build_lookup_payload(
                 name=simpl_name,
                 size=size,
@@ -767,7 +874,7 @@ class ApiBridge:
         download_item = {
             "order_name": item["order_name"],
             "document_id": document_id,
-            "status": "Ожидает",
+            "status": "РћР¶РёРґР°РµС‚",
             "filename": None,
             "csv_path": None,
             "pdf_path": None,
@@ -848,8 +955,8 @@ class ApiBridge:
                 "unauthorized",
                 "cookie",
                 "cookies",
-                "сесс",
-                "авториз",
+                "СЃРµСЃСЃ",
+                "Р°РІС‚РѕСЂРёР·",
                 "csrf",
                 "access denied",
             )
@@ -895,7 +1002,7 @@ class ApiBridge:
             force_refresh = attempt > 0
             force_browser_refresh = attempt > 0
             if attempt > 0:
-                self._log("tsd", f"Повторяем создание задания после обновления сессии: {item.get('order_name')}")
+                self._log("tsd", f"РџРѕРІС‚РѕСЂСЏРµРј СЃРѕР·РґР°РЅРёРµ Р·Р°РґР°РЅРёСЏ РїРѕСЃР»Рµ РѕР±РЅРѕРІР»РµРЅРёСЏ СЃРµСЃСЃРёРё: {item.get('order_name')}")
             session = self._ensure_session(
                 force_refresh=force_refresh,
                 force_browser_refresh=force_browser_refresh,
@@ -930,7 +1037,7 @@ class ApiBridge:
             if path and os.path.exists(path):
                 return str(path)
 
-        desktop = Path.home() / "Desktop" / "Коды км"
+        desktop = _desktop_data_dir(MARKING_CODES_DIRNAME)
         safe_order_name = "".join(
             char
             for char in str(item.get("order_name") or item.get("document_id") or "")
@@ -952,23 +1059,23 @@ class ApiBridge:
 
     def _download_order_internal(self, session: requests.Session, item: Dict[str, Any], log_prefix: str = "") -> Dict[str, Any]:
         if item.get("downloading"):
-            raise RuntimeError(f"{log_prefix}Заказ уже скачивается.")
+            raise RuntimeError(f"{log_prefix}Р—Р°РєР°Р· СѓР¶Рµ СЃРєР°С‡РёРІР°РµС‚СЃСЏ.")
 
         item["downloading"] = True
-        item["status"] = "Скачивается"
-        self._log("download", f"{log_prefix}Начинаем скачивание: {item.get('order_name')}")
+        item["status"] = "РЎРєР°С‡РёРІР°РµС‚СЃСЏ"
+        self._log("download", f"{log_prefix}РќР°С‡РёРЅР°РµРј СЃРєР°С‡РёРІР°РЅРёРµ: {item.get('order_name')}")
         try:
             paths = download_codes(session, item["document_id"], item["order_name"])
             if not paths:
-                raise RuntimeError("download_codes не вернул файлов для скачивания.")
+                raise RuntimeError("download_codes РЅРµ РІРµСЂРЅСѓР» С„Р°Р№Р»РѕРІ РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ.")
             item["pdf_path"], item["csv_path"], item["xls_path"] = paths
             filename = ", ".join([path for path in paths if path])
             if not filename:
-                raise RuntimeError("Сервис не вернул ни одного сохранённого файла.")
+                raise RuntimeError("РЎРµСЂРІРёСЃ РЅРµ РІРµСЂРЅСѓР» РЅРё РѕРґРЅРѕРіРѕ СЃРѕС…СЂР°РЅС‘РЅРЅРѕРіРѕ С„Р°Р№Р»Р°.")
             item["filename"] = filename
-            item["status"] = "Скачан"
+            item["status"] = "РЎРєР°С‡Р°РЅ"
             self._sync_history_from_download_item(item)
-            self._log("download", f"{log_prefix}Успешно скачан: {filename}")
+            self._log("download", f"{log_prefix}РЈСЃРїРµС€РЅРѕ СЃРєР°С‡Р°РЅ: {filename}")
             return self._serialize_download_item(item)
         finally:
             item["downloading"] = False
@@ -976,7 +1083,7 @@ class ApiBridge:
     def _parse_iso_date(self, value: str, *, field_name: str) -> str:
         text = str(value or "").strip()
         if not text:
-            raise RuntimeError(f"Укажите поле '{field_name}'.")
+            raise RuntimeError(f"РЈРєР°Р¶РёС‚Рµ РїРѕР»Рµ '{field_name}'.")
         for pattern in ("%Y-%m", "%Y/%m", "%m.%Y"):
             try:
                 return datetime.strptime(text, pattern).strftime("%Y-%m-01")
@@ -987,7 +1094,7 @@ class ApiBridge:
                 return datetime.strptime(text, pattern).strftime("%Y-%m-%d")
             except ValueError:
                 continue
-        raise RuntimeError(f"Поле '{field_name}' должно быть в формате YYYY-MM-DD или DD-MM-YYYY.")
+        raise RuntimeError(f"РџРѕР»Рµ '{field_name}' РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ РІ С„РѕСЂРјР°С‚Рµ YYYY-MM-DD РёР»Рё DD-MM-YYYY.")
 
     def _build_intro_patch(self, item: Dict[str, Any], production_date: str, expiration_date: str, batch_number: str) -> Dict[str, Any]:
         simpl_name = str(item.get("simpl") or "").strip()
@@ -1013,7 +1120,7 @@ class ApiBridge:
     def _build_tsd_payload(self, item: Dict[str, Any], intro_number: str, production_date: str, expiration_date: str, batch_number: str) -> tuple[List[Dict[str, str]], Dict[str, Any]]:
         gtin = str(item.get("gtin") or _extract_gtin(item.get("history_data") or {}) or "").strip()
         if not gtin:
-            raise RuntimeError(f"У заказа {item.get('order_name')} не найден GTIN.")
+            raise RuntimeError(f"РЈ Р·Р°РєР°Р·Р° {item.get('order_name')} РЅРµ РЅР°Р№РґРµРЅ GTIN.")
         if not gtin.startswith("0"):
             gtin = f"0{gtin}"
         positions_data = [{
@@ -1083,9 +1190,9 @@ class ApiBridge:
             raise last_error
 
     def _match_saved_marking_codes(self, raw_codes: Sequence[str]) -> Dict[str, Any]:
-        desktop_dir = Path.home() / "Desktop" / "Коды км"
+        desktop_dir = _desktop_data_dir(MARKING_CODES_DIRNAME)
         if not desktop_dir.exists():
-            raise RuntimeError(f"Папка с кодами маркировки не найдена: {desktop_dir}")
+            raise RuntimeError(f"РџР°РїРєР° СЃ РєРѕРґР°РјРё РјР°СЂРєРёСЂРѕРІРєРё РЅРµ РЅР°Р№РґРµРЅР°: {desktop_dir}")
 
         targets: Dict[str, str] = {}
         for raw_code in raw_codes:
@@ -1093,7 +1200,7 @@ class ApiBridge:
             if sntin:
                 targets[sntin] = str(raw_code or "").strip()
         if not targets:
-            raise RuntimeError("Не найдены коды маркировки для поиска в папке 'Коды км'.")
+            raise RuntimeError("РќРµ РЅР°Р№РґРµРЅС‹ РєРѕРґС‹ РјР°СЂРєРёСЂРѕРІРєРё РґР»СЏ РїРѕРёСЃРєР° РІ РїР°РїРєРµ 'РљРѕРґС‹ РєРј'.")
 
         matched: Dict[str, Dict[str, Any]] = {}
         scanned_files = 0
@@ -1167,12 +1274,12 @@ class ApiBridge:
             preview_text = ", ".join(unmatched_preview)
             if not matched:
                 raise RuntimeError(
-                    f"Не удалось найти полные коды в папке 'Коды км': {len(unmatched)} шт. Примеры: {preview_text}"
+                    f"РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё РїРѕР»РЅС‹Рµ РєРѕРґС‹ РІ РїР°РїРєРµ 'РљРѕРґС‹ РєРј': {len(unmatched)} С€С‚. РџСЂРёРјРµСЂС‹: {preview_text}"
                 )
             self._log(
                 "aggregation",
-                f"{action_label}: не удалось найти полные коды в папке 'Коды км' для {len(unmatched)} шт. "
-                f"Примеры: {preview_text}. Продолжаем обработку найденных кодов.",
+                f"{action_label}: РЅРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё РїРѕР»РЅС‹Рµ РєРѕРґС‹ РІ РїР°РїРєРµ 'РљРѕРґС‹ РєРј' РґР»СЏ {len(unmatched)} С€С‚. "
+                f"РџСЂРёРјРµСЂС‹: {preview_text}. РџСЂРѕРґРѕР»Р¶Р°РµРј РѕР±СЂР°Р±РѕС‚РєСѓ РЅР°Р№РґРµРЅРЅС‹С… РєРѕРґРѕРІ.",
             )
 
         return {
@@ -1205,14 +1312,27 @@ class ApiBridge:
             "tnved_code": tnved_code,
         }
 
-    def _build_aggregate_intro_document_number(self, order_name: str, group_index: int) -> str:
-        safe_order_name = " ".join(str(order_name or "").strip().split()) or "АК"
+    def _build_aggregate_intro_document_number(
+        self,
+        order_name: str,
+        group_index: int,
+        *,
+        custom_title: str = "",
+        groups_total: int = 1,
+    ) -> str:
+        safe_order_name = " ".join(str(order_name or "").strip().split()) or "РђРљ"
+        custom_label = " ".join(str(custom_title or "").strip().split())
+        if custom_label:
+            if int(groups_total or 1) > 1:
+                return f"{custom_label} [{group_index}]"[:180]
+            return custom_label[:180]
         timestamp = datetime.now().strftime("%d.%m %H:%M")
-        return f"Ввод АК {safe_order_name} [{group_index}] {timestamp}"[:180]
+        return f"Р’РІРѕРґ РђРљ {safe_order_name} [{group_index}] {timestamp}"[:180]
 
     def _get_intro_production_state(self, session: requests.Session, introduction_id: str) -> Dict[str, Any]:
         response = session.get(
             f"{str(os.getenv('BASE_URL') or 'https://mk.kontur.ru').rstrip('/')}/api/v1/codes-introduction/{introduction_id}/production",
+            headers={"Connection": "close"},
             timeout=30,
         )
         response.raise_for_status()
@@ -1222,6 +1342,7 @@ class ApiBridge:
     def _get_intro_document_state(self, session: requests.Session, introduction_id: str) -> Dict[str, Any]:
         response = session.get(
             f"{str(os.getenv('BASE_URL') or 'https://mk.kontur.ru').rstrip('/')}/api/v1/codes-introduction/{introduction_id}",
+            headers={"Connection": "close"},
             timeout=30,
         )
         response.raise_for_status()
@@ -1244,15 +1365,15 @@ class ApiBridge:
             payload = self._get_intro_production_state(session, introduction_id)
             status = str(payload.get("documentStatus") or "").strip()
             if status != last_status:
-                self._log("aggregation", f"Статус ввода в оборот {introduction_id}: {status or 'неизвестно'}")
+                self._log("aggregation", f"РЎС‚Р°С‚СѓСЃ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id}: {status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}")
                 last_status = status
             last_payload = payload
             if status in expected:
                 return payload
             time.sleep(2)
         raise RuntimeError(
-            f"Документ ввода в оборот {introduction_id} не перешёл в статусы {', '.join(sorted(expected))}. "
-            f"Последний статус: {last_status or 'неизвестно'}."
+            f"Р”РѕРєСѓРјРµРЅС‚ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id} РЅРµ РїРµСЂРµС€С‘Р» РІ СЃС‚Р°С‚СѓСЃС‹ {', '.join(sorted(expected))}. "
+            f"РџРѕСЃР»РµРґРЅРёР№ СЃС‚Р°С‚СѓСЃ: {last_status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}."
         )
 
     def _wait_for_intro_codes_check(
@@ -1268,21 +1389,25 @@ class ApiBridge:
         last_status = ""
         terminal_statuses = {"doesNotHaveErrors", "hasErrors", "checked", "noErrors"}
         while time.time() < deadline:
-            response = session.get(f"{base_url}/api/v1/codes-checking/{introduction_id}", timeout=30)
+            response = session.get(
+                f"{base_url}/api/v1/codes-checking/{introduction_id}",
+                headers={"Connection": "close"},
+                timeout=30,
+            )
             response.raise_for_status()
             payload = response.json()
             if isinstance(payload, dict):
                 last_payload = payload
             status = str(payload.get("status") or "").strip()
             if status != last_status:
-                self._log("aggregation", f"Проверка кодов {introduction_id}: {status or 'неизвестно'}")
+                self._log("aggregation", f"РџСЂРѕРІРµСЂРєР° РєРѕРґРѕРІ {introduction_id}: {status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}")
                 last_status = status
             if status in terminal_statuses:
                 return last_payload
             time.sleep(2)
         raise RuntimeError(
-            f"Проверка кодов для документа {introduction_id} не завершилась. "
-            f"Последний статус: {last_status or 'неизвестно'}."
+            f"РџСЂРѕРІРµСЂРєР° РєРѕРґРѕРІ РґР»СЏ РґРѕРєСѓРјРµРЅС‚Р° {introduction_id} РЅРµ Р·Р°РІРµСЂС€РёР»Р°СЃСЊ. "
+            f"РџРѕСЃР»РµРґРЅРёР№ СЃС‚Р°С‚СѓСЃ: {last_status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}."
         )
 
     def _wait_for_intro_final_status(
@@ -1300,19 +1425,19 @@ class ApiBridge:
             payload = self._get_intro_document_state(session, introduction_id)
             status = str(payload.get("documentStatus") or payload.get("status") or "").strip()
             if status != last_status:
-                self._log("aggregation", f"Финальный статус ввода в оборот {introduction_id}: {status or 'неизвестно'}")
+                self._log("aggregation", f"Р¤РёРЅР°Р»СЊРЅС‹Р№ СЃС‚Р°С‚СѓСЃ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id}: {status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}")
                 last_status = status
             last_payload = payload
             if status == "introduced":
                 return payload
             if status in failed_statuses:
                 raise RuntimeError(
-                    f"Документ ввода в оборот {introduction_id} завершился ошибкой: {status}."
+                    f"Р”РѕРєСѓРјРµРЅС‚ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id} Р·Р°РІРµСЂС€РёР»СЃСЏ РѕС€РёР±РєРѕР№: {status}."
                 )
             time.sleep(5)
         raise RuntimeError(
-            f"Документ ввода в оборот {introduction_id} не перешёл в финальный статус introduced. "
-            f"Последний статус: {last_status or 'неизвестно'}."
+            f"Р”РѕРєСѓРјРµРЅС‚ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id} РЅРµ РїРµСЂРµС€С‘Р» РІ С„РёРЅР°Р»СЊРЅС‹Р№ СЃС‚Р°С‚СѓСЃ introduced. "
+            f"РџРѕСЃР»РµРґРЅРёР№ СЃС‚Р°С‚СѓСЃ: {last_status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}."
         )
 
     def _fill_intro_document_from_tsd(
@@ -1325,10 +1450,10 @@ class ApiBridge:
     ) -> None:
         normalized_token = str(tsd_token or "").strip()
         if not normalized_token:
-            raise RuntimeError("Введите TSD токен для ввода в оборот АК.")
+            raise RuntimeError("Р’РІРµРґРёС‚Рµ TSD С‚РѕРєРµРЅ РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РђРљ.")
         codes_payload = [{"code": self._normalize_full_marking_code(code)} for code in full_codes if self._normalize_full_marking_code(code)]
         if not codes_payload:
-            raise RuntimeError("Не удалось подготовить полный список кодов для отправки на ТСД.")
+            raise RuntimeError("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРіРѕС‚РѕРІРёС‚СЊ РїРѕР»РЅС‹Р№ СЃРїРёСЃРѕРє РєРѕРґРѕРІ РґР»СЏ РѕС‚РїСЂР°РІРєРё РЅР° РўРЎР”.")
 
         self._set_cookie_value(session, "tsdToken", normalized_token)
         payload = {
@@ -1367,7 +1492,8 @@ class ApiBridge:
         base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
         warehouse_id = str(api_module.WAREHOUSE_ID or "").strip()
         if not warehouse_id:
-            raise RuntimeError("Не задан WAREHOUSE_ID для создания документа ввода в оборот.")
+            raise RuntimeError("РќРµ Р·Р°РґР°РЅ WAREHOUSE_ID РґР»СЏ СЃРѕР·РґР°РЅРёСЏ РґРѕРєСѓРјРµРЅС‚Р° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
+        close_headers = {"Connection": "close"}
 
         create_payload = {
             "introductionType": "introduction",
@@ -1376,15 +1502,16 @@ class ApiBridge:
         create_response = session.post(
             f"{base_url}/api/v1/codes-introduction?warehouseId={warehouse_id}",
             json=create_payload,
+            headers=close_headers,
             timeout=30,
         )
         create_response.raise_for_status()
         introduction_id = create_response.text.strip().strip('"')
         if not introduction_id:
-            raise RuntimeError(f"{order_name}: API не вернул id документа ввода в оборот.")
+            raise RuntimeError(f"{order_name}: API РЅРµ РІРµСЂРЅСѓР» id РґРѕРєСѓРјРµРЅС‚Р° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
 
         production_payload = {
-            "comment": f"Ввод по кодам из АК: {order_name}"[:500],
+            "comment": f"Р’РІРѕРґ РїРѕ РєРѕРґР°Рј РёР· РђРљ: {order_name}"[:500],
             "documentNumber": document_number,
             "producerInn": "",
             "ownerInn": "",
@@ -1405,6 +1532,7 @@ class ApiBridge:
         production_response = session.patch(
             f"{base_url}/api/v1/codes-introduction/{introduction_id}/production",
             json=production_payload,
+            headers=close_headers,
             timeout=30,
         )
         production_response.raise_for_status()
@@ -1437,7 +1565,7 @@ class ApiBridge:
                 }
             )
         if not rows:
-            raise RuntimeError("Не удалось подготовить строки для ввода в оборот по кодам из АК.")
+            raise RuntimeError("РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕРґРіРѕС‚РѕРІРёС‚СЊ СЃС‚СЂРѕРєРё РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РїРѕ РєРѕРґР°Рј РёР· РђРљ.")
         return {"rows": rows}
 
     def _upload_intro_positions_from_file(
@@ -1451,6 +1579,7 @@ class ApiBridge:
         response = session.post(
             f"{base_url}/api/v1/codes-introduction/{introduction_id}/positions",
             json=rows_payload,
+            headers={"Connection": "close"},
             timeout=60,
         )
         response.raise_for_status()
@@ -1464,15 +1593,16 @@ class ApiBridge:
         base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
         response = session.post(
             f"{base_url}/api/v1/codes-introduction/{introduction_id}/positions/autocomplete",
+            headers={"Connection": "close"},
             timeout=30,
         )
         status_code = int(response.status_code or 0)
         if status_code in {200, 201, 204}:
-            self._log("aggregation", f"Автозаполнение позиций для {introduction_id}: HTTP {status_code}")
+            self._log("aggregation", f"РђРІС‚РѕР·Р°РїРѕР»РЅРµРЅРёРµ РїРѕР·РёС†РёР№ РґР»СЏ {introduction_id}: HTTP {status_code}")
         else:
             self._log(
                 "aggregation",
-                f"Автозаполнение позиций для {introduction_id} вернуло HTTP {status_code}, продолжаем проверку документа.",
+                f"РђРІС‚РѕР·Р°РїРѕР»РЅРµРЅРёРµ РїРѕР·РёС†РёР№ РґР»СЏ {introduction_id} РІРµСЂРЅСѓР»Рѕ HTTP {status_code}, РїСЂРѕРґРѕР»Р¶Р°РµРј РїСЂРѕРІРµСЂРєСѓ РґРѕРєСѓРјРµРЅС‚Р°.",
             )
         if response.content:
             try:
@@ -1496,19 +1626,20 @@ class ApiBridge:
         base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
         generated = session.get(
             f"{base_url}/api/v1/codes-introduction/{introduction_id}/generate-multiple",
+            headers={"Connection": "close"},
             timeout=30,
         )
         generated.raise_for_status()
         items = generated.json()
         if not isinstance(items, list) or not items:
-            raise RuntimeError(f"generate-multiple вернул пустой список для документа {introduction_id}")
+            raise RuntimeError(f"generate-multiple РІРµСЂРЅСѓР» РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє РґР»СЏ РґРѕРєСѓРјРµРЅС‚Р° {introduction_id}")
 
         signed_payload: List[Dict[str, str]] = []
         for item in items:
             base64_content = str(item.get("base64Content") or "").strip()
             document_id = str(item.get("documentId") or item.get("id") or "").strip()
             if not document_id or not base64_content:
-                raise RuntimeError(f"Некорректный элемент generate-multiple для документа {introduction_id}")
+                raise RuntimeError(f"РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ СЌР»РµРјРµРЅС‚ generate-multiple РґР»СЏ РґРѕРєСѓРјРµРЅС‚Р° {introduction_id}")
             signature = sign_data(cert, base64_content, b_detached=True)
             if isinstance(signature, tuple):
                 signature = signature[0]
@@ -1522,22 +1653,180 @@ class ApiBridge:
         send_response = session.post(
             f"{base_url}/api/v1/codes-introduction/{introduction_id}/send-multiple",
             json=signed_payload,
+            headers={"Connection": "close"},
             timeout=30,
         )
         send_response.raise_for_status()
-        final_intro = self._wait_for_intro_final_status(session, introduction_id)
-        final_check = session.get(f"{base_url}/api/v1/codes-checking/{introduction_id}", timeout=30)
+        final_intro = self._get_intro_document_state(session, introduction_id)
+        final_check = session.get(
+            f"{base_url}/api/v1/codes-checking/{introduction_id}",
+            headers={"Connection": "close"},
+            timeout=30,
+        )
         final_check.raise_for_status()
         try:
             send_payload = send_response.json() if send_response.content else {}
         except Exception:
             send_payload = {"raw": send_response.text}
+        current_status = str(final_intro.get("documentStatus") or final_intro.get("status") or "").strip()
+        self._log(
+            "aggregation",
+            f"Р вЂќР С•Р С”РЎС“Р СР ВµР Р…РЎвЂљ Р Р†Р Р†Р С•Р Т‘Р В° Р Р† Р С•Р В±Р С•РЎР‚Р С•РЎвЂљ {introduction_id} Р С•РЎвЂљР С—РЎР‚Р В°Р Р†Р В»Р ВµР Р…. РўРµРєСѓС‰РёР№ СЃС‚Р°С‚СѓСЃ: {current_status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}.",
+        )
         return {
             "generated_count": len(items),
             "send_response": send_payload,
             "final_introduction": final_intro,
             "final_check": final_check.json(),
         }
+
+    def _fetch_code_states_resilient(
+        self,
+        *,
+        service: BulkAggregationService,
+        cert: Any,
+        product_group: str,
+        raw_codes: Sequence[str],
+        context_label: str,
+    ) -> List[Any]:
+        resolved_group = (
+            str(product_group or "").strip()
+            or str(getattr(service, "true_api_product_group", "") or "").strip()
+            or "wheelchairs"
+        )
+
+        last_error: Optional[Exception] = None
+        for attempt in range(1, 3):
+            try:
+                if attempt > 1:
+                    service._true_api_token = None
+                    service._true_api_token_expires_at = 0.0
+                    self._log(
+                        "aggregation",
+                        f"Повторяем запрос статусов КМ для {context_label}: pg={resolved_group}, попытка {attempt}.",
+                    )
+                states = service.fetch_code_states(
+                    cert=cert,
+                    sign_text_func=sign_text_data,
+                    product_group=resolved_group,
+                    raw_codes=raw_codes,
+                )
+                return self._retry_code_state_api_errors(
+                    service=service,
+                    cert=cert,
+                    product_group=resolved_group,
+                    states=states,
+                    context_label=context_label,
+                )
+            except requests.HTTPError as exc:
+                last_error = exc
+                status_code = getattr(exc.response, "status_code", None)
+                if status_code in {401, 403, 404} and attempt == 1:
+                    continue
+                raise
+
+        if last_error:
+            raise last_error
+        raise RuntimeError("Не удалось получить статусы кодов маркировки в Честном Знаке.")
+
+    def _retry_code_state_api_errors(
+        self,
+        *,
+        service: BulkAggregationService,
+        cert: Any,
+        product_group: str,
+        states: Sequence[Any],
+        context_label: str,
+    ) -> List[Any]:
+        error_states = [state for state in states if getattr(state, "api_error", None)]
+        if not error_states:
+            return list(states)
+
+        self._log(
+            "aggregation",
+            f"Повторно запрашиваем статусы КМ с ошибкой для {context_label}: {len(error_states)} шт.",
+        )
+        recovered_by_sntin: Dict[str, Any] = {}
+        for state in error_states:
+            raw_code = str(getattr(state, "raw_code", "") or "").strip()
+            sntin = str(getattr(state, "sntin", "") or raw_code).strip()
+            if not raw_code:
+                continue
+            try:
+                refreshed_states = service.fetch_code_states(
+                    cert=cert,
+                    sign_text_func=sign_text_data,
+                    product_group=product_group,
+                    raw_codes=[raw_code],
+                )
+            except Exception as exc:
+                self._log(
+                    "aggregation",
+                    f"Повторный запрос статуса КМ не удался для {sntin}: {exc}",
+                )
+                continue
+            refreshed_state = refreshed_states[0] if refreshed_states else None
+            if not refreshed_state or getattr(refreshed_state, "api_error", None):
+                continue
+            recovered_key = str(getattr(refreshed_state, "sntin", "") or sntin).strip()
+            if recovered_key:
+                recovered_by_sntin[recovered_key] = refreshed_state
+
+        if recovered_by_sntin:
+            self._log(
+                "aggregation",
+                f"Повторный запрос статусов КМ успешно восстановил {len(recovered_by_sntin)} шт. для {context_label}.",
+            )
+
+        merged_states: List[Any] = []
+        for state in states:
+            key = str(getattr(state, "sntin", "") or "").strip()
+            merged_states.append(recovered_by_sntin.get(key, state))
+        return merged_states
+
+    def _partition_intro_code_states(
+        self,
+        states: Sequence[Any],
+        *,
+        action_label: str,
+    ) -> Dict[str, Any]:
+        status_counts = Counter(getattr(state, "status", None) or "UNKNOWN" for state in states)
+        api_errors = [state for state in states if getattr(state, "api_error", None)]
+        if api_errors and len(api_errors) == len(states):
+            preview = ", ".join(
+                str(getattr(state, "sntin", "") or getattr(state, "raw_code", "") or "").strip()
+                for state in api_errors[:5]
+            )
+            self._log(
+                "aggregation",
+                f"{action_label}: не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}. Продолжаем обработку остальных кодов.",
+            )
+
+        target_codes: List[str] = []
+        already_introduced = 0
+        unsupported_states: List[Any] = []
+        for state in states:
+            if getattr(state, "api_error", None):
+                continue
+            normalized_status = str(getattr(state, "status", "") or "").upper()
+            if normalized_status in {"INTRODUCED", "APPLIED"}:
+                already_introduced += 1
+                continue
+            if normalized_status == "EMITTED":
+                raw_code = str(getattr(state, "raw_code", "") or "").strip()
+                if raw_code:
+                    target_codes.append(raw_code)
+                continue
+            unsupported_states.append(state)
+
+        return {
+            "status_counts": status_counts,
+            "api_errors": api_errors,
+            "target_codes": list(dict.fromkeys(target_codes)),
+            "already_introduced": already_introduced,
+            "unsupported_states": unsupported_states,
+        }
+
 
     def _introduce_aggregations_via_exact_codes(
         self,
@@ -1559,8 +1848,8 @@ class ApiBridge:
         )
         if not ready_aggregates:
             if normalized_filter:
-                raise RuntimeError(f"Не найдены АК readyForSend по фильтру '{normalized_filter}'.")
-            raise RuntimeError("Не найдены АК readyForSend для ввода в оборот.")
+                raise RuntimeError(f"РќРµ РЅР°Р№РґРµРЅС‹ РђРљ readyForSend РїРѕ С„РёР»СЊС‚СЂСѓ '{normalized_filter}'.")
+            raise RuntimeError("РќРµ РЅР°Р№РґРµРЅС‹ РђРљ readyForSend РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
 
         aggregate_codes: List[str] = []
         skipped_nested: List[str] = []
@@ -1571,39 +1860,48 @@ class ApiBridge:
                 skipped_nested.append(aggregate.aggregate_code or aggregate.document_id)
                 self._log(
                     "aggregation",
-                    f"Пропускаем АК {aggregate.aggregate_code or aggregate.document_id}: обнаружены вложенные АК ({len(reaggregation_codes)}).",
+                    f"РџСЂРѕРїСѓСЃРєР°РµРј РђРљ {aggregate.aggregate_code or aggregate.document_id}: РѕР±РЅР°СЂСѓР¶РµРЅС‹ РІР»РѕР¶РµРЅРЅС‹Рµ РђРљ ({len(reaggregation_codes)}).",
                 )
                 continue
             aggregate_codes.extend(raw_codes)
 
         unique_codes = list(dict.fromkeys(code for code in aggregate_codes if str(code or "").strip()))
         if not unique_codes:
-            raise RuntimeError("В найденных АК нет кодов маркировки для ввода в оборот.")
+            raise RuntimeError("Р’ РЅР°Р№РґРµРЅРЅС‹С… РђРљ РЅРµС‚ РєРѕРґРѕРІ РјР°СЂРєРёСЂРѕРІРєРё РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
 
         self._log(
             "aggregation",
-            f"Найдены КМ в readyForSend АК: {len(unique_codes)} шт., начинаем проверку статусов в Честном Знаке.",
+            f"РќР°Р№РґРµРЅС‹ РљРњ РІ readyForSend РђРљ: {len(unique_codes)} С€С‚., РЅР°С‡РёРЅР°РµРј РїСЂРѕРІРµСЂРєСѓ СЃС‚Р°С‚СѓСЃРѕРІ РІ Р§РµСЃС‚РЅРѕРј Р—РЅР°РєРµ.",
         )
         true_product_group = service._resolve_true_product_group(product_group)
-        states = service.fetch_code_states(
+        states = self._fetch_code_states_resilient(
+            service=service,
             cert=cert,
-            sign_text_func=sign_text_data,
             product_group=true_product_group,
             raw_codes=unique_codes,
+            context_label="РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РђРљ",
         )
         status_counts = Counter(state.status or "UNKNOWN" for state in states)
         api_errors = [state for state in states if state.api_error]
-        if api_errors:
+        if api_errors and len(api_errors) == len(states):
             preview = ", ".join(state.sntin for state in api_errors[:5])
             raise RuntimeError(
-                f"Не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. "
-                f"Примеры: {preview}"
+                f"РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃС‹ С‡Р°СЃС‚Рё РєРѕРґРѕРІ РІ Р§РµСЃС‚РЅРѕРј Р—РЅР°РєРµ: {len(api_errors)} С€С‚. "
+                f"РџСЂРёРјРµСЂС‹: {preview}"
             )
 
         target_codes: List[str] = []
+        if api_errors:
+            preview = ", ".join(state.sntin for state in api_errors[:5])
+            self._log(
+                "aggregation",
+                f"Ввод в оборот АК: не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}. Продолжаем обработку остальных кодов.",
+            )
         already_introduced = 0
         unsupported_states: List[CodeState] = []
         for state in states:
+            if state.api_error:
+                continue
             normalized_status = str(state.status or "").upper()
             if normalized_status in {"INTRODUCED", "APPLIED"}:
                 already_introduced += 1
@@ -1614,7 +1912,7 @@ class ApiBridge:
             unsupported_states.append(state)
         self._log(
             "aggregation",
-            f"Статусы КМ из АК: {_format_status_counts(status_counts)}. Уже введено в оборот: {already_introduced}.",
+            f"РЎС‚Р°С‚СѓСЃС‹ РљРњ РёР· РђРљ: {_format_status_counts(status_counts)}. РЈР¶Рµ РІРІРµРґРµРЅРѕ РІ РѕР±РѕСЂРѕС‚: {already_introduced}.",
         )
         if unsupported_states:
             preview = ", ".join(
@@ -1622,27 +1920,27 @@ class ApiBridge:
                 for state in unsupported_states[:5]
             )
             raise RuntimeError(
-                f"Часть кодов из АК нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. "
-                f"Примеры: {preview}"
+                f"Р§Р°СЃС‚СЊ РєРѕРґРѕРІ РёР· РђРљ РЅРµР»СЊР·СЏ РІРІРµСЃС‚Рё РІ РѕР±РѕСЂРѕС‚ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё: {len(unsupported_states)} С€С‚. "
+                f"РџСЂРёРјРµСЂС‹: {preview}"
             )
         if not target_codes:
-            raise RuntimeError("Все коды из найденных АК уже введены в оборот.")
+            raise RuntimeError("Р’СЃРµ РєРѕРґС‹ РёР· РЅР°Р№РґРµРЅРЅС‹С… РђРљ СѓР¶Рµ РІРІРµРґРµРЅС‹ РІ РѕР±РѕСЂРѕС‚.")
 
         match_result = self._match_saved_marking_codes(target_codes)
         prepared_match = self._prepare_marking_match_result(
             match_result,
-            action_label="Ввод в оборот АК",
+            action_label="Р’РІРѕРґ РІ РѕР±РѕСЂРѕС‚ РђРљ",
         )
         groups = prepared_match["groups"]
         introduced_results: List[Dict[str, Any]] = []
         total_sent_codes = 0
         self._log(
             "aggregation",
-            f"Полные коды найдены в папке 'Коды км': {prepared_match['matched_count']} шт., "
-            f"не найдено: {prepared_match['unmatched_count']} шт., файлов просмотрено: {prepared_match['scanned_files']}.",
+            f"РџРѕР»РЅС‹Рµ РєРѕРґС‹ РЅР°Р№РґРµРЅС‹ РІ РїР°РїРєРµ 'РљРѕРґС‹ РєРј': {prepared_match['matched_count']} С€С‚., "
+            f"РЅРµ РЅР°Р№РґРµРЅРѕ: {prepared_match['unmatched_count']} С€С‚., С„Р°Р№Р»РѕРІ РїСЂРѕСЃРјРѕС‚СЂРµРЅРѕ: {prepared_match['scanned_files']}.",
         )
         for index, group in enumerate(groups, start=1):
-            source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
+            source_order_name = str(group.get("order_name") or "").strip() or f"Р“СЂСѓРїРїР° {index}"
             codes = [row["full_code"] for row in group.get("codes", [])]
             if not codes:
                 continue
@@ -1666,7 +1964,7 @@ class ApiBridge:
             }
             self._log(
                 "aggregation",
-                f"Создаём ввод в оборот по АК: заказ '{source_order_name}', кодов {len(codes)}, GTIN {metadata['gtin']}.",
+                f"РЎРѕР·РґР°С‘Рј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚ РїРѕ РђРљ: Р·Р°РєР°Р· '{source_order_name}', РєРѕРґРѕРІ {len(codes)}, GTIN {metadata['gtin']}.",
             )
             ok, create_result = make_task_on_tsd(
                 session=session,
@@ -1675,13 +1973,13 @@ class ApiBridge:
                 production_patch=production_patch,
             )
             if not ok:
-                error_text = "; ".join(create_result.get("errors", [])) or "Не удалось создать документ ввода в оборот"
+                error_text = "; ".join(create_result.get("errors", [])) or "РќРµ СѓРґР°Р»РѕСЃСЊ СЃРѕР·РґР°С‚СЊ РґРѕРєСѓРјРµРЅС‚ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚"
                 raise RuntimeError(f"{source_order_name}: {error_text}")
 
             introduction_id = str(create_result.get("introduction_id") or "").strip()
             if not introduction_id:
-                raise RuntimeError(f"{source_order_name}: API не вернул id документа ввода в оборот.")
-            self._log("aggregation", f"Документ ввода в оборот создан: {introduction_id}. Отправляем точные коды через ТСД.")
+                raise RuntimeError(f"{source_order_name}: API РЅРµ РІРµСЂРЅСѓР» id РґРѕРєСѓРјРµРЅС‚Р° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
+            self._log("aggregation", f"Р”РѕРєСѓРјРµРЅС‚ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ СЃРѕР·РґР°РЅ: {introduction_id}. РћС‚РїСЂР°РІР»СЏРµРј С‚РѕС‡РЅС‹Рµ РєРѕРґС‹ С‡РµСЂРµР· РўРЎР”.")
             self._fill_intro_document_from_tsd(
                 session,
                 introduction_id,
@@ -1697,13 +1995,13 @@ class ApiBridge:
                 if positions:
                     broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
                 raise RuntimeError(
-                    f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
+                    f"{source_order_name}: РїСЂРѕРІРµСЂРєР° РєРѕРґРѕРІ РІРµСЂРЅСѓР»Р° РѕС€РёР±РєРё ({broken_count} С€С‚.), РґРѕРєСѓРјРµРЅС‚ РЅРµ РѕС‚РїСЂР°РІР»РµРЅ."
                 )
             document_state = self._get_intro_document_state(session, introduction_id)
             document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
             self._log(
                 "aggregation",
-                f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+                f"РЎС‚Р°С‚СѓСЃ РґРѕРєСѓРјРµРЅС‚Р° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id} РїРѕСЃР»Рµ РїСЂРѕРІРµСЂРєРё РєРѕРґРѕРІ: {document_status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}",
             )
             if document_status != "introduced":
                 send_result = self._sign_and_send_intro_document(
@@ -1732,7 +2030,7 @@ class ApiBridge:
             total_sent_codes += len(codes)
             self._log(
                 "aggregation",
-                f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+                f"Р’РІРѕРґ РІ РѕР±РѕСЂРѕС‚ РѕС‚РїСЂР°РІР»РµРЅ: {source_order_name} ({len(codes)} РєРѕРґРѕРІ, РґРѕРєСѓРјРµРЅС‚ {introduction_id}).",
             )
 
         return {
@@ -1743,6 +2041,8 @@ class ApiBridge:
             "missing_full_codes": prepared_match["unmatched_count"],
             "missing_full_codes_preview": prepared_match["unmatched_preview"],
             "already_introduced_codes": already_introduced,
+            "skipped_api_error_codes": len(api_errors),
+            "skipped_api_error_preview": [state.sntin for state in api_errors[:5]],
             "introduced_codes": total_sent_codes,
             "groups": introduced_results,
             "status_counts": dict(status_counts),
@@ -1768,8 +2068,8 @@ class ApiBridge:
         )
         if not ready_aggregates:
             if normalized_filter:
-                raise RuntimeError(f"Не найдены АК readyForSend по фильтру '{normalized_filter}'.")
-            raise RuntimeError("Не найдены АК readyForSend для ввода в оборот.")
+                raise RuntimeError(f"РќРµ РЅР°Р№РґРµРЅС‹ РђРљ readyForSend РїРѕ С„РёР»СЊС‚СЂСѓ '{normalized_filter}'.")
+            raise RuntimeError("РќРµ РЅР°Р№РґРµРЅС‹ РђРљ readyForSend РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
 
         aggregate_codes: List[str] = []
         skipped_nested: List[str] = []
@@ -1780,39 +2080,48 @@ class ApiBridge:
                 skipped_nested.append(aggregate.aggregate_code or aggregate.document_id)
                 self._log(
                     "aggregation",
-                    f"Пропускаем АК {aggregate.aggregate_code or aggregate.document_id}: обнаружены вложенные АК ({len(reaggregation_codes)}).",
+                    f"РџСЂРѕРїСѓСЃРєР°РµРј РђРљ {aggregate.aggregate_code or aggregate.document_id}: РѕР±РЅР°СЂСѓР¶РµРЅС‹ РІР»РѕР¶РµРЅРЅС‹Рµ РђРљ ({len(reaggregation_codes)}).",
                 )
                 continue
             aggregate_codes.extend(raw_codes)
 
         unique_codes = list(dict.fromkeys(code for code in aggregate_codes if str(code or "").strip()))
         if not unique_codes:
-            raise RuntimeError("В найденных АК нет кодов маркировки для ввода в оборот.")
+            raise RuntimeError("Р’ РЅР°Р№РґРµРЅРЅС‹С… РђРљ РЅРµС‚ РєРѕРґРѕРІ РјР°СЂРєРёСЂРѕРІРєРё РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
 
         self._log(
             "aggregation",
-            f"Найдены КМ в readyForSend АК: {len(unique_codes)} шт., начинаем проверку статусов в Честном Знаке.",
+            f"РќР°Р№РґРµРЅС‹ РљРњ РІ readyForSend РђРљ: {len(unique_codes)} С€С‚., РЅР°С‡РёРЅР°РµРј РїСЂРѕРІРµСЂРєСѓ СЃС‚Р°С‚СѓСЃРѕРІ РІ Р§РµСЃС‚РЅРѕРј Р—РЅР°РєРµ.",
         )
         true_product_group = service._resolve_true_product_group(product_group)
-        states = service.fetch_code_states(
+        states = self._fetch_code_states_resilient(
+            service=service,
             cert=cert,
-            sign_text_func=sign_text_data,
             product_group=true_product_group,
             raw_codes=unique_codes,
+            context_label="РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РђРљ РёР· С„Р°Р№Р»Р°",
         )
         status_counts = Counter(state.status or "UNKNOWN" for state in states)
         api_errors = [state for state in states if state.api_error]
-        if api_errors:
+        if api_errors and len(api_errors) == len(states):
             preview = ", ".join(state.sntin for state in api_errors[:5])
             raise RuntimeError(
-                f"Не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. "
-                f"Примеры: {preview}"
+                f"РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃС‹ С‡Р°СЃС‚Рё РєРѕРґРѕРІ РІ Р§РµСЃС‚РЅРѕРј Р—РЅР°РєРµ: {len(api_errors)} С€С‚. "
+                f"РџСЂРёРјРµСЂС‹: {preview}"
             )
 
         target_codes: List[str] = []
+        if api_errors:
+            preview = ", ".join(state.sntin for state in api_errors[:5])
+            self._log(
+                "aggregation",
+                f"Ввод в оборот АК из файла: не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}. Продолжаем обработку остальных кодов.",
+            )
         already_introduced = 0
         unsupported_states: List[CodeState] = []
         for state in states:
+            if state.api_error:
+                continue
             normalized_status = str(state.status or "").upper()
             if normalized_status in {"INTRODUCED", "APPLIED"}:
                 already_introduced += 1
@@ -1824,7 +2133,7 @@ class ApiBridge:
 
         self._log(
             "aggregation",
-            f"Статусы КМ из АК: {_format_status_counts(status_counts)}. Уже введено в оборот: {already_introduced}.",
+            f"РЎС‚Р°С‚СѓСЃС‹ РљРњ РёР· РђРљ: {_format_status_counts(status_counts)}. РЈР¶Рµ РІРІРµРґРµРЅРѕ РІ РѕР±РѕСЂРѕС‚: {already_introduced}.",
         )
         if unsupported_states:
             preview = ", ".join(
@@ -1832,27 +2141,27 @@ class ApiBridge:
                 for state in unsupported_states[:5]
             )
             raise RuntimeError(
-                f"Часть кодов из АК нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. "
-                f"Примеры: {preview}"
+                f"Р§Р°СЃС‚СЊ РєРѕРґРѕРІ РёР· РђРљ РЅРµР»СЊР·СЏ РІРІРµСЃС‚Рё РІ РѕР±РѕСЂРѕС‚ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё: {len(unsupported_states)} С€С‚. "
+                f"РџСЂРёРјРµСЂС‹: {preview}"
             )
         if not target_codes:
-            raise RuntimeError("Все коды из найденных АК уже введены в оборот.")
+            raise RuntimeError("Р’СЃРµ РєРѕРґС‹ РёР· РЅР°Р№РґРµРЅРЅС‹С… РђРљ СѓР¶Рµ РІРІРµРґРµРЅС‹ РІ РѕР±РѕСЂРѕС‚.")
 
         match_result = self._match_saved_marking_codes(target_codes)
         prepared_match = self._prepare_marking_match_result(
             match_result,
-            action_label="Ввод в оборот АК",
+            action_label="Р’РІРѕРґ РІ РѕР±РѕСЂРѕС‚ РђРљ",
         )
         groups = prepared_match["groups"]
         introduced_results: List[Dict[str, Any]] = []
         total_sent_codes = 0
         self._log(
             "aggregation",
-            f"Полные коды найдены в папке 'Коды км': {prepared_match['matched_count']} шт., "
-            f"не найдено: {prepared_match['unmatched_count']} шт., файлов просмотрено: {prepared_match['scanned_files']}.",
+            f"РџРѕР»РЅС‹Рµ РєРѕРґС‹ РЅР°Р№РґРµРЅС‹ РІ РїР°РїРєРµ 'РљРѕРґС‹ РєРј': {prepared_match['matched_count']} С€С‚., "
+            f"РЅРµ РЅР°Р№РґРµРЅРѕ: {prepared_match['unmatched_count']} С€С‚., С„Р°Р№Р»РѕРІ РїСЂРѕСЃРјРѕС‚СЂРµРЅРѕ: {prepared_match['scanned_files']}.",
         )
         for index, group in enumerate(groups, start=1):
-            source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
+            source_order_name = str(group.get("order_name") or "").strip() or f"Р“СЂСѓРїРїР° {index}"
             codes = [row["full_code"] for row in group.get("codes", []) if str(row.get("full_code") or "").strip()]
             if not codes:
                 continue
@@ -1864,7 +2173,7 @@ class ApiBridge:
             document_number = self._build_aggregate_intro_document_number(source_order_name, index)
             self._log(
                 "aggregation",
-                f"Создаём ввод в оборот по АК: заказ '{source_order_name}', кодов {len(codes)}, GTIN {metadata['gtin']}.",
+                f"РЎРѕР·РґР°С‘Рј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚ РїРѕ РђРљ: Р·Р°РєР°Р· '{source_order_name}', РєРѕРґРѕРІ {len(codes)}, GTIN {metadata['gtin']}.",
             )
 
             introduction_id = self._create_exact_intro_file_document(
@@ -1878,7 +2187,7 @@ class ApiBridge:
             )
             self._log(
                 "aggregation",
-                f"Документ ввода в оборот создан: {introduction_id}. Загружаем точные коды как файл.",
+                f"Р”РѕРєСѓРјРµРЅС‚ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ СЃРѕР·РґР°РЅ: {introduction_id}. Р—Р°РіСЂСѓР¶Р°РµРј С‚РѕС‡РЅС‹Рµ РєРѕРґС‹ РєР°Рє С„Р°Р№Р».",
             )
 
             rows_payload = self._build_intro_upload_rows(
@@ -1901,14 +2210,14 @@ class ApiBridge:
                 if positions:
                     broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
                 raise RuntimeError(
-                    f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
+                    f"{source_order_name}: РїСЂРѕРІРµСЂРєР° РєРѕРґРѕРІ РІРµСЂРЅСѓР»Р° РѕС€РёР±РєРё ({broken_count} С€С‚.), РґРѕРєСѓРјРµРЅС‚ РЅРµ РѕС‚РїСЂР°РІР»РµРЅ."
                 )
 
             document_state = self._get_intro_document_state(session, introduction_id)
             document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
             self._log(
                 "aggregation",
-                f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+                f"РЎС‚Р°С‚СѓСЃ РґРѕРєСѓРјРµРЅС‚Р° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id} РїРѕСЃР»Рµ РїСЂРѕРІРµСЂРєРё РєРѕРґРѕРІ: {document_status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}",
             )
             if document_status != "introduced":
                 send_result = self._sign_and_send_intro_document(
@@ -1937,7 +2246,7 @@ class ApiBridge:
             total_sent_codes += len(codes)
             self._log(
                 "aggregation",
-                f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+                f"Р’РІРѕРґ РІ РѕР±РѕСЂРѕС‚ РѕС‚РїСЂР°РІР»РµРЅ: {source_order_name} ({len(codes)} РєРѕРґРѕРІ, РґРѕРєСѓРјРµРЅС‚ {introduction_id}).",
             )
 
         return {
@@ -1948,6 +2257,8 @@ class ApiBridge:
             "missing_full_codes": prepared_match["unmatched_count"],
             "missing_full_codes_preview": prepared_match["unmatched_preview"],
             "already_introduced_codes": already_introduced,
+            "skipped_api_error_codes": len(api_errors),
+            "skipped_api_error_preview": [state.sntin for state in api_errors[:5]],
             "introduced_codes": total_sent_codes,
             "groups": introduced_results,
             "status_counts": dict(status_counts),
@@ -1972,7 +2283,7 @@ class ApiBridge:
         response.raise_for_status()
         data = response.json()
         if not isinstance(data, list):
-            raise RuntimeError("Сервис создания агрегационных кодов вернул неожиданный ответ.")
+            raise RuntimeError("РЎРµСЂРІРёСЃ СЃРѕР·РґР°РЅРёСЏ Р°РіСЂРµРіР°С†РёРѕРЅРЅС‹С… РєРѕРґРѕРІ РІРµСЂРЅСѓР» РЅРµРѕР¶РёРґР°РЅРЅС‹Р№ РѕС‚РІРµС‚.")
         return data
 
     def _download_aggregate_codes(
@@ -1993,7 +2304,7 @@ class ApiBridge:
         normalized_target = str(target_value or "").strip().lower()
 
         if mode == "comment" and not normalized_target:
-            raise RuntimeError("Введите название для поиска агрегационных кодов.")
+            raise RuntimeError("Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ РґР»СЏ РїРѕРёСЃРєР° Р°РіСЂРµРіР°С†РёРѕРЅРЅС‹С… РєРѕРґРѕРІ.")
 
         while True:
             params = {
@@ -2056,7 +2367,7 @@ class ApiBridge:
         return all_codes
 
     def _save_simple_aggregation_csv(self, codes: Sequence[Dict[str, Any]], filename: str) -> str:
-        desktop = Path.home() / "Desktop" / "Агрег коды км"
+        desktop = _desktop_data_dir(AGGREGATION_CODES_DIRNAME)
         safe_name = "".join(char for char in str(filename) if char.isalnum() or char in " -_().").strip()
         if not safe_name:
             safe_name = f"aggregation_{int(time.time())}.csv"
@@ -2099,9 +2410,9 @@ class ApiBridge:
             return
         if skipped_not_ready == processed and not any((skipped_empty, skipped_unsupported, skipped_due_to_status)):
             raise RuntimeError(
-                f"{action_label}: Контур не разрешает обработать выбранные АК в их текущем состоянии. "
-                "Если АК уже был зарегистрирован в ГИС МТ, повторная отправка того же состава не создаёт пакет "
-                "на регистрацию: для такого случая нужна отдельная переагрегация только по изменяемым кодам."
+                f"{action_label}: РљРѕРЅС‚СѓСЂ РЅРµ СЂР°Р·СЂРµС€Р°РµС‚ РѕР±СЂР°Р±РѕС‚Р°С‚СЊ РІС‹Р±СЂР°РЅРЅС‹Рµ РђРљ РІ РёС… С‚РµРєСѓС‰РµРј СЃРѕСЃС‚РѕСЏРЅРёРё. "
+                "Р•СЃР»Рё РђРљ СѓР¶Рµ Р±С‹Р» Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°РЅ РІ Р“РРЎ РњРў, РїРѕРІС‚РѕСЂРЅР°СЏ РѕС‚РїСЂР°РІРєР° С‚РѕРіРѕ Р¶Рµ СЃРѕСЃС‚Р°РІР° РЅРµ СЃРѕР·РґР°С‘С‚ РїР°РєРµС‚ "
+                "РЅР° СЂРµРіРёСЃС‚СЂР°С†РёСЋ: РґР»СЏ С‚Р°РєРѕРіРѕ СЃР»СѓС‡Р°СЏ РЅСѓР¶РЅР° РѕС‚РґРµР»СЊРЅР°СЏ РїРµСЂРµР°РіСЂРµРіР°С†РёСЏ С‚РѕР»СЊРєРѕ РїРѕ РёР·РјРµРЅСЏРµРјС‹Рј РєРѕРґР°Рј."
             )
 
     def get_bootstrap(self) -> Dict[str, Any]:
@@ -2143,11 +2454,11 @@ class ApiBridge:
     ) -> Dict[str, Any]:
         try:
             if not str(name).strip():
-                raise RuntimeError("Укажите название товара.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅР°Р·РІР°РЅРёРµ С‚РѕРІР°СЂР°.")
             if not str(size).strip():
-                raise RuntimeError("Укажите размер.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ СЂР°Р·РјРµСЂ.")
             if not str(units_per_pack).strip():
-                raise RuntimeError("Укажите количество единиц в упаковке.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РєРѕР»РёС‡РµСЃС‚РІРѕ РµРґРёРЅРёС† РІ СѓРїР°РєРѕРІРєРµ.")
             result = self._build_lookup_payload(
                 name=str(name).strip(),
                 size=str(size).strip(),
@@ -2155,19 +2466,19 @@ class ApiBridge:
                 color=str(color).strip(),
                 venchik=str(venchik).strip(),
             )
-            self._log("orders", f"GTIN найден для '{name}': {result.get('gtin')}")
+            self._log("orders", f"GTIN РЅР°Р№РґРµРЅ РґР»СЏ '{name}': {result.get('gtin')}")
             return result
         except Exception as exc:
-            self._log("orders", f"Ошибка поиска GTIN: {exc}")
+            self._log("orders", f"РћС€РёР±РєР° РїРѕРёСЃРєР° GTIN: {exc}")
             return {"error": str(exc)}
 
     def lookup_gtin_by_code(self, gtin_value: str) -> Dict[str, Any]:
         try:
             result = self._lookup_by_gtin(str(gtin_value or "").strip())
-            self._log("orders", f"Поиск по GTIN выполнен: {result.get('gtin')}")
+            self._log("orders", f"РџРѕРёСЃРє РїРѕ GTIN РІС‹РїРѕР»РЅРµРЅ: {result.get('gtin')}")
             return result
         except Exception as exc:
-            self._log("orders", f"Ошибка поиска по GTIN: {exc}")
+            self._log("orders", f"РћС€РёР±РєР° РїРѕРёСЃРєР° РїРѕ GTIN: {exc}")
             return {"error": str(exc)}
 
     def get_history(self, limit: int = 50) -> List[Dict[str, Any]] | Dict[str, Any]:
@@ -2215,8 +2526,8 @@ class ApiBridge:
         try:
             normalized = str(channel or "").strip()
             if normalized not in LOG_CHANNELS:
-                raise RuntimeError(f"Неизвестный канал логов: {normalized}")
-            return list(_get_runtime().logs[normalized])
+                raise RuntimeError(f"РќРµРёР·РІРµСЃС‚РЅС‹Р№ РєР°РЅР°Р» Р»РѕРіРѕРІ: {normalized}")
+            return [_normalize_ui_text(line) for line in _get_runtime().logs[normalized]]
         except Exception as exc:
             return {"error": str(exc)}
 
@@ -2224,7 +2535,7 @@ class ApiBridge:
         try:
             normalized = str(channel or "").strip()
             if normalized not in LOG_CHANNELS:
-                raise RuntimeError(f"Неизвестный канал логов: {normalized}")
+                raise RuntimeError(f"РќРµРёР·РІРµСЃС‚РЅС‹Р№ РєР°РЅР°Р» Р»РѕРіРѕРІ: {normalized}")
             _get_runtime().logs[normalized] = []
             return {"success": True}
         except Exception as exc:
@@ -2263,14 +2574,14 @@ class ApiBridge:
             item = self._prepare_order_item(payload)
             runtime = _get_runtime()
             runtime.order_queue.append(item)
-            self._log("orders", f"Добавлено в очередь: {item['order_name']} ({item['gtin']})")
+            self._log("orders", f"Р”РѕР±Р°РІР»РµРЅРѕ РІ РѕС‡РµСЂРµРґСЊ: {item['order_name']} ({item['gtin']})")
             return {
                 "success": True,
                 "item": self._serialize_queue_item(item),
                 "queue": [self._serialize_queue_item(queue_item) for queue_item in runtime.order_queue],
             }
         except Exception as exc:
-            self._log("orders", f"Ошибка добавления в очередь: {exc}")
+            self._log("orders", f"РћС€РёР±РєР° РґРѕР±Р°РІР»РµРЅРёСЏ РІ РѕС‡РµСЂРµРґСЊ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def remove_order_item(self, uid: str) -> Dict[str, Any]:
@@ -2287,7 +2598,7 @@ class ApiBridge:
     def clear_order_queue(self) -> Dict[str, Any]:
         try:
             _get_runtime().order_queue = []
-            self._log("orders", "Очередь заказов очищена")
+            self._log("orders", "РћС‡РµСЂРµРґСЊ Р·Р°РєР°Р·РѕРІ РѕС‡РёС‰РµРЅР°")
             return {"success": True, "queue": []}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -2296,12 +2607,12 @@ class ApiBridge:
         try:
             normalized_id = str(document_id or "").strip()
             if not normalized_id:
-                raise RuntimeError("Выберите заказ для удаления.")
+                raise RuntimeError("Р’С‹Р±РµСЂРёС‚Рµ Р·Р°РєР°Р· РґР»СЏ СѓРґР°Р»РµРЅРёСЏ.")
 
             runtime = _get_runtime()
             order_data = self._find_order_data(normalized_id)
             if not order_data:
-                raise RuntimeError("Заказ не найден в истории.")
+                raise RuntimeError("Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ РІ РёСЃС‚РѕСЂРёРё.")
 
             deleted_orders = [item for item in self._load_deleted_orders() if str(item.get("document_id") or "").strip() != normalized_id]
             archived_record = dict(order_data)
@@ -2336,21 +2647,21 @@ class ApiBridge:
             ]
             runtime.document_status_cache.pop(normalized_id, None)
             runtime.code_status_cache.pop(normalized_id, None)
-            self._log("orders", f"Заказ удален в архив: {order_data.get('order_name') or normalized_id}")
-            self._log("download", f"Заказ удален из активных списков: {order_data.get('order_name') or normalized_id}")
-            self._log("intro", f"Заказ удален из списка ввода в оборот: {order_data.get('order_name') or normalized_id}")
-            self._log("tsd", f"Заказ удален из списка ТСД: {order_data.get('order_name') or normalized_id}")
-            self._log("labels", f"Заказ удален из печати этикеток: {order_data.get('order_name') or normalized_id}")
+            self._log("orders", f"Р—Р°РєР°Р· СѓРґР°Р»РµРЅ РІ Р°СЂС…РёРІ: {order_data.get('order_name') or normalized_id}")
+            self._log("download", f"Р—Р°РєР°Р· СѓРґР°Р»РµРЅ РёР· Р°РєС‚РёРІРЅС‹С… СЃРїРёСЃРєРѕРІ: {order_data.get('order_name') or normalized_id}")
+            self._log("intro", f"Р—Р°РєР°Р· СѓРґР°Р»РµРЅ РёР· СЃРїРёСЃРєР° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚: {order_data.get('order_name') or normalized_id}")
+            self._log("tsd", f"Р—Р°РєР°Р· СѓРґР°Р»РµРЅ РёР· СЃРїРёСЃРєР° РўРЎР”: {order_data.get('order_name') or normalized_id}")
+            self._log("labels", f"Р—Р°РєР°Р· СѓРґР°Р»РµРЅ РёР· РїРµС‡Р°С‚Рё СЌС‚РёРєРµС‚РѕРє: {order_data.get('order_name') or normalized_id}")
             return {"success": True}
         except Exception as exc:
-            self._log("orders", f"Ошибка удаления заказа: {exc}")
+            self._log("orders", f"РћС€РёР±РєР° СѓРґР°Р»РµРЅРёСЏ Р·Р°РєР°Р·Р°: {exc}")
             return {"success": False, "error": str(exc)}
 
     def restore_deleted_order(self, document_id: str) -> Dict[str, Any]:
         try:
             normalized_id = str(document_id or "").strip()
             if not normalized_id:
-                raise RuntimeError("Выберите удаленный заказ для восстановления.")
+                raise RuntimeError("Р’С‹Р±РµСЂРёС‚Рµ СѓРґР°Р»РµРЅРЅС‹Р№ Р·Р°РєР°Р· РґР»СЏ РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ.")
 
             deleted_orders = self._load_deleted_orders()
             restored_order = None
@@ -2362,16 +2673,16 @@ class ApiBridge:
                 remaining_orders.append(item)
 
             if not restored_order:
-                raise RuntimeError("Удаленный заказ не найден.")
+                raise RuntimeError("РЈРґР°Р»РµРЅРЅС‹Р№ Р·Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ.")
 
             restored_order.pop("deleted_at", None)
             restored_order.pop("deleted_by", None)
             _get_runtime().history_db.add_order(restored_order)
             self._save_deleted_orders(remaining_orders)
-            self._log("orders", f"Заказ восстановлен из архива: {restored_order.get('order_name') or normalized_id}")
+            self._log("orders", f"Р—Р°РєР°Р· РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅ РёР· Р°СЂС…РёРІР°: {restored_order.get('order_name') or normalized_id}")
             return {"success": True}
         except Exception as exc:
-            self._log("orders", f"Ошибка восстановления заказа: {exc}")
+            self._log("orders", f"РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ Р·Р°РєР°Р·Р°: {exc}")
             return {"success": False, "error": str(exc)}
 
     def create_order(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -2380,7 +2691,7 @@ class ApiBridge:
             result = self._submit_order_item(item)
             return {"success": True, **result}
         except Exception as exc:
-            self._log("orders", f"Ошибка создания заказа: {exc}")
+            self._log("orders", f"РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ Р·Р°РєР°Р·Р°: {exc}")
             return {"success": False, "document_id": "", "status": "", "error": str(exc)}
 
     def _submit_order_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -2395,7 +2706,7 @@ class ApiBridge:
             }
         ]
 
-        self._log("orders", f"Создаём заказ: {item['order_name']}")
+        self._log("orders", f"РЎРѕР·РґР°С‘Рј Р·Р°РєР°Р·: {item['order_name']}")
         response = codes_order(
             session,
             item["order_name"],
@@ -2406,7 +2717,7 @@ class ApiBridge:
             thumbprint=None,
         )
         if not response:
-            raise RuntimeError("API не вернуло результат по созданию заказа.")
+            raise RuntimeError("API РЅРµ РІРµСЂРЅСѓР»Рѕ СЂРµР·СѓР»СЊС‚Р°С‚ РїРѕ СЃРѕР·РґР°РЅРёСЋ Р·Р°РєР°Р·Р°.")
 
         document_id = str(response.get("documentId") or response.get("id") or "")
         status = str(response.get("status") or "unknown")
@@ -2443,15 +2754,15 @@ class ApiBridge:
             "download_item": self._serialize_download_item(download_item),
         }
         _get_runtime().session_orders.insert(0, result)
-        self._log("orders", f"Заказ создан: {item['order_name']} ({document_id})")
-        self._log("download", f"Добавлен в очередь загрузки: {item['order_name']}")
+        self._log("orders", f"Р—Р°РєР°Р· СЃРѕР·РґР°РЅ: {item['order_name']} ({document_id})")
+        self._log("download", f"Р”РѕР±Р°РІР»РµРЅ РІ РѕС‡РµСЂРµРґСЊ Р·Р°РіСЂСѓР·РєРё: {item['order_name']}")
         return result
 
     def submit_order_queue(self) -> Dict[str, Any]:
         try:
             runtime = _get_runtime()
             if not runtime.order_queue:
-                raise RuntimeError("Очередь заказов пуста.")
+                raise RuntimeError("РћС‡РµСЂРµРґСЊ Р·Р°РєР°Р·РѕРІ РїСѓСЃС‚Р°.")
 
             results = []
             errors = []
@@ -2460,7 +2771,7 @@ class ApiBridge:
                     results.append(self._submit_order_item(item))
                 except Exception as exc:
                     errors.append({"order_name": item["order_name"], "error": str(exc)})
-                    self._log("orders", f"Ошибка заказа {item['order_name']}: {exc}")
+                    self._log("orders", f"РћС€РёР±РєР° Р·Р°РєР°Р·Р° {item['order_name']}: {exc}")
 
             runtime.order_queue = []
             return {
@@ -2470,7 +2781,7 @@ class ApiBridge:
                 "state": self.get_orders_view_state(),
             }
         except Exception as exc:
-            self._log("orders", f"Ошибка выполнения очереди: {exc}")
+            self._log("orders", f"РћС€РёР±РєР° РІС‹РїРѕР»РЅРµРЅРёСЏ РѕС‡РµСЂРµРґРё: {exc}")
             return {"success": False, "error": str(exc)}
 
     def get_download_state(self) -> Dict[str, Any]:
@@ -2504,10 +2815,10 @@ class ApiBridge:
                     continue
                 _get_runtime().download_items.append(_history_order_to_download_item(order))
                 restored += 1
-            self._log("download", f"Добавлено из истории в активный список: {restored}")
+            self._log("download", f"Р”РѕР±Р°РІР»РµРЅРѕ РёР· РёСЃС‚РѕСЂРёРё РІ Р°РєС‚РёРІРЅС‹Р№ СЃРїРёСЃРѕРє: {restored}")
             return {"success": True, "restored": restored, "state": self.get_download_state()}
         except Exception as exc:
-            self._log("download", f"Ошибка восстановления заявок из истории: {exc}")
+            self._log("download", f"РћС€РёР±РєР° РІРѕСЃСЃС‚Р°РЅРѕРІР»РµРЅРёСЏ Р·Р°СЏРІРѕРє РёР· РёСЃС‚РѕСЂРёРё: {exc}")
             return {"success": False, "error": str(exc)}
 
     def sync_download_statuses(self, auto_download: bool = True) -> Dict[str, Any]:
@@ -2524,8 +2835,8 @@ class ApiBridge:
                     continue
 
                 if item.get("filename") or item.get("csv_path"):
-                    if item.get("status") != "Скачан":
-                        item["status"] = "Скачан"
+                    if item.get("status") != "РЎРєР°С‡Р°РЅ":
+                        item["status"] = "РЎРєР°С‡Р°РЅ"
                         self._sync_history_from_download_item(item)
                     updated.append(self._serialize_download_item(item, session=session))
                     continue
@@ -2533,35 +2844,35 @@ class ApiBridge:
                 raw_status = check_order_status(session, document_id)
                 item["status"] = raw_status
                 if raw_status in {"released", "received"} and auto_download:
-                    self._download_order_internal(session, item, log_prefix="Автоскачивание: ")
+                    self._download_order_internal(session, item, log_prefix="РђРІС‚РѕСЃРєР°С‡РёРІР°РЅРёРµ: ")
                 updated.append(self._serialize_download_item(item, session=session))
 
-            self._log("download", "Синхронизация статусов завершена")
+            self._log("download", "РЎРёРЅС…СЂРѕРЅРёР·Р°С†РёСЏ СЃС‚Р°С‚СѓСЃРѕРІ Р·Р°РІРµСЂС€РµРЅР°")
             return {"success": True, "items": updated, "state": self.get_download_state()}
         except Exception as exc:
-            self._log("download", f"Ошибка синхронизации статусов: {exc}")
+            self._log("download", f"РћС€РёР±РєР° СЃРёРЅС…СЂРѕРЅРёР·Р°С†РёРё СЃС‚Р°С‚СѓСЃРѕРІ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def manual_download_order(self, document_id: str) -> Dict[str, Any]:
         try:
             item = self._find_download_item(str(document_id or "").strip())
             if not item:
-                raise RuntimeError("Заказ не найден в активном списке загрузок.")
+                raise RuntimeError("Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ РІ Р°РєС‚РёРІРЅРѕРј СЃРїРёСЃРєРµ Р·Р°РіСЂСѓР·РѕРє.")
             session = self._ensure_session()
             result = self._download_order_internal(session, item)
             return {"success": True, "item": result, "state": self.get_download_state()}
         except Exception as exc:
-            self._log("download", f"Ошибка ручного скачивания: {exc}")
+            self._log("download", f"РћС€РёР±РєР° СЂСѓС‡РЅРѕРіРѕ СЃРєР°С‡РёРІР°РЅРёСЏ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def print_download_order(self, document_id: str, printer_name: str) -> Dict[str, Any]:
         try:
             item = self._find_download_item(str(document_id or "").strip())
             if not item:
-                raise RuntimeError("Заказ не найден в списке загрузок.")
+                raise RuntimeError("Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ РІ СЃРїРёСЃРєРµ Р·Р°РіСЂСѓР·РѕРє.")
             csv_path = self._resolve_order_csv_path(item)
             if not csv_path:
-                raise RuntimeError("У заказа не найден CSV-файл с кодами маркировки.")
+                raise RuntimeError("РЈ Р·Р°РєР°Р·Р° РЅРµ РЅР°Р№РґРµРЅ CSV-С„Р°Р№Р» СЃ РєРѕРґР°РјРё РјР°СЂРєРёСЂРѕРІРєРё.")
             context = build_print_context(
                 order_name=str(item.get("order_name") or ""),
                 document_id=str(item.get("document_id") or ""),
@@ -2569,7 +2880,7 @@ class ApiBridge:
                 printer_name=printer_name,
             )
             print_labels(context)
-            self._log("download", f"Печать термоэтикеток запущена: {item.get('order_name')}")
+            self._log("download", f"РџРµС‡Р°С‚СЊ С‚РµСЂРјРѕСЌС‚РёРєРµС‚РѕРє Р·Р°РїСѓС‰РµРЅР°: {item.get('order_name')}")
             return {
                 "success": True,
                 "context": {
@@ -2583,7 +2894,7 @@ class ApiBridge:
                 },
             }
         except Exception as exc:
-            self._log("download", f"Ошибка печати термоэтикеток: {exc}")
+            self._log("download", f"РћС€РёР±РєР° РїРµС‡Р°С‚Рё С‚РµСЂРјРѕСЌС‚РёРєРµС‚РѕРє: {exc}")
             return {"success": False, "error": str(exc)}
 
     def get_intro_state(self) -> Dict[str, Any]:
@@ -2620,11 +2931,11 @@ class ApiBridge:
     ) -> Dict[str, Any]:
         try:
             if not document_ids:
-                raise RuntimeError("Выберите хотя бы один заказ для ввода в оборот.")
+                raise RuntimeError("Р’С‹Р±РµСЂРёС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ Р·Р°РєР°Р· РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
             session = self._ensure_session()
             thumbprint = self._get_thumbprint()
-            prod = self._parse_iso_date(production_date, field_name="Дата производства")
-            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            prod = self._parse_iso_date(production_date, field_name="Р”Р°С‚Р° РїСЂРѕРёР·РІРѕРґСЃС‚РІР°")
+            exp = self._parse_iso_date(expiration_date, field_name="РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё")
             results = []
             errors = []
 
@@ -2636,13 +2947,13 @@ class ApiBridge:
                     if isinstance(history_order, dict):
                         item = _history_order_to_download_item(history_order)
                 if not item:
-                    errors.append({"document_id": document_id, "error": "Заказ не найден"})
+                    errors.append({"document_id": document_id, "error": "Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ"})
                     continue
                 if not is_order_ready_for_intro(item):
-                    errors.append({"document_id": document_id, "error": "Заказ ещё не готов для ввода в оборот"})
+                    errors.append({"document_id": document_id, "error": "Р—Р°РєР°Р· РµС‰С‘ РЅРµ РіРѕС‚РѕРІ РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚"})
                     continue
 
-                self._log("intro", f"Запускаем ввод в оборот: {item.get('order_name')}")
+                self._log("intro", f"Р—Р°РїСѓСЃРєР°РµРј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚: {item.get('order_name')}")
                 patch = self._build_intro_patch(item, prod, exp, str(batch_number or "").strip())
                 ok, result = put_into_circulation(
                     session=session,
@@ -2655,15 +2966,15 @@ class ApiBridge:
                 )
 
                 if ok:
-                    item["status"] = "Введен в оборот"
+                    item["status"] = "Р’РІРµРґРµРЅ РІ РѕР±РѕСЂРѕС‚"
                     self._sync_history_from_download_item(item)
-                    self._log("intro", f"Успешно: {item.get('order_name')} ({result.get('introduction_id')})")
+                    self._log("intro", f"РЈСЃРїРµС€РЅРѕ: {item.get('order_name')} ({result.get('introduction_id')})")
                     results.append({"document_id": document_id, "result": result})
                 else:
-                    item["status"] = "Ошибка ввода"
+                    item["status"] = "РћС€РёР±РєР° РІРІРѕРґР°"
                     self._sync_history_from_download_item(item)
-                    error_text = "; ".join(result.get("errors", [])) or "Неизвестная ошибка"
-                    self._log("intro", f"Ошибка: {item.get('order_name')} - {error_text}")
+                    error_text = "; ".join(result.get("errors", [])) or "РќРµРёР·РІРµСЃС‚РЅР°СЏ РѕС€РёР±РєР°"
+                    self._log("intro", f"РћС€РёР±РєР°: {item.get('order_name')} - {error_text}")
                     errors.append({"document_id": document_id, "error": error_text, "result": result})
 
             return {
@@ -2673,7 +2984,7 @@ class ApiBridge:
                 "state": self.get_intro_state(),
             }
         except Exception as exc:
-            self._log("intro", f"Ошибка ввода в оборот: {exc}")
+            self._log("intro", f"РћС€РёР±РєР° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚: {exc}")
             return {"success": False, "error": str(exc)}
 
     def get_tsd_state(self, live: bool = False) -> Dict[str, Any]:
@@ -2718,38 +3029,38 @@ class ApiBridge:
     ) -> Dict[str, Any]:
         try:
             if not document_ids:
-                raise RuntimeError("Выберите хотя бы один заказ для задания на ТСД.")
+                raise RuntimeError("Р’С‹Р±РµСЂРёС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ Р·Р°РєР°Р· РґР»СЏ Р·Р°РґР°РЅРёСЏ РЅР° РўРЎР”.")
             if not str(intro_number or "").strip():
-                raise RuntimeError("Укажите номер ввода в оборот.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅРѕРјРµСЂ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
 
-            prod = self._parse_iso_date(production_date, field_name="Дата производства")
-            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            prod = self._parse_iso_date(production_date, field_name="Р”Р°С‚Р° РїСЂРѕРёР·РІРѕРґСЃС‚РІР°")
+            exp = self._parse_iso_date(expiration_date, field_name="РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё")
             results = []
             errors = []
             normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
             total = len(normalized_ids)
 
             for index, document_id in enumerate(normalized_ids, start=1):
-                self._log("tsd", f"Прогресс создания заданий: {index - 1}/{total}")
+                self._log("tsd", f"РџСЂРѕРіСЂРµСЃСЃ СЃРѕР·РґР°РЅРёСЏ Р·Р°РґР°РЅРёР№: {index - 1}/{total}")
                 item = self._find_download_item(document_id)
                 if not item:
                     history_order = _get_runtime().history_db.get_order_by_document_id(document_id)
                     if history_order:
                         item = _history_order_to_download_item(history_order)
                     else:
-                        errors.append({"document_id": document_id, "error": "Заказ не найден"})
+                        errors.append({"document_id": document_id, "error": "Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ"})
                         continue
 
                 retry_tsd = bool(item.get("tsd_created") or (item.get("history_data") or {}).get("tsd_created"))
                 if retry_tsd:
                     item = dict(item)
-                    item["status"] = "Готов для ТСД"
+                    item["status"] = "Р“РѕС‚РѕРІ РґР»СЏ РўРЎР”"
 
                 if not retry_tsd and not is_order_ready_for_tsd(item):
-                    errors.append({"document_id": document_id, "error": "Заказ ещё не готов для задания на ТСД"})
+                    errors.append({"document_id": document_id, "error": "Р—Р°РєР°Р· РµС‰С‘ РЅРµ РіРѕС‚РѕРІ РґР»СЏ Р·Р°РґР°РЅРёСЏ РЅР° РўРЎР”"})
                     continue
 
-                action_label = "Повторно создаём задание на ТСД" if retry_tsd else "Создаём задание на ТСД"
+                action_label = "РџРѕРІС‚РѕСЂРЅРѕ СЃРѕР·РґР°С‘Рј Р·Р°РґР°РЅРёРµ РЅР° РўРЎР”" if retry_tsd else "РЎРѕР·РґР°С‘Рј Р·Р°РґР°РЅРёРµ РЅР° РўРЎР”"
                 self._log("tsd", f"{action_label}: {item.get('order_name')}")
                 try:
                     ok, result = self._create_tsd_task_with_retry(
@@ -2761,7 +3072,7 @@ class ApiBridge:
                     )
                 except Exception as exc:
                     error_text = str(exc)
-                    self._log("tsd", f"Ошибка ТСД: {item.get('order_name')} - {error_text}")
+                    self._log("tsd", f"РћС€РёР±РєР° РўРЎР”: {item.get('order_name')} - {error_text}")
                     errors.append({"document_id": document_id, "error": error_text})
                     continue
                 if ok:
@@ -2769,11 +3080,11 @@ class ApiBridge:
                     self._mark_tsd_created_local(str(item.get("document_id") or ""), introduction_id)
                     remove_order_by_document_id(_get_runtime().download_items, str(item.get("document_id") or ""))
                     _get_runtime().document_status_cache.pop(document_id, None)
-                    self._log("tsd", f"Задание на ТСД создано: {item.get('order_name')} ({introduction_id})")
+                    self._log("tsd", f"Р—Р°РґР°РЅРёРµ РЅР° РўРЎР” СЃРѕР·РґР°РЅРѕ: {item.get('order_name')} ({introduction_id})")
                     results.append({"document_id": document_id, "result": result})
                 else:
-                    error_text = "; ".join(result.get("errors", [])) or "Неизвестная ошибка"
-                    self._log("tsd", f"Ошибка ТСД: {item.get('order_name')} - {error_text}")
+                    error_text = "; ".join(result.get("errors", [])) or "РќРµРёР·РІРµСЃС‚РЅР°СЏ РѕС€РёР±РєР°"
+                    self._log("tsd", f"РћС€РёР±РєР° РўРЎР”: {item.get('order_name')} - {error_text}")
                     errors.append({"document_id": document_id, "error": error_text, "result": result})
 
             return {
@@ -2784,7 +3095,7 @@ class ApiBridge:
                 "total": total,
             }
         except Exception as exc:
-            self._log("tsd", f"Ошибка создания заданий на ТСД: {exc}")
+            self._log("tsd", f"РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ Р·Р°РґР°РЅРёР№ РЅР° РўРЎР”: {exc}")
             return {"success": False, "error": str(exc)}
 
     def _list_aggregation_documents(
@@ -2801,7 +3112,7 @@ class ApiBridge:
             if str(status).strip()
         ]
         if not warehouse_id:
-            raise RuntimeError("Не задан WAREHOUSE_ID для загрузки списка АК.")
+            raise RuntimeError("РќРµ Р·Р°РґР°РЅ WAREHOUSE_ID РґР»СЏ Р·Р°РіСЂСѓР·РєРё СЃРїРёСЃРєР° РђРљ.")
 
         rows: List[Dict[str, Any]] = []
         seen_document_ids: set[str] = set()
@@ -2830,9 +3141,9 @@ class ApiBridge:
                     self._log(
                         "aggregation",
                         (
-                            f"Контур не отдал страницу списка АК для "
+                            f"РљРѕРЅС‚СѓСЂ РЅРµ РѕС‚РґР°Р» СЃС‚СЂР°РЅРёС†Сѓ СЃРїРёСЃРєР° РђРљ РґР»СЏ "
                             f"{status_label} (offset {offset}): {exc}. "
-                            f"Показываем уже загруженные АК."
+                            f"РџРѕРєР°Р·С‹РІР°РµРј СѓР¶Рµ Р·Р°РіСЂСѓР¶РµРЅРЅС‹Рµ РђРљ."
                         ),
                     )
                     break
@@ -2842,9 +3153,9 @@ class ApiBridge:
                     self._log(
                         "aggregation",
                         (
-                            f"Контур вернул {response.status_code} при загрузке АК "
-                            f"для {status_label} "
-                            f"(offset {offset}). Показываем уже загруженные АК."
+                            f"РљРѕРЅС‚СѓСЂ РІРµСЂРЅСѓР» {response.status_code} РїСЂРё Р·Р°РіСЂСѓР·РєРµ РђРљ "
+                            f"РґР»СЏ {status_label} "
+                            f"(offset {offset}). РџРѕРєР°Р·С‹РІР°РµРј СѓР¶Рµ Р·Р°РіСЂСѓР¶РµРЅРЅС‹Рµ РђРљ."
                         ),
                     )
                     break
@@ -2855,9 +3166,9 @@ class ApiBridge:
                     self._log(
                         "aggregation",
                         (
-                            f"Контур вернул некорректный JSON для статуса "
+                            f"РљРѕРЅС‚СѓСЂ РІРµСЂРЅСѓР» РЅРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ JSON РґР»СЏ СЃС‚Р°С‚СѓСЃР° "
                             f"{status_label} (offset {offset}): {exc}. "
-                            f"Показываем уже загруженные АК."
+                            f"РџРѕРєР°Р·С‹РІР°РµРј СѓР¶Рµ Р·Р°РіСЂСѓР¶РµРЅРЅС‹Рµ РђРљ."
                         ),
                     )
                     break
@@ -2983,9 +3294,9 @@ class ApiBridge:
             normalized_comment = str(comment or "").strip()
             normalized_count = int(count or 0)
             if not normalized_comment:
-                raise RuntimeError("Введите название агрегации.")
+                raise RuntimeError("Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ Р°РіСЂРµРіР°С†РёРё.")
             if normalized_count <= 0:
-                raise RuntimeError("Количество агрегатов должно быть больше нуля.")
+                raise RuntimeError("РљРѕР»РёС‡РµСЃС‚РІРѕ Р°РіСЂРµРіР°С‚РѕРІ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р±РѕР»СЊС€Рµ РЅСѓР»СЏ.")
             batch_limit = 99
             remaining = normalized_count
             batch_counts: List[int] = []
@@ -2999,7 +3310,7 @@ class ApiBridge:
             for batch_index, batch_count in enumerate(batch_counts, start=1):
                 self._log(
                     "aggregation",
-                    f"Запрос {batch_index}/{total_batches}: создаем {batch_count} кодов агрегации",
+                    f"Р—Р°РїСЂРѕСЃ {batch_index}/{total_batches}: СЃРѕР·РґР°РµРј {batch_count} РєРѕРґРѕРІ Р°РіСЂРµРіР°С†РёРё",
                 )
                 batch_items = self._run_with_session_retry(
                     lambda session, current_count=batch_count: self._create_aggregate_codes(
@@ -3008,16 +3319,16 @@ class ApiBridge:
                         current_count,
                     ),
                     log_channel="aggregation",
-                    retry_message="Получили ошибку создания АК, обновляем cookies и повторяем",
+                    retry_message="РџРѕР»СѓС‡РёР»Рё РѕС€РёР±РєСѓ СЃРѕР·РґР°РЅРёСЏ РђРљ, РѕР±РЅРѕРІР»СЏРµРј cookies Рё РїРѕРІС‚РѕСЂСЏРµРј",
                 )
                 created_items.extend(batch_items)
                 self._log(
                     "aggregation",
-                    f"Запрос {batch_index}/{total_batches} выполнен: получено {len(batch_items)} кодов",
+                    f"Р—Р°РїСЂРѕСЃ {batch_index}/{total_batches} РІС‹РїРѕР»РЅРµРЅ: РїРѕР»СѓС‡РµРЅРѕ {len(batch_items)} РєРѕРґРѕРІ",
                 )
 
             self._invalidate_aggregation_cache()
-            self._log("aggregation", f"Создано АК: {normalized_comment}, количество {len(created_items)}")
+            self._log("aggregation", f"РЎРѕР·РґР°РЅРѕ РђРљ: {normalized_comment}, РєРѕР»РёС‡РµСЃС‚РІРѕ {len(created_items)}")
             return {
                 "success": True,
                 "created_count": len(created_items),
@@ -3025,7 +3336,7 @@ class ApiBridge:
                 "items": created_items,
             }
         except Exception as exc:
-            self._log("aggregation", f"Ошибка создания АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° СЃРѕР·РґР°РЅРёСЏ РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def download_aggregation_codes(
@@ -3039,9 +3350,9 @@ class ApiBridge:
             normalized_mode = str(mode or "").strip()
             normalized_target = str(target_value or "").strip()
             if normalized_mode not in {"comment", "count"}:
-                raise RuntimeError("Неверный режим скачивания агрегационных кодов.")
+                raise RuntimeError("РќРµРІРµСЂРЅС‹Р№ СЂРµР¶РёРј СЃРєР°С‡РёРІР°РЅРёСЏ Р°РіСЂРµРіР°С†РёРѕРЅРЅС‹С… РєРѕРґРѕРІ.")
             if normalized_mode == "count" and int(normalized_target or "0") <= 0:
-                raise RuntimeError("Введите корректное количество агрегационных кодов.")
+                raise RuntimeError("Р’РІРµРґРёС‚Рµ РєРѕСЂСЂРµРєС‚РЅРѕРµ РєРѕР»РёС‡РµСЃС‚РІРѕ Р°РіСЂРµРіР°С†РёРѕРЅРЅС‹С… РєРѕРґРѕРІ.")
             items = self._run_with_session_retry(
                 lambda session: self._download_aggregate_codes(
                     session,
@@ -3051,15 +3362,15 @@ class ApiBridge:
                     limit=limit,
                 ),
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторной загрузкой АК",
+                retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅРѕР№ Р·Р°РіСЂСѓР·РєРѕР№ РђРљ",
             )
             if normalized_mode == "count":
-                filename = f"Коды_агрегации_{normalized_target}_шт.csv"
+                filename = f"РљРѕРґС‹_Р°РіСЂРµРіР°С†РёРё_{normalized_target}_С€С‚.csv"
             else:
                 safe_comment = "".join(char for char in normalized_target if char.isalnum() or char in " -_").strip()[:80]
                 filename = f"{safe_comment}_{len(items)}.csv"
             saved_path = self._save_simple_aggregation_csv(items, filename)
-            self._log("aggregation", f"Скачано АК: {len(items)}, сохранено в {saved_path}")
+            self._log("aggregation", f"РЎРєР°С‡Р°РЅРѕ РђРљ: {len(items)}, СЃРѕС…СЂР°РЅРµРЅРѕ РІ {saved_path}")
             return {
                 "success": True,
                 "count": len(items),
@@ -3068,19 +3379,19 @@ class ApiBridge:
                 "state": self.get_aggregation_state(),
             }
         except Exception as exc:
-            self._log("aggregation", f"Ошибка скачивания АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° СЃРєР°С‡РёРІР°РЅРёСЏ РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def download_selected_aggregations(self, document_ids: Sequence[str]) -> Dict[str, Any]:
         try:
             normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
             if not normalized_ids:
-                raise RuntimeError("Выберите хотя бы один АК.")
+                raise RuntimeError("Р’С‹Р±РµСЂРёС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ РђРљ.")
 
             def _run(session: requests.Session) -> Dict[str, Any]:
                 aggregates = self._resolve_aggregate_infos_by_ids(session, normalized_ids)
                 if not aggregates:
-                    raise RuntimeError("Не удалось загрузить выбранные АК из Контур.Маркировки.")
+                    raise RuntimeError("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РІС‹Р±СЂР°РЅРЅС‹Рµ РђРљ РёР· РљРѕРЅС‚СѓСЂ.РњР°СЂРєРёСЂРѕРІРєРё.")
                 items = [
                     {
                         "aggregateCode": aggregate.aggregate_code,
@@ -3099,7 +3410,7 @@ class ApiBridge:
                     if str(aggregate.aggregate_code or "").strip()
                 ]
                 if not items:
-                    raise RuntimeError("У выбранных АК нет кодов агрегации для скачивания.")
+                    raise RuntimeError("РЈ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ РЅРµС‚ РєРѕРґРѕРІ Р°РіСЂРµРіР°С†РёРё РґР»СЏ СЃРєР°С‡РёРІР°РЅРёСЏ.")
 
                 unique_comments = sorted({str(item.get("comment") or "").strip() for item in items if str(item.get("comment") or "").strip()})
                 if len(unique_comments) == 1:
@@ -3108,7 +3419,7 @@ class ApiBridge:
                 else:
                     filename = f"selected_aggregations_{len(items)}.csv"
                 saved_path = self._save_simple_aggregation_csv(items, filename)
-                self._log("aggregation", f"Скачано выбранных АК: {len(items)}, сохранено в {saved_path}")
+                self._log("aggregation", f"РЎРєР°С‡Р°РЅРѕ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ: {len(items)}, СЃРѕС…СЂР°РЅРµРЅРѕ РІ {saved_path}")
                 return {
                     "count": len(items),
                     "items": items,
@@ -3118,11 +3429,11 @@ class ApiBridge:
             result = self._run_with_session_retry(
                 _run,
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторным скачиванием выбранных АК",
+                retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅС‹Рј СЃРєР°С‡РёРІР°РЅРёРµРј РІС‹Р±СЂР°РЅРЅС‹С… РђРљ",
             )
             return {"success": True, **result}
         except Exception as exc:
-            self._log("aggregation", f"Ошибка скачивания выбранных АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° СЃРєР°С‡РёРІР°РЅРёСЏ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def approve_selected_aggregations(
@@ -3133,13 +3444,13 @@ class ApiBridge:
         try:
             normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
             if not normalized_ids:
-                raise RuntimeError("Выберите хотя бы один АК.")
+                raise RuntimeError("Р’С‹Р±РµСЂРёС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ РђРљ.")
 
             cert = self._get_certificate()
             if not cert:
-                raise RuntimeError("Не найден сертификат для подписи.")
+                raise RuntimeError("РќРµ РЅР°Р№РґРµРЅ СЃРµСЂС‚РёС„РёРєР°С‚ РґР»СЏ РїРѕРґРїРёСЃРё.")
 
-            self._log("aggregation", f"Запускаем проведение выбранных АК: {len(normalized_ids)} шт.")
+            self._log("aggregation", f"Р—Р°РїСѓСЃРєР°РµРј РїСЂРѕРІРµРґРµРЅРёРµ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ: {len(normalized_ids)} С€С‚.")
 
             def _run(session: requests.Session) -> Dict[str, Any]:
                 service = _get_runtime().bulk_aggregation_service
@@ -3153,7 +3464,7 @@ class ApiBridge:
                     sign_base64_func=sign_data,
                     sign_text_func=sign_text_data,
                     log=lambda message: self._log("aggregation", message),
-                    progress=lambda processed, total: self._log("aggregation", f"Прогресс проведения: {processed}/{total}"),
+                    progress=lambda processed, total: self._log("aggregation", f"РџСЂРѕРіСЂРµСЃСЃ РїСЂРѕРІРµРґРµРЅРёСЏ: {processed}/{total}"),
                     confirm=lambda _title, _message: bool(allow_disaggregate),
                     summary=summary,
                 )
@@ -3162,12 +3473,12 @@ class ApiBridge:
             summary = self._run_with_session_retry(
                 _run,
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторным проведением выбранных АК",
+                retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅС‹Рј РїСЂРѕРІРµРґРµРЅРёРµРј РІС‹Р±СЂР°РЅРЅС‹С… РђРљ",
             )
-            self._raise_if_aggregation_action_noop(summary, action_label="Проведение АК")
+            self._raise_if_aggregation_action_noop(summary, action_label="РџСЂРѕРІРµРґРµРЅРёРµ РђРљ")
             return {"success": True, "summary": summary}
         except Exception as exc:
-            self._log("aggregation", f"Ошибка проведения выбранных АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° РїСЂРѕРІРµРґРµРЅРёСЏ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def introduce_selected_aggregations(
@@ -3176,67 +3487,80 @@ class ApiBridge:
         production_date: str,
         expiration_date: str,
         batch_number: str,
+        document_title: str = "",
     ) -> Dict[str, Any]:
         try:
             normalized_ids = [str(document_id or "").strip() for document_id in document_ids if str(document_id or "").strip()]
             if not normalized_ids:
-                raise RuntimeError("Выберите хотя бы один АК.")
+                raise RuntimeError("Р’С‹Р±РµСЂРёС‚Рµ С…РѕС‚СЏ Р±С‹ РѕРґРёРЅ РђРљ.")
 
             cert = self._get_certificate()
             if not cert:
-                raise RuntimeError("Не найден сертификат для подписи.")
+                raise RuntimeError("РќРµ РЅР°Р№РґРµРЅ СЃРµСЂС‚РёС„РёРєР°С‚ РґР»СЏ РїРѕРґРїРёСЃРё.")
 
             normalized_batch = str(batch_number or "").strip()
+            normalized_title = " ".join(str(document_title or "").strip().split())
             if not normalized_batch:
-                raise RuntimeError("Укажите номер партии.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅРѕРјРµСЂ РїР°СЂС‚РёРё.")
 
-            prod = self._parse_iso_date(production_date, field_name="Дата производства")
-            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
-            self._log("aggregation", f"Запускаем ввод в оборот кодов из выбранных АК: {len(normalized_ids)} шт.")
+            prod = self._parse_iso_date(production_date, field_name="Р”Р°С‚Р° РїСЂРѕРёР·РІРѕРґСЃС‚РІР°")
+            exp = self._parse_iso_date(expiration_date, field_name="РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё")
+            self._log("aggregation", f"Р—Р°РїСѓСЃРєР°РµРј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚ РєРѕРґРѕРІ РёР· РІС‹Р±СЂР°РЅРЅС‹С… РђРљ: {len(normalized_ids)} С€С‚.")
 
             def _run(session: requests.Session) -> Dict[str, Any]:
+                self._log("aggregation", f"Загружаем выбранные АК из Контура: {len(normalized_ids)} шт.")
                 aggregates = self._resolve_aggregate_infos_by_ids(session, normalized_ids)
                 if not aggregates:
-                    raise RuntimeError("Не удалось загрузить выбранные АК из Контур.Маркировки.")
+                    raise RuntimeError("РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ РІС‹Р±СЂР°РЅРЅС‹Рµ РђРљ РёР· РљРѕРЅС‚СѓСЂ.РњР°СЂРєРёСЂРѕРІРєРё.")
 
                 aggregate_codes: List[str] = []
                 skipped_nested: List[str] = []
                 service = _get_runtime().bulk_aggregation_service
+                self._log("aggregation", f"Считываем коды маркировки из выбранных АК: {len(aggregates)} шт.")
                 for aggregate in aggregates:
                     raw_codes, reaggregation_codes = service.fetch_aggregate_codes(session, aggregate.document_id)
                     if reaggregation_codes:
                         skipped_nested.append(aggregate.aggregate_code or aggregate.document_id)
                         self._log(
                             "aggregation",
-                            f"Пропускаем АК {aggregate.aggregate_code or aggregate.document_id}: обнаружены вложенные АК ({len(reaggregation_codes)}).",
+                            f"РџСЂРѕРїСѓСЃРєР°РµРј РђРљ {aggregate.aggregate_code or aggregate.document_id}: РѕР±РЅР°СЂСѓР¶РµРЅС‹ РІР»РѕР¶РµРЅРЅС‹Рµ РђРљ ({len(reaggregation_codes)}).",
                         )
                         continue
                     aggregate_codes.extend(raw_codes)
 
                 unique_codes = list(dict.fromkeys(code for code in aggregate_codes if str(code or "").strip()))
                 if not unique_codes:
-                    raise RuntimeError("В выбранных АК нет кодов маркировки для ввода в оборот.")
+                    raise RuntimeError("Р’ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ РЅРµС‚ РєРѕРґРѕРІ РјР°СЂРєРёСЂРѕРІРєРё РґР»СЏ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚.")
 
                 product_group = next((aggregate.product_group for aggregate in aggregates if aggregate.product_group), "wheelChairs")
                 true_product_group = service._resolve_true_product_group(product_group)
-                states = service.fetch_code_states(
+                states = self._fetch_code_states_resilient(
+                    service=service,
                     cert=cert,
-                    sign_text_func=sign_text_data,
                     product_group=true_product_group,
                     raw_codes=unique_codes,
+                    context_label="РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ",
                 )
                 status_counts = Counter(state.status or "UNKNOWN" for state in states)
                 api_errors = [state for state in states if state.api_error]
-                if api_errors:
+                if api_errors and len(api_errors) == len(states):
                     preview = ", ".join(state.sntin for state in api_errors[:5])
                     raise RuntimeError(
-                        f"Не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}"
+                        f"РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ СЃС‚Р°С‚СѓСЃС‹ С‡Р°СЃС‚Рё РєРѕРґРѕРІ РІ Р§РµСЃС‚РЅРѕРј Р—РЅР°РєРµ: {len(api_errors)} С€С‚. РџСЂРёРјРµСЂС‹: {preview}"
                     )
 
                 target_codes: List[str] = []
+                if api_errors:
+                    preview = ", ".join(state.sntin for state in api_errors[:5])
+                    self._log(
+                        "aggregation",
+                        f"Ввод в оборот выбранных АК: не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}. Продолжаем обработку остальных кодов.",
+                    )
                 already_introduced = 0
                 unsupported_states: List[Any] = []
                 for state in states:
+                    if state.api_error:
+                        continue
                     normalized_status = str(state.status or "").upper()
                     if normalized_status in {"INTRODUCED", "APPLIED"}:
                         already_introduced += 1
@@ -3248,32 +3572,34 @@ class ApiBridge:
 
                 self._log(
                     "aggregation",
-                    f"Статусы КМ из выбранных АК: {_format_status_counts(status_counts)}. Уже введено в оборот: {already_introduced}.",
+                    f"РЎС‚Р°С‚СѓСЃС‹ РљРњ РёР· РІС‹Р±СЂР°РЅРЅС‹С… РђРљ: {_format_status_counts(status_counts)}. РЈР¶Рµ РІРІРµРґРµРЅРѕ РІ РѕР±РѕСЂРѕС‚: {already_introduced}.",
                 )
                 if unsupported_states:
                     preview = ", ".join(f"{state.sntin} ({state.status})" for state in unsupported_states[:5])
                     raise RuntimeError(
-                        f"Часть кодов из выбранных АК нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. Примеры: {preview}"
+                        f"Р§Р°СЃС‚СЊ РєРѕРґРѕРІ РёР· РІС‹Р±СЂР°РЅРЅС‹С… РђРљ РЅРµР»СЊР·СЏ РІРІРµСЃС‚Рё РІ РѕР±РѕСЂРѕС‚ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё: {len(unsupported_states)} С€С‚. РџСЂРёРјРµСЂС‹: {preview}"
                     )
                 if not target_codes:
-                    raise RuntimeError("Все коды из выбранных АК уже введены в оборот.")
+                    raise RuntimeError("Р’СЃРµ РєРѕРґС‹ РёР· РІС‹Р±СЂР°РЅРЅС‹С… РђРљ СѓР¶Рµ РІРІРµРґРµРЅС‹ РІ РѕР±РѕСЂРѕС‚.")
 
+                self._log("aggregation", f"Ищем полные коды в папке 'Коды км': {len(target_codes)} шт.")
                 match_result = self._match_saved_marking_codes(target_codes)
                 prepared_match = self._prepare_marking_match_result(
                     match_result,
-                    action_label="Ввод в оборот выбранных АК",
+                    action_label="Р’РІРѕРґ РІ РѕР±РѕСЂРѕС‚ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ",
                 )
 
                 introduced_results: List[Dict[str, Any]] = []
                 total_sent_codes = 0
                 self._log(
                     "aggregation",
-                    f"Полные коды найдены в папке 'Коды км': {prepared_match['matched_count']} шт., "
-                    f"не найдено: {prepared_match['unmatched_count']} шт., файлов просмотрено: {prepared_match['scanned_files']}.",
+                    f"РџРѕР»РЅС‹Рµ РєРѕРґС‹ РЅР°Р№РґРµРЅС‹ РІ РїР°РїРєРµ 'РљРѕРґС‹ РєРј': {prepared_match['matched_count']} С€С‚., "
+                    f"РЅРµ РЅР°Р№РґРµРЅРѕ: {prepared_match['unmatched_count']} С€С‚., С„Р°Р№Р»РѕРІ РїСЂРѕСЃРјРѕС‚СЂРµРЅРѕ: {prepared_match['scanned_files']}.",
                 )
                 groups = prepared_match["groups"]
+                groups_total = len(groups)
                 for index, group in enumerate(groups, start=1):
-                    source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
+                    source_order_name = str(group.get("order_name") or "").strip() or f"Р“СЂСѓРїРїР° {index}"
                     codes = [row["full_code"] for row in group.get("codes", []) if str(row.get("full_code") or "").strip()]
                     if not codes:
                         continue
@@ -3282,7 +3608,16 @@ class ApiBridge:
                         str(group.get("gtin") or "").strip(),
                         str(group.get("full_name") or "").strip(),
                     )
-                    document_number = self._build_aggregate_intro_document_number(source_order_name, index)
+                    document_number = self._build_aggregate_intro_document_number(
+                        source_order_name,
+                        index,
+                        custom_title=normalized_title,
+                        groups_total=groups_total,
+                    )
+                    self._log(
+                        "aggregation",
+                        f"Создаём документ ввода в оборот для группы {index}/{groups_total}: {source_order_name} ({len(codes)} кодов).",
+                    )
                     introduction_id = self._create_exact_intro_file_document(
                         session,
                         product_group=product_group,
@@ -3292,6 +3627,7 @@ class ApiBridge:
                         expiration_date=exp,
                         batch_number=normalized_batch,
                     )
+                    self._log("aggregation", f"Документ ввода в оборот создан: {introduction_id}. Загружаем позиции.")
                     rows_payload = self._build_intro_upload_rows(
                         metadata=metadata,
                         full_codes=codes,
@@ -3302,6 +3638,7 @@ class ApiBridge:
                         introduction_id,
                         rows_payload=rows_payload,
                     )
+                    self._log("aggregation", f"Позиции загружены в документ {introduction_id}. Ждём проверку кодов.")
                     codes_check = self._wait_for_intro_codes_check(session, introduction_id)
                     production_state = self._get_intro_production_state(session, introduction_id)
                     if str(codes_check.get("status") or "").strip() == "hasErrors":
@@ -3311,16 +3648,17 @@ class ApiBridge:
                         if positions:
                             broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
                         raise RuntimeError(
-                            f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
+                            f"{source_order_name}: РїСЂРѕРІРµСЂРєР° РєРѕРґРѕРІ РІРµСЂРЅСѓР»Р° РѕС€РёР±РєРё ({broken_count} С€С‚.), РґРѕРєСѓРјРµРЅС‚ РЅРµ РѕС‚РїСЂР°РІР»РµРЅ."
                         )
 
                     document_state = self._get_intro_document_state(session, introduction_id)
                     document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
                     self._log(
                         "aggregation",
-                        f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+                        f"РЎС‚Р°С‚СѓСЃ РґРѕРєСѓРјРµРЅС‚Р° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ {introduction_id} РїРѕСЃР»Рµ РїСЂРѕРІРµСЂРєРё РєРѕРґРѕРІ: {document_status or 'РЅРµРёР·РІРµСЃС‚РЅРѕ'}",
                     )
                     if document_status != "introduced":
+                        self._log("aggregation", f"Подписываем и отправляем документ {introduction_id}.")
                         send_result = self._sign_and_send_intro_document(
                             session,
                             introduction_id,
@@ -3347,7 +3685,7 @@ class ApiBridge:
                     total_sent_codes += len(codes)
                     self._log(
                         "aggregation",
-                        f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+                        f"Р’РІРѕРґ РІ РѕР±РѕСЂРѕС‚ РѕС‚РїСЂР°РІР»РµРЅ: {source_order_name} ({len(codes)} РєРѕРґРѕРІ, РґРѕРєСѓРјРµРЅС‚ {introduction_id}).",
                     )
 
                 return {
@@ -3358,29 +3696,36 @@ class ApiBridge:
                     "missing_full_codes": prepared_match["unmatched_count"],
                     "missing_full_codes_preview": prepared_match["unmatched_preview"],
                     "already_introduced_codes": already_introduced,
+                    "skipped_api_error_codes": len(api_errors),
+                    "skipped_api_error_preview": [state.sntin for state in api_errors[:5]],
                     "introduced_codes": total_sent_codes,
                     "groups": introduced_results,
                     "status_counts": dict(status_counts),
                     "scanned_saved_files": prepared_match["scanned_files"],
                 }
 
-            summary = self._run_with_session_retry(
-                _run,
+            summary = self._run_with_transient_network_retry(
+                lambda: self._run_with_session_retry(
+                    _run,
+                    log_channel="aggregation",
+                    retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅРѕР№ РѕС‚РїСЂР°РІРєРѕР№ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ",
+                ),
+                attempts=3,
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторной отправкой ввода в оборот выбранных АК",
+                retry_message="Сетевое соединение оборвалось при вводе в оборот выбранных АК. Обновляем сессию и повторяем",
             )
             return {"success": True, "summary": summary}
         except Exception as exc:
-            self._log("aggregation", f"Ошибка ввода в оборот выбранных АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РІС‹Р±СЂР°РЅРЅС‹С… РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def approve_aggregations(self, comment_filter: str = "", allow_disaggregate: bool = False) -> Dict[str, Any]:
         try:
             cert = self._get_certificate()
             if not cert:
-                raise RuntimeError("Не найден сертификат для подписи.")
+                raise RuntimeError("РќРµ РЅР°Р№РґРµРЅ СЃРµСЂС‚РёС„РёРєР°С‚ РґР»СЏ РїРѕРґРїРёСЃРё.")
 
-            self._log("aggregation", "Запускаем проведение АК в статусах readyForSend и approveFailed")
+            self._log("aggregation", "Р—Р°РїСѓСЃРєР°РµРј РїСЂРѕРІРµРґРµРЅРёРµ РђРљ РІ СЃС‚Р°С‚СѓСЃР°С… readyForSend Рё approveFailed")
             summary = self._run_with_session_retry(
                 lambda session: _get_runtime().bulk_aggregation_service.run(
                     kontur_session=session,
@@ -3388,33 +3733,33 @@ class ApiBridge:
                     sign_base64_func=sign_data,
                     sign_text_func=sign_text_data,
                     log_callback=lambda message: self._log("aggregation", message),
-                    progress_callback=lambda processed, total: self._log("aggregation", f"Прогресс проведения: {processed}/{total}"),
+                    progress_callback=lambda processed, total: self._log("aggregation", f"РџСЂРѕРіСЂРµСЃСЃ РїСЂРѕРІРµРґРµРЅРёСЏ: {processed}/{total}"),
                     confirm_callback=lambda _title, _message: bool(allow_disaggregate),
                     comment_filter=str(comment_filter or "").strip() or None,
                 ),
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторным проведением АК",
+                retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅС‹Рј РїСЂРѕРІРµРґРµРЅРёРµРј РђРљ",
             )
             serialized_summary = self._serialize_summary(summary)
-            self._raise_if_aggregation_action_noop(serialized_summary, action_label="Проведение АК")
+            self._raise_if_aggregation_action_noop(serialized_summary, action_label="РџСЂРѕРІРµРґРµРЅРёРµ РђРљ")
             return {"success": True, "summary": serialized_summary}
         except Exception as exc:
-            self._log("aggregation", f"Ошибка проведения АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° РїСЂРѕРІРµРґРµРЅРёСЏ РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def refill_aggregations(self, comment_filter: str, tsd_token: str) -> Dict[str, Any]:
         try:
             cert = self._get_certificate()
             if not cert:
-                raise RuntimeError("Не найден сертификат для подписи.")
+                raise RuntimeError("РќРµ РЅР°Р№РґРµРЅ СЃРµСЂС‚РёС„РёРєР°С‚ РґР»СЏ РїРѕРґРїРёСЃРё.")
             normalized_filter = str(comment_filter or "").strip()
             normalized_token = str(tsd_token or "").strip()
             if not normalized_filter:
-                raise RuntimeError("Введите название для повторного наполнения АК.")
+                raise RuntimeError("Р’РІРµРґРёС‚Рµ РЅР°Р·РІР°РЅРёРµ РґР»СЏ РїРѕРІС‚РѕСЂРЅРѕРіРѕ РЅР°РїРѕР»РЅРµРЅРёСЏ РђРљ.")
             if not normalized_token:
-                raise RuntimeError("Введите TSD токен.")
+                raise RuntimeError("Р’РІРµРґРёС‚Рµ TSD С‚РѕРєРµРЅ.")
 
-            self._log("aggregation", f"Запускаем повторное наполнение АК по названию '{normalized_filter}'")
+            self._log("aggregation", f"Р—Р°РїСѓСЃРєР°РµРј РїРѕРІС‚РѕСЂРЅРѕРµ РЅР°РїРѕР»РЅРµРЅРёРµ РђРљ РїРѕ РЅР°Р·РІР°РЅРёСЋ '{normalized_filter}'")
             summary = self._run_with_session_retry(
                 lambda session: _get_runtime().bulk_aggregation_service.run_tsd_refill(
                     kontur_session=session,
@@ -3422,17 +3767,17 @@ class ApiBridge:
                     sign_base64_func=sign_data,
                     tsd_token=normalized_token,
                     log_callback=lambda message: self._log("aggregation", message),
-                    progress_callback=lambda processed, total: self._log("aggregation", f"Прогресс повторного наполнения: {processed}/{total}"),
+                    progress_callback=lambda processed, total: self._log("aggregation", f"РџСЂРѕРіСЂРµСЃСЃ РїРѕРІС‚РѕСЂРЅРѕРіРѕ РЅР°РїРѕР»РЅРµРЅРёСЏ: {processed}/{total}"),
                     comment_filter=normalized_filter,
                 ),
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторным наполнением АК",
+                retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅС‹Рј РЅР°РїРѕР»РЅРµРЅРёРµРј РђРљ",
             )
             serialized_summary = self._serialize_summary(summary)
-            self._raise_if_aggregation_action_noop(serialized_summary, action_label="Повторное наполнение АК")
+            self._raise_if_aggregation_action_noop(serialized_summary, action_label="РџРѕРІС‚РѕСЂРЅРѕРµ РЅР°РїРѕР»РЅРµРЅРёРµ РђРљ")
             return {"success": True, "summary": serialized_summary}
         except Exception as exc:
-            self._log("aggregation", f"Ошибка повторного наполнения АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° РїРѕРІС‚РѕСЂРЅРѕРіРѕ РЅР°РїРѕР»РЅРµРЅРёСЏ РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def introduce_aggregations(
@@ -3446,22 +3791,22 @@ class ApiBridge:
         try:
             cert = self._get_certificate()
             if not cert:
-                raise RuntimeError("Не найден сертификат для подписи.")
+                raise RuntimeError("РќРµ РЅР°Р№РґРµРЅ СЃРµСЂС‚РёС„РёРєР°С‚ РґР»СЏ РїРѕРґРїРёСЃРё.")
 
             normalized_token = str(tsd_token or "").strip()
             normalized_batch = str(batch_number or "").strip()
             if not normalized_token:
-                raise RuntimeError("Введите TSD токен.")
+                raise RuntimeError("Р’РІРµРґРёС‚Рµ TSD С‚РѕРєРµРЅ.")
             if not normalized_batch:
-                raise RuntimeError("Укажите номер партии.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅРѕРјРµСЂ РїР°СЂС‚РёРё.")
 
-            prod = self._parse_iso_date(production_date, field_name="Дата производства")
-            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            prod = self._parse_iso_date(production_date, field_name="Р”Р°С‚Р° РїСЂРѕРёР·РІРѕРґСЃС‚РІР°")
+            exp = self._parse_iso_date(expiration_date, field_name="РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё")
             normalized_filter = str(comment_filter or "").strip()
             if normalized_filter:
-                self._log("aggregation", f"Запускаем ввод в оборот АК по фильтру '{normalized_filter}'.")
+                self._log("aggregation", f"Р—Р°РїСѓСЃРєР°РµРј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚ РђРљ РїРѕ С„РёР»СЊС‚СЂСѓ '{normalized_filter}'.")
             else:
-                self._log("aggregation", "Запускаем ввод в оборот для всех АК в статусе readyForSend.")
+                self._log("aggregation", "Р—Р°РїСѓСЃРєР°РµРј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚ РґР»СЏ РІСЃРµС… РђРљ РІ СЃС‚Р°С‚СѓСЃРµ readyForSend.")
 
             summary = self._run_with_session_retry(
                 lambda session: self._introduce_aggregations_via_exact_codes(
@@ -3474,11 +3819,11 @@ class ApiBridge:
                     cert=cert,
                 ),
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторной отправкой ввода в оборот АК",
+                retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅРѕР№ РѕС‚РїСЂР°РІРєРѕР№ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РђРљ",
             )
             return {"success": True, "summary": summary}
         except Exception as exc:
-            self._log("aggregation", f"Ошибка ввода в оборот АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def introduce_aggregations(
@@ -3492,19 +3837,19 @@ class ApiBridge:
         try:
             cert = self._get_certificate()
             if not cert:
-                raise RuntimeError("Не найден сертификат для подписи.")
+                raise RuntimeError("РќРµ РЅР°Р№РґРµРЅ СЃРµСЂС‚РёС„РёРєР°С‚ РґР»СЏ РїРѕРґРїРёСЃРё.")
 
             normalized_batch = str(batch_number or "").strip()
             if not normalized_batch:
-                raise RuntimeError("Укажите номер партии.")
+                raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РЅРѕРјРµСЂ РїР°СЂС‚РёРё.")
 
-            prod = self._parse_iso_date(production_date, field_name="Дата производства")
-            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            prod = self._parse_iso_date(production_date, field_name="Р”Р°С‚Р° РїСЂРѕРёР·РІРѕРґСЃС‚РІР°")
+            exp = self._parse_iso_date(expiration_date, field_name="РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё")
             normalized_filter = str(comment_filter or "").strip()
             if normalized_filter:
-                self._log("aggregation", f"Запускаем ввод в оборот АК по фильтру '{normalized_filter}'.")
+                self._log("aggregation", f"Р—Р°РїСѓСЃРєР°РµРј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚ РђРљ РїРѕ С„РёР»СЊС‚СЂСѓ '{normalized_filter}'.")
             else:
-                self._log("aggregation", "Запускаем ввод в оборот для всех АК в статусе readyForSend.")
+                self._log("aggregation", "Р—Р°РїСѓСЃРєР°РµРј РІРІРѕРґ РІ РѕР±РѕСЂРѕС‚ РґР»СЏ РІСЃРµС… РђРљ РІ СЃС‚Р°С‚СѓСЃРµ readyForSend.")
 
             summary = self._run_with_session_retry(
                 lambda session: self._introduce_aggregations_via_exact_codes_file(
@@ -3516,11 +3861,11 @@ class ApiBridge:
                     cert=cert,
                 ),
                 log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторной отправкой ввода в оборот АК",
+                retry_message="РћР±РЅРѕРІР»СЏРµРј СЃРµСЃСЃРёСЋ РїРµСЂРµРґ РїРѕРІС‚РѕСЂРЅРѕР№ РѕС‚РїСЂР°РІРєРѕР№ РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РђРљ",
             )
             return {"success": True, "summary": summary}
         except Exception as exc:
-            self._log("aggregation", f"Ошибка ввода в оборот АК: {exc}")
+            self._log("aggregation", f"РћС€РёР±РєР° РІРІРѕРґР° РІ РѕР±РѕСЂРѕС‚ РђРљ: {exc}")
             return {"success": False, "error": str(exc)}
 
     def get_labels_state(self) -> Dict[str, Any]:
@@ -3579,7 +3924,7 @@ class ApiBridge:
                         "relative_path": item.relative_path,
                         "path": item.path,
                         "data_source_kind": item.data_source_kind,
-                        "source_label": "Агрег коды км" if item.data_source_kind == AGGREGATION_SOURCE_KIND else "Коды км",
+                        "source_label": "РђРіСЂРµРі РєРѕРґС‹ РєРј" if item.data_source_kind == AGGREGATION_SOURCE_KIND else "РљРѕРґС‹ РєРј",
                     }
                     for item in list_100x180_templates()
                 ],
@@ -3653,7 +3998,7 @@ class ApiBridge:
                 continue
         if last_error:
             raise last_error
-        raise RuntimeError(f"Не удалось прочитать CSV для печати: {csv_path}")
+        raise RuntimeError(f"РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕС‡РёС‚Р°С‚СЊ CSV РґР»СЏ РїРµС‡Р°С‚Рё: {csv_path}")
 
     @staticmethod
     def _shorten_label_preview_value(value: str, *, limit: int = 96) -> str:
@@ -3662,7 +4007,7 @@ class ApiBridge:
             return prepared
         head = max(24, limit // 2 - 8)
         tail = max(16, limit - head - 1)
-        return f"{prepared[:head]}…{prepared[-tail:]}"
+        return f"{prepared[:head]}вЂ¦{prepared[-tail:]}"
 
     def _build_label_record_preview(self, row: Sequence[str], data_source_kind: str) -> Dict[str, Any]:
         first_value = str(row[0] or "").strip() if row else ""
@@ -3674,7 +4019,7 @@ class ApiBridge:
             full_name = str(row[2] or "").strip() if len(row) > 2 else ""
             return {
                 "kind": "marking",
-                "label": "Код маркировки",
+                "label": "РљРѕРґ РјР°СЂРєРёСЂРѕРІРєРё",
                 "value": normalized_code or first_value,
                 "value_short": self._shorten_label_preview_value(normalized_code or first_value),
                 "gtin": gtin,
@@ -3684,7 +4029,7 @@ class ApiBridge:
         aggregate_code = first_value
         return {
             "kind": "aggregation",
-            "label": "Агрегационный код",
+            "label": "РђРіСЂРµРіР°С†РёРѕРЅРЅС‹Р№ РєРѕРґ",
             "value": aggregate_code,
             "value_short": self._shorten_label_preview_value(aggregate_code, limit=64),
             "gtin": "",
@@ -3711,17 +4056,17 @@ class ApiBridge:
         try:
             selected_record_number = int(str(raw_record_number or "").strip())
         except (TypeError, ValueError):
-            raise RuntimeError("Укажите корректный номер этикетки для печати.")
+            raise RuntimeError("РЈРєР°Р¶РёС‚Рµ РєРѕСЂСЂРµРєС‚РЅС‹Р№ РЅРѕРјРµСЂ СЌС‚РёРєРµС‚РєРё РґР»СЏ РїРµС‡Р°С‚Рё.")
 
         if selected_record_number < 1 or selected_record_number > total_record_count:
             raise RuntimeError(
-                f"Номер этикетки должен быть в диапазоне от 1 до {total_record_count}."
+                f"РќРѕРјРµСЂ СЌС‚РёРєРµС‚РєРё РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІ РґРёР°РїР°Р·РѕРЅРµ РѕС‚ 1 РґРѕ {total_record_count}."
             )
 
         rows, delimiter = self._read_label_csv_rows(Path(base_context.aggregation_csv_path))
         if selected_record_number > len(rows):
             raise RuntimeError(
-                f"Не удалось найти запись №{selected_record_number} в CSV для печати."
+                f"РќРµ СѓРґР°Р»РѕСЃСЊ РЅР°Р№С‚Рё Р·Р°РїРёСЃСЊ в„–{selected_record_number} РІ CSV РґР»СЏ РїРµС‡Р°С‚Рё."
             )
 
         selected_row = rows[selected_record_number - 1]
@@ -3775,7 +4120,7 @@ class ApiBridge:
             "dispenser_count": context.dispenser_count,
             "package_text": context.package_text,
             "print_scope": selection.get("print_scope") or "all",
-            "print_scope_label": "Одна этикетка" if selection.get("print_scope") == "single" else "Весь файл",
+            "print_scope_label": "РћРґРЅР° СЌС‚РёРєРµС‚РєР°" if selection.get("print_scope") == "single" else "Р’РµСЃСЊ С„Р°Р№Р»",
             "total_record_count": int(selection.get("total_record_count") or context.label_count or 0),
             "selected_record_number": selection.get("selected_record_number"),
             "selected_code_label": record_preview.get("label") or "",
@@ -3793,7 +4138,7 @@ class ApiBridge:
             printer_name = str(payload.get("printer_name") or "").strip()
             order_data = _get_runtime().history_db.get_order_by_document_id(order_id)
             if not order_data:
-                raise RuntimeError("Заказ не найден в истории.")
+                raise RuntimeError("Р—Р°РєР°Р· РЅРµ РЅР°Р№РґРµРЅ РІ РёСЃС‚РѕСЂРёРё.")
             base_context = build_label_print_context(
                 df=self._load_nomenclature_df(),
                 order_data=order_data,
@@ -3826,7 +4171,7 @@ class ApiBridge:
                 "preview": preview_payload,
             }
         except Exception as exc:
-            self._log("labels", f"Ошибка подготовки контекста 100x180: {exc}")
+            self._log("labels", f"РћС€РёР±РєР° РїРѕРґРіРѕС‚РѕРІРєРё РєРѕРЅС‚РµРєСЃС‚Р° 100x180: {exc}")
             return {"success": False, "error": str(exc)}
 
     def print_100x180_label(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -3866,15 +4211,15 @@ class ApiBridge:
                 if selection.get("print_scope") == "single":
                     self._log(
                         "labels",
-                        "Печать одной этикетки 100x180 запущена: "
-                        f"{context.order_name}, запись №{selection.get('selected_record_number')} "
-                        f"({(selection.get('record_preview') or {}).get('value_short') or 'код не распознан'})",
+                        "РџРµС‡Р°С‚СЊ РѕРґРЅРѕР№ СЌС‚РёРєРµС‚РєРё 100x180 Р·Р°РїСѓС‰РµРЅР°: "
+                        f"{context.order_name}, Р·Р°РїРёСЃСЊ в„–{selection.get('selected_record_number')} "
+                        f"({(selection.get('record_preview') or {}).get('value_short') or 'РєРѕРґ РЅРµ СЂР°СЃРїРѕР·РЅР°РЅ'})",
                     )
                 else:
-                    self._log("labels", f"Печать 100x180 запущена: {context.order_name}")
+                    self._log("labels", f"РџРµС‡Р°С‚СЊ 100x180 Р·Р°РїСѓС‰РµРЅР°: {context.order_name}")
             finally:
                 self._cleanup_label_selection(selection)
             return {"success": True, "preview": preview_result.get("preview")}
         except Exception as exc:
-            self._log("labels", f"Ошибка печати 100x180: {exc}")
+            self._log("labels", f"РћС€РёР±РєР° РїРµС‡Р°С‚Рё 100x180: {exc}")
             return {"success": False, "error": str(exc)}

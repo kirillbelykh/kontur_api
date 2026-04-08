@@ -1,3 +1,5 @@
+from pathlib import Path
+import tempfile
 import types
 import unittest
 from unittest import mock
@@ -8,6 +10,22 @@ import ui_v2.api_bridge as api_bridge
 class ApiBridgeUiV2Tests(unittest.TestCase):
     def setUp(self):
         self.bridge = api_bridge.ApiBridge()
+
+    def test_normalize_ui_text_repairs_latin1_cp1251_mojibake(self):
+        broken = "\u00c7\u00e0\u00e3\u00f0\u00f3\u00e6\u00e0\u00e5\u00ec"
+        self.assertEqual(api_bridge._normalize_ui_text(broken), "\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043c")
+
+    def test_desktop_data_dir_resolves_existing_marking_codes_folder(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            desktop_dir = temp_root / "Desktop"
+            target_dir = desktop_dir / "\u041a\u043e\u0434\u044b \u043a\u043c"
+            target_dir.mkdir(parents=True)
+
+            with mock.patch.object(api_bridge.Path, "home", return_value=temp_root):
+                resolved = api_bridge._desktop_data_dir(api_bridge.MARKING_CODES_DIRNAME)
+
+            self.assertEqual(resolved, target_dir)
 
     def test_get_default_date_window_uses_shared_helper(self):
         with mock.patch.object(
@@ -87,7 +105,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         create_mock.assert_called_once()
         retried_item = create_mock.call_args.kwargs["item"]
         self.assertEqual(retried_item["document_id"], "doc-1")
-        self.assertEqual(retried_item["status"], "Готов для ТСД")
+        self.assertEqual(api_bridge._normalize_ui_text(retried_item["status"]), "Готов для ТСД")
         mark_mock.assert_called_once_with("doc-1", "intro-2")
         remove_mock.assert_called_once_with(fake_runtime.download_items, "doc-1")
 
@@ -147,11 +165,12 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             "scanned_files": 4,
         }
 
-        with self.assertRaisesRegex(RuntimeError, "Не удалось найти полные коды"):
+        with self.assertRaises(RuntimeError) as error_context:
             self.bridge._prepare_marking_match_result(
                 match_result,
                 action_label="Ввод в оборот выбранных АК",
             )
+        self.assertIn("Не удалось найти полные коды", api_bridge._normalize_ui_text(str(error_context.exception)))
 
     def test_introduce_selected_aggregations_sends_when_document_stays_created_after_codes_check(self):
         aggregate = types.SimpleNamespace(
@@ -223,6 +242,95 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
 
         self.assertTrue(result["success"])
         self.assertEqual(result["summary"]["introduced_codes"], 1)
+        sign_mock.assert_called_once()
+
+    def test_introduce_selected_aggregations_skips_codes_with_unavailable_true_api_status(self):
+        aggregate = types.SimpleNamespace(
+            document_id="agg-doc-1",
+            aggregate_code="AGG-1",
+            product_group="wheelChairs",
+            status="readyForSend",
+            comment="test",
+            includes_units_count=2,
+            codes_check_errors_count=0,
+        )
+        good_state = types.SimpleNamespace(
+            status="EMITTED",
+            api_error=None,
+            raw_code="010000000000000021GOOD",
+            sntin="010000000000000021GOOD",
+        )
+        bad_state = types.SimpleNamespace(
+            status="UNKNOWN",
+            api_error="True API error",
+            raw_code="010000000000000021BAD",
+            sntin="010000000000000021BAD",
+        )
+
+        fetch_code_states_mock = mock.Mock(
+            side_effect=lambda **kwargs: (
+                [good_state, bad_state]
+                if len(kwargs["raw_codes"]) == 2
+                else [bad_state]
+            )
+        )
+        fake_service = types.SimpleNamespace(
+            fetch_aggregate_codes=lambda _session, _document_id: ([good_state.raw_code, bad_state.raw_code], []),
+            _resolve_true_product_group=lambda product_group: product_group,
+            fetch_code_states=fetch_code_states_mock,
+        )
+        fake_runtime = types.SimpleNamespace(bulk_aggregation_service=fake_service)
+
+        with (
+            mock.patch.object(self.bridge, "_get_certificate", return_value=object()),
+            mock.patch.object(self.bridge, "_parse_iso_date", side_effect=lambda value, **_kwargs: value),
+            mock.patch.object(self.bridge, "_resolve_aggregate_infos_by_ids", return_value=[aggregate]),
+            mock.patch.object(self.bridge, "_match_saved_marking_codes", return_value={
+                "matched": {good_state.raw_code: {"full_code": "010000000000000021GOOD\x1d91EE11\x1d92TAIL"}},
+                "groups": [{
+                    "order_name": "order-1",
+                    "gtin": "04650118041257",
+                    "full_name": "Перчатки",
+                    "source_path": "codes.csv",
+                    "codes": [{"full_code": "010000000000000021GOOD\x1d91EE11\x1d92TAIL"}],
+                }],
+                "unmatched": [],
+                "scanned_files": 1,
+            }),
+            mock.patch.object(self.bridge, "_lookup_intro_product_metadata", return_value={
+                "gtin": "04650118041257",
+                "full_name": "Перчатки",
+                "simpl_name": "Перчатки",
+                "tnved_code": "EE11",
+            }),
+            mock.patch.object(self.bridge, "_create_exact_intro_file_document", return_value="intro-123"),
+            mock.patch.object(self.bridge, "_build_intro_upload_rows", return_value={"rows": [{"code": "010000000000000021GOOD"}]}),
+            mock.patch.object(self.bridge, "_upload_intro_positions_from_file"),
+            mock.patch.object(self.bridge, "_wait_for_intro_codes_check", return_value={"status": "doesNotHaveErrors"}),
+            mock.patch.object(self.bridge, "_get_intro_production_state", return_value={"documentStatus": "created", "positions": []}),
+            mock.patch.object(self.bridge, "_get_intro_document_state", return_value={"documentStatus": "created"}),
+            mock.patch.object(self.bridge, "_sign_and_send_intro_document", return_value={
+                "generated_count": 1,
+                "send_response": {"ok": True},
+                "final_introduction": {"documentStatus": "introduced"},
+                "final_check": {"status": "doesNotHaveErrors"},
+            }) as sign_mock,
+            mock.patch.object(self.bridge, "_log"),
+            mock.patch.object(self.bridge, "_run_with_session_retry", side_effect=lambda action, **_kwargs: action(object())),
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+        ):
+            result = self.bridge.introduce_selected_aggregations(
+                ["agg-doc-1"],
+                "01-01-2026",
+                "01-01-2031",
+                "260330",
+            )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["summary"]["introduced_codes"], 1)
+        self.assertEqual(result["summary"]["skipped_api_error_codes"], 1)
+        self.assertEqual(result["summary"]["skipped_api_error_preview"], [bad_state.sntin])
+        self.assertGreaterEqual(fetch_code_states_mock.call_count, 2)
         sign_mock.assert_called_once()
 
 
