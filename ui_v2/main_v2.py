@@ -49,11 +49,44 @@ def _ensure_desktop_shortcut() -> None:
         pass
 
 
+def _install_desktop_scroll_overrides(window: webview.Window) -> None:
+    window.load_css(
+        """
+        body {
+          overflow-y: auto !important;
+          overflow-x: hidden !important;
+        }
+
+        .app-shell {
+          min-height: max(100vh, var(--app-height)) !important;
+          height: auto !important;
+          align-items: start;
+        }
+
+        .sidebar {
+          position: sticky;
+          top: 0;
+          align-self: start;
+          min-height: var(--app-height);
+        }
+
+        .main-shell {
+          grid-template-rows: auto auto 28px !important;
+          overflow: visible !important;
+        }
+
+        .content-area {
+          overflow: visible !important;
+        }
+        """
+    )
+
+
 def main():
     _ensure_desktop_shortcut()
     api = ApiBridge()
     index_path = Path(__file__).resolve().parent / "ui" / "index.html"
-    webview.create_window(
+    window = webview.create_window(
         title="KonturTestAPI [TEST]",
         url=index_path.resolve().as_uri(),
         js_api=api,
@@ -61,6 +94,7 @@ def main():
         height=900,
         min_size=(1100, 700),
     )
+    window.events.loaded += _install_desktop_scroll_overrides
     webview.start(debug=True)
 
 
