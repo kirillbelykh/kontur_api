@@ -12,7 +12,7 @@ import uuid
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from threading import Lock
+from threading import Lock, Thread
 from typing import Any, Dict, List, Optional, Sequence
 
 import pandas as pd
@@ -344,6 +344,30 @@ class ApiBridge:
         runtime.logs[channel].append(f"[{timestamp}] {normalized_message}")
         if len(runtime.logs[channel]) > MAX_LOG_LINES:
             runtime.logs[channel] = runtime.logs[channel][-MAX_LOG_LINES:]
+
+    def _run_background_job(
+        self,
+        *,
+        name: str,
+        action,
+        error_log_channel: str,
+        error_log_prefix: str,
+        cleanup=None,
+    ) -> None:
+        def _worker() -> None:
+            try:
+                action()
+            except Exception as exc:
+                self._log(error_log_channel, f"{error_log_prefix}: {exc}")
+            finally:
+                if cleanup is not None:
+                    try:
+                        cleanup()
+                    except Exception:
+                        pass
+
+        worker = Thread(target=_worker, name=name, daemon=True)
+        worker.start()
 
     def _deleted_orders_path(self) -> Path:
         path = _get_runtime().root_dir / DELETED_ORDERS_DIRNAME / DELETED_ORDERS_FILE
@@ -2885,8 +2909,13 @@ class ApiBridge:
                 csv_path=csv_path,
                 printer_name=printer_name,
             )
-            print_labels(context)
-            self._log("download", f"Печать термоэтикеток запущена: {item.get('order_name')}")
+            self._run_background_job(
+                name=f"download-print-{context.document_id or uuid.uuid4().hex}",
+                action=lambda: print_labels(context),
+                error_log_channel="download",
+                error_log_prefix="Ошибка печати термоэтикеток",
+            )
+            self._log("download", f"Печать термоэтикеток отправлена в BarTender: {item.get('order_name')}")
             return {
                 "success": True,
                 "context": {
@@ -4200,6 +4229,7 @@ class ApiBridge:
                 quantity_value=payload.get("quantity_value"),
             )
             selection = self._resolve_label_print_selection(base_context=base_context, payload=payload)
+            cleanup_delegated = False
             try:
                 context = base_context
                 if selection.get("print_scope") == "single":
@@ -4213,18 +4243,26 @@ class ApiBridge:
                         expiration_date=str(payload.get("expiration_date") or ""),
                         quantity_value=payload.get("quantity_value"),
                     )
-                print_100x180_labels(context)
+                self._run_background_job(
+                    name=f"labels-print-{context.document_id or uuid.uuid4().hex}",
+                    action=lambda: print_100x180_labels(context),
+                    error_log_channel="labels",
+                    error_log_prefix="Ошибка печати 100x180",
+                    cleanup=lambda: self._cleanup_label_selection(selection),
+                )
+                cleanup_delegated = True
                 if selection.get("print_scope") == "single":
                     self._log(
                         "labels",
-                        "Печать одной этикетки 100x180 запущена: "
+                        "Печать одной этикетки 100x180 отправлена в BarTender: "
                         f"{context.order_name}, запись №{selection.get('selected_record_number')} "
                         f"({(selection.get('record_preview') or {}).get('value_short') or 'код не распознан'})",
                     )
                 else:
-                    self._log("labels", f"Печать 100x180 запущена: {context.order_name}")
+                    self._log("labels", f"Печать 100x180 отправлена в BarTender: {context.order_name}")
             finally:
-                self._cleanup_label_selection(selection)
+                if not cleanup_delegated:
+                    self._cleanup_label_selection(selection)
             return {"success": True, "preview": preview_result.get("preview")}
         except Exception as exc:
             self._log("labels", f"Ошибка печати 100x180: {exc}")

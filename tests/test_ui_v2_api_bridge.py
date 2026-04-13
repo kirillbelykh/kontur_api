@@ -342,6 +342,59 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertGreaterEqual(fetch_code_states_mock.call_count, 2)
         sign_mock.assert_called_once()
 
+    def test_print_100x180_label_returns_after_queueing_background_print(self):
+        preview_payload = {"document_id": "doc-1", "order_name": "Заказ 1"}
+        order_data = {"document_id": "doc-1", "order_name": "Заказ 1"}
+        base_context = types.SimpleNamespace(document_id="doc-1", order_name="Заказ 1")
+        single_context = types.SimpleNamespace(document_id="doc-1", order_name="Заказ 1")
+        selection = {
+            "print_scope": "single",
+            "selected_record_number": 3,
+            "record_preview": {"value_short": "CODE-3"},
+            "cleanup_path": "temp.csv",
+        }
+        fake_runtime = types.SimpleNamespace(
+            history_db=types.SimpleNamespace(get_order_by_document_id=lambda document_id: order_data if document_id == "doc-1" else None)
+        )
+
+        with (
+            mock.patch.object(self.bridge, "preview_100x180_label", return_value={"success": True, "preview": preview_payload}),
+            mock.patch.object(self.bridge, "_load_nomenclature_df", return_value=object()),
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(api_bridge, "build_label_print_context", side_effect=[base_context, single_context]),
+            mock.patch.object(self.bridge, "_resolve_label_print_selection", return_value=selection),
+            mock.patch.object(self.bridge, "_cleanup_label_selection") as cleanup_mock,
+            mock.patch.object(self.bridge, "_run_background_job") as background_mock,
+            mock.patch.object(api_bridge, "print_100x180_labels") as print_mock,
+            mock.patch.object(self.bridge, "_log") as log_mock,
+        ):
+            result = self.bridge.print_100x180_label(
+                {
+                    "document_id": "doc-1",
+                    "template_path": "template.btw",
+                    "csv_path": "codes.csv",
+                    "printer_name": "Printer",
+                    "manufacture_date": "01-01-2026",
+                    "expiration_date": "01-01-2031",
+                    "quantity_value": "200",
+                    "print_scope": "single",
+                    "record_number": 3,
+                }
+            )
+
+            self.assertTrue(result["success"])
+            self.assertEqual(result["preview"], preview_payload)
+            background_mock.assert_called_once()
+            cleanup_mock.assert_not_called()
+            background_kwargs = background_mock.call_args.kwargs
+            self.assertEqual(background_kwargs["error_log_channel"], "labels")
+            self.assertEqual(background_kwargs["error_log_prefix"], "Ошибка печати 100x180")
+            background_kwargs["action"]()
+            print_mock.assert_called_once_with(single_context)
+            background_kwargs["cleanup"]()
+            cleanup_mock.assert_called_once_with(selection)
+            self.assertTrue(any("отправлена в BarTender" in str(call.args[1]) for call in log_mock.call_args_list))
+
 
 if __name__ == "__main__":
     unittest.main()
