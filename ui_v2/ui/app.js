@@ -21,8 +21,19 @@ const ROUTES = {
   },
   labels: {
     title: 'Печать этикеток',
-    subtitle: 'Шаблоны BarTender 100x180, контекст печати и запуск печати.',
+    subtitle: 'Шаблоны BarTender 100x180 и 100x136, контекст печати и запуск печати.',
   },
+};
+
+const CLIENT_CONFIG = {
+  browserMode: Boolean(window.__KONTUR_CLIENT_CONFIG__?.browserMode),
+  mobileMode: Boolean(window.__KONTUR_CLIENT_CONFIG__?.mobileMode),
+  disableLabels: Boolean(window.__KONTUR_CLIENT_CONFIG__?.disableLabels),
+  disablePrinting: Boolean(window.__KONTUR_CLIENT_CONFIG__?.disablePrinting),
+  apiBase: String(window.__KONTUR_CLIENT_CONFIG__?.apiBase || '/api/call').replace(/\/+$/, ''),
+  appTitle: String(window.__KONTUR_CLIENT_CONFIG__?.appTitle || '').trim(),
+  brandTitle: String(window.__KONTUR_CLIENT_CONFIG__?.brandTitle || '').trim(),
+  subtitleSuffix: String(window.__KONTUR_CLIENT_CONFIG__?.subtitleSuffix || '').trim(),
 };
 
 const ROUTE_KEYS = Object.keys(ROUTES);
@@ -67,6 +78,7 @@ const state = {
     queue: [],
     sessionOrders: [],
     history: [],
+    selectedQueueId: '',
     deletedOrders: [],
     selectedHistoryId: '',
     selectedDeletedId: '',
@@ -77,6 +89,7 @@ const state = {
     printers: [],
     defaultPrinter: '',
     selectedPrinter: '',
+    recordNumber: '',
     selectedItemId: '',
     selectedIds: new Set(),
     autoDownload: false,
@@ -114,6 +127,9 @@ const state = {
     totalItems: 0,
   },
   labels: {
+    sheetFormats: [],
+    defaultSheetFormat: '100x180',
+    selectedSheetFormat: '100x180',
     templates: [],
     aggregationFiles: [],
     markingFiles: [],
@@ -123,6 +139,15 @@ const state = {
     selectedPrinter: '',
     selectedTemplatePath: '',
     selectedOrderId: '',
+    manualPrompt: '',
+    manualFields: {
+      gtin: '',
+      size: '',
+      batch: '',
+      color: '',
+      units_per_pack: '',
+    },
+    manualEnabled: false,
     selectedAggregationPath: '',
     selectedMarkingPath: '',
     printScope: 'all',
@@ -150,14 +175,39 @@ const $ = (selector) => document.querySelector(selector);
 const API = {
   async call(method, ...args) {
     const target = window.pywebview?.api?.[method];
-    if (!target) {
-      throw new Error(`PyWebView API method not found: ${method}`);
+    if (target) {
+      const result = await target(...args);
+      if (result?.error) {
+        throw new Error(result.error);
+      }
+      return result;
     }
-    const result = await target(...args);
-    if (result?.error) {
-      throw new Error(result.error);
+
+    const response = await fetch(`${CLIENT_CONFIG.apiBase}/${encodeURIComponent(method)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify({ args }),
+    });
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      throw new Error('Некорректный ответ сервера.');
     }
-    return result;
+    if (!response.ok) {
+      throw new Error(payload?.error || `HTTP ${response.status}`);
+    }
+    if (payload?.error) {
+      throw new Error(payload.error);
+    }
+    return payload;
   },
 };
 
@@ -197,18 +247,247 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+function repairMojibakeText(value) {
+  const text = String(value ?? '');
+  if (!text || !/(\u0420\xa0.|\u0420\u040e.|\u0421\u0402\u0421\u045f|\u0420\u0406\u0420\u040f|\u0420\u0406\u0420\u201a|\u0420\u0457\u0421\u2014\u0420\u2026)/.test(text)) {
+    return text;
+  }
+  try {
+    const bytes = Uint8Array.from(Array.from(text, (char) => char.charCodeAt(0) & 0xff));
+    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+    return decoded && decoded !== text ? decoded : text;
+  } catch (error) {
+    return text;
+  }
+}
+
+function normalizeMojibakeInDom(root) {
+  if (!root) {
+    return;
+  }
+  const textNodes = [];
+  if (root.nodeType === Node.TEXT_NODE) {
+    textNodes.push(root);
+  } else {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode();
+    while (node) {
+      textNodes.push(node);
+      node = walker.nextNode();
+    }
+  }
+  textNodes.forEach((node) => {
+    const repaired = repairMojibakeText(node.nodeValue);
+    if (repaired !== node.nodeValue) {
+      node.nodeValue = repaired;
+    }
+  });
+
+  const elements = [];
+  if (root.nodeType === Node.ELEMENT_NODE) {
+    elements.push(root, ...root.querySelectorAll('*'));
+  }
+  elements.forEach((element) => {
+    ['placeholder', 'title', 'aria-label'].forEach((attr) => {
+      const current = element.getAttribute?.(attr);
+      if (!current) {
+        return;
+      }
+      const repaired = repairMojibakeText(current);
+      if (repaired !== current) {
+        element.setAttribute(attr, repaired);
+      }
+    });
+  });
+  if (document.title) {
+    document.title = repairMojibakeText(document.title);
+  }
+}
+
+let mojibakeGuardInstalled = false;
+let mojibakeObserver = null;
+let mojibakeNormalizationQueued = false;
+const mojibakePendingRoots = new Set();
+
+function flushMojibakeNormalizationQueue() {
+  mojibakeNormalizationQueued = false;
+  const roots = Array.from(mojibakePendingRoots);
+  mojibakePendingRoots.clear();
+  if (!roots.length) {
+    return;
+  }
+  if (mojibakeObserver) {
+    mojibakeObserver.disconnect();
+  }
+  try {
+    roots.forEach((root) => {
+      if (root?.isConnected === false) {
+        return;
+      }
+      normalizeMojibakeInDom(root || document.documentElement);
+    });
+  } finally {
+    if (mojibakeObserver && document.documentElement) {
+      mojibakeObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  }
+}
+
+function scheduleMojibakeNormalization(root = document.documentElement) {
+  if (!root) {
+    return;
+  }
+  mojibakePendingRoots.add(root);
+  if (mojibakeNormalizationQueued) {
+    return;
+  }
+  mojibakeNormalizationQueued = true;
+  const scheduler = typeof window.requestAnimationFrame === 'function'
+    ? window.requestAnimationFrame.bind(window)
+    : (callback) => window.setTimeout(callback, 0);
+  scheduler(() => {
+    flushMojibakeNormalizationQueue();
+  });
+}
+
+function installMojibakeGuard() {
+  if (mojibakeGuardInstalled || !document.documentElement) {
+    return;
+  }
+  mojibakeGuardInstalled = true;
+  scheduleMojibakeNormalization(document.documentElement);
+  if (typeof MutationObserver !== 'function') {
+    return;
+  }
+  mojibakeObserver = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (node?.nodeType === Node.ELEMENT_NODE || node?.nodeType === Node.TEXT_NODE) {
+          scheduleMojibakeNormalization(node);
+        }
+      });
+    });
+  });
+  mojibakeObserver.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
+}
+
 function setStatusText(text, online = true) {
-  $('#status-text').textContent = text;
+  $('#status-text').textContent = repairMojibakeText(text);
   const connection = $('#status-connection');
-  connection.textContent = online ? 'Онлайн' : 'Оффлайн';
+  connection.textContent = repairMojibakeText(online ? 'Онлайн' : 'Оффлайн');
   connection.classList.toggle('is-online', online);
+}
+
+function applyClientConfig() {
+  if (CLIENT_CONFIG.browserMode) {
+    document.body.dataset.clientMode = CLIENT_CONFIG.mobileMode ? 'browser-mobile' : 'browser';
+  }
+  if (CLIENT_CONFIG.appTitle) {
+    document.title = CLIENT_CONFIG.appTitle;
+  }
+  if (CLIENT_CONFIG.brandTitle) {
+    const brandTitle = document.querySelector('.brand-block h1');
+    if (brandTitle) {
+      brandTitle.textContent = CLIENT_CONFIG.brandTitle;
+    }
+  }
+  if (CLIENT_CONFIG.disableLabels) {
+    document.querySelector('[data-route="labels"]')?.classList.add('is-hidden');
+    document.querySelector('#view-labels')?.classList.add('is-hidden');
+    if (state.route === 'labels') {
+      state.route = 'orders';
+    }
+  }
+  if (CLIENT_CONFIG.disablePrinting) {
+    document.querySelector('#download-print-btn')?.classList.add('is-hidden');
+    document.querySelector('#labels-preview-btn')?.classList.add('is-hidden');
+    document.querySelector('#labels-print-btn')?.classList.add('is-hidden');
+  }
+}
+
+let mobileViewportGuardInstalled = false;
+
+function updateMobileViewportMetrics() {
+  if (!CLIENT_CONFIG.mobileMode) {
+    return;
+  }
+  const vv = window.visualViewport;
+  const viewportHeight = Math.max(320, Math.round(vv?.height || window.innerHeight || 0));
+  document.documentElement.style.setProperty('--app-height', `${viewportHeight}px`);
+  const keyboardOpen = Boolean(vv && window.innerHeight && vv.height < window.innerHeight * 0.82);
+  document.body.dataset.keyboardOpen = keyboardOpen ? 'true' : 'false';
+}
+
+function scrollFocusedFieldIntoView(target) {
+  if (!CLIENT_CONFIG.mobileMode || !target) {
+    return;
+  }
+  const focusHost = target.closest('.field, .panel, .table-host, .inline-actions') || target;
+  const scrollAction = () => {
+    try {
+      focusHost.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    } catch (error) {
+      try {
+        focusHost.scrollIntoView();
+      } catch (_unused) {
+        return;
+      }
+    }
+  };
+  window.setTimeout(scrollAction, 80);
+  window.setTimeout(scrollAction, 260);
+}
+
+function installMobileViewportGuard() {
+  if (!CLIENT_CONFIG.mobileMode || mobileViewportGuardInstalled) {
+    return;
+  }
+  mobileViewportGuardInstalled = true;
+  updateMobileViewportMetrics();
+
+  const vv = window.visualViewport;
+  if (vv) {
+    vv.addEventListener('resize', updateMobileViewportMetrics);
+    vv.addEventListener('scroll', updateMobileViewportMetrics);
+  }
+  window.addEventListener('resize', updateMobileViewportMetrics);
+  window.addEventListener('orientationchange', () => {
+    window.setTimeout(updateMobileViewportMetrics, 120);
+  });
+
+  document.addEventListener('focusin', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    if (!target.matches('input, select, textarea')) {
+      return;
+    }
+    target.closest('.field')?.classList.add('is-active');
+    scrollFocusedFieldIntoView(target);
+  });
+
+  document.addEventListener('focusout', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    target.closest('.field')?.classList.remove('is-active');
+    window.setTimeout(updateMobileViewportMetrics, 120);
+  });
 }
 
 function showToast(message, type = 'success', durationMs = null) {
   const host = $('#toast-host');
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.textContent = message;
+  toast.textContent = repairMojibakeText(message);
   host.appendChild(toast);
   const duration = durationMs ?? (type === 'error' ? 4200 : type === 'info' ? 1500 : 2800);
   setTimeout(() => toast.remove(), duration);
@@ -229,7 +508,7 @@ function appendUiLog(message, channel = getCurrentLogChannel()) {
     minute: '2-digit',
     second: '2-digit',
   });
-  const line = `[${timestamp}] ${message}`;
+  const line = `[${timestamp}] ${repairMojibakeText(message)}`;
   const current = element.textContent.trim();
   element.textContent = current ? `${current}\n${line}` : line;
   element.scrollTop = element.scrollHeight;
@@ -694,6 +973,7 @@ function formatPreview(preview) {
   }
   const lines = [
     `Заказ: ${preview.order_name}` ,
+    `Формат: ${preview.sheet_format_label || preview.sheet_format || '100x180'}` ,
     `Шаблон: ${preview.template_category} / ${preview.data_source_kind}` ,
     `Режим печати: ${preview.print_scope_label || 'Весь файл'}` ,
     `Размер: ${preview.size}` ,
@@ -728,6 +1008,28 @@ function setTheme(theme) {
   document.body.dataset.theme = theme;
   localStorage.setItem('kontur-ui-v2-theme', theme);
   $('#theme-toggle-btn').textContent = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+}
+
+function ensureAggregationIntroDocumentTitleField() {
+  const input = $('#agg-intro-document-title');
+  const batchInput = $('#agg-intro-batch-number');
+  if (!input || !batchInput) {
+    return;
+  }
+  const field = input.closest('.field');
+  const formGrid = batchInput.closest('.form-grid');
+  const batchField = batchInput.closest('.field');
+  if (!field || !formGrid || !batchField) {
+    return;
+  }
+  const label = field.querySelector('span');
+  if (label) {
+    label.textContent = 'Название документа ввода в оборот';
+  }
+  input.placeholder = 'Можно оставить пустым для автоназвания';
+  if (field.parentElement !== formGrid || field !== batchField.nextElementSibling) {
+    batchField.insertAdjacentElement('afterend', field);
+  }
 }
 
 function applyDefaultDateWindow(dateWindow) {
@@ -810,6 +1112,9 @@ function applySessionInfo(info) {
 
 const Router = {
   go(route) {
+    if (!(route in ROUTES) || (CLIENT_CONFIG.disableLabels && route === 'labels')) {
+      route = 'orders';
+    }
     state.route = route;
     document.querySelectorAll('.nav-item').forEach((item) => {
       item.classList.toggle('is-active', item.dataset.route === route);
@@ -818,7 +1123,9 @@ const Router = {
       view.classList.toggle('is-active', view.id === `view-${route}`);
     });
     $('#view-title').textContent = ROUTES[route].title;
-    $('#view-subtitle').textContent = ROUTES[route].subtitle;
+    $('#view-subtitle').textContent = CLIENT_CONFIG.subtitleSuffix
+      ? `${ROUTES[route].subtitle} ${CLIENT_CONFIG.subtitleSuffix}`
+      : ROUTES[route].subtitle;
     Promise.all([
       refreshCurrentRouteState({ freshnessMs: UI_PERF.routeNavFreshMs[route] || 0 }),
       refreshLogs(getCurrentLogChannel(), { freshnessMs: 4000 }),
@@ -889,7 +1196,16 @@ const Views = {
           { label: 'Кодов', key: 'codes_count' },
         ],
         state.orders.queue,
-        { compact: true, maxHeight: '180px' },
+        {
+          single: true,
+          compact: true,
+          maxHeight: '180px',
+          selectedIds: state.orders.selectedQueueId,
+          onRowClick: (id) => {
+            state.orders.selectedQueueId = id;
+            Views.orders.render();
+          },
+        },
       );
 
       createTable(
@@ -954,6 +1270,9 @@ const Views = {
       fillSelect($('#download-printer-select'), state.download.printers, 'Выберите принтер');
       if (state.download.selectedPrinter) {
         $('#download-printer-select').value = state.download.selectedPrinter;
+      }
+      if ($('#download-record-number')) {
+        $('#download-record-number').value = state.download.recordNumber || '';
       }
       updateDownloadSelectionMeta();
       updateDownloadProgressUi();
@@ -1054,24 +1373,62 @@ const Views = {
   labels: {
     render() {
       ensureLabelsSelectivePrintUi();
+      fillSelectOptions(
+        $("#labels-sheet-format-select"),
+        state.labels.sheetFormats.map((item) => ({ value: item.key, label: item.label })),
+        "Выберите формат",
+      );
+      if ($("#labels-sheet-format-select")) {
+        $("#labels-sheet-format-select").value = state.labels.selectedSheetFormat || state.labels.defaultSheetFormat || '100x180';
+      }
+      const sheetFormatLabel = selectedLabelSheetFormatLabel();
+      const heading = $("#labels-sheet-format-heading");
+      if (heading) {
+        heading.textContent = `Параметры печати ${sheetFormatLabel}`;
+      }
       fillSelect($("#labels-printer-select"), state.labels.printers, "Выберите принтер");
       if (state.labels.selectedPrinter) {
         $("#labels-printer-select").value = state.labels.selectedPrinter;
       }
+      const manualPanel = $('#labels-manual-panel');
+      if (manualPanel) {
+        manualPanel.classList.toggle('is-hidden', !state.labels.manualEnabled);
+      }
+      if ($('#labels-manual-note')) {
+        $('#labels-manual-note').textContent = state.labels.manualPrompt
+          || 'Если автоподбор не сработал, заполните поля вручную и повторите предпросмотр или печать.';
+      }
+      if ($('#labels-manual-gtin')) {
+        $('#labels-manual-gtin').value = state.labels.manualFields.gtin || '';
+      }
+      if ($('#labels-manual-size')) {
+        $('#labels-manual-size').value = state.labels.manualFields.size || '';
+      }
+      if ($('#labels-manual-batch')) {
+        $('#labels-manual-batch').value = state.labels.manualFields.batch || '';
+      }
+      if ($('#labels-manual-color')) {
+        $('#labels-manual-color').value = state.labels.manualFields.color || '';
+      }
+      if ($('#labels-manual-units')) {
+        $('#labels-manual-units').value = state.labels.manualFields.units_per_pack || '';
+      }
 
+      const availableTemplates = visibleLabelTemplates();
       const templateHost = $("#labels-template-grid");
       const pageSize = state.labels.templatePageSize || 3;
-      const totalPages = Math.max(1, Math.ceil(state.labels.templates.length / pageSize));
+      const totalPages = Math.max(1, Math.ceil(availableTemplates.length / pageSize));
       state.labels.templatePage = Math.min(state.labels.templatePage, totalPages - 1);
       const pageStart = state.labels.templatePage * pageSize;
-      const visibleTemplates = state.labels.templates.slice(pageStart, pageStart + pageSize);
-      $("#labels-template-page").textContent = `${state.labels.templates.length ? pageStart + 1 : 0}-${Math.min(pageStart + visibleTemplates.length, state.labels.templates.length)} из ${state.labels.templates.length}`;
+      const visibleTemplates = availableTemplates.slice(pageStart, pageStart + pageSize);
+      $("#labels-template-page").textContent = `${availableTemplates.length ? pageStart + 1 : 0}-${Math.min(pageStart + visibleTemplates.length, availableTemplates.length)} / ${availableTemplates.length}`;
       $("#labels-template-prev").disabled = state.labels.templatePage <= 0;
       $("#labels-template-next").disabled = state.labels.templatePage >= totalPages - 1;
 
       templateHost.innerHTML = visibleTemplates.map((template) => `
         <button class="template-card ${state.labels.selectedTemplatePath === template.path ? 'is-selected' : ''}" data-template-path="${escapeHtml(template.path)}">
           <strong>${escapeHtml(template.name)}</strong>
+          <small>${escapeHtml(template.sheet_format_label || template.sheet_format || '')}</small>
           <small>${escapeHtml(template.category)}</small>
           <small>${escapeHtml(template.relative_path)}</small>
           <small>${escapeHtml(template.source_label || template.data_source_kind)}</small>
@@ -1080,6 +1437,7 @@ const Views = {
       templateHost.querySelectorAll("[data-template-path]").forEach((button) => {
         button.addEventListener("click", () => {
           state.labels.selectedTemplatePath = button.dataset.templatePath;
+          resetLabelsManualState();
           invalidateLabelsPreview();
           Views.labels.render();
         });
@@ -1102,6 +1460,7 @@ const Views = {
           selectedIds: state.labels.selectedOrderId,
           onRowClick: (id) => {
             state.labels.selectedOrderId = id;
+            resetLabelsManualState();
             invalidateLabelsPreview();
             Views.labels.render();
           },
@@ -1124,6 +1483,7 @@ const Views = {
           rowId: (row) => row.path,
           onRowClick: (id) => {
             state.labels.selectedAggregationPath = id;
+            resetLabelsManualState();
             invalidateLabelsPreview();
             Views.labels.render();
           },
@@ -1146,6 +1506,7 @@ const Views = {
           rowId: (row) => row.path,
           onRowClick: (id) => {
             state.labels.selectedMarkingPath = id;
+            resetLabelsManualState();
             invalidateLabelsPreview();
             Views.labels.render();
           },
@@ -1234,6 +1595,9 @@ async function loadOrdersState(options = {}) {
     state.orders.sessionOrders = result.session_orders || [];
     state.orders.history = result.history || [];
     state.orders.deletedOrders = result.deleted_orders || [];
+    if (!state.orders.queue.some((item) => item.uid === state.orders.selectedQueueId)) {
+      state.orders.selectedQueueId = '';
+    }
     if (!state.orders.history.some((item) => item.document_id === state.orders.selectedHistoryId)) {
       state.orders.selectedHistoryId = '';
     }
@@ -1369,12 +1733,22 @@ async function loadLabelsState(options = {}) {
   state.ui.routeLoading.labels = true;
   try {
     const result = await API.call('get_labels_state');
+    state.labels.sheetFormats = result.sheet_formats || [];
+    state.labels.defaultSheetFormat = result.default_sheet_format || state.labels.defaultSheetFormat || '100x180';
     state.labels.templates = result.templates || [];
     state.labels.aggregationFiles = result.aggregation_files || [];
     state.labels.markingFiles = result.marking_files || [];
     state.labels.orders = result.orders || [];
     state.labels.printers = result.printers || [];
     state.labels.defaultPrinter = result.default_printer || state.labels.defaultPrinter;
+    const availableSheetFormatKeys = new Set(
+      state.labels.sheetFormats.map((item) => String(item.key || '').trim()).filter(Boolean),
+    );
+    if (!availableSheetFormatKeys.has(state.labels.selectedSheetFormat)) {
+      state.labels.selectedSheetFormat = availableSheetFormatKeys.has(state.labels.defaultSheetFormat)
+        ? state.labels.defaultSheetFormat
+        : (state.labels.sheetFormats[0]?.key || state.labels.defaultSheetFormat || '100x180');
+    }
     if (!state.labels.printers.includes(state.labels.selectedPrinter)) {
       if (state.labels.defaultPrinter && state.labels.printers.includes(state.labels.defaultPrinter)) {
         state.labels.selectedPrinter = state.labels.defaultPrinter;
@@ -1382,17 +1756,19 @@ async function loadLabelsState(options = {}) {
         state.labels.selectedPrinter = state.labels.printers[0] || '';
       }
     }
-    if (!state.labels.templates.some((item) => item.path === state.labels.selectedTemplatePath)) {
-      state.labels.selectedTemplatePath = state.labels.templates[0]?.path || '';
+    const availableTemplates = visibleLabelTemplates();
+    if (!availableTemplates.some((item) => item.path === state.labels.selectedTemplatePath)) {
+      state.labels.selectedTemplatePath = availableTemplates[0]?.path || '';
     }
     if (state.labels.selectedTemplatePath) {
-      const currentIndex = state.labels.templates.findIndex((item) => item.path === state.labels.selectedTemplatePath);
+      const currentIndex = availableTemplates.findIndex((item) => item.path === state.labels.selectedTemplatePath);
       state.labels.templatePage = currentIndex >= 0 ? Math.floor(currentIndex / state.labels.templatePageSize) : 0;
     } else {
       state.labels.templatePage = 0;
     }
     if (!state.labels.orders.some((item) => item.document_id === state.labels.selectedOrderId)) {
       state.labels.selectedOrderId = state.labels.orders[0]?.document_id || '';
+      resetLabelsManualState();
     }
     if (!state.labels.aggregationFiles.some((item) => item.path === state.labels.selectedAggregationPath)) {
       state.labels.selectedAggregationPath = state.labels.aggregationFiles[0]?.path || '';
@@ -1409,8 +1785,21 @@ async function loadLabelsState(options = {}) {
   }
 }
 
+function visibleLabelTemplates() {
+  const selectedSheetFormat = String(state.labels.selectedSheetFormat || state.labels.defaultSheetFormat || '100x180').trim();
+  return state.labels.templates.filter(
+    (item) => String(item.sheet_format || state.labels.defaultSheetFormat || '100x180').trim() === selectedSheetFormat,
+  );
+}
+
+function selectedLabelSheetFormatLabel() {
+  const selectedSheetFormat = String(state.labels.selectedSheetFormat || state.labels.defaultSheetFormat || '100x180').trim();
+  const selectedFormat = state.labels.sheetFormats.find((item) => String(item.key || '').trim() === selectedSheetFormat);
+  return selectedFormat?.label || selectedSheetFormat || '100x180';
+}
+
 function selectedTemplate() {
-  return state.labels.templates.find((item) => item.path === state.labels.selectedTemplatePath) || null;
+  return visibleLabelTemplates().find((item) => item.path === state.labels.selectedTemplatePath) || null;
 }
 
 function selectedLabelCsvPath() {
@@ -1433,6 +1822,49 @@ function selectedLabelFileMeta() {
     return state.labels.aggregationFiles.find((item) => item.path === state.labels.selectedAggregationPath) || null;
   }
   return state.labels.markingFiles.find((item) => item.path === state.labels.selectedMarkingPath) || null;
+}
+
+function selectedLabelsOrder() {
+  return state.labels.orders.find((item) => item.document_id === state.labels.selectedOrderId) || null;
+}
+
+function resetLabelsManualState() {
+  state.labels.manualPrompt = '';
+  state.labels.manualEnabled = false;
+  state.labels.manualFields = {
+    gtin: '',
+    size: '',
+    batch: '',
+    color: '',
+    units_per_pack: '',
+  };
+}
+
+function applyLabelsManualForm(payload = {}) {
+  const fields = payload?.fields || {};
+  state.labels.manualPrompt = payload?.prompt || 'Заполните форму вручную и повторите действие.';
+  state.labels.manualEnabled = true;
+  state.labels.manualFields = {
+    gtin: String(fields.gtin || ''),
+    size: String(fields.size || ''),
+    batch: String(fields.batch || ''),
+    color: String(fields.color || ''),
+    units_per_pack: String(fields.units_per_pack || ''),
+  };
+}
+
+function readLabelsManualOverride() {
+  if (!state.labels.manualEnabled) {
+    return null;
+  }
+  return {
+    enabled: true,
+    gtin: $('#labels-manual-gtin')?.value?.trim?.() || '',
+    size: $('#labels-manual-size')?.value?.trim?.() || '',
+    batch: $('#labels-manual-batch')?.value?.trim?.() || '',
+    color: $('#labels-manual-color')?.value?.trim?.() || '',
+    units_per_pack: $('#labels-manual-units')?.value?.trim?.() || '',
+  };
 }
 
 function invalidateLabelsPreview() {
@@ -1690,6 +2122,17 @@ async function bindEvents() {
     }, 'Очередь очищена.');
   });
 
+  $('#orders-remove-queue-btn').addEventListener('click', async () => {
+    await runAction('Удаляем позицию из очереди...', async () => {
+      if (!state.orders.selectedQueueId) {
+        throw new Error('Выберите позицию в очереди заказов.');
+      }
+      const result = await API.call('remove_order_item', state.orders.selectedQueueId);
+      await loadOrdersState({ force: true });
+      return result;
+    }, 'Позиция удалена из очереди.');
+  });
+
   $('#orders-delete-btn').addEventListener('click', async () => {
     await runAction('Удаляем заказ...', async () => {
       const result = await API.call('delete_order', state.orders.selectedHistoryId);
@@ -1781,10 +2224,19 @@ async function bindEvents() {
     }, 'Заказ скачан.');
   });
 
+  $('#download-record-number').addEventListener('change', () => {
+    state.download.recordNumber = $('#download-record-number').value.trim();
+  });
+
   $('#download-print-btn').addEventListener('click', async () => {
     await runAction('Запускаем печать термоэтикеток...', async () => {
       const targetId = state.download.selectedItemId || Array.from(state.download.selectedIds)[0] || '';
-      const result = await API.call('print_download_order', targetId, $('#download-printer-select').value);
+      const result = await API.call(
+        'print_download_order',
+        targetId,
+        $('#download-printer-select').value,
+        state.download.recordNumber || null,
+      );
       return result;
     }, 'Печать термоэтикеток запущена.');
   });
@@ -1806,6 +2258,13 @@ async function bindEvents() {
       markRoutesDirty(['download', 'tsd']);
       return result;
     }, 'Ввод в оборот завершён.');
+  });
+
+  $('#intro-refresh-btn').addEventListener('click', async () => {
+    await runAction('Обновляем список заказов для ввода в оборот...', async () => {
+      const result = await loadIntroState({ force: true });
+      return result || { success: true };
+    }, 'Список заказов обновлён.');
   });
 
   $('#tsd-run-btn').addEventListener('click', async () => {
@@ -1972,9 +2431,12 @@ async function bindEvents() {
         $('#agg-intro-production-date').value,
         $('#agg-intro-expiration-date').value,
         $('#agg-intro-batch-number').value,
+        $('#agg-intro-document-title').value,
       );
-      await loadAggregationState({ force: true });
-      markRoutesDirty(['download', 'intro', 'tsd']);
+      markRoutesDirty(['aggregation', 'download', 'intro', 'tsd']);
+      window.setTimeout(() => {
+        loadAggregationState({ force: true, render: isRouteActive('aggregation') }).catch(() => null);
+      }, 0);
       return result;
     }, 'Ввод в оборот по выбранным АК завершён.');
   });
@@ -2004,6 +2466,7 @@ async function bindEvents() {
   $('#labels-preview-btn').addEventListener('click', async () => {
     await runAction('Собираем контекст печати...', async () => {
       const result = await API.call('preview_100x180_label', {
+        sheet_format: state.labels.selectedSheetFormat,
         document_id: state.labels.selectedOrderId,
         template_path: state.labels.selectedTemplatePath,
         csv_path: selectedLabelCsvPath(),
@@ -2013,16 +2476,30 @@ async function bindEvents() {
         quantity_value: $('#labels-quantity-value').value,
         print_scope: state.labels.printScope,
         record_number: state.labels.printScope === 'single' ? state.labels.selectedRecordNumber : null,
+        manual_override: readLabelsManualOverride(),
       });
+      if (result.needs_manual_input) {
+        applyLabelsManualForm(result.manual_form || {});
+        state.labels.preview = null;
+        Views.labels.render();
+        setStatusText(result.prompt || 'Заполните форму вручную и повторите действие.', true);
+        appendUiLog(result.prompt || 'Нужно заполнить поля вручную для печати этикетки.', 'labels');
+        showToast(result.prompt || 'Заполните форму вручную.', 'info');
+        return result;
+      }
+      if (!result.preview?.manual_override_used) {
+        resetLabelsManualState();
+      }
       state.labels.preview = result.preview;
       Views.labels.render();
       return result;
-    }, 'Контекст печати собран.');
+    });
   });
 
   $('#labels-print-btn').addEventListener('click', async () => {
     await runAction('Запускаем печать этикеток...', async () => {
       const result = await API.call('print_100x180_label', {
+        sheet_format: state.labels.selectedSheetFormat,
         document_id: state.labels.selectedOrderId,
         template_path: state.labels.selectedTemplatePath,
         csv_path: selectedLabelCsvPath(),
@@ -2032,15 +2509,54 @@ async function bindEvents() {
         quantity_value: $('#labels-quantity-value').value,
         print_scope: state.labels.printScope,
         record_number: state.labels.printScope === 'single' ? state.labels.selectedRecordNumber : null,
+        manual_override: readLabelsManualOverride(),
       });
+      if (result.needs_manual_input) {
+        applyLabelsManualForm(result.manual_form || {});
+        state.labels.preview = null;
+        Views.labels.render();
+        setStatusText(result.prompt || 'Заполните форму вручную и повторите действие.', true);
+        appendUiLog(result.prompt || 'Нужно заполнить поля вручную для печати этикетки.', 'labels');
+        showToast(result.prompt || 'Заполните форму вручную.', 'info');
+        return result;
+      }
+      if (!result.preview?.manual_override_used) {
+        resetLabelsManualState();
+      }
       state.labels.preview = result.preview || state.labels.preview;
       Views.labels.render();
       return result;
-    }, 'Печать этикеток запущена.');
+    });
   });
 
   $('#labels-printer-select').addEventListener('change', () => {
     state.labels.selectedPrinter = $('#labels-printer-select').value;
+  });
+
+  $('#labels-sheet-format-select').addEventListener('change', () => {
+    state.labels.selectedSheetFormat = $('#labels-sheet-format-select').value || state.labels.defaultSheetFormat || '100x180';
+    const availableTemplates = visibleLabelTemplates();
+    if (!availableTemplates.some((item) => item.path === state.labels.selectedTemplatePath)) {
+      state.labels.selectedTemplatePath = availableTemplates[0]?.path || '';
+      state.labels.templatePage = 0;
+    } else {
+      const currentIndex = availableTemplates.findIndex((item) => item.path === state.labels.selectedTemplatePath);
+      state.labels.templatePage = currentIndex >= 0 ? Math.floor(currentIndex / state.labels.templatePageSize) : 0;
+    }
+    resetLabelsManualState();
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  ['gtin', 'size', 'batch', 'color', 'units'].forEach((field) => {
+    const element = $(`#labels-manual-${field}`);
+    if (!element) {
+      return;
+    }
+    element.addEventListener('input', () => {
+      const key = field === 'units' ? 'units_per_pack' : field;
+      state.labels.manualFields[key] = element.value;
+    });
   });
 
   document.querySelectorAll('[data-clear-log]').forEach((button) => {
@@ -2098,7 +2614,11 @@ async function init() {
     return;
   }
   appInitialized = true;
+  applyClientConfig();
   setTheme(state.theme);
+  installMobileViewportGuard();
+  installMojibakeGuard();
+  ensureAggregationIntroDocumentTitleField();
 
   await bindEvents();
 
@@ -2127,10 +2647,17 @@ async function init() {
 
 window.addEventListener('pywebviewready', init);
 window.addEventListener('DOMContentLoaded', () => {
-  if (window.pywebview?.api) {
+  applyClientConfig();
+  installMojibakeGuard();
+  if (CLIENT_CONFIG.mobileMode) {
+    setTheme(state.theme);
+    installMobileViewportGuard();
+  }
+  if (window.pywebview?.api || CLIENT_CONFIG.browserMode) {
     init();
   } else {
     setTheme(state.theme);
     setStatusText('Ожидаем инициализацию PyWebView API...', false);
   }
 });
+

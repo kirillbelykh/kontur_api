@@ -118,6 +118,88 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         mark_mock.assert_called_once_with("doc-1", "intro-2")
         remove_mock.assert_called_once_with(fake_runtime.download_items, "doc-1")
 
+    def test_introduce_orders_auto_downloads_missing_files_before_intro(self):
+        item = {
+            "document_id": "doc-1",
+            "order_name": "Order 1",
+            "status": "released",
+            "filename": "",
+            "csv_path": "",
+            "simpl": "Gloves",
+        }
+
+        def fake_download(_session, current_item, log_prefix=""):
+            current_item["filename"] = "codes.csv"
+            current_item["csv_path"] = "codes.csv"
+            current_item["status"] = "Скачан"
+            return current_item
+
+        with (
+            mock.patch.object(self.bridge, "_ensure_session", return_value=object()),
+            mock.patch.object(self.bridge, "_get_thumbprint", return_value="thumb"),
+            mock.patch.object(self.bridge, "_parse_iso_date", side_effect=lambda value, **_kwargs: value),
+            mock.patch.object(self.bridge, "_get_order_for_document_id", return_value=item),
+            mock.patch.object(self.bridge, "_download_order_internal", side_effect=fake_download) as download_mock,
+            mock.patch.object(self.bridge, "_sync_history_from_download_item"),
+            mock.patch.object(self.bridge, "_log"),
+            mock.patch.object(api_bridge, "put_into_circulation", return_value=(True, {"introduction_id": "intro-1"})) as intro_mock,
+        ):
+            result = self.bridge.introduce_orders(
+                ["doc-1"],
+                "01-01-2026",
+                "01-01-2031",
+                "260330",
+            )
+
+        self.assertTrue(result["success"])
+        download_mock.assert_called_once()
+        intro_mock.assert_called_once()
+
+    def test_download_selected_aggregations_saves_separate_files_by_comment(self):
+        aggregates = [
+            types.SimpleNamespace(
+                aggregate_code="A1",
+                document_id="doc-1",
+                status="readyForSend",
+                includes_units_count=1,
+                comment="Alpha",
+                product_group="wheelChairs",
+                codes_check_errors_count=0,
+            ),
+            types.SimpleNamespace(
+                aggregate_code="A2",
+                document_id="doc-2",
+                status="readyForSend",
+                includes_units_count=1,
+                comment="Alpha",
+                product_group="wheelChairs",
+                codes_check_errors_count=0,
+            ),
+            types.SimpleNamespace(
+                aggregate_code="B1",
+                document_id="doc-3",
+                status="readyForSend",
+                includes_units_count=1,
+                comment="Beta",
+                product_group="wheelChairs",
+                codes_check_errors_count=0,
+            ),
+        ]
+
+        with (
+            mock.patch.object(self.bridge, "_resolve_aggregate_infos_by_ids", return_value=aggregates),
+            mock.patch.object(self.bridge, "_save_simple_aggregation_csv", side_effect=lambda items, filename: f"C:/tmp/{filename}") as save_mock,
+            mock.patch.object(self.bridge, "_run_with_session_retry", side_effect=lambda action, **_kwargs: action(object())),
+            mock.patch.object(self.bridge, "_log"),
+        ):
+            result = self.bridge.download_selected_aggregations(["doc-1", "doc-2", "doc-3"])
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["count"], 3)
+        self.assertEqual(len(result["saved_paths"]), 2)
+        self.assertEqual([group["comment"] for group in result["groups"]], ["Alpha", "Beta"])
+        self.assertEqual(save_mock.call_count, 2)
+
     def test_upload_intro_positions_from_file_runs_autocomplete(self):
         upload_response = mock.Mock()
         upload_response.raise_for_status.return_value = None
@@ -342,10 +424,140 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertGreaterEqual(fetch_code_states_mock.call_count, 2)
         sign_mock.assert_called_once()
 
+    def test_preview_100x180_label_requests_manual_form_when_auto_metadata_fails(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path = temp_root / "codes.csv"
+            csv_path.write_text("010000000000000021ABC\t04650118041257\tName\n", encoding="utf-8")
+            order_data = {"document_id": "doc-1", "order_name": "Order M 260330", "gtin": "04650118041257"}
+            fake_runtime = types.SimpleNamespace(
+                history_db=types.SimpleNamespace(get_order_by_document_id=lambda document_id: order_data if document_id == "doc-1" else None)
+            )
+
+            with (
+                mock.patch.object(self.bridge, "_load_nomenclature_df", return_value=object()),
+                mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+                mock.patch.object(api_bridge, "list_label_templates", return_value=[
+                    types.SimpleNamespace(path=str(template_path), data_source_kind="marking", category="Templates", name="Template")
+                ]),
+                mock.patch.object(api_bridge, "build_label_print_context", side_effect=RuntimeError("GTIN 04650118041257 не найден в nomenclature.xlsx")),
+                mock.patch.object(self.bridge, "_log"),
+            ):
+                result = self.bridge.preview_100x180_label(
+                    {
+                        "sheet_format": "100x180",
+                        "document_id": "doc-1",
+                        "template_path": str(template_path),
+                        "csv_path": str(csv_path),
+                        "printer_name": "Printer",
+                        "manufacture_date": "2026-01",
+                        "expiration_date": "2031-01",
+                        "quantity_value": "10",
+                    }
+                )
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["needs_manual_input"])
+        self.assertIn("fields", result["manual_form"])
+
+    def test_preview_100x180_label_uses_manual_override_when_provided(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path = temp_root / "codes.csv"
+            csv_path.write_text("010000000000000021ABC\t04650118041257\tName\n", encoding="utf-8")
+            order_data = {"document_id": "doc-1", "order_name": "Order 260330", "gtin": ""}
+            fake_runtime = types.SimpleNamespace(
+                history_db=types.SimpleNamespace(get_order_by_document_id=lambda document_id: order_data if document_id == "doc-1" else None)
+            )
+
+            with (
+                mock.patch.object(self.bridge, "_load_nomenclature_df", return_value=object()),
+                mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+                mock.patch.object(api_bridge, "list_label_templates", return_value=[
+                    types.SimpleNamespace(path=str(template_path), data_source_kind="marking", category="Templates", name="Template")
+                ]),
+                mock.patch.object(api_bridge, "build_label_print_context", side_effect=RuntimeError("GTIN missing")),
+                mock.patch.object(self.bridge, "_parse_iso_date", side_effect=lambda value, **_kwargs: f"{value}-01" if len(str(value)) == 7 else value),
+                mock.patch.object(self.bridge, "_log"),
+            ):
+                result = self.bridge.preview_100x180_label(
+                    {
+                        "sheet_format": "100x180",
+                        "document_id": "doc-1",
+                        "template_path": str(template_path),
+                        "csv_path": str(csv_path),
+                        "printer_name": "Printer",
+                        "manufacture_date": "2026-01",
+                        "expiration_date": "2031-01",
+                        "quantity_value": "10",
+                        "manual_override": {
+                            "enabled": True,
+                            "gtin": "04650118041257",
+                            "size": "M",
+                            "batch": "260330",
+                            "color": "",
+                            "units_per_pack": "10",
+                        },
+                    }
+                )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["preview"]["size"], "M")
+        self.assertEqual(result["preview"]["batch"], "260330")
+        self.assertTrue(result["preview"]["manual_override_used"])
+
+    def test_print_download_order_supports_single_record_number(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            csv_path = temp_root / "codes.csv"
+            csv_path.write_text(
+                "010000000000000021AAA\t04650118041257\tName A\n"
+                "010000000000000021BBB\t04650118041257\tName B\n",
+                encoding="utf-8",
+            )
+            item = {"document_id": "doc-1", "order_name": "Order 1"}
+            built_contexts = []
+            cleanup_callbacks = []
+
+            def fake_build_print_context(**kwargs):
+                built_contexts.append(kwargs)
+                return types.SimpleNamespace(
+                    order_name="Order 1",
+                    document_id="doc-1",
+                    csv_path=kwargs["csv_path"],
+                    template_path="template.btw",
+                    printer_name=kwargs["printer_name"],
+                    size="M",
+                    label_count=1,
+                )
+
+            def capture_background_job(**kwargs):
+                cleanup_callbacks.append(kwargs["cleanup"])
+
+            with (
+                mock.patch.object(self.bridge, "_find_download_item", return_value=item),
+                mock.patch.object(self.bridge, "_resolve_order_csv_path", return_value=str(csv_path)),
+                mock.patch.object(api_bridge, "build_print_context", side_effect=fake_build_print_context),
+                mock.patch.object(self.bridge, "_run_background_job", side_effect=capture_background_job),
+                mock.patch.object(self.bridge, "_log"),
+            ):
+                result = self.bridge.print_download_order("doc-1", "Printer", 2)
+
+            self.assertTrue(result["success"])
+            self.assertEqual(result["selection"]["selected_record_number"], 2)
+            self.assertEqual(len(built_contexts), 1)
+            self.assertNotEqual(built_contexts[0]["csv_path"], str(csv_path))
+            selected_csv = Path(built_contexts[0]["csv_path"])
+            self.assertIn("010000000000000021BBB", selected_csv.read_text(encoding="utf-8-sig"))
+            cleanup_callbacks[0]()
+            self.assertFalse(selected_csv.exists())
+
     def test_print_100x180_label_returns_after_queueing_background_print(self):
-        preview_payload = {"document_id": "doc-1", "order_name": "Заказ 1"}
         order_data = {"document_id": "doc-1", "order_name": "Заказ 1"}
-        base_context = types.SimpleNamespace(document_id="doc-1", order_name="Заказ 1")
         single_context = types.SimpleNamespace(document_id="doc-1", order_name="Заказ 1")
         selection = {
             "print_scope": "single",
@@ -357,19 +569,33 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             history_db=types.SimpleNamespace(get_order_by_document_id=lambda document_id: order_data if document_id == "doc-1" else None)
         )
 
+        background_jobs = []
+
+        def capture_background_job(**kwargs):
+            background_jobs.append(kwargs)
+
         with (
-            mock.patch.object(self.bridge, "preview_100x180_label", return_value={"success": True, "preview": preview_payload}),
-            mock.patch.object(self.bridge, "_load_nomenclature_df", return_value=object()),
             mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
-            mock.patch.object(api_bridge, "build_label_print_context", side_effect=[base_context, single_context]),
+            mock.patch.object(
+                self.bridge,
+                "_resolve_label_template_info",
+                return_value={"path": "template.btw", "name": "Шаблон"},
+            ),
             mock.patch.object(self.bridge, "_resolve_label_print_selection", return_value=selection),
+            mock.patch.object(
+                self.bridge,
+                "_resolve_label_context",
+                return_value={"context": single_context, "used_manual_override": False},
+            ),
+            mock.patch.object(self.bridge, "_serialize_label_preview", return_value={"document_id": "doc-1", "order_name": "Заказ 1"}),
             mock.patch.object(self.bridge, "_cleanup_label_selection") as cleanup_mock,
-            mock.patch.object(self.bridge, "_run_background_job") as background_mock,
-            mock.patch.object(api_bridge, "print_100x180_labels") as print_mock,
+            mock.patch.object(self.bridge, "_run_background_job", side_effect=capture_background_job),
+            mock.patch.object(api_bridge, "print_label_sheet") as print_mock,
             mock.patch.object(self.bridge, "_log") as log_mock,
         ):
             result = self.bridge.print_100x180_label(
                 {
+                    "sheet_format": "100x180",
                     "document_id": "doc-1",
                     "template_path": "template.btw",
                     "csv_path": "codes.csv",
@@ -383,16 +609,20 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             )
 
             self.assertTrue(result["success"])
-            self.assertEqual(result["preview"], preview_payload)
-            background_mock.assert_called_once()
+            self.assertEqual(result["preview"]["document_id"], "doc-1")
             cleanup_mock.assert_not_called()
-            background_kwargs = background_mock.call_args.kwargs
+            self.assertEqual(len(background_jobs), 1)
+            background_kwargs = background_jobs[0]
             self.assertEqual(background_kwargs["error_log_channel"], "labels")
             self.assertEqual(background_kwargs["error_log_prefix"], "Ошибка печати 100x180")
+            print_mock.assert_not_called()
             background_kwargs["action"]()
             print_mock.assert_called_once_with(single_context)
             background_kwargs["cleanup"]()
-            cleanup_mock.assert_called_once_with(selection)
+            cleanup_mock.assert_called_once_with(
+                selection,
+                delay_seconds=api_bridge.LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS,
+            )
             self.assertTrue(any("отправлена в BarTender" in str(call.args[1]) for call in log_mock.call_args_list))
 
 

@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 from threading import Lock, Thread
+from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence
 
 import pandas as pd
@@ -31,16 +32,34 @@ from api import (
     make_task_on_tsd,
     put_into_circulation,
 )
-from bartender_label_100x180 import (
-    AGGREGATION_SOURCE_KIND,
-    MARKING_SOURCE_KIND,
-    build_label_print_context,
-    list_100x180_templates,
-    list_aggregation_csv_files,
-    list_marking_csv_files,
-    print_100x180_labels,
-    resolve_order_metadata,
-)
+try:
+    from bartender_label_formats import (
+        AGGREGATION_SOURCE_KIND,
+        DEFAULT_LABEL_SHEET_FORMAT,
+        MARKING_SOURCE_KIND,
+        build_label_print_context,
+        format_label_sheet_title,
+        list_aggregation_csv_files,
+        list_label_sheet_formats,
+        list_label_templates,
+        list_marking_csv_files,
+        print_label_sheet,
+        resolve_order_metadata,
+    )
+except ModuleNotFoundError:
+    from ui_v2.bartender_label_formats import (
+        AGGREGATION_SOURCE_KIND,
+        DEFAULT_LABEL_SHEET_FORMAT,
+        MARKING_SOURCE_KIND,
+        build_label_print_context,
+        format_label_sheet_title,
+        list_aggregation_csv_files,
+        list_label_sheet_formats,
+        list_label_templates,
+        list_marking_csv_files,
+        print_label_sheet,
+        resolve_order_metadata,
+    )
 from bartender_print import build_print_context, list_installed_printers, print_labels
 from cookies import get_valid_cookies
 from cryptopro import find_certificate_by_thumbprint, sign_data, sign_text_data
@@ -59,6 +78,8 @@ from options import (
 )
 from queue_utils import is_order_ready_for_intro, is_order_ready_for_tsd, remove_order_by_document_id
 from utils import get_tnved_code, make_session_with_cookies
+
+LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS = 300
 
 
 LOG_CHANNELS = ("orders", "download", "intro", "tsd", "aggregation", "labels")
@@ -1087,6 +1108,83 @@ class ApiBridge:
 
         return None
 
+    def _collect_known_orders(self) -> List[Dict[str, Any]]:
+        runtime = _get_runtime()
+        runtime.load_download_items_from_history()
+        merged_by_id: Dict[str, Dict[str, Any]] = {}
+
+        for source in (runtime.session_orders, runtime.download_items, runtime.history_db.get_all_orders()):
+            for item in source:
+                document_id = str(item.get("document_id") or "").strip()
+                if not document_id:
+                    continue
+                existing = merged_by_id.get(document_id)
+                if existing is None:
+                    merged_by_id[document_id] = dict(item)
+                else:
+                    merged_by_id[document_id] = self._merge_order_data(existing, item)
+
+        items = list(merged_by_id.values())
+        items.sort(
+            key=lambda row: (
+                str(row.get("updated_at") or row.get("created_at") or ""),
+                str(row.get("document_id") or ""),
+            ),
+            reverse=True,
+        )
+        return items
+
+    def _get_order_for_document_id(self, document_id: str) -> Optional[Dict[str, Any]]:
+        normalized_id = str(document_id or "").strip()
+        if not normalized_id:
+            return None
+
+        item = self._find_download_item(normalized_id)
+        if item:
+            return item
+
+        for session_item in _get_runtime().session_orders:
+            if str(session_item.get("document_id") or "").strip() == normalized_id:
+                return self._merge_order_data(session_item)
+
+        history_order = _get_runtime().history_db.get_order_by_document_id(normalized_id)
+        if isinstance(history_order, dict):
+            return _history_order_to_download_item(history_order)
+        return None
+
+    def _ensure_order_downloaded_for_intro(
+        self,
+        session: requests.Session,
+        item: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        csv_path = self._resolve_order_csv_path(item)
+        if csv_path:
+            if str(item.get("status") or "").strip() != "Скачан":
+                item["status"] = "Скачан"
+                self._sync_history_from_download_item(item)
+            return item
+
+        document_id = str(item.get("document_id") or "").strip()
+        if not document_id:
+            raise RuntimeError("У заказа не найден document_id.")
+
+        raw_status = str(item.get("status_raw") or item.get("status") or "").strip()
+        if raw_status not in {"released", "received", "downloaded"}:
+            raw_status = check_order_status(session, document_id)
+            item["status"] = raw_status
+            self._sync_history_from_download_item(item)
+
+        if raw_status not in {"released", "received", "downloaded"}:
+            raise RuntimeError("Заказ ещё не готов для ввода в оборот.")
+
+        self._log("intro", f"Заказ {item.get('order_name') or document_id} ещё не скачан. Скачиваем перед вводом в оборот.")
+        self._download_order_internal(
+            session,
+            item,
+            log_prefix="Автоскачивание перед вводом в оборот: ",
+        )
+        return item
+
     def _download_order_internal(self, session: requests.Session, item: Dict[str, Any], log_prefix: str = "") -> Dict[str, Any]:
         if item.get("downloading"):
             raise RuntimeError(f"{log_prefix}Заказ уже скачивается.")
@@ -1710,6 +1808,109 @@ class ApiBridge:
             "final_check": final_check.json(),
         }
 
+    def _collect_intro_partial_details(self, production_state: Dict[str, Any]) -> Dict[str, Any]:
+        positions = production_state.get("positions") or []
+        total_codes = 0
+        broken_codes: List[str] = []
+        broken_count = 0
+
+        for position in positions:
+            try:
+                total_codes += max(int(position.get("codesCount") or 0), 0)
+            except Exception:
+                pass
+            try:
+                broken_count += max(int(position.get("brokenCodesCount") or 0), 0)
+            except Exception:
+                pass
+            for broken_group in position.get("brokenCodes") or []:
+                broken_codes.extend(
+                    str(code or "").strip()
+                    for code in (broken_group.get("codes") or [])
+                    if str(code or "").strip()
+                )
+
+        successful_codes_count = max(total_codes - broken_count, 0)
+        return {
+            "total_codes_count": total_codes,
+            "broken_codes_count": broken_count,
+            "successful_codes_count": successful_codes_count,
+            "broken_codes": broken_codes,
+        }
+
+    def _finalize_intro_document_after_check(
+        self,
+        session: requests.Session,
+        introduction_id: str,
+        *,
+        cert: Any,
+        codes_check: Dict[str, Any],
+        uploaded_codes_count: int,
+        log_channel: str,
+        source_label: str,
+    ) -> Dict[str, Any]:
+        production_state = self._get_intro_production_state(session, introduction_id)
+        check_status = str(codes_check.get("status") or "").strip()
+
+        if check_status == "hasErrors":
+            partial_details = self._collect_intro_partial_details(production_state)
+            successful_codes_count = int(partial_details.get("successful_codes_count") or 0)
+            broken_codes_count = int(partial_details.get("broken_codes_count") or 0)
+            broken_codes = [str(code or "").strip() for code in partial_details.get("broken_codes") or [] if str(code or "").strip()]
+
+            if successful_codes_count <= 0:
+                preview = ", ".join(broken_codes[:5])
+                raise RuntimeError(
+                    f"{source_label}: проверка кодов вернула ошибки для {broken_codes_count} КМ, "
+                    f"успешно обработанных кодов нет. Примеры: {preview}"
+                )
+
+            self._log(
+                log_channel,
+                f"{source_label}: документ {introduction_id} обработан частично. "
+                f"Успешно: {successful_codes_count}, с ошибками: {broken_codes_count}. "
+                f"Подписываем и отправляем успешно обработанные коды.",
+            )
+            send_result = self._sign_and_send_intro_document(
+                session,
+                introduction_id,
+                cert=cert,
+            )
+            send_result["partial_success"] = partial_details
+            return {
+                "send_result": send_result,
+                "document_state": self._get_intro_document_state(session, introduction_id),
+                "production_state": production_state,
+                "actual_sent_codes_count": successful_codes_count,
+            }
+
+        document_state = self._get_intro_document_state(session, introduction_id)
+        document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
+        self._log(
+            log_channel,
+            f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+        )
+        if document_status != "introduced":
+            self._log(log_channel, f"Подписываем и отправляем документ {introduction_id}.")
+            send_result = self._sign_and_send_intro_document(
+                session,
+                introduction_id,
+                cert=cert,
+            )
+        else:
+            send_result = {
+                "generated_count": 0,
+                "send_response": {},
+                "final_introduction": document_state or {"documentId": introduction_id, "documentStatus": "introduced"},
+                "final_check": codes_check,
+            }
+        return {
+            "send_result": send_result,
+            "document_state": document_state,
+            "production_state": production_state,
+            "actual_sent_codes_count": max(int(uploaded_codes_count or 0), 0),
+        }
+
     def _fetch_code_states_resilient(
         self,
         *,
@@ -2017,35 +2218,17 @@ class ApiBridge:
                 full_codes=codes,
             )
             codes_check = self._wait_for_intro_codes_check(session, introduction_id)
-            production_state = self._get_intro_production_state(session, introduction_id)
-            if str(codes_check.get("status") or "").strip() == "hasErrors":
-                refreshed_state = self._get_intro_production_state(session, introduction_id)
-                positions = refreshed_state.get("positions") or production_state.get("positions") or []
-                broken_count = 0
-                if positions:
-                    broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
-                raise RuntimeError(
-                    f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
-                )
-            document_state = self._get_intro_document_state(session, introduction_id)
-            document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
-            self._log(
-                "aggregation",
-                f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+            finalize_result = self._finalize_intro_document_after_check(
+                session,
+                introduction_id,
+                cert=cert,
+                codes_check=codes_check,
+                uploaded_codes_count=len(codes),
+                log_channel="aggregation",
+                source_label=source_order_name,
             )
-            if document_status != "introduced":
-                send_result = self._sign_and_send_intro_document(
-                    session,
-                    introduction_id,
-                    cert=cert,
-                )
-            else:
-                send_result = {
-                    "generated_count": 0,
-                    "send_response": {},
-                    "final_introduction": document_state or {"documentId": introduction_id, "documentStatus": "introduced"},
-                    "final_check": codes_check,
-                }
+            send_result = finalize_result["send_result"]
+            actual_sent_codes_count = int(finalize_result.get("actual_sent_codes_count") or 0)
 
             introduced_results.append(
                 {
@@ -2054,13 +2237,15 @@ class ApiBridge:
                     "source_path": str(group.get("source_path") or ""),
                     "gtin": metadata["gtin"],
                     "codes_count": len(codes),
+                    "actual_sent_codes_count": actual_sent_codes_count,
                     "result": send_result,
                 }
             )
-            total_sent_codes += len(codes)
+            total_sent_codes += actual_sent_codes_count
             self._log(
                 "aggregation",
-                f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+                f"Ввод в оборот отправлен: {source_order_name} "
+                f"({actual_sent_codes_count} из {len(codes)} кодов, документ {introduction_id}).",
             )
 
         return {
@@ -2232,36 +2417,17 @@ class ApiBridge:
             )
 
             codes_check = self._wait_for_intro_codes_check(session, introduction_id)
-            production_state = self._get_intro_production_state(session, introduction_id)
-            if str(codes_check.get("status") or "").strip() == "hasErrors":
-                refreshed_state = self._get_intro_production_state(session, introduction_id)
-                positions = refreshed_state.get("positions") or production_state.get("positions") or []
-                broken_count = 0
-                if positions:
-                    broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
-                raise RuntimeError(
-                    f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
-                )
-
-            document_state = self._get_intro_document_state(session, introduction_id)
-            document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
-            self._log(
-                "aggregation",
-                f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+            finalize_result = self._finalize_intro_document_after_check(
+                session,
+                introduction_id,
+                cert=cert,
+                codes_check=codes_check,
+                uploaded_codes_count=len(codes),
+                log_channel="aggregation",
+                source_label=source_order_name,
             )
-            if document_status != "introduced":
-                send_result = self._sign_and_send_intro_document(
-                    session,
-                    introduction_id,
-                    cert=cert,
-                )
-            else:
-                send_result = {
-                    "generated_count": 0,
-                    "send_response": {},
-                    "final_introduction": document_state or {"documentId": introduction_id, "documentStatus": "introduced"},
-                    "final_check": codes_check,
-                }
+            send_result = finalize_result["send_result"]
+            actual_sent_codes_count = int(finalize_result.get("actual_sent_codes_count") or 0)
 
             introduced_results.append(
                 {
@@ -2270,13 +2436,15 @@ class ApiBridge:
                     "source_path": str(group.get("source_path") or ""),
                     "gtin": metadata["gtin"],
                     "codes_count": len(codes),
+                    "actual_sent_codes_count": actual_sent_codes_count,
                     "result": send_result,
                 }
             )
-            total_sent_codes += len(codes)
+            total_sent_codes += actual_sent_codes_count
             self._log(
                 "aggregation",
-                f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+                f"Ввод в оборот отправлен: {source_order_name} "
+                f"({actual_sent_codes_count} из {len(codes)} кодов, документ {introduction_id}).",
             )
 
         return {
@@ -2895,7 +3063,55 @@ class ApiBridge:
             self._log("download", f"Ошибка ручного скачивания: {exc}")
             return {"success": False, "error": str(exc)}
 
-    def print_download_order(self, document_id: str, printer_name: str) -> Dict[str, Any]:
+    def _resolve_download_print_selection(
+        self,
+        csv_path: str,
+        record_number: Any = None,
+    ) -> Dict[str, Any]:
+        normalized_csv_path = str(csv_path or "").strip()
+        if not normalized_csv_path:
+            raise RuntimeError("Не найден CSV-файл заказа для печати.")
+
+        rows, delimiter = self._read_label_csv_rows(Path(normalized_csv_path))
+        total_record_count = len(rows)
+        if total_record_count <= 0:
+            raise RuntimeError("В CSV нет строк для печати.")
+
+        raw_record_number = str(record_number or "").strip()
+        if not raw_record_number:
+            return {
+                "csv_path": normalized_csv_path,
+                "cleanup_path": None,
+                "total_record_count": total_record_count,
+                "selected_record_number": None,
+                "record_preview": None,
+            }
+
+        try:
+            selected_record_number = int(raw_record_number)
+        except ValueError as exc:
+            raise RuntimeError("Номер этикетки должен быть целым числом.") from exc
+
+        if selected_record_number < 1 or selected_record_number > total_record_count:
+            raise RuntimeError(
+                f"Номер этикетки должен быть в диапазоне от 1 до {total_record_count}."
+            )
+
+        selected_row = rows[selected_record_number - 1]
+        temp_csv_path = Path(tempfile.gettempdir()) / f"kontur_ui_v2_download_label_{uuid.uuid4().hex}.csv"
+        with temp_csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
+            writer = csv.writer(csv_file, delimiter=delimiter, lineterminator="\n")
+            writer.writerow(selected_row)
+
+        return {
+            "csv_path": str(temp_csv_path),
+            "cleanup_path": str(temp_csv_path),
+            "total_record_count": total_record_count,
+            "selected_record_number": selected_record_number,
+            "record_preview": self._build_label_record_preview(selected_row, MARKING_SOURCE_KIND),
+        }
+
+    def print_download_order(self, document_id: str, printer_name: str, record_number: Any = None) -> Dict[str, Any]:
         try:
             item = self._find_download_item(str(document_id or "").strip())
             if not item:
@@ -2903,10 +3119,11 @@ class ApiBridge:
             csv_path = self._resolve_order_csv_path(item)
             if not csv_path:
                 raise RuntimeError("У заказа не найден CSV-файл с кодами маркировки.")
+            selection = self._resolve_download_print_selection(csv_path, record_number)
             context = build_print_context(
                 order_name=str(item.get("order_name") or ""),
                 document_id=str(item.get("document_id") or ""),
-                csv_path=csv_path,
+                csv_path=str(selection.get("csv_path") or csv_path),
                 printer_name=printer_name,
             )
             self._run_background_job(
@@ -2914,8 +3131,18 @@ class ApiBridge:
                 action=lambda: print_labels(context),
                 error_log_channel="download",
                 error_log_prefix="Ошибка печати термоэтикеток",
+                cleanup=lambda: self._cleanup_label_selection(selection),
             )
-            self._log("download", f"Печать термоэтикеток отправлена в BarTender: {item.get('order_name')}")
+            if selection.get("selected_record_number"):
+                preview = selection.get("record_preview") or {}
+                self._log(
+                    "download",
+                    "Печать одной термоэтикетки отправлена в BarTender: "
+                    f"{item.get('order_name')}, запись №{selection.get('selected_record_number')} "
+                    f"({preview.get('value_short') or 'код не распознан'})",
+                )
+            else:
+                self._log("download", f"Печать термоэтикеток отправлена в BarTender: {item.get('order_name')}")
             return {
                 "success": True,
                 "context": {
@@ -2927,6 +3154,11 @@ class ApiBridge:
                     "size": context.size,
                     "label_count": context.label_count,
                 },
+                "selection": {
+                    "total_record_count": int(selection.get("total_record_count") or 0),
+                    "selected_record_number": selection.get("selected_record_number"),
+                    "record_preview": selection.get("record_preview"),
+                },
             }
         except Exception as exc:
             self._log("download", f"Ошибка печати термоэтикеток: {exc}")
@@ -2934,22 +3166,19 @@ class ApiBridge:
 
     def get_intro_state(self) -> Dict[str, Any]:
         try:
-            runtime = _get_runtime()
-            session = self._ensure_session_safely("intro")
             deleted_ids = self._get_deleted_document_ids()
-            intro_items: List[Dict[str, Any]] = []
-            for item in runtime.history_db.get_all_orders():
-                document_id = str(item.get("document_id") or "").strip()
-                if not document_id or document_id in deleted_ids:
-                    continue
-                intro_items.append(item)
-            intro_items.sort(key=lambda row: str(row.get("created_at") or ""), reverse=True)
+            intro_items = [
+                item
+                for item in self._collect_known_orders()
+                if str(item.get("document_id") or "").strip()
+                and str(item.get("document_id") or "").strip() not in deleted_ids
+            ]
             return {
                 "items": [
                     self._normalize_history_item(
                         item,
-                        session=session,
-                        include_marking_status=self._should_include_marking_status(item),
+                        session=None,
+                        include_marking_status=False,
                     )
                     for item in intro_items
                 ]
@@ -2967,6 +3196,9 @@ class ApiBridge:
         try:
             if not document_ids:
                 raise RuntimeError("Выберите хотя бы один заказ для ввода в оборот.")
+            normalized_batch = str(batch_number or "").strip()
+            if not normalized_batch:
+                raise RuntimeError("Укажите номер партии.")
             session = self._ensure_session()
             thumbprint = self._get_thumbprint()
             prod = self._parse_iso_date(production_date, field_name="Дата производства")
@@ -2976,20 +3208,19 @@ class ApiBridge:
 
             for document_id in document_ids:
                 normalized_id = str(document_id or "").strip()
-                item = self._find_download_item(normalized_id)
-                if not item:
-                    history_order = _get_runtime().history_db.get_order_by_document_id(normalized_id)
-                    if isinstance(history_order, dict):
-                        item = _history_order_to_download_item(history_order)
+                item = self._get_order_for_document_id(normalized_id)
                 if not item:
                     errors.append({"document_id": document_id, "error": "Заказ не найден"})
                     continue
-                if not is_order_ready_for_intro(item):
-                    errors.append({"document_id": document_id, "error": "Заказ ещё не готов для ввода в оборот"})
+
+                try:
+                    item = self._ensure_order_downloaded_for_intro(session, item)
+                except Exception as exc:
+                    errors.append({"document_id": document_id, "error": str(exc)})
                     continue
 
                 self._log("intro", f"Запускаем ввод в оборот: {item.get('order_name')}")
-                patch = self._build_intro_patch(item, prod, exp, str(batch_number or "").strip())
+                patch = self._build_intro_patch(item, prod, exp, normalized_batch)
                 ok, result = put_into_circulation(
                     session=session,
                     codes_order_id=str(item.get("document_id") or ""),
@@ -3020,6 +3251,135 @@ class ApiBridge:
             }
         except Exception as exc:
             self._log("intro", f"Ошибка ввода в оборот: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    def introduce_saved_order_exact(
+        self,
+        document_id: str,
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+        excluded_codes: Sequence[str] | None = None,
+        document_title: str = "",
+    ) -> Dict[str, Any]:
+        try:
+            normalized_id = str(document_id or "").strip()
+            if not normalized_id:
+                raise RuntimeError("Не указан document_id заказа.")
+
+            normalized_batch = str(batch_number or "").strip()
+            if not normalized_batch:
+                raise RuntimeError("Укажите номер партии.")
+
+            prod = self._parse_iso_date(production_date, field_name="Дата производства")
+            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
+            normalized_title = " ".join(str(document_title or "").strip().split())
+
+            session = self._ensure_session()
+            cert = self._get_certificate()
+            if not cert:
+                raise RuntimeError("Не найден сертификат для подписи.")
+
+            item = self._find_download_item(normalized_id)
+            if not item:
+                history_order = _get_runtime().history_db.get_order_by_document_id(normalized_id)
+                if isinstance(history_order, dict):
+                    item = _history_order_to_download_item(history_order)
+            if not item:
+                raise RuntimeError("Заказ не найден в истории.")
+
+            csv_path = self._resolve_order_csv_path(item)
+            if not csv_path:
+                raise RuntimeError("Не найден CSV-файл заказа в папке 'Коды км'.")
+
+            rows = list(self._iter_saved_marking_rows(Path(csv_path)))
+            if not rows:
+                raise RuntimeError("CSV-файл заказа пуст или не содержит кодов маркировки.")
+
+            excluded_sntins = {
+                extract_sntin(str(code or "").strip())
+                for code in (excluded_codes or [])
+                if extract_sntin(str(code or "").strip())
+            }
+
+            filtered_rows: List[Dict[str, Any]] = []
+            seen_sntins: set[str] = set()
+            for row in rows:
+                full_code = str(row.get("full_code") or "").strip()
+                if not full_code:
+                    continue
+                sntin = extract_sntin(full_code)
+                if not sntin or sntin in seen_sntins or sntin in excluded_sntins:
+                    continue
+                seen_sntins.add(sntin)
+                filtered_rows.append(row)
+
+            if not filtered_rows:
+                raise RuntimeError("После исключения уже введённых КМ не осталось кодов для отправки.")
+
+            order_name = str(item.get("order_name") or Path(csv_path).parent.name or normalized_id).strip()
+            metadata = self._lookup_intro_product_metadata(
+                str(item.get("gtin") or filtered_rows[0].get("gtin") or "").strip(),
+                str(item.get("full_name") or filtered_rows[0].get("full_name") or order_name).strip(),
+            )
+            document_number = normalized_title or order_name
+
+            self._log(
+                "intro",
+                f"Точный ввод в оборот: {order_name}. Исключаем {len(excluded_sntins)} КМ, отправляем {len(filtered_rows)} КМ.",
+            )
+            introduction_id = self._create_exact_intro_file_document(
+                session,
+                product_group=str(getattr(api_module, "PRODUCT_GROUP", "wheelChairs")),
+                order_name=order_name,
+                document_number=document_number,
+                production_date=prod,
+                expiration_date=exp,
+                batch_number=normalized_batch,
+            )
+            self._log("intro", f"Документ ввода в оборот создан: {introduction_id}. Загружаем точные коды.")
+
+            rows_payload = self._build_intro_upload_rows(
+                metadata=metadata,
+                full_codes=[row["full_code"] for row in filtered_rows],
+                fallback_name=order_name,
+            )
+            self._upload_intro_positions_from_file(
+                session,
+                introduction_id,
+                rows_payload=rows_payload,
+            )
+            self._log("intro", f"Позиции загружены в документ {introduction_id}. Ждём проверку кодов.")
+
+            codes_check = self._wait_for_intro_codes_check(session, introduction_id)
+            finalize_result = self._finalize_intro_document_after_check(
+                session,
+                introduction_id,
+                cert=cert,
+                codes_check=codes_check,
+                uploaded_codes_count=len(filtered_rows),
+                log_channel="intro",
+                source_label=order_name,
+            )
+            send_result = finalize_result["send_result"]
+            actual_sent_codes_count = int(finalize_result.get("actual_sent_codes_count") or 0)
+
+            self._log(
+                "intro",
+                f"Точный ввод в оборот отправлен: {order_name} "
+                f"({actual_sent_codes_count} из {len(filtered_rows)} КМ, документ {introduction_id}).",
+            )
+            return {
+                "success": True,
+                "document_id": normalized_id,
+                "introduction_id": introduction_id,
+                "excluded_codes_count": len(excluded_sntins),
+                "sent_codes_count": actual_sent_codes_count,
+                "csv_path": csv_path,
+                "result": send_result,
+            }
+        except Exception as exc:
+            self._log("intro", f"Ошибка точного ввода в оборот: {exc}")
             return {"success": False, "error": str(exc)}
 
     def get_tsd_state(self, live: bool = False) -> Dict[str, Any]:
@@ -3447,18 +3807,35 @@ class ApiBridge:
                 if not items:
                     raise RuntimeError("У выбранных АК нет кодов агрегации для скачивания.")
 
-                unique_comments = sorted({str(item.get("comment") or "").strip() for item in items if str(item.get("comment") or "").strip()})
-                if len(unique_comments) == 1:
-                    safe_comment = "".join(char for char in unique_comments[0] if char.isalnum() or char in " -_").strip()[:80]
-                    filename = f"{safe_comment}_{len(items)}.csv"
-                else:
-                    filename = f"selected_aggregations_{len(items)}.csv"
-                saved_path = self._save_simple_aggregation_csv(items, filename)
-                self._log("aggregation", f"Скачано выбранных АК: {len(items)}, сохранено в {saved_path}")
+                grouped_items: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+                for item in items:
+                    comment = " ".join(str(item.get("comment") or "").strip().split()) or "Без названия"
+                    grouped_items[comment].append(item)
+
+                saved_groups: List[Dict[str, Any]] = []
+                saved_paths: List[str] = []
+                for comment, group_rows in sorted(grouped_items.items(), key=lambda pair: pair[0]):
+                    safe_comment = "".join(char for char in comment if char.isalnum() or char in " -_").strip()[:80]
+                    filename = f"{safe_comment or 'selected_aggregations'}_{len(group_rows)}.csv"
+                    saved_path = self._save_simple_aggregation_csv(group_rows, filename)
+                    saved_paths.append(saved_path)
+                    saved_groups.append(
+                        {
+                            "comment": comment,
+                            "count": len(group_rows),
+                            "saved_path": saved_path,
+                        }
+                    )
+                    self._log(
+                        "aggregation",
+                        f"Скачано АК '{comment}': {len(group_rows)}, сохранено в {saved_path}",
+                    )
                 return {
                     "count": len(items),
                     "items": items,
-                    "saved_path": saved_path,
+                    "saved_path": saved_paths[0] if len(saved_paths) == 1 else "",
+                    "saved_paths": saved_paths,
+                    "groups": saved_groups,
                 }
 
             result = self._run_with_session_retry(
@@ -3675,37 +4052,17 @@ class ApiBridge:
                     )
                     self._log("aggregation", f"Позиции загружены в документ {introduction_id}. Ждём проверку кодов.")
                     codes_check = self._wait_for_intro_codes_check(session, introduction_id)
-                    production_state = self._get_intro_production_state(session, introduction_id)
-                    if str(codes_check.get("status") or "").strip() == "hasErrors":
-                        refreshed_state = self._get_intro_production_state(session, introduction_id)
-                        positions = refreshed_state.get("positions") or production_state.get("positions") or []
-                        broken_count = 0
-                        if positions:
-                            broken_count = max(int(position.get("brokenCodesCount") or 0) for position in positions)
-                        raise RuntimeError(
-                            f"{source_order_name}: проверка кодов вернула ошибки ({broken_count} шт.), документ не отправлен."
-                        )
-
-                    document_state = self._get_intro_document_state(session, introduction_id)
-                    document_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
-                    self._log(
-                        "aggregation",
-                        f"Статус документа ввода в оборот {introduction_id} после проверки кодов: {document_status or 'неизвестно'}",
+                    finalize_result = self._finalize_intro_document_after_check(
+                        session,
+                        introduction_id,
+                        cert=cert,
+                        codes_check=codes_check,
+                        uploaded_codes_count=len(codes),
+                        log_channel="aggregation",
+                        source_label=source_order_name,
                     )
-                    if document_status != "introduced":
-                        self._log("aggregation", f"Подписываем и отправляем документ {introduction_id}.")
-                        send_result = self._sign_and_send_intro_document(
-                            session,
-                            introduction_id,
-                            cert=cert,
-                        )
-                    else:
-                        send_result = {
-                            "generated_count": 0,
-                            "send_response": {},
-                            "final_introduction": document_state or {"documentId": introduction_id, "documentStatus": "introduced"},
-                            "final_check": codes_check,
-                        }
+                    send_result = finalize_result["send_result"]
+                    actual_sent_codes_count = int(finalize_result.get("actual_sent_codes_count") or 0)
 
                     introduced_results.append(
                         {
@@ -3714,13 +4071,15 @@ class ApiBridge:
                             "source_path": str(group.get("source_path") or ""),
                             "gtin": metadata["gtin"],
                             "codes_count": len(codes),
+                            "actual_sent_codes_count": actual_sent_codes_count,
                             "result": send_result,
                         }
                     )
-                    total_sent_codes += len(codes)
+                    total_sent_codes += actual_sent_codes_count
                     self._log(
                         "aggregation",
-                        f"Ввод в оборот отправлен: {source_order_name} ({len(codes)} кодов, документ {introduction_id}).",
+                        f"Ввод в оборот отправлен: {source_order_name} "
+                        f"({actual_sent_codes_count} из {len(codes)} кодов, документ {introduction_id}).",
                     )
 
                 return {
@@ -3951,18 +4310,29 @@ class ApiBridge:
                         }
                     )
 
+            sheet_formats = list_label_sheet_formats()
+            templates: list[dict[str, Any]] = []
+            for sheet_format in sheet_formats:
+                sheet_format_key = str(sheet_format.get("key") or DEFAULT_LABEL_SHEET_FORMAT).strip()
+                sheet_format_label = str(sheet_format.get("label") or sheet_format_key).strip()
+                for item in list_label_templates(sheet_format_key):
+                    templates.append(
+                        {
+                            "name": item.name,
+                            "category": item.category,
+                            "relative_path": item.relative_path,
+                            "path": item.path,
+                            "data_source_kind": item.data_source_kind,
+                            "source_label": "Агрег коды км" if item.data_source_kind == AGGREGATION_SOURCE_KIND else "Коды км",
+                            "sheet_format": sheet_format_key,
+                            "sheet_format_label": sheet_format_label,
+                        }
+                    )
+
             return {
-                "templates": [
-                    {
-                        "name": item.name,
-                        "category": item.category,
-                        "relative_path": item.relative_path,
-                        "path": item.path,
-                        "data_source_kind": item.data_source_kind,
-                        "source_label": "Агрег коды км" if item.data_source_kind == AGGREGATION_SOURCE_KIND else "Коды км",
-                    }
-                    for item in list_100x180_templates()
-                ],
+                "sheet_formats": sheet_formats,
+                "default_sheet_format": DEFAULT_LABEL_SHEET_FORMAT,
+                "templates": templates,
                 "aggregation_files": [
                     {
                         "name": item.name,
@@ -4035,6 +4405,31 @@ class ApiBridge:
             raise last_error
         raise RuntimeError(f"Не удалось прочитать CSV для печати: {csv_path}")
 
+    def _resolve_label_template_info(self, *, sheet_format: str, template_path: str) -> Dict[str, Any]:
+        normalized_template_path = str(template_path or "").strip()
+        if not normalized_template_path:
+            raise RuntimeError("Выберите шаблон BarTender.")
+
+        resolved_template_path = str(Path(normalized_template_path).resolve())
+        for item in list_label_templates(sheet_format):
+            if str(Path(item.path).resolve()) == resolved_template_path:
+                return {
+                    "path": item.path,
+                    "category": item.category,
+                    "data_source_kind": item.data_source_kind,
+                    "name": item.name,
+                }
+
+        template_file = Path(normalized_template_path)
+        if not template_file.exists():
+            raise RuntimeError(f"Шаблон BarTender не найден: {template_file}")
+        return {
+            "path": str(template_file),
+            "category": template_file.parent.name,
+            "data_source_kind": MARKING_SOURCE_KIND,
+            "name": template_file.name,
+        }
+
     @staticmethod
     def _shorten_label_preview_value(value: str, *, limit: int = 96) -> str:
         prepared = str(value or "").replace("\x1d", "\\x1d").strip()
@@ -4071,16 +4466,27 @@ class ApiBridge:
             "full_name": "",
         }
 
-    def _resolve_label_print_selection(self, *, base_context, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _resolve_label_print_selection(
+        self,
+        *,
+        template_info: Dict[str, Any],
+        csv_path: str,
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
         print_scope = str(payload.get("print_scope") or "all").strip().lower()
         if print_scope not in {"all", "single"}:
             print_scope = "all"
 
-        total_record_count = int(base_context.label_count or 0)
+        normalized_csv_path = str(csv_path or "").strip()
+        if not normalized_csv_path:
+            raise RuntimeError("Выберите файл с кодами для печати.")
+
+        rows, delimiter = self._read_label_csv_rows(Path(normalized_csv_path))
+        total_record_count = len(rows)
         if print_scope != "single":
             return {
                 "print_scope": "all",
-                "csv_path": base_context.aggregation_csv_path,
+                "csv_path": normalized_csv_path,
                 "cleanup_path": None,
                 "total_record_count": total_record_count,
                 "selected_record_number": None,
@@ -4098,14 +4504,11 @@ class ApiBridge:
                 f"Номер этикетки должен быть в диапазоне от 1 до {total_record_count}."
             )
 
-        rows, delimiter = self._read_label_csv_rows(Path(base_context.aggregation_csv_path))
-        if selected_record_number > len(rows):
-            raise RuntimeError(
-                f"Не удалось найти запись №{selected_record_number} в CSV для печати."
-            )
-
         selected_row = rows[selected_record_number - 1]
-        record_preview = self._build_label_record_preview(selected_row, base_context.data_source_kind)
+        record_preview = self._build_label_record_preview(
+            selected_row,
+            str(template_info.get("data_source_kind") or MARKING_SOURCE_KIND),
+        )
 
         temp_csv_path = Path(tempfile.gettempdir()) / f"kontur_ui_v2_label_{uuid.uuid4().hex}.csv"
         with temp_csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
@@ -4122,22 +4525,263 @@ class ApiBridge:
         }
 
     @staticmethod
-    def _cleanup_label_selection(selection: Dict[str, Any]) -> None:
+    def _cleanup_label_selection(
+        selection: Dict[str, Any],
+        *,
+        delay_seconds: int = 0,
+    ) -> None:
         cleanup_path = str(selection.get("cleanup_path") or "").strip()
         if not cleanup_path:
             return
-        try:
-            Path(cleanup_path).unlink()
-        except OSError:
-            pass
+        cleanup_target = Path(cleanup_path)
+
+        def _cleanup() -> None:
+            try:
+                if delay_seconds > 0:
+                    time.sleep(max(1, int(delay_seconds)))
+                cleanup_target.unlink()
+            except OSError:
+                pass
+            except Exception:
+                pass
+
+        if delay_seconds > 0:
+            Thread(
+                target=_cleanup,
+                name=f"kontur-ui-label-cleanup-{cleanup_target.stem[:24]}",
+                daemon=True,
+            ).start()
+            return
+
+        _cleanup()
 
     @staticmethod
-    def _serialize_label_preview(context, selection: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_label_manual_text(value: Any) -> str:
+        prepared = str(value or "").strip()
+        if prepared.lower() in {"nan", "none", "null", "nat"}:
+            return ""
+        return prepared
+
+    @staticmethod
+    def _parse_label_positive_int(value: Any, *, field_name: str) -> int:
+        prepared = str(value or "").strip().replace(" ", "").replace(",", ".")
+        if not prepared:
+            raise RuntimeError(f"Заполните поле '{field_name}'.")
+        try:
+            parsed_value = int(float(prepared))
+        except ValueError as exc:
+            raise RuntimeError(f"Поле '{field_name}' должно быть целым числом.") from exc
+        if parsed_value <= 0:
+            raise RuntimeError(f"Поле '{field_name}' должно быть больше нуля.")
+        return parsed_value
+
+    def _normalize_label_year_month(self, value: Any, *, field_name: str) -> str:
+        normalized = self._parse_iso_date(str(value or "").strip(), field_name=field_name)
+        return normalized[:7]
+
+    @staticmethod
+    def _pluralize_ru(value: int, singular: str, few: str, many: str) -> str:
+        remainder10 = value % 10
+        remainder100 = value % 100
+        if remainder10 == 1 and remainder100 != 11:
+            return singular
+        if remainder10 in (2, 3, 4) and remainder100 not in (12, 13, 14):
+            return few
+        return many
+
+    def _should_offer_manual_label_input(self, error_text: str) -> bool:
+        normalized_error = str(error_text or "").lower()
+        triggers = (
+            "gtin",
+            "nomenclature.xlsx",
+            "размер",
+            "партии",
+            "товарные данные",
+            "справочник",
+            "не найден gtin",
+        )
+        return any(trigger in normalized_error for trigger in triggers)
+
+    def _build_label_manual_form(self, *, order_data: Dict[str, Any], error_text: str) -> Dict[str, Any]:
+        order_name = str(order_data.get("order_name") or "").strip()
+        guessed_batch = ""
+        batch_match = re.search(r"\b(\d{6})\b", order_name)
+        if batch_match:
+            guessed_batch = batch_match.group(1)
+
+        guessed_size = ""
+        size_match = re.search(r"\b(XXL|XL|XS|S|M|L|\d+[.,]\d)\b", order_name, flags=re.IGNORECASE)
+        if size_match:
+            guessed_size = size_match.group(1).upper().replace(".", ",")
+
+        return {
+            "prompt": "Не удалось автоматически прочитать данные заказа для этикетки. Заполните форму вручную и повторите действие.",
+            "error": str(error_text or "").strip(),
+            "fields": {
+                "gtin": str(order_data.get("gtin") or "").strip(),
+                "size": guessed_size,
+                "batch": guessed_batch,
+                "color": self._normalize_label_manual_text(order_data.get("color")),
+                "units_per_pack": str(order_data.get("units_per_pack") or "").strip(),
+            },
+        }
+
+    def _build_manual_label_context(
+        self,
+        *,
+        order_data: Dict[str, Any],
+        template_info: Dict[str, Any],
+        csv_path: str,
+        printer_name: str,
+        manufacture_date: Any,
+        expiration_date: Any,
+        quantity_value: Any,
+        manual_override: Dict[str, Any],
+    ):
+        template_path = str(template_info.get("path") or "").strip()
+        template_file = Path(template_path)
+        if not template_file.exists():
+            raise RuntimeError(f"Шаблон BarTender не найден: {template_file}")
+
+        csv_file = Path(str(csv_path or "").strip())
+        if not csv_file.exists():
+            raise RuntimeError(f"CSV для печати не найден: {csv_file}")
+
+        rows, _delimiter = self._read_label_csv_rows(csv_file)
+        label_count = len(rows)
+        if label_count <= 0:
+            raise RuntimeError(f"В CSV нет строк для печати: {csv_file}")
+
+        printer_name_text = str(printer_name or "").strip()
+        if not printer_name_text:
+            raise RuntimeError("Не выбран принтер для печати этикеток.")
+
+        size = self._normalize_label_manual_text(manual_override.get("size"))
+        batch = self._normalize_label_manual_text(manual_override.get("batch"))
+        color = self._normalize_label_manual_text(manual_override.get("color"))
+        gtin = self._normalize_label_manual_text(manual_override.get("gtin")) or str(order_data.get("gtin") or "").strip()
+        units_per_pack = self._parse_label_positive_int(
+            manual_override.get("units_per_pack"),
+            field_name="Единиц в упаковке",
+        )
+
+        if not size:
+            raise RuntimeError("Заполните поле 'Размер'.")
+        if not batch:
+            raise RuntimeError("Заполните поле 'Партия'.")
+
+        manufacture_date_text = self._normalize_label_year_month(
+            manufacture_date,
+            field_name="Дата изготовления",
+        )
+        expiration_date_text = self._normalize_label_year_month(
+            expiration_date,
+            field_name="Срок годности",
+        )
+
+        data_source_kind = str(template_info.get("data_source_kind") or MARKING_SOURCE_KIND).strip()
+        if data_source_kind == AGGREGATION_SOURCE_KIND:
+            quantity_pairs = self._parse_label_positive_int(quantity_value, field_name="Количество")
+            if quantity_pairs % units_per_pack != 0:
+                raise RuntimeError(
+                    "Количество должно быть кратно значению 'Единиц в упаковке'. "
+                    f"Сейчас: {quantity_pairs}, в упаковке: {units_per_pack}."
+                )
+            dispenser_count = quantity_pairs // units_per_pack
+            package_text = (
+                f"({dispenser_count} {self._pluralize_ru(dispenser_count, 'диспенсер', 'диспенсера', 'диспенсеров')} "
+                f"по {units_per_pack} {self._pluralize_ru(units_per_pack, 'пара', 'пары', 'пар')})"
+            )
+        else:
+            quantity_pairs = units_per_pack
+            dispenser_count = 0
+            package_text = None
+
+        return SimpleNamespace(
+            document_id=str(order_data.get("document_id") or "").strip(),
+            order_name=str(order_data.get("order_name") or "").strip(),
+            template_path=str(template_file),
+            aggregation_csv_path=str(csv_file),
+            printer_name=printer_name_text,
+            data_source_kind=data_source_kind,
+            template_category=str(template_info.get("category") or ""),
+            label_count=label_count,
+            gtin=gtin,
+            size=size,
+            batch=batch,
+            color=color,
+            manufacture_date=manufacture_date_text,
+            expiration_date=expiration_date_text,
+            quantity_pairs=quantity_pairs,
+            quantity_pairs_word=self._pluralize_ru(quantity_pairs, "пара", "пары", "пар"),
+            units_per_pack=units_per_pack,
+            dispenser_count=dispenser_count,
+            package_text=package_text,
+        )
+
+    def _resolve_label_context(
+        self,
+        *,
+        sheet_format: str,
+        order_data: Dict[str, Any],
+        template_info: Dict[str, Any],
+        selection: Dict[str, Any],
+        payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        context_kwargs = {
+            "sheet_format": sheet_format,
+            "df": self._load_nomenclature_df(),
+            "order_data": order_data,
+            "template_path": str(template_info.get("path") or ""),
+            "aggregation_csv_path": str(selection.get("csv_path") or ""),
+            "printer_name": str(payload.get("printer_name") or ""),
+            "manufacture_date": str(payload.get("manufacture_date") or ""),
+            "expiration_date": str(payload.get("expiration_date") or ""),
+            "quantity_value": payload.get("quantity_value"),
+        }
+        try:
+            return {
+                "context": build_label_print_context(**context_kwargs),
+                "used_manual_override": False,
+            }
+        except Exception as exc:
+            manual_override = payload.get("manual_override")
+            if isinstance(manual_override, dict) and manual_override.get("enabled"):
+                return {
+                    "context": self._build_manual_label_context(
+                        order_data=order_data,
+                        template_info=template_info,
+                        csv_path=str(selection.get("csv_path") or ""),
+                        printer_name=str(payload.get("printer_name") or ""),
+                        manufacture_date=payload.get("manufacture_date"),
+                        expiration_date=payload.get("expiration_date"),
+                        quantity_value=payload.get("quantity_value"),
+                        manual_override=manual_override,
+                    ),
+                    "used_manual_override": True,
+                }
+
+            error_text = str(exc)
+            if self._should_offer_manual_label_input(error_text):
+                return {
+                    "needs_manual_input": True,
+                    "prompt": "Не удалось автоматически прочитать данные заказа для этикетки. Заполните форму вручную и повторите действие.",
+                    "manual_form": self._build_label_manual_form(
+                        order_data=order_data,
+                        error_text=error_text,
+                    ),
+                }
+            raise
+
+    @staticmethod
+    def _serialize_label_preview(context, selection: Dict[str, Any], *, sheet_format: str) -> Dict[str, Any]:
         record_preview = selection.get("record_preview") or {}
         return {
             "document_id": context.document_id,
             "order_name": context.order_name,
             "template_path": context.template_path,
+            "sheet_format": sheet_format,
+            "sheet_format_label": format_label_sheet_title(sheet_format),
             "aggregation_csv_path": context.aggregation_csv_path,
             "printer_name": context.printer_name,
             "data_source_kind": context.data_source_kind,
@@ -4167,38 +4811,40 @@ class ApiBridge:
 
     def preview_100x180_label(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
+            sheet_format = str(payload.get("sheet_format") or DEFAULT_LABEL_SHEET_FORMAT).strip()
             order_id = str(payload.get("document_id") or "").strip()
             template_path = str(payload.get("template_path") or "").strip()
             csv_path = str(payload.get("csv_path") or "").strip()
-            printer_name = str(payload.get("printer_name") or "").strip()
             order_data = _get_runtime().history_db.get_order_by_document_id(order_id)
             if not order_data:
                 raise RuntimeError("Заказ не найден в истории.")
-            base_context = build_label_print_context(
-                df=self._load_nomenclature_df(),
-                order_data=order_data,
+            template_info = self._resolve_label_template_info(
+                sheet_format=sheet_format,
                 template_path=template_path,
-                aggregation_csv_path=csv_path,
-                printer_name=printer_name,
-                manufacture_date=str(payload.get("manufacture_date") or ""),
-                expiration_date=str(payload.get("expiration_date") or ""),
-                quantity_value=payload.get("quantity_value"),
             )
-            selection = self._resolve_label_print_selection(base_context=base_context, payload=payload)
+            selection = self._resolve_label_print_selection(
+                template_info=template_info,
+                csv_path=csv_path,
+                payload=payload,
+            )
             try:
-                context = base_context
-                if selection.get("print_scope") == "single":
-                    context = build_label_print_context(
-                        df=self._load_nomenclature_df(),
-                        order_data=order_data,
-                        template_path=template_path,
-                        aggregation_csv_path=str(selection.get("csv_path") or ""),
-                        printer_name=printer_name,
-                        manufacture_date=str(payload.get("manufacture_date") or ""),
-                        expiration_date=str(payload.get("expiration_date") or ""),
-                        quantity_value=payload.get("quantity_value"),
-                    )
-                preview_payload = self._serialize_label_preview(context, selection)
+                context_result = self._resolve_label_context(
+                    sheet_format=sheet_format,
+                    order_data=order_data,
+                    template_info=template_info,
+                    selection=selection,
+                    payload=payload,
+                )
+                if context_result.get("needs_manual_input"):
+                    return {
+                        "success": True,
+                        "needs_manual_input": True,
+                        "prompt": context_result.get("prompt") or "",
+                        "manual_form": context_result.get("manual_form") or {},
+                    }
+                context = context_result["context"]
+                preview_payload = self._serialize_label_preview(context, selection, sheet_format=sheet_format)
+                preview_payload["manual_override_used"] = bool(context_result.get("used_manual_override"))
             finally:
                 self._cleanup_label_selection(selection)
             return {
@@ -4206,64 +4852,70 @@ class ApiBridge:
                 "preview": preview_payload,
             }
         except Exception as exc:
-            self._log("labels", f"Ошибка подготовки контекста 100x180: {exc}")
+            self._log("labels", f"Ошибка подготовки контекста печати: {exc}")
             return {"success": False, "error": str(exc)}
 
     def print_100x180_label(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            preview_result = self.preview_100x180_label(payload)
-            if not preview_result.get("success"):
-                return preview_result
+            sheet_format = str(payload.get("sheet_format") or DEFAULT_LABEL_SHEET_FORMAT).strip()
+            sheet_format_label = format_label_sheet_title(sheet_format)
             order_id = str(payload.get("document_id") or "").strip()
             order_data = _get_runtime().history_db.get_order_by_document_id(order_id)
+            if not order_data:
+                raise RuntimeError("Заказ не найден в истории.")
             template_path = str(payload.get("template_path") or "").strip()
-            printer_name = str(payload.get("printer_name") or "").strip()
-            base_context = build_label_print_context(
-                df=self._load_nomenclature_df(),
-                order_data=order_data,
+            template_info = self._resolve_label_template_info(
+                sheet_format=sheet_format,
                 template_path=template_path,
-                aggregation_csv_path=str(payload.get("csv_path") or "").strip(),
-                printer_name=printer_name,
-                manufacture_date=str(payload.get("manufacture_date") or ""),
-                expiration_date=str(payload.get("expiration_date") or ""),
-                quantity_value=payload.get("quantity_value"),
             )
-            selection = self._resolve_label_print_selection(base_context=base_context, payload=payload)
+            selection = self._resolve_label_print_selection(
+                template_info=template_info,
+                csv_path=str(payload.get("csv_path") or "").strip(),
+                payload=payload,
+            )
             cleanup_delegated = False
             try:
-                context = base_context
-                if selection.get("print_scope") == "single":
-                    context = build_label_print_context(
-                        df=self._load_nomenclature_df(),
-                        order_data=order_data,
-                        template_path=template_path,
-                        aggregation_csv_path=str(selection.get("csv_path") or ""),
-                        printer_name=printer_name,
-                        manufacture_date=str(payload.get("manufacture_date") or ""),
-                        expiration_date=str(payload.get("expiration_date") or ""),
-                        quantity_value=payload.get("quantity_value"),
-                    )
+                context_result = self._resolve_label_context(
+                    sheet_format=sheet_format,
+                    order_data=order_data,
+                    template_info=template_info,
+                    selection=selection,
+                    payload=payload,
+                )
+                if context_result.get("needs_manual_input"):
+                    return {
+                        "success": True,
+                        "needs_manual_input": True,
+                        "prompt": context_result.get("prompt") or "",
+                        "manual_form": context_result.get("manual_form") or {},
+                    }
+                context = context_result["context"]
+                preview_payload = self._serialize_label_preview(context, selection, sheet_format=sheet_format)
+                preview_payload["manual_override_used"] = bool(context_result.get("used_manual_override"))
                 self._run_background_job(
                     name=f"labels-print-{context.document_id or uuid.uuid4().hex}",
-                    action=lambda: print_100x180_labels(context),
+                    action=lambda: print_label_sheet(context),
                     error_log_channel="labels",
-                    error_log_prefix="Ошибка печати 100x180",
-                    cleanup=lambda: self._cleanup_label_selection(selection),
+                    error_log_prefix=f"Ошибка печати {sheet_format_label}",
+                    cleanup=lambda: self._cleanup_label_selection(
+                        selection,
+                        delay_seconds=LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS,
+                    ),
                 )
                 cleanup_delegated = True
                 if selection.get("print_scope") == "single":
                     self._log(
                         "labels",
-                        "Печать одной этикетки 100x180 отправлена в BarTender: "
+                        f"Печать одной этикетки {sheet_format_label} отправлена в BarTender: "
                         f"{context.order_name}, запись №{selection.get('selected_record_number')} "
                         f"({(selection.get('record_preview') or {}).get('value_short') or 'код не распознан'})",
                     )
                 else:
-                    self._log("labels", f"Печать 100x180 отправлена в BarTender: {context.order_name}")
+                    self._log("labels", f"Печать {sheet_format_label} отправлена в BarTender: {context.order_name}")
             finally:
                 if not cleanup_delegated:
                     self._cleanup_label_selection(selection)
-            return {"success": True, "preview": preview_result.get("preview")}
+            return {"success": True, "preview": preview_payload}
         except Exception as exc:
-            self._log("labels", f"Ошибка печати 100x180: {exc}")
+            self._log("labels", f"Ошибка печати: {exc}")
             return {"success": False, "error": str(exc)}

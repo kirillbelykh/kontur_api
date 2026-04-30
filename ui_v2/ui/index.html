@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>KonturTestAPI [TEST]</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -14,7 +14,6 @@
           <h1>Kontur v2</h1>
           <span class="test-badge">TEST</span>
         </div>
-        <p>Тестовый UI на PyWebView для полного рабочего контура.</p>
       </div>
 
       <nav class="sidebar-nav" id="sidebar-nav">
@@ -56,6 +55,10 @@
                   <button class="segment is-active" data-mode="params">По параметрам</button>
                   <button class="segment" data-mode="gtin">По GTIN</button>
                 </div>
+                <label class="field">
+                  <span>Название документа ввода в оборот</span>
+                  <input id="agg-intro-document-title" type="text" placeholder="Можно оставить пустым для автоназвания">
+                </label>
               </div>
 
               <div class="form-grid">
@@ -121,6 +124,7 @@
               <div class="panel-header">
                 <h3>Очередь и результаты</h3>
                 <div class="inline-actions compact">
+                  <button class="secondary-btn" id="orders-remove-queue-btn">Удалить из очереди</button>
                   <button class="secondary-btn" id="submit-queue-btn">Выполнить очередь</button>
                   <button class="secondary-btn" id="clear-queue-btn">Очистить очередь</button>
                 </div>
@@ -136,32 +140,36 @@
             </article>
           </div>
 
-          <article class="panel">
-            <div class="panel-header">
-              <h3>История заказов</h3>
-              <div class="inline-actions compact">
-                <button class="secondary-btn" id="orders-delete-btn">Удалить</button>
-                <button class="secondary-btn" id="orders-toggle-deleted-btn">Удаленные</button>
+          <div class="grid orders-workspace">
+            <div class="grid orders-history-stack">
+              <article class="panel">
+                <div class="panel-header">
+                  <h3>История заказов</h3>
+                  <div class="inline-actions compact">
+                    <button class="secondary-btn" id="orders-delete-btn">Удалить</button>
+                    <button class="secondary-btn" id="orders-toggle-deleted-btn">Удаленные</button>
+                  </div>
+                </div>
+                <div class="table-host" id="orders-history-table"></div>
+              </article>
+
+              <article class="panel is-hidden" id="orders-deleted-panel">
+                <div class="panel-header">
+                  <h3>Удаленные заказы</h3>
+                  <button class="secondary-btn" id="orders-restore-deleted-btn">Восстановить</button>
+                </div>
+                <div class="table-host" id="orders-deleted-table"></div>
+              </article>
+            </div>
+
+            <article class="panel">
+              <div class="panel-header">
+                <h3>Лог операций</h3>
+                <button class="secondary-btn" data-clear-log="orders">Очистить лог</button>
               </div>
-            </div>
-            <div class="table-host" id="orders-history-table"></div>
-          </article>
-
-          <article class="panel is-hidden" id="orders-deleted-panel">
-            <div class="panel-header">
-              <h3>Удаленные заказы</h3>
-              <button class="secondary-btn" id="orders-restore-deleted-btn">Восстановить</button>
-            </div>
-            <div class="table-host" id="orders-deleted-table"></div>
-          </article>
-
-          <article class="panel">
-            <div class="panel-header">
-              <h3>Лог операций</h3>
-              <button class="secondary-btn" data-clear-log="orders">Очистить лог</button>
-            </div>
-            <pre class="log-box" id="orders-log"></pre>
-          </article>
+              <pre class="log-box" id="orders-log"></pre>
+            </article>
+          </div>
         </section>
 
         <section class="view" id="view-download">
@@ -172,7 +180,7 @@
                 <div class="inline-actions compact">
                   <button class="secondary-btn" id="download-refresh-btn">Обновить статусы</button>
                   <label class="checkbox-inline">
-                    <input type="checkbox" id="download-auto-checkbox" checked>
+                    <input type="checkbox" id="download-auto-checkbox">
                     <span>Автоскачивание</span>
                   </label>
                 </div>
@@ -182,11 +190,20 @@
                   <span>Принтер термоэтикеток</span>
                   <select id="download-printer-select"></select>
                 </label>
+                <label class="field">
+                  <span>Номер этикетки по порядку</span>
+                  <input id="download-record-number" type="number" min="1" step="1" placeholder="Если пусто — печать всего файла">
+                </label>
               </div>
               <div class="inline-actions">
-                <button class="secondary-btn" id="download-manual-btn">Скачать выбранный</button>
-                <button id="download-print-btn">Печать термоэтикеток</button>
+                <button class="secondary-btn" id="download-manual-btn">Скачать выбранное</button>
+                <button id="download-print-btn">Печать термоэтикеток 30x20</button>
               </div>
+              <div class="selection-meta" id="download-selection-meta">Всего заказов: 0 • Выбрано: 0</div>
+              <div class="progress-strip" id="download-progress">
+                <div class="progress-strip__bar" id="download-progress-bar"></div>
+              </div>
+              <div class="progress-strip__label" id="download-progress-label">Прогресс скачивания появится во время массовой загрузки.</div>
               <div class="table-host" id="download-items-table"></div>
             </article>
           </div>
@@ -209,11 +226,11 @@
               <div class="form-grid">
                 <label class="field">
                   <span>Дата производства</span>
-                  <input id="intro-production-date" type="text" placeholder="YYYY-MM-DD">
+                  <input id="intro-production-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
                 </label>
                 <label class="field">
                   <span>Срок годности</span>
-                  <input id="intro-expiration-date" type="text" placeholder="YYYY-MM-DD">
+                  <input id="intro-expiration-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
                 </label>
                 <label class="field">
                   <span>Номер партии</span>
@@ -228,6 +245,9 @@
             <article class="panel">
               <div class="panel-header">
                 <h3>Готовые заявки</h3>
+                <div class="inline-actions compact">
+                  <button class="secondary-btn" id="intro-refresh-btn">Обновить список заказов</button>
+                </div>
               </div>
               <div class="table-host" id="intro-items-table"></div>
             </article>
@@ -257,11 +277,11 @@
                 </label>
                 <label class="field">
                   <span>Дата производства</span>
-                  <input id="tsd-production-date" type="text" placeholder="YYYY-MM-DD">
+                  <input id="tsd-production-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
                 </label>
                 <label class="field">
                   <span>Срок годности</span>
-                  <input id="tsd-expiration-date" type="text" placeholder="YYYY-MM-DD">
+                  <input id="tsd-expiration-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
                 </label>
                 <label class="field">
                   <span>Номер партии</span>
@@ -329,46 +349,81 @@
               <div class="panel-header"><h3>Проведение и повторное наполнение</h3></div>
               <div class="form-grid">
                 <label class="field">
-                  <span>Название</span>
-                  <input id="agg-approve-filter" type="text" placeholder="Фильтр по названию, можно пусто">
+                  <span>Название для повторного наполнения</span>
+                  <input id="agg-approve-filter" type="text" placeholder="Нужно только для повторного наполнения">
                 </label>
                 <label class="field">
-                  <span>TSD токен</span>
-                  <input id="agg-refill-token" type="text" placeholder="Вставьте токен ТСД">
+                  <span>TSD токен (только для повторного наполнения)</span>
+                  <input id="agg-refill-token" type="text" placeholder="Нужен только для повторного наполнения">
                 </label>
+                <label class="field">
+                  <span>Дата производства</span>
+                  <input id="agg-intro-production-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
+                </label>
+                <label class="field">
+                  <span>Срок годности</span>
+                  <input id="agg-intro-expiration-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
+                </label>
+                <label class="field">
+                  <span>Номер партии</span>
+                  <input id="agg-intro-batch-number" type="text" placeholder="Введите номер партии">
+                </label>
+              </div>
+              <div class="inline-note">
+                Повторное наполнение используйте только для АК, которые ещё не были зарегистрированы в ГИС МТ.
+                Для уже зарегистрированных АК нужна переагрегация только по изменяемым кодам, а не повторная отправка всего состава.
               </div>
               <label class="checkbox-inline">
                 <input type="checkbox" id="agg-allow-disaggregate">
-                <span>Разрешить расформирование чужих АК</span>
+                <span>Разрешить расформирование чужих АК при проведении</span>
               </label>
               <div class="inline-actions">
-                <button class="secondary-btn" id="agg-approve-btn">Провести АК</button>
+                <button class="secondary-btn" id="agg-download-selected-btn">Скачать выбранные АК</button>
+                <button class="secondary-btn" id="agg-approve-selected-btn">Провести выбранные АК</button>
+                <button class="secondary-btn" id="agg-intro-selected-btn">Ввести в оборот выбранные АК</button>
                 <button id="agg-refill-btn">Повторное наполнение</button>
               </div>
             </article>
           </div>
 
-          <article class="panel">
-            <div class="panel-header">
-              <h3>Последние CSV агрегации</h3>
-            </div>
-            <div class="table-host" id="agg-csv-table"></div>
-          </article>
+          <div class="grid aggregation-workspace">
+            <article class="panel aggregation-list-panel">
+              <div class="panel-header">
+                <h3>Список АК из Контур.Маркировки</h3>
+                <div class="inline-actions compact wrap">
+                  <label class="field compact-field">
+                    <span>Статус</span>
+                    <select id="agg-status-filter"></select>
+                  </label>
+                  <label class="field compact-field">
+                    <span>Поиск</span>
+                    <input id="agg-search-query" type="text" placeholder="Название или код агрегации">
+                  </label>
+                  <button class="secondary-btn" id="agg-select-visible-btn">Выбрать найденные</button>
+                  <button class="secondary-btn" id="agg-select-by-name-btn">Выбрать одноимённые</button>
+                  <button class="secondary-btn" id="agg-clear-selection-btn">Снять выделение</button>
+                  <button class="secondary-btn" id="agg-refresh-list-btn">Обновить</button>
+                </div>
+              </div>
+              <div class="selection-meta" id="agg-selection-meta">Выбрано АК: 0</div>
+              <div class="table-host" id="agg-items-table"></div>
+            </article>
 
-          <article class="panel">
-            <div class="panel-header">
-              <h3>Лог агрегации</h3>
-              <button class="secondary-btn" data-clear-log="aggregation">Очистить лог</button>
-            </div>
-            <pre class="log-box" id="aggregation-log"></pre>
-          </article>
+            <article class="panel aggregation-log-panel">
+              <div class="panel-header">
+                <h3>Лог агрегации</h3>
+                <button class="secondary-btn" data-clear-log="aggregation">Очистить лог</button>
+              </div>
+              <pre class="log-box" id="aggregation-log"></pre>
+            </article>
+          </div>
         </section>
 
         <section class="view" id="view-labels">
           <div class="grid two-col">
             <article class="panel">
               <div class="panel-header">
-                <h3>Параметры печати 100x180</h3>
+                <h3 id="labels-sheet-format-heading">Параметры печати</h3>
                 <div class="inline-actions compact">
                   <button class="secondary-btn" id="labels-preview-btn">Показать контекст</button>
                   <button id="labels-print-btn">Выполнить печать</button>
@@ -376,16 +431,20 @@
               </div>
               <div class="form-grid">
                 <label class="field">
+                  <span>Формат этикетки</span>
+                  <select id="labels-sheet-format-select"></select>
+                </label>
+                <label class="field">
                   <span>Принтер</span>
                   <select id="labels-printer-select"></select>
                 </label>
                 <label class="field">
                   <span>Дата изготовления</span>
-                  <input id="labels-manufacture-date" type="text" placeholder="YYYY-MM или DD-MM-YYYY">
+                  <input id="labels-manufacture-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
                 </label>
                 <label class="field">
                   <span>Срок годности</span>
-                  <input id="labels-expiration-date" type="text" placeholder="YYYY-MM или DD-MM-YYYY">
+                  <input id="labels-expiration-date" type="text" placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY">
                 </label>
                 <label class="field">
                   <span>Количество</span>
@@ -393,6 +452,34 @@
                 </label>
               </div>
               <div class="preview-box" id="labels-preview-box">Выберите шаблон, файл и заказ, затем нажмите «Показать контекст».</div>
+              <div class="panel is-hidden" id="labels-manual-panel">
+                <div class="panel-header">
+                  <h3>Ручное заполнение</h3>
+                </div>
+                <div class="inline-note" id="labels-manual-note">Если автоподбор не сработал, заполните поля вручную и повторите предпросмотр или печать.</div>
+                <div class="form-grid">
+                  <label class="field">
+                    <span>GTIN</span>
+                    <input id="labels-manual-gtin" type="text" placeholder="GTIN">
+                  </label>
+                  <label class="field">
+                    <span>Размер</span>
+                    <input id="labels-manual-size" type="text" placeholder="Например, M или 7,5">
+                  </label>
+                  <label class="field">
+                    <span>Партия</span>
+                    <input id="labels-manual-batch" type="text" placeholder="Номер партии">
+                  </label>
+                  <label class="field">
+                    <span>Цвет</span>
+                    <input id="labels-manual-color" type="text" placeholder="Можно оставить пустым">
+                  </label>
+                  <label class="field">
+                    <span>Единиц в упаковке</span>
+                    <input id="labels-manual-units" type="number" min="1" step="1" placeholder="Например, 10">
+                  </label>
+                </div>
+              </div>
             </article>
 
             <article class="panel">
