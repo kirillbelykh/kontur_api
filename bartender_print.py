@@ -5,6 +5,8 @@ import json
 import re
 import subprocess
 import tempfile
+import threading
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -23,6 +25,10 @@ TEXT_OBJECT_TYPE = "2"
 SERIAL_OBJECT_TYPE = "4096"
 COPIES_OBJECT_TYPE = "2048"
 KNOWN_SIZES = tuple(sorted({str(value).upper() for value in size_options}, key=len, reverse=True))
+PRINT_SUBMIT_ATTEMPTS = 2
+PRINT_SUBPROCESS_TIMEOUT_SECONDS = 90
+PRINT_SUBMIT_RETRY_DELAY_SECONDS = 2
+_SDK_PRINT_LOCK = threading.Lock()
 
 
 class BarTenderPrintError(RuntimeError):
@@ -152,21 +158,22 @@ def count_csv_records(csv_path: Path) -> int:
 
 
 def print_labels(context: PrintContext) -> None:
-    temp_template_path = _prepare_template_copy(context)
+    with _SDK_PRINT_LOCK:
+        temp_template_path = _prepare_template_copy(context)
 
-    try:
-        _run_sdk_print(
-            template_path=temp_template_path,
-            csv_path=Path(context.csv_path),
-            label_count=context.label_count,
-            job_name=context.order_name,
-            printer_name=context.printer_name,
-        )
-    finally:
         try:
-            temp_template_path.unlink()
-        except OSError:
-            pass
+            _run_sdk_print(
+                template_path=temp_template_path,
+                csv_path=Path(context.csv_path),
+                label_count=context.label_count,
+                job_name=context.order_name,
+                printer_name=context.printer_name,
+            )
+        finally:
+            try:
+                temp_template_path.unlink()
+            except OSError:
+                pass
 
 
 def _prepare_template_copy(context: PrintContext) -> Path:
@@ -365,30 +372,47 @@ def _run_sdk_print(
         "1" if print_now else "0",
     ]
 
+    last_error = ""
     try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=creationflags,
-        )
-    except FileNotFoundError as exc:
-        raise BarTenderPrintError("Не найден powershell.exe. Без него нельзя запустить печать через BarTender SDK.") from exc
+        for attempt in range(1, PRINT_SUBMIT_ATTEMPTS + 1):
+            try:
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    creationflags=creationflags,
+                    timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS,
+                )
+            except FileNotFoundError as exc:
+                raise BarTenderPrintError("Не найден powershell.exe. Без него нельзя запустить печать через BarTender SDK.") from exc
+            except subprocess.TimeoutExpired:
+                last_error = (
+                    f"BarTender SDK не ответил за {PRINT_SUBPROCESS_TIMEOUT_SECONDS} сек. "
+                    "Повтор автоматически не выполнялся, чтобы не напечатать дубли."
+                )
+                break
+
+            if completed.returncode == 0:
+                return
+
+            last_error = _extract_process_error(completed.stderr or completed.stdout)
+            if completed.returncode == 10:
+                break
+            if attempt < PRINT_SUBMIT_ATTEMPTS:
+                time.sleep(PRINT_SUBMIT_RETRY_DELAY_SECONDS)
     finally:
         try:
             script_path.unlink()
         except OSError:
             pass
 
-    if completed.returncode != 0:
-        process_error = _extract_process_error(completed.stderr or completed.stdout)
-        raise BarTenderPrintError(
-            "Не удалось отправить печать в BarTender."
-            + (f" Причина: {process_error}" if process_error else "")
-        )
+    raise BarTenderPrintError(
+        "Не удалось отправить печать в BarTender."
+        + (f" Причина: {last_error}" if last_error else "")
+    )
 
 
 def _build_powershell_script() -> str:
@@ -408,6 +432,21 @@ $ErrorActionPreference = 'Stop'
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 Add-Type -Path $SdkPath
+
+function Format-BarTenderMessages([Seagull.BarTender.Print.Messages]$Messages) {
+    if ($null -eq $Messages -or $Messages.Count -lt 1) {
+        return ''
+    }
+
+    $parts = @()
+    foreach ($btMessage in $Messages) {
+        $text = [string]$btMessage.Text
+        if ($text) {
+            $parts += ('{0}: {1}' -f $btMessage.Severity, $text)
+        }
+    }
+    return ($parts -join ' | ')
+}
 
 $engine = $null
 $format = $null
@@ -440,6 +479,15 @@ try {
     }
 
     if ($PrinterName) {
+        $printer = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -eq $PrinterName } |
+            Select-Object -First 1
+        if ($null -eq $printer) {
+            throw "Принтер '$PrinterName' не найден в Windows."
+        }
+        if ($printer.WorkOffline) {
+            throw "Принтер '$PrinterName' сейчас в автономном режиме."
+        }
         $format.PrintSetup.PrinterName = $PrinterName
     }
 
@@ -465,7 +513,15 @@ try {
     $format.PrintSetup.NumberOfSerializedLabels = 1
 
     if ($PrintNow -eq '1') {
-        [void]$format.Print($JobName, 60000)
+        [Seagull.BarTender.Print.Messages]$messages = New-Object Seagull.BarTender.Print.Messages
+        $result = $format.Print($JobName, 60000, [ref]$messages)
+        $messageText = Format-BarTenderMessages $messages
+        if ($result -ne [Seagull.BarTender.Print.Result]::Success) {
+            throw ("BarTender вернул статус {0}.{1}" -f $result, $(if ($messageText) { " $messageText" } else { '' }))
+        }
+        if ($messageText) {
+            [Console]::Out.WriteLine($messageText)
+        }
     }
 }
 catch {
@@ -475,6 +531,9 @@ catch {
     }
 
     [Console]::Error.WriteLine($message)
+    if ($message -like 'BarTender вернул статус*') {
+        exit 10
+    }
     exit 1
 }
 finally {

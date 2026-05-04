@@ -27,6 +27,9 @@ BARTENDER_SDK_DLL = Path(
 )
 POWERSHELL_EXE = "powershell.exe"
 TEMP_PRINT_ARTIFACT_RETENTION_SECONDS = 300
+PRINT_SUBMIT_ATTEMPTS = 2
+PRINT_SUBPROCESS_TIMEOUT_SECONDS = 90
+PRINT_SUBMIT_RETRY_DELAY_SECONDS = 2
 TEXT_OBJECT_TYPE = "2"
 COPIES_OBJECT_TYPE = "2048"
 SERIAL_OBJECT_TYPE = "4096"
@@ -45,6 +48,7 @@ UNITS_COLUMN = "Количество единиц употребления в п
 SIZE_COLUMN = "Размер"
 COLOR_COLUMN = "Цвет"
 SIMPL_COLUMN = "Упрощенно"
+_SDK_PRINT_LOCK = threading.Lock()
 
 
 class BarTenderLabel100x180Error(RuntimeError):
@@ -265,27 +269,28 @@ def build_label_print_context(
 
 
 def print_100x180_labels(context: LabelPrint100x180Context) -> None:
-    _ensure_unique_label_values(Path(context.aggregation_csv_path), context.data_source_kind)
-    temp_template_path = _prepare_template_copy(context)
-    submitted_to_bartender = False
+    with _SDK_PRINT_LOCK:
+        _ensure_unique_label_values(Path(context.aggregation_csv_path), context.data_source_kind)
+        temp_template_path = _prepare_template_copy(context)
+        submitted_to_bartender = False
 
-    try:
-        _run_sdk_database_print(
-            template_path=temp_template_path,
-            csv_path=Path(context.aggregation_csv_path),
-            record_count=context.label_count,
-            job_name=context.order_name,
-            printer_name=context.printer_name,
-        )
-        submitted_to_bartender = True
-    finally:
-        if submitted_to_bartender:
-            _schedule_delayed_print_artifact_cleanup(temp_template_path)
-        else:
-            try:
-                temp_template_path.unlink()
-            except OSError:
-                pass
+        try:
+            _run_sdk_database_print(
+                template_path=temp_template_path,
+                csv_path=Path(context.aggregation_csv_path),
+                record_count=context.label_count,
+                job_name=context.order_name,
+                printer_name=context.printer_name,
+            )
+            submitted_to_bartender = True
+        finally:
+            if submitted_to_bartender:
+                _schedule_delayed_print_artifact_cleanup(temp_template_path)
+            else:
+                try:
+                    temp_template_path.unlink()
+                except OSError:
+                    pass
 
 
 def count_csv_records(csv_path: Path) -> int:
@@ -1053,32 +1058,49 @@ def _run_sdk_database_print(
         "1" if print_now else "0",
     ]
 
+    last_error = ""
     try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            creationflags=creationflags,
-        )
-    except FileNotFoundError as exc:
-        raise BarTenderLabel100x180Error(
-            "Не найден powershell.exe. Без него нельзя запустить печать этикеток 100x180."
-        ) from exc
+        for attempt in range(1, PRINT_SUBMIT_ATTEMPTS + 1):
+            try:
+                completed = subprocess.run(
+                    command,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    creationflags=creationflags,
+                    timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS,
+                )
+            except FileNotFoundError as exc:
+                raise BarTenderLabel100x180Error(
+                    "Не найден powershell.exe. Без него нельзя запустить печать этикеток 100x180."
+                ) from exc
+            except subprocess.TimeoutExpired as exc:
+                last_error = (
+                    f"BarTender SDK не ответил за {PRINT_SUBPROCESS_TIMEOUT_SECONDS} сек. "
+                    "Повтор автоматически не выполнялся, чтобы не напечатать дубли."
+                )
+                break
+
+            if completed.returncode == 0:
+                return
+
+            last_error = _extract_process_error(completed.stderr or completed.stdout)
+            if completed.returncode == 10:
+                break
+            if attempt < PRINT_SUBMIT_ATTEMPTS:
+                time.sleep(PRINT_SUBMIT_RETRY_DELAY_SECONDS)
     finally:
         try:
             script_path.unlink()
         except OSError:
             pass
 
-    if completed.returncode != 0:
-        process_error = _extract_process_error(completed.stderr or completed.stdout)
-        raise BarTenderLabel100x180Error(
-            "Не удалось отправить печать этикеток 100x180 в BarTender."
-            + (f" Причина: {process_error}" if process_error else "")
-        )
+    raise BarTenderLabel100x180Error(
+        "Не удалось отправить печать этикеток 100x180 в BarTender."
+        + (f" Причина: {last_error}" if last_error else "")
+    )
 
 
 def _build_powershell_script() -> str:
@@ -1098,6 +1120,21 @@ $ErrorActionPreference = 'Stop'
 $OutputEncoding = [System.Text.Encoding]::UTF8
 
 Add-Type -Path $SdkPath
+
+function Format-BarTenderMessages([Seagull.BarTender.Print.Messages]$Messages) {
+    if ($null -eq $Messages -or $Messages.Count -lt 1) {
+        return ''
+    }
+
+    $parts = @()
+    foreach ($btMessage in $Messages) {
+        $text = [string]$btMessage.Text
+        if ($text) {
+            $parts += ('{0}: {1}' -f $btMessage.Severity, $text)
+        }
+    }
+    return ($parts -join ' | ')
+}
 
 $engine = $null
 $format = $null
@@ -1142,11 +1179,28 @@ try {
     }
 
     if ($PrinterName) {
+        $printer = Get-CimInstance Win32_Printer -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -eq $PrinterName } |
+            Select-Object -First 1
+        if ($null -eq $printer) {
+            throw "Принтер '$PrinterName' не найден в Windows."
+        }
+        if ($printer.WorkOffline) {
+            throw "Принтер '$PrinterName' сейчас в автономном режиме."
+        }
         $format.PrintSetup.PrinterName = $PrinterName
     }
 
     if ($PrintNow -eq '1') {
-        [void]$format.Print($JobName, 60000)
+        [Seagull.BarTender.Print.Messages]$messages = New-Object Seagull.BarTender.Print.Messages
+        $result = $format.Print($JobName, 60000, [ref]$messages)
+        $messageText = Format-BarTenderMessages $messages
+        if ($result -ne [Seagull.BarTender.Print.Result]::Success) {
+            throw ("BarTender вернул статус {0}.{1}" -f $result, $(if ($messageText) { " $messageText" } else { '' }))
+        }
+        if ($messageText) {
+            [Console]::Out.WriteLine($messageText)
+        }
     }
 }
 catch {
@@ -1156,6 +1210,9 @@ catch {
     }
 
     [Console]::Error.WriteLine($message)
+    if ($message -like 'BarTender вернул статус*') {
+        exit 10
+    }
     exit 1
 }
 finally {

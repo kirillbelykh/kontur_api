@@ -659,7 +659,9 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 selection,
                 delay_seconds=api_bridge.LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS,
             )
-            self.assertTrue(any("отправлена в BarTender" in str(call.args[1]) for call in log_mock.call_args_list))
+            logged_messages = [str(call.args[1]) for call in log_mock.call_args_list]
+            self.assertTrue(any("фоновую очередь" in message for message in logged_messages))
+            self.assertTrue(any("BarTender принял задание" in message for message in logged_messages))
 
 
 if __name__ == "__main__":

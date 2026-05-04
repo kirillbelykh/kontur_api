@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+import bartender_print
 import bartender_label_100x180 as labels
 
 
@@ -151,6 +152,14 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
                 labels._ensure_unique_label_values(csv_path, labels.MARKING_SOURCE_KIND)
 
         self.assertIn("дублирующиеся коды маркировки", str(error_context.exception))
+
+    def test_powershell_print_script_checks_bartender_result(self):
+        scripts = [labels._build_powershell_script(), bartender_print._build_powershell_script()]
+
+        for script in scripts:
+            self.assertIn("[ref]$messages", script)
+            self.assertIn("[Seagull.BarTender.Print.Result]::Success", script)
+            self.assertIn("exit 10", script)
 
 
 if __name__ == "__main__":

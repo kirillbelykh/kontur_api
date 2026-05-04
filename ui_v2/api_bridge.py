@@ -3132,23 +3132,33 @@ class ApiBridge:
                 csv_path=str(selection.get("csv_path") or csv_path),
                 printer_name=printer_name,
             )
+            if selection.get("selected_record_number"):
+                preview = selection.get("record_preview") or {}
+                queued_message = (
+                    "Печать одной термоэтикетки поставлена в фоновую очередь: "
+                    f"{item.get('order_name')}, запись №{selection.get('selected_record_number')} "
+                    f"({preview.get('value_short') or 'код не распознан'})"
+                )
+                accepted_message = (
+                    "BarTender принял задание печати одной термоэтикетки: "
+                    f"{item.get('order_name')}, запись №{selection.get('selected_record_number')}"
+                )
+            else:
+                queued_message = f"Печать термоэтикеток поставлена в фоновую очередь: {item.get('order_name')}"
+                accepted_message = f"BarTender принял задание печати термоэтикеток: {item.get('order_name')}"
+
+            def _print_and_log_success() -> None:
+                print_labels(context)
+                self._log("download", accepted_message)
+
             self._run_background_job(
                 name=f"download-print-{context.document_id or uuid.uuid4().hex}",
-                action=lambda: print_labels(context),
+                action=_print_and_log_success,
                 error_log_channel="download",
                 error_log_prefix="Ошибка печати термоэтикеток",
                 cleanup=lambda: self._cleanup_label_selection(selection),
             )
-            if selection.get("selected_record_number"):
-                preview = selection.get("record_preview") or {}
-                self._log(
-                    "download",
-                    "Печать одной термоэтикетки отправлена в BarTender: "
-                    f"{item.get('order_name')}, запись №{selection.get('selected_record_number')} "
-                    f"({preview.get('value_short') or 'код не распознан'})",
-                )
-            else:
-                self._log("download", f"Печать термоэтикеток отправлена в BarTender: {item.get('order_name')}")
+            self._log("download", queued_message)
             return {
                 "success": True,
                 "context": {
@@ -4898,9 +4908,27 @@ class ApiBridge:
                 context = context_result["context"]
                 preview_payload = self._serialize_label_preview(context, selection, sheet_format=sheet_format)
                 preview_payload["manual_override_used"] = bool(context_result.get("used_manual_override"))
+                if selection.get("print_scope") == "single":
+                    queued_message = (
+                        f"Печать одной этикетки {sheet_format_label} поставлена в фоновую очередь: "
+                        f"{context.order_name}, запись №{selection.get('selected_record_number')} "
+                        f"({(selection.get('record_preview') or {}).get('value_short') or 'код не распознан'})"
+                    )
+                    accepted_message = (
+                        f"BarTender принял задание печати одной этикетки {sheet_format_label}: "
+                        f"{context.order_name}, запись №{selection.get('selected_record_number')}"
+                    )
+                else:
+                    queued_message = f"Печать {sheet_format_label} поставлена в фоновую очередь: {context.order_name}"
+                    accepted_message = f"BarTender принял задание печати {sheet_format_label}: {context.order_name}"
+
+                def _print_and_log_success() -> None:
+                    print_label_sheet(context)
+                    self._log("labels", accepted_message)
+
                 self._run_background_job(
                     name=f"labels-print-{context.document_id or uuid.uuid4().hex}",
-                    action=lambda: print_label_sheet(context),
+                    action=_print_and_log_success,
                     error_log_channel="labels",
                     error_log_prefix=f"Ошибка печати {sheet_format_label}",
                     cleanup=lambda: self._cleanup_label_selection(
@@ -4909,15 +4937,7 @@ class ApiBridge:
                     ),
                 )
                 cleanup_delegated = True
-                if selection.get("print_scope") == "single":
-                    self._log(
-                        "labels",
-                        f"Печать одной этикетки {sheet_format_label} отправлена в BarTender: "
-                        f"{context.order_name}, запись №{selection.get('selected_record_number')} "
-                        f"({(selection.get('record_preview') or {}).get('value_short') or 'код не распознан'})",
-                    )
-                else:
-                    self._log("labels", f"Печать {sheet_format_label} отправлена в BarTender: {context.order_name}")
+                self._log("labels", queued_message)
             finally:
                 if not cleanup_delegated:
                     self._cleanup_label_selection(selection)
