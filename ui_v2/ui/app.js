@@ -1613,6 +1613,23 @@ async function loadOrdersState(options = {}) {
   }
 }
 
+function applyOrderQueueUpdate(result, options = {}) {
+  if (Array.isArray(result?.queue)) {
+    state.orders.queue = result.queue;
+  } else if (result?.item) {
+    state.orders.queue = [...state.orders.queue, result.item];
+  }
+  if (options.selectItem && result?.item?.uid) {
+    state.orders.selectedQueueId = result.item.uid;
+  }
+  if (!state.orders.queue.some((item) => item.uid === state.orders.selectedQueueId)) {
+    state.orders.selectedQueueId = '';
+  }
+  if (isRouteActive('orders')) {
+    Views.orders.render();
+  }
+}
+
 async function loadDownloadState(options = {}) {
   const { render = isRouteActive('download') } = normalizeLoadOptions(options);
   state.ui.routeLoading.download = true;
@@ -2091,7 +2108,7 @@ async function bindEvents() {
   $('#add-order-btn').addEventListener('click', async () => {
     await runAction('Добавляем в очередь...', async () => {
       const result = await API.call('add_order_item', readOrderForm());
-      await loadOrdersState({ force: true });
+      applyOrderQueueUpdate(result, { selectItem: true });
       return result;
     }, 'Позиция добавлена в очередь.');
   });
@@ -2117,7 +2134,7 @@ async function bindEvents() {
   $('#clear-queue-btn').addEventListener('click', async () => {
     await runAction('Очищаем очередь...', async () => {
       const result = await API.call('clear_order_queue');
-      await loadOrdersState({ force: true });
+      applyOrderQueueUpdate(result);
       return result;
     }, 'Очередь очищена.');
   });
@@ -2128,7 +2145,7 @@ async function bindEvents() {
         throw new Error('Выберите позицию в очереди заказов.');
       }
       const result = await API.call('remove_order_item', state.orders.selectedQueueId);
-      await loadOrdersState({ force: true });
+      applyOrderQueueUpdate(result);
       return result;
     }, 'Позиция удалена из очереди.');
   });

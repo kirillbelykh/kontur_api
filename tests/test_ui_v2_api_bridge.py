@@ -50,6 +50,42 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 },
             )
 
+    def test_get_orders_view_state_uses_fast_local_history_snapshot(self):
+        history_items = [
+            {
+                "document_id": f"doc-{index}",
+                "order_name": f"Order {index}",
+                "status": "created",
+            }
+            for index in range(300)
+        ]
+        fake_runtime = types.SimpleNamespace(
+            order_queue=[],
+            session_orders=[],
+            history_db=types.SimpleNamespace(get_all_orders=lambda: history_items),
+        )
+        normalized_ids = []
+
+        def fake_normalize(item, *, session=None, include_marking_status=False):
+            self.assertIsNone(session)
+            self.assertFalse(include_marking_status)
+            normalized_ids.append(item["document_id"])
+            return {"document_id": item["document_id"]}
+
+        with (
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(self.bridge, "_ensure_session_safely") as ensure_session_mock,
+            mock.patch.object(self.bridge, "_get_deleted_document_ids", return_value={"doc-0"}),
+            mock.patch.object(self.bridge, "_load_deleted_orders", return_value=[]),
+            mock.patch.object(self.bridge, "_normalize_history_item", side_effect=fake_normalize),
+        ):
+            result = self.bridge.get_orders_view_state()
+
+        self.assertNotIn("error", result)
+        self.assertEqual(len(result["history"]), 250)
+        self.assertEqual(normalized_ids, [f"doc-{index}" for index in range(1, 251)])
+        ensure_session_mock.assert_not_called()
+
     def test_create_aggregation_codes_splits_large_request_into_99_batches(self):
         batch_calls = []
 

@@ -2743,18 +2743,24 @@ class ApiBridge:
         try:
             runtime = _get_runtime()
             deleted_ids = self._get_deleted_document_ids()
-            session = self._ensure_session_safely("orders")
+            history_items: List[Dict[str, Any]] = []
+            for item in runtime.history_db.get_all_orders():
+                if str(item.get("document_id") or "").strip() in deleted_ids:
+                    continue
+                history_items.append(item)
+                if len(history_items) >= 250:
+                    break
+
             return {
                 "queue": [self._serialize_queue_item(item) for item in runtime.order_queue],
                 "session_orders": [
-                    self._serialize_order_record(item, session=session)
+                    self._serialize_order_record(item, session=None)
                     for item in runtime.session_orders
                 ],
                 "history": [
-                    self._normalize_history_item(item, session=session)
-                    for item in runtime.history_db.get_all_orders()
-                    if str(item.get("document_id") or "").strip() not in deleted_ids
-                ][:250],
+                    self._normalize_history_item(item, session=None)
+                    for item in history_items
+                ],
                 "deleted_orders": [
                     self._serialize_order_record(item, session=None)
                     | {
