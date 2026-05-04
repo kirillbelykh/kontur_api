@@ -1,4 +1,5 @@
 import base64
+import csv
 import concurrent.futures
 import json
 import os
@@ -6,6 +7,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Sequence
 from urllib.parse import urlparse
 
@@ -22,8 +24,20 @@ DEFAULT_TRUE_API_BASE_URL = DEFAULT_TRUE_API_PRODUCTION_BASE_URL
 DEFAULT_TRUE_API_PRODUCT_GROUP = "wheelchairs"
 DEFAULT_KONTUR_PRODUCT_GROUP = "wheelChairs"
 DEFAULT_BULK_AGGREGATION_MAX_WORKERS = 3
-PROCESSABLE_AGGREGATE_STATUSES = ("readyForSend", "approveFailed")
-TSD_REFILL_AGGREGATE_STATUSES = ("approveFailed", "returnedToTsd", "tsdProcessStart", "readyForSend")
+PROCESSABLE_AGGREGATE_STATUSES = ("readyForSend", "approveFailed", "readyForSendAfterApproved")
+TSD_REFILL_AGGREGATE_STATUSES = (
+    "approveFailed",
+    "returnedToTsd",
+    "tsdProcessStart",
+    "readyForSend",
+    "readyForSendAfterApproved",
+)
+REAGGREGATION_TYPE_ADDING = "adding"
+REAGGREGATION_TYPE_REMOVING = "removing"
+SUPPORTED_REAGGREGATION_TYPES = {
+    REAGGREGATION_TYPE_ADDING,
+    REAGGREGATION_TYPE_REMOVING,
+}
 
 KONTUR_TO_TRUE_PRODUCT_GROUP = {
     "wheelChairs": "wheelchairs",
@@ -146,6 +160,9 @@ class AggregateInfo:
 class AggregateDetail(AggregateInfo):
     allow_return_to_tsd: bool = False
     allow_save: bool = False
+    allow_send_for_approve: bool = False
+    was_registered_in_ttis: bool = False
+    reaggregation_type: str = ""
 
 
 @dataclass(frozen=True)
@@ -348,6 +365,7 @@ class BulkAggregationService:
         cert_provider: Callable[[], Any],
         sign_base64_func: Callable[[Any, str, bool], str],
         tsd_token: str,
+        reaggregation_type: Optional[str] = None,
         log_callback: Optional[Callable[[str], None]] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         comment_filter: Optional[str] = None,
@@ -386,6 +404,7 @@ class BulkAggregationService:
                     aggregate=aggregate,
                     cert=cert,
                     sign_base64_func=sign_base64_func,
+                    reaggregation_type=reaggregation_type,
                     log=log,
                     summary=summary,
                 )
@@ -827,6 +846,14 @@ class BulkAggregationService:
             log(f"⏭️ {aggregate.aggregate_code}: статус уже изменился на {detail.status}")
             return
         is_recovery_required = detail.status == "approveFailed"
+        if detail.status == "readyForSendAfterApproved" and not detail.allow_send_for_approve:
+            summary.skipped_not_ready += 1
+            log(
+                f"⏭️ {aggregate.aggregate_code}: Контур пока не разрешает регистрацию изменённого состава. "
+                "Обычно это означает, что после возврата на ТСД был повторно отправлен тот же состав "
+                "без реальной дельты добавления/удаления кодов."
+            )
+            return
 
         raw_codes, reaggregation_codes = self.fetch_aggregate_codes(kontur_session, aggregate.document_id)
         logger.info(
@@ -965,6 +992,15 @@ class BulkAggregationService:
             return
 
         if is_recovery_required:
+            if detail.was_registered_in_ttis:
+                summary.skipped_not_ready += 1
+                log(
+                    f"⏭️ {aggregate.aggregate_code}: это уже зарегистрированный АК. "
+                    "Автовосстановление через повторную отправку всего текущего состава отключено, "
+                    "потому что для переагрегации Контур ждёт только изменяемые коды и режим "
+                    "добавления/удаления, а не полный состав агрегата."
+                )
+                return
             if not detail.allow_return_to_tsd:
                 raise RuntimeError(
                     f"АК {aggregate.aggregate_code}: Контур не разрешает возврат на ТСД (allowReturnToTsd=false)"
@@ -991,9 +1027,16 @@ class BulkAggregationService:
             detail = self.wait_for_aggregate_status(
                 kontur_session=kontur_session,
                 document_id=aggregate.document_id,
-                expected_statuses={"readyForSend"},
-                allowed_statuses={"returnedToTsd", "tsdProcessStart", "readyForSend"},
+                expected_statuses={"readyForSend", "readyForSendAfterApproved"},
+                allowed_statuses={"returnedToTsd", "tsdProcessStart", "readyForSend", "readyForSendAfterApproved"},
             )
+            if detail.status == "readyForSendAfterApproved":
+                summary.skipped_not_ready += 1
+                log(
+                    f"ℹ️ {aggregate.aggregate_code}: повторное наполнение выполнено, "
+                    "Контур вернул статус readyForSendAfterApproved. Повторите проведение позже."
+                )
+                return
 
         logger.info("АК %s: отправляем в Контур на подпись", aggregate.aggregate_code)
         final_detail = self.send_aggregate_for_approve(
@@ -1020,6 +1063,7 @@ class BulkAggregationService:
         aggregate: AggregateInfo,
         cert: Any,
         sign_base64_func: Callable[[Any, str, bool], str],
+        reaggregation_type: Optional[str],
         log: Callable[[str], None],
         summary: BulkAggregationSummary,
     ) -> None:
@@ -1043,6 +1087,16 @@ class BulkAggregationService:
             log(f"⏭️ {aggregate.aggregate_code}: статус {detail.status} не подходит для повторного наполнения")
             return
 
+        if detail.was_registered_in_ttis:
+            summary.skipped_not_ready += 1
+            log(
+                f"⏭️ {aggregate.aggregate_code}: АК уже был зарегистрирован в ГИС МТ. "
+                "Повторное наполнение тем же составом больше не запускаем, потому что Контур ждёт "
+                "дельту изменения состава (добавление/удаление кодов), а не повторную отправку "
+                "текущего полного состава."
+            )
+            return
+
         raw_codes, reaggregation_codes = self.fetch_aggregate_codes(kontur_session, aggregate.document_id)
         logger.info(
             "АК %s: для повторного наполнения загружены коды, km_count=%s, nested_ak_count=%s",
@@ -1064,7 +1118,7 @@ class BulkAggregationService:
 
         log(f"• {aggregate.aggregate_code}: найдено КМ {len(raw_codes)}")
 
-        if detail.status == "approveFailed":
+        if detail.status in {"approveFailed", "readyForSend"}:
             if not detail.allow_return_to_tsd:
                 raise RuntimeError(
                     f"АК {aggregate.aggregate_code}: Контур не разрешает возврат на ТСД (allowReturnToTsd=false)"
@@ -1072,7 +1126,7 @@ class BulkAggregationService:
             log(f"↩️ {aggregate.aggregate_code}: возвращаем на ТСД")
             detail = self.return_aggregate_to_tsd(kontur_session, aggregate.document_id)
 
-        if detail.status in {"approveFailed", "returnedToTsd", "tsdProcessStart"}:
+        if detail.status in {"returnedToTsd", "tsdProcessStart"}:
             tsd_token = self.get_cookie_value(kontur_session, "tsdToken")
             if not tsd_token:
                 raise RuntimeError(
@@ -1085,20 +1139,29 @@ class BulkAggregationService:
                 kontur_session=kontur_session,
                 document_id=aggregate.document_id,
                 raw_codes=raw_codes,
+                reaggregation_type=reaggregation_type,
             )
 
             log(f"⏳ {aggregate.aggregate_code}: ожидаем возврат в readyForSend")
             detail = self.wait_for_aggregate_status(
                 kontur_session=kontur_session,
                 document_id=aggregate.document_id,
-                expected_statuses={"readyForSend"},
-                allowed_statuses={"returnedToTsd", "tsdProcessStart", "readyForSend"},
+                expected_statuses={"readyForSend", "readyForSendAfterApproved"},
+                allowed_statuses={"returnedToTsd", "tsdProcessStart", "readyForSend", "readyForSendAfterApproved"},
             )
 
-        if detail.status != "readyForSend":
+        if detail.status not in {"readyForSend", "readyForSendAfterApproved"}:
             summary.skipped_not_ready += 1
             log(f"⏭️ {aggregate.aggregate_code}: не удалось довести до readyForSend, текущий статус {detail.status}")
             return
+
+        logger.info(
+            "АК %s: повторное наполнение завершено, текущий статус=%s",
+            aggregate.aggregate_code,
+            detail.status,
+        )
+        log(f"✅ {aggregate.aggregate_code}: повторное наполнение завершено, статус {detail.status}")
+        return
 
         logger.info("АК %s: после повторного наполнения отправляем в Контур на подпись", aggregate.aggregate_code)
         final_detail = self.send_aggregate_for_approve(
@@ -1143,6 +1206,9 @@ class BulkAggregationService:
             codes_check_errors_count=int(item.get("codesCheckErrorsCount") or 0),
             allow_return_to_tsd=bool(actions.get("allowReturnToTsd")),
             allow_save=bool(actions.get("allowSave")),
+            allow_send_for_approve=bool(actions.get("allowSendForApprove")),
+            was_registered_in_ttis=bool(item.get("wasRegisteredInTtis")),
+            reaggregation_type=str(item.get("reaggregationType") or ""),
         )
 
     def fetch_aggregate_codes(
@@ -1370,6 +1436,119 @@ class BulkAggregationService:
             raise RuntimeError("Сессия не поддерживает установку cookies для TSD токена")
         cookie_jar.set(name, value, domain=domain, path=path)
 
+    @staticmethod
+    def _normalize_full_marking_code(value: str) -> str:
+        normalized = str(value or "").strip().replace("\\x1d", "\x1d")
+        if normalized.startswith("^1"):
+            normalized = normalized[2:]
+        if normalized.startswith("]C1"):
+            normalized = normalized[3:]
+        return normalized.strip()
+
+    def _iter_saved_marking_rows(self, csv_path: Path):
+        encodings = ("utf-8-sig", "utf-8", "cp1251")
+        last_error: Optional[Exception] = None
+        for encoding in encodings:
+            try:
+                with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                    reader = csv.reader(csv_file, delimiter="\t")
+                    for row in reader:
+                        prepared = list(row)
+                        if len(prepared) == 1:
+                            raw_line = str(prepared[0] or "")
+                            if "\t" in raw_line:
+                                prepared = raw_line.split("\t")
+                            elif ";" in raw_line:
+                                prepared = raw_line.split(";")
+                            elif "," in raw_line:
+                                prepared = raw_line.split(",")
+                        if not prepared:
+                            continue
+                        normalized_code = self._normalize_full_marking_code(prepared[0])
+                        if normalized_code.startswith("01"):
+                            yield normalized_code
+                return
+            except UnicodeDecodeError as exc:
+                last_error = exc
+                continue
+        if last_error:
+            raise last_error
+
+    def _expand_codes_for_tsd(self, raw_codes: Sequence[str]) -> List[str]:
+        prepared_codes: List[str] = []
+        targets: Dict[str, str] = {}
+        for raw_code in raw_codes:
+            normalized = self._normalize_full_marking_code(raw_code)
+            if not normalized:
+                continue
+            sntin = extract_sntin(normalized)
+            if "\x1d" in normalized or len(normalized) > len(sntin):
+                prepared_codes.append(normalized)
+                continue
+            if sntin:
+                targets.setdefault(sntin, normalized)
+
+        if targets:
+            desktop_dir = Path.home() / "Desktop" / "Коды км"
+            if not desktop_dir.exists():
+                raise RuntimeError(f"Папка с кодами маркировки не найдена: {desktop_dir}")
+
+            matched: Dict[str, str] = {}
+            for csv_path in sorted(desktop_dir.rglob("*.csv")):
+                for full_code in self._iter_saved_marking_rows(csv_path):
+                    sntin = extract_sntin(full_code)
+                    if sntin not in targets or sntin in matched:
+                        continue
+                    matched[sntin] = full_code
+                    if len(matched) >= len(targets):
+                        break
+                if len(matched) >= len(targets):
+                    break
+
+            missing = [targets[sntin] for sntin in targets.keys() if sntin not in matched]
+            if missing:
+                preview = ", ".join(extract_sntin(code) for code in missing[:5])
+                raise RuntimeError(
+                    "Не удалось найти полные коды маркировки в папке 'Коды км' "
+                    f"для повторного наполнения АК: {len(missing)} шт. Примеры: {preview}"
+                )
+
+            for raw_code in raw_codes:
+                normalized = self._normalize_full_marking_code(raw_code)
+                if not normalized:
+                    continue
+                sntin = extract_sntin(normalized)
+                if sntin in matched:
+                    prepared_codes.append(matched[sntin])
+
+        return list(dict.fromkeys(code for code in prepared_codes if code))
+
+    @staticmethod
+    def _extract_http_error_text(response: requests.Response) -> str:
+        try:
+            payload = response.json()
+        except ValueError:
+            text = str(response.text or "").strip()
+            return text or f"HTTP {response.status_code}"
+
+        for key in ("error", "Error"):
+            value = payload.get(key)
+            if isinstance(value, dict):
+                message = str(value.get("message") or value.get("Message") or "").strip()
+                code = str(value.get("code") or value.get("Code") or "").strip()
+                if code and message:
+                    return f"{code}: {message}"
+                if message:
+                    return message
+            elif value:
+                return str(value)
+
+        for key in ("message", "Message", "type", "Type"):
+            value = str(payload.get(key) or "").strip()
+            if value:
+                return value
+        return json.dumps(payload, ensure_ascii=False)
+
     def wait_for_aggregate_status(
         self,
         *,
@@ -1437,10 +1616,23 @@ class BulkAggregationService:
         kontur_session: requests.Session,
         document_id: str,
         raw_codes: Sequence[str],
+        reaggregation_type: Optional[str] = None,
     ) -> None:
+        payload_codes = self._expand_codes_for_tsd(raw_codes)
+        if not payload_codes:
+            raise RuntimeError(f"Контур не вернул коды для повторного наполнения АК {document_id}")
+        payload: Dict[str, Any] = {"codes": payload_codes}
+        normalized_reaggregation_type = str(reaggregation_type or "").strip().lower()
+        if normalized_reaggregation_type:
+            if normalized_reaggregation_type not in SUPPORTED_REAGGREGATION_TYPES:
+                raise RuntimeError(
+                    f"Некорректный режим изменения состава АК: {normalized_reaggregation_type}. "
+                    f"Допустимо: {', '.join(sorted(SUPPORTED_REAGGREGATION_TYPES))}."
+                )
+            payload["reaggregationType"] = normalized_reaggregation_type
         response = kontur_session.post(
             f"{self.kontur_base_url}/tsd/api/v1/documents/aggregates/{document_id}",
-            json={"codes": list(raw_codes)},
+            json=payload,
             headers={
                 "Accept": "*/*",
                 "Content-Type": "application/json; charset=utf-8",
@@ -1449,7 +1641,12 @@ class BulkAggregationService:
             },
             timeout=30,
         )
-        response.raise_for_status()
+        if response.ok:
+            return
+        raise RuntimeError(
+            f"Контур не принял повторное наполнение АК {document_id}: "
+            f"{self._extract_http_error_text(response)}"
+        )
 
     def fetch_content_for_sign(
         self,
@@ -1705,9 +1902,14 @@ class BulkAggregationService:
         sign_base64_func: Callable[[Any, str, bool], str],
     ) -> AggregateDetail:
         detail = self.fetch_aggregate_detail(kontur_session, aggregate.document_id)
-        if detail.status != "readyForSend":
+        if detail.status not in {"readyForSend", "readyForSendAfterApproved"}:
             raise RuntimeError(
                 f"АК {aggregate.aggregate_code} не готов к отправке на подпись, текущий статус {detail.status}"
+            )
+        if detail.status == "readyForSendAfterApproved" and not detail.allow_send_for_approve:
+            raise RuntimeError(
+                f"АК {aggregate.aggregate_code}: Контур не разрешает отправку изменённого состава на регистрацию. "
+                "Обычно это означает отсутствие реальной дельты добавления/удаления кодов."
             )
 
         sign_content = self.fetch_content_for_sign(kontur_session, aggregate.document_id)
@@ -1728,7 +1930,7 @@ class BulkAggregationService:
             kontur_session=kontur_session,
             document_id=aggregate.document_id,
             expected_statuses={"approved", "sentForApprove"},
-            allowed_statuses={"readyForSend", "sentForApprove", "approved"},
+            allowed_statuses={"readyForSend", "readyForSendAfterApproved", "sentForApprove", "approved"},
         )
 
     @staticmethod

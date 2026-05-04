@@ -21,6 +21,11 @@ function Write-WarnMsg {
     Write-Host "[!] $Message" -ForegroundColor Yellow
 }
 
+function ConvertFrom-Utf8Base64 {
+    param([Parameter(Mandatory = $true)][string]$Value)
+    return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
+}
+
 function Refresh-Path {
     $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -451,6 +456,16 @@ function Install-YandexDriver {
         }
 
         $targetExe = Join-Path $driverDir "yandexdriver.exe"
+        if (Test-Path $targetExe) {
+            try {
+                $lockProbe = [System.IO.File]::Open($targetExe, "Open", "ReadWrite", "None")
+                $lockProbe.Close()
+            } catch {
+                Write-WarnMsg "Existing YandexDriver is currently in use. Keeping current file: $targetExe"
+                return
+            }
+        }
+
         Copy-Item -Path $driverExe.FullName -Destination $targetExe -Force
         Write-Ok "YandexDriver installed: $targetExe"
     } finally {
@@ -488,12 +503,78 @@ function Sync-ProjectDependencies {
     }
 }
 
-function Create-DesktopShortcut {
+function Ensure-EnvFile {
     param([Parameter(Mandatory = $true)][string]$ProjectDir)
 
-    $launcher = Join-Path $ProjectDir "run_kontur.vbs"
+    $envPath = Join-Path $ProjectDir ".env"
+    if (Test-Path $envPath) {
+        Write-Ok ".env already exists"
+        return
+    }
+
+    $examplePath = Join-Path $ProjectDir ".env.example"
+    if (-not (Test-Path $examplePath)) {
+        Write-WarnMsg ".env.example was not found. Create .env manually before using Kontur API requests."
+        return
+    }
+
+    Copy-Item -Path $examplePath -Destination $envPath -Force
+    Write-Ok ".env created from .env.example"
+}
+
+function Ensure-DesktopDataDirectories {
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $dirnames = @(
+        (ConvertFrom-Utf8Base64 "0JrQvtC00Ysg0LrQvA=="),
+        (ConvertFrom-Utf8Base64 "0JDQs9GA0LXQsyDQutC+0LTRiyDQutC8"),
+        (ConvertFrom-Utf8Base64 "0KPQtNCw0LvQtdC90L3Ri9C1")
+    )
+    foreach ($dirname in $dirnames) {
+        $path = Join-Path $desktop $dirname
+        if (-not (Test-Path $path)) {
+            New-Item -ItemType Directory -Path $path -Force | Out-Null
+            Write-Ok "Created data folder: $path"
+        }
+    }
+}
+
+function Test-PythonEnvironment {
+    param([Parameter(Mandatory = $true)][string]$ProjectDir)
+
+    $python = Join-Path $ProjectDir ".venv\Scripts\python.exe"
+    if (-not (Test-Path $python)) {
+        throw "Python executable was not found after dependency sync: $python"
+    }
+
+    Write-Step "Checking Python runtime imports"
+    & $python -c "import customtkinter, openpyxl, pandas, requests, selenium, win32com.client, webview; print('ok')"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Python runtime import check failed."
+    }
+    Write-Ok "Python runtime imports are available"
+}
+
+function Test-BarTenderInstallation {
+    $sdkPath = "C:\Program Files\Seagull\BarTender 2022\SDK\Assemblies\Seagull.BarTender.Print.dll"
+    if (Test-Path $sdkPath) {
+        Write-Ok "BarTender SDK found: $sdkPath"
+        return
+    }
+
+    Write-WarnMsg "BarTender SDK was not found. Label printing needs BarTender 2022 installed separately."
+}
+
+function Create-DesktopShortcut {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectDir,
+        [Parameter(Mandatory = $true)][string]$ShortcutName,
+        [Parameter(Mandatory = $true)][string]$LauncherFile,
+        [string]$Description = ""
+    )
+
+    $launcher = Join-Path $ProjectDir $LauncherFile
     if (-not (Test-Path $launcher)) {
-        throw "run_kontur.vbs was not found in project directory."
+        throw "$LauncherFile was not found in project directory."
     }
     $wscript = Join-Path $env:WINDIR "System32\\wscript.exe"
     if (-not (Test-Path $wscript)) {
@@ -501,7 +582,7 @@ function Create-DesktopShortcut {
     }
 
     $desktop = [Environment]::GetFolderPath("Desktop")
-    $shortcutPath = Join-Path $desktop "KonturAPI.lnk"
+    $shortcutPath = Join-Path $desktop "$ShortcutName.lnk"
     if (Test-Path $shortcutPath) {
         Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
     }
@@ -511,6 +592,9 @@ function Create-DesktopShortcut {
     $shortcut.TargetPath = $wscript
     $shortcut.Arguments = "`"$launcher`""
     $shortcut.WorkingDirectory = $ProjectDir
+    if (-not [string]::IsNullOrWhiteSpace($Description)) {
+        $shortcut.Description = $Description
+    }
 
     $iconPath = Join-Path $ProjectDir "icon.ico"
     if (Test-Path $iconPath) {
@@ -533,15 +617,20 @@ Ensure-Uv
 $projectDir = Resolve-ProjectDir -ScriptRoot $PSScriptRoot
 Write-Ok "Project directory: $projectDir"
 
+Ensure-EnvFile -ProjectDir $projectDir
+Ensure-DesktopDataDirectories
 Sync-ProjectDependencies -ProjectDir $projectDir
+Test-PythonEnvironment -ProjectDir $projectDir
 
 $browserPath = Ensure-YandexBrowser -ProjectDir $projectDir
 $browserVersion = Get-YandexBrowserVersion -BrowserPath $browserPath
 Write-Ok "Yandex Browser version: $browserVersion"
 
 Install-YandexDriver -ProjectDir $projectDir -BrowserVersion $browserVersion
-Create-DesktopShortcut -ProjectDir $projectDir
+Test-BarTenderInstallation
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
 
 Write-Host ""
 Write-Ok "Installation completed"
-Write-Host "Run the app from desktop shortcut: KonturAPI"
+Write-Host "Run the app from desktop shortcut: KonturTestAPI"

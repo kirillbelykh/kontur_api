@@ -5,6 +5,8 @@ import csv
 import re
 import subprocess
 import tempfile
+import threading
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
@@ -24,6 +26,7 @@ BARTENDER_SDK_DLL = Path(
     r"C:\Program Files\Seagull\BarTender 2022\SDK\Assemblies\Seagull.BarTender.Print.dll"
 )
 POWERSHELL_EXE = "powershell.exe"
+TEMP_PRINT_ARTIFACT_RETENTION_SECONDS = 300
 TEXT_OBJECT_TYPE = "2"
 COPIES_OBJECT_TYPE = "2048"
 SERIAL_OBJECT_TYPE = "4096"
@@ -169,15 +172,18 @@ def resolve_order_metadata(order_data: dict[str, Any], df: pd.DataFrame) -> Orde
     units_per_pack = _parse_positive_int(row.get(UNITS_COLUMN), field_name="Единиц в упаковке")
     order_quantity = _extract_order_quantity(order_data)
 
+    full_name = _normalize_optional_text(row.get(FULL_NAME_COLUMN)) or _extract_position_name(order_data)
+    simpl_name = _normalize_optional_text(row.get(SIMPL_COLUMN)) or _normalize_optional_text(order_data.get("simpl"))
+
     return OrderMetadata(
         document_id=document_id,
         order_name=order_name,
         gtin=gtin,
-        full_name=str(row.get(FULL_NAME_COLUMN) or _extract_position_name(order_data) or "").strip(),
-        simpl_name=str(row.get(SIMPL_COLUMN) or order_data.get("simpl") or "").strip(),
+        full_name=full_name,
+        simpl_name=simpl_name,
         size=size,
         batch=batch,
-        color=str(row.get(COLOR_COLUMN) or "").strip(),
+        color=_normalize_optional_text(row.get(COLOR_COLUMN)),
         units_per_pack=units_per_pack,
         order_quantity=order_quantity,
     )
@@ -259,7 +265,9 @@ def build_label_print_context(
 
 
 def print_100x180_labels(context: LabelPrint100x180Context) -> None:
+    _ensure_unique_label_values(Path(context.aggregation_csv_path), context.data_source_kind)
     temp_template_path = _prepare_template_copy(context)
+    submitted_to_bartender = False
 
     try:
         _run_sdk_database_print(
@@ -269,21 +277,43 @@ def print_100x180_labels(context: LabelPrint100x180Context) -> None:
             job_name=context.order_name,
             printer_name=context.printer_name,
         )
+        submitted_to_bartender = True
     finally:
-        try:
-            temp_template_path.unlink()
-        except OSError:
-            pass
+        if submitted_to_bartender:
+            _schedule_delayed_print_artifact_cleanup(temp_template_path)
+        else:
+            try:
+                temp_template_path.unlink()
+            except OSError:
+                pass
 
 
 def count_csv_records(csv_path: Path) -> int:
-    record_count = 0
-    with csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
-        reader = csv.reader(csv_file)
-        for row in reader:
-            if any(str(cell).strip() for cell in row):
-                record_count += 1
-    return record_count
+    rows, _delimiter = _read_csv_rows(csv_path)
+    return len(rows)
+
+
+def _schedule_delayed_print_artifact_cleanup(
+    file_path: Path,
+    *,
+    delay_seconds: int = TEMP_PRINT_ARTIFACT_RETENTION_SECONDS,
+) -> None:
+    target_path = Path(file_path)
+
+    def _cleanup() -> None:
+        try:
+            time.sleep(max(1, int(delay_seconds)))
+            target_path.unlink()
+        except OSError:
+            pass
+        except Exception:
+            pass
+
+    threading.Thread(
+        target=_cleanup,
+        name=f"kontur-bt-cleanup-{target_path.stem[:24]}",
+        daemon=True,
+    ).start()
 
 
 def _list_csv_files(root_dir: Path) -> list[AggregationCsvInfo]:
@@ -385,14 +415,20 @@ def _configure_template_objects(bt_format, context: LabelPrint100x180Context) ->
         required_markers=("Размер", "Партия", "Дата изготовления", "Количество"),
     )
     description_object = _find_optional_text_object_by_marker(object_elements, "цвет:")
+    serial_text_object = _find_optional_serial_text_object(
+        object_elements,
+        excluded_objects=(details_object, description_object),
+    )
     copies_object = _find_object_by_type(object_elements, COPIES_OBJECT_TYPE, required=False)
     serial_object = _find_object_by_type(object_elements, SERIAL_OBJECT_TYPE, required=False)
 
     _update_details_object(details_object, context)
 
-    if description_object is not None and context.color:
+    if description_object is not None:
         _update_description_object(description_object, context.color)
 
+    if serial_text_object is not None:
+        _reset_serial_text_object(serial_text_object)
     if copies_object is not None:
         _write_first_substring_value(copies_object, "1")
     if serial_object is not None:
@@ -487,9 +523,15 @@ def _replace_quantity_value(
 
     if index + 1 < len(values) and _is_plain_value_substring(values[index + 1]):
         if context.package_text:
-            next_value = f"{context.quantity_pairs_word}\r   {context.package_text}"
+            if _string_contains_digits(values[index]):
+                next_value = context.quantity_pairs_word
+            else:
+                next_value = f"{context.quantity_pairs} {context.quantity_pairs_word}"
+
+            next_value = f"{next_value}\r   {context.package_text}"
         else:
-            next_value = context.quantity_pairs_word
+            next_value = _replace_adjacent_quantity_digits(values[index], values[index + 1], context.quantity_pairs)
+
         values[index + 1] = _replace_preserving_linebreak(values[index + 1], next_value)
         updated = True
 
@@ -520,15 +562,6 @@ def _replace_inline_quantity_value(
     if replaced_count:
         updated = True
 
-    value, replaced_count = re.subn(
-        r"(?iu)(Количество\s*\d+\s*)(пара|пары|пар)\b",
-        lambda match: f"{match.group(1)}{quantity_pairs_word}",
-        value,
-        count=1,
-    )
-    if replaced_count:
-        updated = True
-
     return value, updated
 
 
@@ -552,12 +585,21 @@ def _update_description_object(description_object: ET.Element, color: str) -> No
         if "цвет:" not in value.lower():
             continue
 
-        values[index] = re.sub(
-            r"(?i)(цвет:\s*)([^\r\n]+)",
-            lambda match: f"{match.group(1)}{color}",
-            value,
-            count=1,
-        )
+        if color:
+            values[index] = re.sub(
+                r"(?i)(цвет:\s*)([^\r\n]+)",
+                lambda match: f"{match.group(1)}{color}",
+                value,
+                count=1,
+            )
+        else:
+            values[index] = re.sub(
+                r"(?i)(^|\r)-?цвет:\s*[^\r\n]*(?=\r|$)",
+                lambda match: match.group(1),
+                value,
+                count=1,
+            )
+            values[index] = re.sub(r"\r{2,}", "\r", values[index])
         updated = True
 
     if updated:
@@ -591,6 +633,31 @@ def _find_optional_text_object_by_marker(object_elements: list[ET.Element], mark
             return element
 
     return None
+
+
+def _find_optional_serial_text_object(
+    object_elements: list[ET.Element],
+    *,
+    excluded_objects: tuple[ET.Element | None, ...] = (),
+) -> ET.Element | None:
+    excluded_ids = {id(element) for element in excluded_objects if element is not None}
+    candidates: list[tuple[int, str, ET.Element]] = []
+
+    for element in object_elements:
+        if id(element) in excluded_ids or element.attrib.get("Type") != TEXT_OBJECT_TYPE:
+            continue
+
+        joined_value = "".join(_get_substring_values(element)).strip()
+        if not joined_value.isdigit():
+            continue
+
+        candidates.append((len(joined_value), element.attrib.get("Name", ""), element))
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return candidates[0][2]
 
 
 def _find_object_by_type(
@@ -631,6 +698,15 @@ def _write_first_substring_value(object_element: ET.Element, value: str) -> None
     _set_substring_values(object_element, values)
 
 
+def _reset_serial_text_object(object_element: ET.Element) -> None:
+    values = _get_substring_values(object_element)
+    if not values:
+        return
+
+    values[0] = _replace_preserving_linebreak(values[0], _build_serial_seed(values[0]))
+    _set_substring_values(object_element, values)
+
+
 def _decode_value(raw_value: str | None) -> str:
     if not raw_value:
         return ""
@@ -650,7 +726,19 @@ def _replace_preserving_linebreak(original_value: str, new_value: str) -> str:
         if original_value.endswith(candidate):
             linebreak_suffix = candidate
             break
-    return f"{new_value}{linebreak_suffix}"
+    base_value = original_value[: -len(linebreak_suffix)] if linebreak_suffix else original_value
+    if not base_value:
+        return f"{new_value}{linebreak_suffix}"
+
+    leading_whitespace = re.match(r"^\s*", base_value)
+    trailing_whitespace = re.search(r"\s*$", base_value)
+    prefix = leading_whitespace.group(0) if leading_whitespace else ""
+    suffix = trailing_whitespace.group(0) if trailing_whitespace else ""
+
+    if not base_value.strip():
+        return f"{prefix}{new_value}{linebreak_suffix}"
+
+    return f"{prefix}{new_value}{suffix}{linebreak_suffix}"
 
 
 def _parse_quantity_pairs(quantity_value: str | int | None) -> int:
@@ -719,6 +807,24 @@ def _parse_positive_int(value: Any, *, field_name: str) -> int:
     return parsed_value
 
 
+def _normalize_optional_text(value: Any) -> str:
+    if value is None:
+        return ""
+
+    try:
+        is_na = pd.isna(value)
+    except Exception:
+        is_na = False
+
+    if isinstance(is_na, bool) and is_na:
+        return ""
+
+    prepared = str(value).strip()
+    if prepared.lower() in {"nan", "none", "null", "nat"}:
+        return ""
+    return prepared
+
+
 def _extract_gtin(order_data: dict[str, Any]) -> str:
     direct_gtin = str(order_data.get("gtin") or "").strip()
     if direct_gtin:
@@ -775,7 +881,7 @@ def _extract_batch_from_order_name(order_name: str) -> str:
 
 
 def _normalize_size_from_table(raw_size: Any) -> str:
-    value = str(raw_size or "").upper().strip()
+    value = _normalize_optional_text(raw_size).upper()
     bracket_match = re.search(r"\(([^)]+)\)", value)
     if bracket_match:
         return bracket_match.group(1).strip().upper()
@@ -789,6 +895,120 @@ def _normalize_size_from_table(raw_size: Any) -> str:
         return numeric_match.group(1)
 
     return value
+
+
+def _read_csv_rows(csv_path: Path) -> tuple[list[list[str]], str]:
+    encodings = ("utf-8-sig", "utf-8", "cp1251")
+    last_error: Exception | None = None
+
+    for encoding in encodings:
+        try:
+            sample_line = ""
+            with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                for raw_line in csv_file:
+                    if str(raw_line or "").strip():
+                        sample_line = raw_line
+                        break
+
+            delimiter = "\t"
+            if ";" in sample_line and "\t" not in sample_line:
+                delimiter = ";"
+            elif "," in sample_line and "\t" not in sample_line and ";" not in sample_line:
+                delimiter = ","
+
+            rows: list[list[str]] = []
+            with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                reader = csv.reader(csv_file, delimiter=delimiter)
+                for row in reader:
+                    prepared = [str(cell or "") for cell in row]
+                    if len(prepared) == 1:
+                        raw_line = str(prepared[0] or "")
+                        if delimiter == "\t" and "\t" in raw_line:
+                            prepared = raw_line.split("\t")
+                        elif delimiter == ";" and ";" in raw_line:
+                            prepared = raw_line.split(";")
+                        elif delimiter == "," and "," in raw_line:
+                            prepared = raw_line.split(",")
+                    if any(cell.strip() for cell in prepared):
+                        rows.append(prepared)
+
+            return rows, delimiter
+        except UnicodeDecodeError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise BarTenderLabel100x180Error(f"Не удалось прочитать CSV для печати: {csv_path}") from last_error
+    raise BarTenderLabel100x180Error(f"Не удалось прочитать CSV для печати: {csv_path}")
+
+
+def _ensure_unique_label_values(csv_path: Path, data_source_kind: str) -> None:
+    rows, _delimiter = _read_csv_rows(csv_path)
+    if len(rows) < 2:
+        return
+
+    seen_values: dict[str, int] = {}
+    duplicate_values: list[str] = []
+
+    for row in rows:
+        if not row:
+            continue
+        primary_value = str(row[0] or "").strip()
+        if not primary_value:
+            continue
+        if primary_value in seen_values:
+            duplicate_values.append(primary_value)
+            continue
+        seen_values[primary_value] = 1
+
+    if not duplicate_values:
+        return
+
+    entity_label = "коды маркировки" if data_source_kind == MARKING_SOURCE_KIND else "коды для печати"
+    preview = ", ".join(_format_duplicate_value_preview(value) for value in duplicate_values[:5])
+    raise BarTenderLabel100x180Error(
+        f"В CSV для печати найдены дублирующиеся {entity_label}: {len(duplicate_values)} шт. "
+        f"Примеры: {preview}"
+    )
+
+
+def _format_duplicate_value_preview(value: str, *, limit: int = 64) -> str:
+    prepared = str(value or "").replace("\x1d", "\\x1d").strip()
+    if len(prepared) <= limit:
+        return prepared
+    return f"{prepared[: limit - 1]}…"
+
+
+def _string_contains_digits(value: str) -> bool:
+    return bool(re.search(r"\d", str(value or "")))
+
+
+def _replace_adjacent_quantity_digits(current_value: str, adjacent_value: str, quantity_pairs: int) -> str:
+    if _string_contains_digits(current_value):
+        return adjacent_value
+
+    updated_value, replaced_count = re.subn(
+        r"\d+",
+        str(quantity_pairs),
+        str(adjacent_value or ""),
+        count=1,
+    )
+    if not replaced_count:
+        return adjacent_value
+
+    updated_value = re.sub(
+        rf"^{quantity_pairs}(?=[^\d\s\r\n])",
+        f"{quantity_pairs} ",
+        updated_value,
+        count=1,
+    )
+    return updated_value
+
+
+def _build_serial_seed(value: str) -> str:
+    stripped_value = str(value or "").strip()
+    if stripped_value.isdigit() and len(stripped_value) > 1:
+        return str(1).zfill(len(stripped_value))
+    return "1"
 
 
 def _pluralize_ru(value: int, singular: str, few: str, many: str) -> str:

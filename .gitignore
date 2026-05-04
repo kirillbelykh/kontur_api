@@ -4,6 +4,11 @@
 __pycache__
 *.pyc
 *.log
+*.log.*
+tmp_*
+bundle-legacy.*.js
+index.*.js
+polyfills.*.js
 kontur_cookies.json
 last_snapshot.json
 История заказов.txt
@@ -13,5 +18,7 @@ driver/
 yandexdriver.exe
 orders_history.json
 .history_sync_cache/
+/Удаленные/
+/РЈРґР°Р»РµРЅРЅС‹Рµ/
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
