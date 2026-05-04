@@ -159,6 +159,8 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
         for script in scripts:
             self.assertIn("[ref]$messages", script)
             self.assertIn("[Seagull.BarTender.Print.Result]::Success", script)
+            self.assertIn("$Messages.HasError", script)
+            self.assertIn("без подробного сообщения", script)
             self.assertIn("exit 10", script)
 
 

@@ -1136,6 +1136,13 @@ function Format-BarTenderMessages([Seagull.BarTender.Print.Messages]$Messages) {
     return ($parts -join ' | ')
 }
 
+function Test-BarTenderMessagesHaveError([Seagull.BarTender.Print.Messages]$Messages) {
+    if ($null -eq $Messages -or $Messages.Count -lt 1) {
+        return $false
+    }
+    return [bool]$Messages.HasError
+}
+
 $engine = $null
 $format = $null
 
@@ -1195,8 +1202,12 @@ try {
         [Seagull.BarTender.Print.Messages]$messages = New-Object Seagull.BarTender.Print.Messages
         $result = $format.Print($JobName, 60000, [ref]$messages)
         $messageText = Format-BarTenderMessages $messages
-        if ($result -ne [Seagull.BarTender.Print.Result]::Success) {
+        $hasErrorMessages = Test-BarTenderMessagesHaveError $messages
+        if ($result -ne [Seagull.BarTender.Print.Result]::Success -and $hasErrorMessages) {
             throw ("BarTender вернул статус {0}.{1}" -f $result, $(if ($messageText) { " $messageText" } else { '' }))
+        }
+        if ($result -ne [Seagull.BarTender.Print.Result]::Success -and -not $messageText) {
+            throw ("BarTender вернул статус {0} без подробного сообщения." -f $result)
         }
         if ($messageText) {
             [Console]::Out.WriteLine($messageText)
