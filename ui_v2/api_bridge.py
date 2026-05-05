@@ -18,9 +18,10 @@ from typing import Any, Dict, List, Optional, Sequence
 
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-os.environ.setdefault("HISTORY_SYNC_ENABLED", "0")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import api as api_module
 import cookies as cookies_module
@@ -245,7 +246,7 @@ def _format_datetime_value(value: Any) -> str:
 class _BridgeRuntime:
     def __init__(self):
         self.root_dir = Path(__file__).resolve().parent.parent
-        self.history_db = OrderHistoryDB(startup_sync="none", sync_enabled=False)
+        self.history_db = OrderHistoryDB(startup_sync="none")
         self.lock = Lock()
         self.session: Optional[requests.Session] = None
         self.session_created_at = 0.0
@@ -262,7 +263,14 @@ class _BridgeRuntime:
         self.aggregation_cache_items: List[Dict[str, Any]] = []
         self.aggregation_cache_at = 0.0
         self.aggregation_cache_ttl_seconds = 90.0
+        self._sync_history_on_startup()
         self.load_download_items_from_history()
+
+    def _sync_history_on_startup(self) -> None:
+        try:
+            self.history_db.sync_with_github(force=True, push=False, reason="runtime-init")
+        except Exception:
+            pass
 
     def load_download_items_from_history(self) -> None:
         existing_ids = {item.get("document_id") for item in self.download_items if item.get("document_id")}

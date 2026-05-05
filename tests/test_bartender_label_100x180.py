@@ -45,6 +45,31 @@ def _make_object_xml(*values: str, object_name: str, object_type: str = labels.T
 
 
 class BarTenderLabel100x180Tests(unittest.TestCase):
+    def test_resolve_order_metadata_matches_gtin_with_leading_zero(self):
+        df = pd.DataFrame(
+            [
+                {
+                    labels.GTIN_COLUMN: 4640473507123,
+                    labels.UNITS_COLUMN: 60,
+                    labels.SIZE_COLUMN: "р-р 9,0",
+                    labels.COLOR_COLUMN: "",
+                    labels.FULL_NAME_COLUMN: "Перчатки Sover хирургические",
+                    labels.SIMPL_COLUMN: "хир с полимерным",
+                }
+            ]
+        )
+        order_data = {
+            "document_id": "doc-790",
+            "order_name": "790 хир 9,0 260319 60пар",
+            "gtin": "04640473507123",
+            "positions": [{"name": "Перчатки Sover хирургические", "quantity": 1}],
+        }
+
+        metadata = labels.resolve_order_metadata(order_data, df)
+
+        self.assertEqual(metadata.units_per_pack, 60)
+        self.assertEqual(metadata.size, "9,0")
+
     def test_resolve_order_metadata_ignores_nan_optional_values(self):
         df = pd.DataFrame(
             [

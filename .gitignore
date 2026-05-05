@@ -5,6 +5,7 @@ __pycache__
 *.pyc
 *.log
 *.log.*
+*.pid
 tmp_*
 bundle-legacy.*.js
 index.*.js
@@ -18,6 +19,7 @@ driver/
 yandexdriver.exe
 orders_history.json
 .history_sync_cache/
+/ui_mobile/certs/
 /Удаленные/
 /РЈРґР°Р»РµРЅРЅС‹Рµ/
 #Ignore vscode AI rules

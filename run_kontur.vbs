@@ -12,7 +12,5 @@ If fso.FileExists(pythonw) Then
     cmd = """" & pythonw & """ """ & mainScript & """"
     shell.Run cmd, 0, False
 Else
-    ' Fallback for missing .venv: try uv runtime from PATH.
-    cmd = "cmd /c cd /d """ & projectDir & """ && uv run --python 3.12 main.pyw"
-    shell.Run cmd, 0, False
+    MsgBox "Не найдена установленная среда KonturAPI (.venv). Запустите setup.bat заново.", vbExclamation, "KonturAPI"
 End If

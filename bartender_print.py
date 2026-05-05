@@ -44,6 +44,7 @@ class PrintContext:
     printer_name: str
     size: str
     label_count: int
+    marking_fragment: str
 
 
 def build_print_context(
@@ -75,6 +76,7 @@ def build_print_context(
         printer_name=printer_name_text,
         size=size,
         label_count=label_count,
+        marking_fragment=_resolve_marking_fragment(csv_file) if label_count == 1 else "",
     )
 
 
@@ -157,6 +159,34 @@ def count_csv_records(csv_path: Path) -> int:
     return record_count
 
 
+def _resolve_marking_fragment(csv_path: Path, *, fragment_length: int = 8) -> str:
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+        for raw_line in csv_file:
+            line = raw_line.strip()
+            if not line:
+                continue
+
+            parts = line.split("\t")
+            if not parts:
+                continue
+
+            normalized_code = _normalize_marking_code_for_fragment(parts[0])
+            if normalized_code:
+                return normalized_code[-fragment_length:]
+
+    return ""
+
+
+def _normalize_marking_code_for_fragment(value: str) -> str:
+    return (
+        str(value or "")
+        .replace("\x1d", "")
+        .replace("\\x1d", "")
+        .replace(" ", "")
+        .strip()
+    )
+
+
 def print_labels(context: PrintContext) -> None:
     with _SDK_PRINT_LOCK:
         temp_template_path = _prepare_template_copy(context)
@@ -190,7 +220,7 @@ def _prepare_template_copy(context: PrintContext) -> Path:
         app.Visible = False
         bt_format = app.Formats.Open(context.template_path, False, "")
 
-        _configure_template_objects(bt_format, context.size)
+        _configure_template_objects(bt_format, context.size, context.marking_fragment)
         bt_format.SaveAs(str(temp_template_path), False)
 
         return temp_template_path
@@ -212,7 +242,7 @@ def _prepare_template_copy(context: PrintContext) -> Path:
         pythoncom.CoUninitialize()
 
 
-def _configure_template_objects(bt_format, size: str) -> None:
+def _configure_template_objects(bt_format, size: str, marking_fragment: str = "") -> None:
     raw_xml = getattr(bt_format.Objects, "ExportDataSourceValuesToXML", "")
     if not raw_xml:
         raise BarTenderPrintError(
@@ -239,7 +269,7 @@ def _configure_template_objects(bt_format, size: str) -> None:
         )
 
     _write_object_value(size_object, size)
-    _write_object_value(serial_text_object, "1")
+    _write_object_value(serial_text_object, marking_fragment or "1")
     _write_object_value(serial_source_object, "1")
 
     if copies_object is not None:

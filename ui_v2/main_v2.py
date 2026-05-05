@@ -2,10 +2,12 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 os.environ.setdefault("LOG_FILE", str(Path(__file__).resolve().parent.parent / "lookup.log"))
-os.environ.setdefault("HISTORY_SYNC_ENABLED", "0")
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 try:
     import webview
@@ -95,7 +97,8 @@ def main():
         min_size=(1100, 700),
     )
     window.events.loaded += _install_desktop_scroll_overrides
-    webview.start(debug=True)
+    debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    webview.start(debug=debug_mode)
 
 
 if __name__ == "__main__":

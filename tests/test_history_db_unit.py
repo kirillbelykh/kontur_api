@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -165,6 +166,22 @@ class OrderHistoryDBTests(unittest.TestCase):
         self.assertTrue(kwargs.get("force"))
         self.assertTrue(kwargs.get("push"))
         self.assertEqual(kwargs.get("reason"), "startup")
+
+    def test_sync_is_enabled_by_default_when_env_flag_is_missing(self):
+        db_path = self.base_path / "full_orders_history.json"
+        with (
+            patch.dict(os.environ, {}, clear=False),
+            patch.object(OrderHistoryDB, "_detect_origin_url", return_value="https://example.test/repo.git"),
+            patch.object(OrderHistoryDB, "_resolve_sync_relative_path", return_value=Path("full_orders_history.json")),
+        ):
+            os.environ.pop("HISTORY_SYNC_ENABLED", None)
+            db = OrderHistoryDB(
+                db_file=str(db_path),
+                legacy_db_files=[],
+                startup_sync="none",
+            )
+
+        self.assertTrue(db.sync_enabled)
 
     def test_add_order_attempts_sync_even_when_record_is_unchanged(self):
         db = OrderHistoryDB(

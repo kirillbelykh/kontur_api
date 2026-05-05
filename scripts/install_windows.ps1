@@ -547,7 +547,7 @@ function Test-PythonEnvironment {
     }
 
     Write-Step "Checking Python runtime imports"
-    & $python -c "import customtkinter, openpyxl, pandas, requests, selenium, win32com.client, webview; print('ok')"
+    & $python -c "import customtkinter, openpyxl, pandas, requests, selenium, trustme, win32com.client, webview; print('ok')"
     if ($LASTEXITCODE -ne 0) {
         throw "Python runtime import check failed."
     }
@@ -630,6 +630,7 @@ Install-YandexDriver -ProjectDir $projectDir -BrowserVersion $browserVersion
 Test-BarTenderInstallation
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
 
 Write-Host ""
 Write-Ok "Installation completed"

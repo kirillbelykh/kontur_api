@@ -50,6 +50,31 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 },
             )
 
+    def test_bridge_runtime_syncs_history_before_populating_download_items(self):
+        fake_history_order = {"document_id": "doc-1", "order_name": "Order 1"}
+        sync_calls = []
+
+        class FakeHistoryDB:
+            def __init__(self, *args, **kwargs):
+                self.args = args
+                self.kwargs = kwargs
+
+            def sync_with_github(self, **kwargs):
+                sync_calls.append(kwargs)
+
+            def get_orders_without_tsd(self):
+                return [fake_history_order]
+
+        with mock.patch.object(api_bridge, "OrderHistoryDB", FakeHistoryDB):
+            runtime = api_bridge._BridgeRuntime()
+
+        self.assertEqual(
+            sync_calls,
+            [{"force": True, "push": False, "reason": "runtime-init"}],
+        )
+        self.assertEqual(len(runtime.download_items), 1)
+        self.assertEqual(runtime.download_items[0]["document_id"], "doc-1")
+
     def test_get_orders_view_state_uses_fast_local_history_snapshot(self):
         history_items = [
             {

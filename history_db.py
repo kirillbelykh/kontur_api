@@ -87,7 +87,7 @@ class OrderHistoryDB:
     def _resolve_sync_enabled(self, explicit: Optional[bool]) -> bool:
         if explicit is not None:
             return explicit
-        value = os.getenv(SYNC_ENABLED_ENV, "0").strip().lower()
+        value = os.getenv(SYNC_ENABLED_ENV, "1").strip().lower()
         return value not in {"0", "false", "no", "off"}
 
     def _resolve_sync_relative_path(self) -> Optional[Path]:

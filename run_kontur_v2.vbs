@@ -16,7 +16,5 @@ ElseIf fso.FileExists(python) Then
     cmd = """" & python & """ """ & mainScript & """"
     shell.Run cmd, 0, False
 Else
-    ' Fallback for missing .venv: try uv runtime from PATH.
-    cmd = "cmd /c cd /d """ & projectDir & """ && uv run --python 3.12 ui_v2\main_v2.py"
-    shell.Run cmd, 0, False
+    MsgBox "Не найдена установленная среда KonturTestAPI (.venv). Запустите setup.bat заново.", vbExclamation, "KonturTestAPI"
 End If

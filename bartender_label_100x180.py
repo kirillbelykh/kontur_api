@@ -842,11 +842,29 @@ def _extract_gtin(order_data: dict[str, Any]) -> str:
     return ""
 
 
+def _normalize_gtin_value(value: Any) -> str:
+    prepared = _normalize_optional_text(value)
+    if not prepared:
+        return ""
+
+    digits_only = re.sub(r"\D", "", prepared)
+    if not digits_only:
+        return prepared
+
+    normalized = digits_only.lstrip("0")
+    return normalized or "0"
+
+
 def _lookup_nomenclature_row_by_gtin(df: pd.DataFrame, gtin: str) -> pd.Series | None:
     if GTIN_COLUMN not in df.columns:
         return None
 
-    match = df[df[GTIN_COLUMN].astype(str).str.strip() == str(gtin).strip()]
+    target_gtin = _normalize_gtin_value(gtin)
+    if not target_gtin:
+        return None
+
+    normalized_gtins = df[GTIN_COLUMN].map(_normalize_gtin_value)
+    match = df[normalized_gtins == target_gtin]
     if match.empty:
         return None
 
