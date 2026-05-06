@@ -45,6 +45,52 @@ def _make_object_xml(*values: str, object_name: str, object_type: str = labels.T
 
 
 class BarTenderLabel100x180Tests(unittest.TestCase):
+    def test_build_label_print_context_uses_quantity_field_for_marking_templates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path = temp_root / "codes.csv"
+            csv_path.write_text(
+                "010000000000000021ABC\t0465011804000000\tТовар 1\n",
+                encoding="utf-8-sig",
+            )
+            df = pd.DataFrame(
+                [
+                    {
+                        labels.GTIN_COLUMN: "0465011804000000",
+                        labels.UNITS_COLUMN: 100,
+                        labels.SIZE_COLUMN: "L",
+                        labels.COLOR_COLUMN: "",
+                        labels.FULL_NAME_COLUMN: "Перчатки Stera",
+                        labels.SIMPL_COLUMN: "",
+                    }
+                ]
+            )
+            order_data = {
+                "document_id": "doc-1",
+                "order_name": "646 стер лат L 260407 120к",
+                "gtin": "0465011804000000",
+                "positions": [{"name": "Перчатки Stera", "quantity": 120}],
+            }
+
+            context = labels.build_label_print_context(
+                df=df,
+                order_data=order_data,
+                template_path=str(template_path),
+                aggregation_csv_path=str(csv_path),
+                printer_name="Printer",
+                manufacture_date="2026-02",
+                expiration_date="2031-02",
+                quantity_value="10",
+            )
+
+        self.assertEqual(context.data_source_kind, labels.MARKING_SOURCE_KIND)
+        self.assertEqual(context.units_per_pack, 100)
+        self.assertEqual(context.quantity_pairs, 10)
+        self.assertEqual(context.quantity_pairs_word, "пар")
+        self.assertIsNone(context.package_text)
+
     def test_resolve_order_metadata_matches_gtin_with_leading_zero(self):
         df = pd.DataFrame(
             [

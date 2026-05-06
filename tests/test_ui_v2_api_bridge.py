@@ -599,6 +599,41 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertEqual(result["preview"]["size"], "M")
         self.assertEqual(result["preview"]["batch"], "260330")
         self.assertTrue(result["preview"]["manual_override_used"])
+    
+    def test_build_manual_label_context_uses_quantity_field_for_marking_templates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path = temp_root / "codes.csv"
+            csv_path.write_text("010000000000000021ABC\t04650118041257\tName\n", encoding="utf-8")
+
+            with mock.patch.object(
+                self.bridge,
+                "_parse_iso_date",
+                side_effect=lambda value, **_kwargs: f"{value}-01" if len(str(value)) == 7 else value,
+            ):
+                context = self.bridge._build_manual_label_context(
+                    order_data={"document_id": "doc-1", "order_name": "Order 260330", "gtin": "04650118041257"},
+                    template_info={"path": str(template_path), "data_source_kind": "marking", "category": "Templates"},
+                    csv_path=str(csv_path),
+                    printer_name="Printer",
+                    manufacture_date="2026-01",
+                    expiration_date="2031-01",
+                    quantity_value="10",
+                    manual_override={
+                        "gtin": "04650118041257",
+                        "size": "M",
+                        "batch": "260330",
+                        "color": "",
+                        "units_per_pack": "100",
+                    },
+                )
+
+        self.assertEqual(context.units_per_pack, 100)
+        self.assertEqual(context.quantity_pairs, 10)
+        self.assertEqual(context.quantity_pairs_word, "пар")
+        self.assertIsNone(context.package_text)
 
     def test_print_download_order_supports_single_record_number(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -640,6 +675,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             self.assertTrue(result["success"])
             self.assertEqual(result["selection"]["selected_record_number"], 2)
             self.assertEqual(len(built_contexts), 1)
+            self.assertEqual(built_contexts[0]["selected_record_number"], 2)
             self.assertNotEqual(built_contexts[0]["csv_path"], str(csv_path))
             selected_csv = Path(built_contexts[0]["csv_path"])
             self.assertIn("010000000000000021BBB", selected_csv.read_text(encoding="utf-8-sig"))

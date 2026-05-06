@@ -226,8 +226,9 @@ def build_label_print_context(
     metadata = resolve_order_metadata(order_data, df)
     data_source_kind = _resolve_template_data_source_kind(template_file)
 
+    quantity_pairs = _parse_quantity_pairs(quantity_value)
+
     if data_source_kind == AGGREGATION_SOURCE_KIND:
-        quantity_pairs = _parse_quantity_pairs(quantity_value)
         if quantity_pairs % metadata.units_per_pack != 0:
             raise BarTenderLabel100x180Error(
                 "Количество должно быть кратно значению 'Единиц в упаковке'. "
@@ -240,7 +241,6 @@ def build_label_print_context(
             f"по {metadata.units_per_pack} {_pluralize_ru(metadata.units_per_pack, 'пара', 'пары', 'пар')})"
         )
     else:
-        quantity_pairs = metadata.units_per_pack
         dispenser_count = 0
         package_text = None
 

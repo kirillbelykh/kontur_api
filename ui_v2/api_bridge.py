@@ -3146,6 +3146,7 @@ class ApiBridge:
                 document_id=str(item.get("document_id") or ""),
                 csv_path=str(selection.get("csv_path") or csv_path),
                 printer_name=printer_name,
+                selected_record_number=selection.get("selected_record_number"),
             )
             if selection.get("selected_record_number"):
                 preview = selection.get("record_preview") or {}
@@ -4711,8 +4712,8 @@ class ApiBridge:
         )
 
         data_source_kind = str(template_info.get("data_source_kind") or MARKING_SOURCE_KIND).strip()
+        quantity_pairs = self._parse_label_positive_int(quantity_value, field_name="Количество")
         if data_source_kind == AGGREGATION_SOURCE_KIND:
-            quantity_pairs = self._parse_label_positive_int(quantity_value, field_name="Количество")
             if quantity_pairs % units_per_pack != 0:
                 raise RuntimeError(
                     "Количество должно быть кратно значению 'Единиц в упаковке'. "
@@ -4724,7 +4725,6 @@ class ApiBridge:
                 f"по {units_per_pack} {self._pluralize_ru(units_per_pack, 'пара', 'пары', 'пар')})"
             )
         else:
-            quantity_pairs = units_per_pack
             dispenser_count = 0
             package_text = None
 
