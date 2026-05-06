@@ -77,6 +77,7 @@ ALLOWED_METHODS = {
     "preview_100x180_label",
     "print_100x180_label",
     "print_download_order",
+    "prolong_kontur_access",
     "refresh_session",
     "refill_aggregations",
     "restore_deleted_order",

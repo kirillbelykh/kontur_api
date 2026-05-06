@@ -11,6 +11,7 @@ bundle-legacy.*.js
 index.*.js
 polyfills.*.js
 kontur_cookies.json
+kontur_access_prolongation.json
 last_snapshot.json
 История заказов.txt
 lookup.log

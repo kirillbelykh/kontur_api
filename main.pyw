@@ -20,7 +20,7 @@ from api import (
     send_utd_documents_to_diadoc,
     split_document_numbers,
 )
-from cookies import get_valid_cookies
+from cookies import ensure_kontur_access_prolongation_worker_started, get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 from date_defaults import get_default_production_window
 from queue_utils import (
@@ -104,6 +104,7 @@ class SessionManager:
         """Инициализация менеджера сессий - запускается при старте приложения"""
         if not cls._initialized:
             cls._initialized = True
+            ensure_kontur_access_prolongation_worker_started()
             # Сразу запускаем фоновый процесс
             cls.start_background_update()
             # Принудительно запускаем первое обновление

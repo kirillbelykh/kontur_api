@@ -9,6 +9,13 @@ import ui_v2.api_bridge as api_bridge
 
 class ApiBridgeUiV2Tests(unittest.TestCase):
     def setUp(self):
+        self.prolongation_worker_patcher = mock.patch.object(
+            api_bridge.cookies_module,
+            "ensure_kontur_access_prolongation_worker_started",
+            return_value=True,
+        )
+        self.prolongation_worker_patcher.start()
+        self.addCleanup(self.prolongation_worker_patcher.stop)
         self.bridge = api_bridge.ApiBridge()
 
     def test_normalize_ui_text_repairs_latin1_cp1251_mojibake(self):
@@ -53,6 +60,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
     def test_bridge_runtime_syncs_history_before_populating_download_items(self):
         fake_history_order = {"document_id": "doc-1", "order_name": "Order 1"}
         sync_calls = []
+        worker_calls = []
 
         class FakeHistoryDB:
             def __init__(self, *args, **kwargs):
@@ -65,15 +73,39 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             def get_orders_without_tsd(self):
                 return [fake_history_order]
 
-        with mock.patch.object(api_bridge, "OrderHistoryDB", FakeHistoryDB):
+        with (
+            mock.patch.object(api_bridge, "OrderHistoryDB", FakeHistoryDB),
+            mock.patch.object(
+                api_bridge.cookies_module,
+                "ensure_kontur_access_prolongation_worker_started",
+                side_effect=lambda: worker_calls.append("started") or True,
+            ),
+        ):
             runtime = api_bridge._BridgeRuntime()
 
         self.assertEqual(
             sync_calls,
             [{"force": True, "push": False, "reason": "runtime-init"}],
         )
+        self.assertEqual(worker_calls, ["started"])
         self.assertEqual(len(runtime.download_items), 1)
         self.assertEqual(runtime.download_items[0]["document_id"], "doc-1")
+
+    def test_get_session_info_includes_prolongation_state(self):
+        fake_state = {
+            "enabled": True,
+            "due": False,
+            "seconds_until_due": 123.0,
+        }
+
+        with mock.patch.object(
+            api_bridge.cookies_module,
+            "get_kontur_access_prolongation_state",
+            return_value=fake_state,
+        ):
+            result = self.bridge.get_session_info()
+
+        self.assertEqual(result["prolongation"], fake_state)
 
     def test_get_orders_view_state_uses_fast_local_history_snapshot(self):
         history_items = [

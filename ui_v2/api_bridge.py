@@ -263,6 +263,7 @@ class _BridgeRuntime:
         self.aggregation_cache_items: List[Dict[str, Any]] = []
         self.aggregation_cache_at = 0.0
         self.aggregation_cache_ttl_seconds = 90.0
+        cookies_module.ensure_kontur_access_prolongation_worker_started()
         self._sync_history_on_startup()
         self.load_download_items_from_history()
 
@@ -2710,6 +2711,7 @@ class ApiBridge:
                     "has_session": runtime.session is not None,
                     "age_seconds": round(age, 2),
                     "minutes_until_update": round(max(0.0, runtime.session_ttl_seconds - age) / 60.0, 2),
+                    "prolongation": cookies_module.get_kontur_access_prolongation_state(),
                 }
         except Exception as exc:
             return {"error": str(exc)}
@@ -2725,6 +2727,12 @@ class ApiBridge:
         try:
             self._ensure_session(force_refresh=True, force_browser_refresh=True)
             return {"success": True, "session": self.get_session_info()}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def prolong_kontur_access(self) -> Dict[str, Any]:
+        try:
+            return cookies_module.prolong_kontur_access(force=True)
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 

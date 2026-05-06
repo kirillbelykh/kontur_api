@@ -14,6 +14,7 @@ class UiMobileServerTests(unittest.TestCase):
             "preview_100x180_label",
             "print_100x180_label",
             "print_download_order",
+            "prolong_kontur_access",
         ):
             self.assertIn(method_name, mobile_server.ALLOWED_METHODS)
             self.assertNotIn(method_name, mobile_server.BLOCKED_METHODS)
