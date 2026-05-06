@@ -177,8 +177,8 @@
     {
       "order_name": "621 лат диаг M 260330 1код",
       "document_id": "4eccd51c-da6a-46ba-a753-bc9c143d5809",
-      "status": "Введен в оборот",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.pdf, C:\\Users\\user\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.xls",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.pdf, C:\\Users\\User\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
       "gtin": "4650118041295",
@@ -199,9 +199,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код_csv.csv",
-      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.xls",
-      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.pdf"
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код_csv.csv",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.xls",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\621 лат диаг M 260330 1код\\621 лат диаг M 260330 1код.pdf"
     },
     {
       "order_name": "797 хир 7,0 260420 50пар",
@@ -13133,7 +13133,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-06T10:31:10.471395",
+  "last_update": "2026-05-06T10:32:41.117288",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
