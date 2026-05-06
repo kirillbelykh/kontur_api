@@ -3,8 +3,8 @@
     {
       "order_name": "815 хир 7,0 260420 100пар",
       "document_id": "9ec1a54d-1c8d-4714-be51-11ccda6a04e7",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\815 хир 70 260420 100пар\\815 хир 70 260420 100пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\815 хир 70 260420 100пар\\815 хир 7,0 260420 100пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\815 хир 70 260420 100пар\\815 хир 7,0 260420 100пар.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473510604",
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\815 хир 70 260420 100пар\\815 хир 7,0 260420 100пар.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\815 хир 70 260420 100пар\\815 хир 7,0 260420 100пар_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\815 хир 70 260420 100пар\\815 хир 70 260420 100пар.pdf"
     },
     {
       "order_name": "814 стер лат L 260407",
@@ -13217,7 +13220,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-06T11:36:17.282986",
+  "last_update": "2026-05-06T11:37:30.995915",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
