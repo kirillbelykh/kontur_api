@@ -3,7 +3,7 @@
     {
       "order_name": "816 стер лат L 260318",
       "document_id": "4393b17d-622d-45a1-a87b-b8091c353c91",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\816 стер лат L 260318\\816 стер лат L 260318.pdf, C:\\Users\\User\\Desktop\\Коды км\\816 стер лат L 260318\\816 стер лат L 260318_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\816 стер лат L 260318\\816 стер лат L 260318.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
@@ -13249,7 +13249,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-06T16:22:35.172534",
+  "last_update": "2026-05-06T16:23:34.255032",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
