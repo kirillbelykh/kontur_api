@@ -414,6 +414,19 @@ def ensure_kontur_access_prolongation_worker_started() -> bool:
         return True
 
 
+def run_kontur_access_prolongation_service() -> None:
+    if not ensure_kontur_access_prolongation_worker_started():
+        logger.info("Автопродление доступа: сервис не запущен, так как функция отключена.")
+        return
+
+    logger.info("Автопродление доступа: отдельный сервис запущен.")
+    try:
+        while True:
+            time.sleep(60.0)
+    except KeyboardInterrupt:
+        logger.info("Автопродление доступа: сервис остановлен пользователем.")
+
+
 def validate_cookies(cookies: Dict[str, str]) -> tuple[bool, List[str]]:
     if not cookies:
         return False, ["all cookies missing"]

@@ -263,7 +263,6 @@ class _BridgeRuntime:
         self.aggregation_cache_items: List[Dict[str, Any]] = []
         self.aggregation_cache_at = 0.0
         self.aggregation_cache_ttl_seconds = 90.0
-        cookies_module.ensure_kontur_access_prolongation_worker_started()
         self._sync_history_on_startup()
         self.load_download_items_from_history()
 

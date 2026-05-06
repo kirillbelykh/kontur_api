@@ -631,6 +631,7 @@ Test-BarTenderInstallation
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAccessProlongation" -LauncherFile "run_kontur_access_prolongation.vbs" -Description "Kontur API access prolongation service"
 
 Write-Host ""
 Write-Ok "Installation completed"
