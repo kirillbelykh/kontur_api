@@ -32,9 +32,9 @@
     {
       "order_name": "813 стер лат L 250623",
       "document_id": "5e4765b2-5cdf-438f-8e92-276f134acff1",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\813 стер лат L 250623\\813 стер лат L 250623.pdf, C:\\Users\\User\\Desktop\\Коды км\\813 стер лат L 250623\\813 стер лат L 250623_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\813 стер лат L 250623\\813 стер лат L 250623.xls",
+      "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118048324",
       "positions": [
@@ -53,7 +53,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\813 стер лат L 250623\\813 стер лат L 250623.xls",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\813 стер лат L 250623\\813 стер лат L 250623.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\813 стер лат L 250623\\813 стер лат L 250623_csv.csv"
     },
     {
       "order_name": "803 хир 7,0 260422 50по100",
@@ -13188,7 +13191,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-06T11:08:59.811236",
+  "last_update": "2026-05-06T11:09:55.949482",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
