@@ -576,9 +576,23 @@ function Create-DesktopShortcut {
     if (-not (Test-Path $launcher)) {
         throw "$LauncherFile was not found in project directory."
     }
-    $wscript = Join-Path $env:WINDIR "System32\\wscript.exe"
-    if (-not (Test-Path $wscript)) {
-        $wscript = "wscript.exe"
+    $launcherExtension = [System.IO.Path]::GetExtension($launcher).ToLowerInvariant()
+    $targetPath = $launcher
+    $arguments = ""
+    if ($launcherExtension -eq ".vbs") {
+        $wscript = Join-Path $env:WINDIR "System32\\wscript.exe"
+        if (-not (Test-Path $wscript)) {
+            $wscript = "wscript.exe"
+        }
+        $targetPath = $wscript
+        $arguments = "`"$launcher`""
+    } elseif ($launcherExtension -in @(".cmd", ".bat")) {
+        $cmdExe = $env:ComSpec
+        if ([string]::IsNullOrWhiteSpace($cmdExe)) {
+            $cmdExe = "cmd.exe"
+        }
+        $targetPath = $cmdExe
+        $arguments = "/c `"$launcher`""
     }
 
     $desktop = [Environment]::GetFolderPath("Desktop")
@@ -589,8 +603,10 @@ function Create-DesktopShortcut {
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $wscript
-    $shortcut.Arguments = "`"$launcher`""
+    $shortcut.TargetPath = $targetPath
+    if (-not [string]::IsNullOrWhiteSpace($arguments)) {
+        $shortcut.Arguments = $arguments
+    }
     $shortcut.WorkingDirectory = $ProjectDir
     if (-not [string]::IsNullOrWhiteSpace($Description)) {
         $shortcut.Description = $Description
@@ -632,6 +648,7 @@ Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -Launch
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAccessProlongation" -LauncherFile "run_kontur_access_prolongation.vbs" -Description "Kontur API access prolongation service"
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LUuYmF0") -Description "Kontur API full update and rebuild"
 
 Write-Host ""
 Write-Ok "Installation completed"

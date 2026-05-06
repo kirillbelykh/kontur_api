@@ -9,6 +9,11 @@ function Write-Ok {
     Write-Host "[+] $Message" -ForegroundColor Green
 }
 
+function ConvertFrom-Utf8Base64 {
+    param([Parameter(Mandatory = $true)][string]$Value)
+    return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectDir = (Resolve-Path (Join-Path $scriptRoot "..")).Path
 
@@ -28,6 +33,20 @@ function New-KonturShortcut {
     if (-not (Test-Path $launcher)) {
         throw "Launcher not found: $launcher"
     }
+    $launcherExtension = [System.IO.Path]::GetExtension($launcher).ToLowerInvariant()
+    $targetPath = $launcher
+    $arguments = ""
+    if ($launcherExtension -eq ".vbs") {
+        $targetPath = $wscript
+        $arguments = "`"$launcher`""
+    } elseif ($launcherExtension -in @(".cmd", ".bat")) {
+        $cmdExe = $env:ComSpec
+        if ([string]::IsNullOrWhiteSpace($cmdExe)) {
+            $cmdExe = "cmd.exe"
+        }
+        $targetPath = $cmdExe
+        $arguments = "/c `"$launcher`""
+    }
 
     $desktop = [Environment]::GetFolderPath("Desktop")
     $shortcutPath = Join-Path $desktop "$ShortcutName.lnk"
@@ -38,8 +57,10 @@ function New-KonturShortcut {
 
     $shell = New-Object -ComObject WScript.Shell
     $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $wscript
-    $shortcut.Arguments = "`"$launcher`""
+    $shortcut.TargetPath = $targetPath
+    if (-not [string]::IsNullOrWhiteSpace($arguments)) {
+        $shortcut.Arguments = $arguments
+    }
     $shortcut.WorkingDirectory = $projectDir
     if (-not [string]::IsNullOrWhiteSpace($Description)) {
         $shortcut.Description = $Description
@@ -56,3 +77,6 @@ function New-KonturShortcut {
 
 New-KonturShortcut -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 New-KonturShortcut -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
+New-KonturShortcut -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
+New-KonturShortcut -ShortcutName "KonturAccessProlongation" -LauncherFile "run_kontur_access_prolongation.vbs" -Description "Kontur API access prolongation service"
+New-KonturShortcut -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LUuYmF0") -Description "Kontur API full update and rebuild"
