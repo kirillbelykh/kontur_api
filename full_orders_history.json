@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "821 латекс HR M 260402 10x25",
+      "document_id": "17545f7a-e597-48eb-a73b-2d02217fde5a",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р M, цвет синий",
+      "gtin": "4650118040533",
+      "positions": [
+        {
+          "gtin": "4650118040533",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р M, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 10,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-07T11:37:29.768962",
+      "created_by": "user",
+      "updated_at": "2026-05-07T11:37:29.768962",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "820 нитрил диаг M 260325 4x50",
       "document_id": "938d07cf-d0c7-40f2-90de-24a3897fc63a",
       "status": "Выполнен",
@@ -13362,7 +13388,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-07T11:37:25.175078",
+  "last_update": "2026-05-07T11:37:31.305544",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
