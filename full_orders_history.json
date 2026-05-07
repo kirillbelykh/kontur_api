@@ -3,7 +3,7 @@
     {
       "order_name": "822 хир 7,0 260411 100пар",
       "document_id": "8aaba017-576b-49ea-8bdb-66899a7acbc0",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 70 260411 100пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 7,0 260411 100пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 7,0 260411 100пар.xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
@@ -13423,7 +13423,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-07T11:59:31.204027",
+  "last_update": "2026-05-07T12:01:59.543163",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
