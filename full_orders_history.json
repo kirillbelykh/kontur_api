@@ -3,9 +3,9 @@
     {
       "order_name": "822 хир 7,0 260411 100пар",
       "document_id": "8aaba017-576b-49ea-8bdb-66899a7acbc0",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 70 260411 100пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 7,0 260411 100пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 7,0 260411 100пар.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473510604",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 7,0 260411 100пар_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 70 260411 100пар.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\822 хир 70 260411 100пар\\822 хир 7,0 260411 100пар.xls"
     },
     {
       "order_name": "821 латекс HR M 260402 10x25",
@@ -13420,7 +13423,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-07T11:55:56.899069",
+  "last_update": "2026-05-07T11:59:31.204027",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
