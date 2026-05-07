@@ -3,9 +3,9 @@
     {
       "order_name": "828 HR нитрил L 260507",
       "document_id": "8c8d02c3-513d-4d89-9d2d-798850e10602",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\828 HR нитрил L 260507\\828 HR нитрил L 260507.pdf, C:\\Users\\User\\Desktop\\Коды км\\828 HR нитрил L 260507\\828 HR нитрил L 260507_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\828 HR нитрил L 260507\\828 HR нитрил L 260507.xls",
+      "simpl": "нитрил диаг hr удлиненный",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые высокой прочности с удлиненной крагой неопудренные текстурированные, р-р L, цвет синий",
       "gtin": "4650118043534",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\828 HR нитрил L 260507\\828 HR нитрил L 260507.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\828 HR нитрил L 260507\\828 HR нитрил L 260507_csv.csv",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\828 HR нитрил L 260507\\828 HR нитрил L 260507.xls"
     },
     {
       "order_name": "827 HR нитрил M 260507",
@@ -13594,7 +13597,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-07T16:40:15.492474",
+  "last_update": "2026-05-07T16:40:36.702958",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
