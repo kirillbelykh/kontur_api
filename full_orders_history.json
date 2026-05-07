@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "828 HR нитрил L 260507",
+      "document_id": "8c8d02c3-513d-4d89-9d2d-798850e10602",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые высокой прочности с удлиненной крагой неопудренные текстурированные, р-р L, цвет синий",
+      "gtin": "4650118043534",
+      "positions": [
+        {
+          "gtin": "4650118043534",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые высокой прочности с удлиненной крагой неопудренные текстурированные, р-р L, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 260,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-07T16:27:54.984691",
+      "created_by": "User",
+      "updated_at": "2026-05-07T16:27:54.984691",
+      "updated_by": "User",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "827 HR нитрил M 260507",
       "document_id": "9e0e66b0-8f98-4e93-ac73-9520aad72f31",
       "status": "Выполнен",
@@ -13562,7 +13588,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-07T16:27:51.960995",
+  "last_update": "2026-05-07T16:27:56.350090",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
