@@ -3,7 +3,7 @@
     {
       "order_name": "821 латекс HR M 260402 10x25",
       "document_id": "17545f7a-e597-48eb-a73b-2d02217fde5a",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\821 латекс HR M 260402 10x25\\821 латекс HR M 260402 10x25.pdf, C:\\Users\\user\\Desktop\\Коды км\\821 латекс HR M 260402 10x25\\821 латекс HR M 260402 10x25_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\821 латекс HR M 260402 10x25\\821 латекс HR M 260402 10x25.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р M, цвет синий",
@@ -13394,7 +13394,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-07T11:46:18.000569",
+  "last_update": "2026-05-07T11:46:30.023684",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
