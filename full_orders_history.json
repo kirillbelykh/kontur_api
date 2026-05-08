@@ -3,7 +3,7 @@
     {
       "order_name": "840 стер латекс M 260501 2x125",
       "document_id": "0ce9ce5b-5908-45aa-a538-d9d4eccd7aab",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\840 стер латекс M 260501 2x125\\840 стер латекс M 260501 2x125.pdf, C:\\Users\\user\\Desktop\\Коды км\\840 стер латекс M 260501 2x125\\840 стер латекс M 260501 2x125_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\840 стер латекс M 260501 2x125\\840 стер латекс M 260501 2x125.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
@@ -13945,7 +13945,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T17:09:49.892998",
+  "last_update": "2026-05-08T17:10:36.960533",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
