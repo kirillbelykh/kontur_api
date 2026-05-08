@@ -3,9 +3,9 @@
     {
       "order_name": "831 стер лат S 260501 125пар",
       "document_id": "18846c94-975b-40ef-b418-10ad7d50a556",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Введен в оборот",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\831 стер лат S 260501 125пар\\831 стер лат S 260501 125пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\831 стер лат S 260501 125пар\\831 стер лат S 260501 125пар_csv.csv",
+      "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р S",
       "gtin": "4650118046245",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\831 стер лат S 260501 125пар\\831 стер лат S 260501 125пар.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\831 стер лат S 260501 125пар\\831 стер лат S 260501 125пар_csv.csv"
     },
     {
       "order_name": "830 хир 7,5 260420 к заявке 5846",
@@ -13681,7 +13684,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T10:59:46.017732",
+  "last_update": "2026-05-08T11:06:45.419408",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
