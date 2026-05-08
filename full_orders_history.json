@@ -3,8 +3,8 @@
     {
       "order_name": "839 лат диаг L 260330",
       "document_id": "e5801fe2-7277-4290-b719-16f37ddf6d8f",
-      "status": "received",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\839 лат диаг L 260330\\839 лат диаг L 260330.pdf, C:\\Users\\User\\Desktop\\Коды км\\839 лат диаг L 260330\\839 лат диаг L 260330_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\839 лат диаг L 260330\\839 лат диаг L 260330.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041332",
@@ -25,9 +25,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "pdf_path": null,
-      "xls_path": null,
-      "csv_path": null
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\839 лат диаг L 260330\\839 лат диаг L 260330.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\839 лат диаг L 260330\\839 лат диаг L 260330.xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\839 лат диаг L 260330\\839 лат диаг L 260330_csv.csv"
     },
     {
       "order_name": "838 стер лат L 260512 144к",
@@ -13916,7 +13916,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T16:25:53.219722",
+  "last_update": "2026-05-08T16:26:08.753019",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
