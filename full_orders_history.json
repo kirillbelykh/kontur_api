@@ -159,9 +159,9 @@
     {
       "order_name": "832 лат диаг S 260510 37к",
       "document_id": "442155b5-89f6-4d6e-8ba3-56bc688e4c64",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\832 лат диаг S 260510 37к\\832 лат диаг S 260510 37к.pdf, C:\\Users\\User\\Desktop\\Коды км\\832 лат диаг S 260510 37к\\832 лат диаг S 260510 37к_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\832 лат диаг S 260510 37к\\832 лат диаг S 260510 37к.xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
       "gtin": "4650118041257",
       "positions": [
@@ -180,7 +180,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\832 лат диаг S 260510 37к\\832 лат диаг S 260510 37к.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\832 лат диаг S 260510 37к\\832 лат диаг S 260510 37к.xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\832 лат диаг S 260510 37к\\832 лат диаг S 260510 37к_csv.csv"
     },
     {
       "order_name": "831 стер лат S 260501 125пар",
@@ -13866,7 +13869,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T12:30:02.479348",
+  "last_update": "2026-05-08T12:48:46.065419",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
