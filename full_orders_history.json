@@ -29,7 +29,7 @@
     {
       "order_name": "838 стер лат L 260512 144к",
       "document_id": "b5578b51-b621-4fd2-81b6-79451708a700",
-      "status": "Введен в оборот",
+      "status": "Скачан",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\838 стер лат L 260512 144к\\838 стер лат L 260512 144к.pdf, C:\\Users\\User\\Desktop\\Коды км\\838 стер лат L 260512 144к\\838 стер лат L 260512 144к_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\838 стер лат L 260512 144к\\838 стер лат L 260512 144к.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
@@ -13913,7 +13913,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T16:22:34.910493",
+  "last_update": "2026-05-08T16:23:02.867621",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
