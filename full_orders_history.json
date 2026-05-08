@@ -29,9 +29,9 @@
     {
       "order_name": "837 стер лат M 260513 640к",
       "document_id": "2f77ac5d-3aa7-4174-bbe0-c0f7546b1d2f",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\837 стер лат M 260513 640к\\837 стер лат M 260513 640к.pdf, C:\\Users\\User\\Desktop\\Коды км\\837 стер лат M 260513 640к\\837 стер лат M 260513 640к_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\837 стер лат M 260513 640к\\837 стер лат M 260513 640к.xls",
+      "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
       "gtin": "4650118040083",
       "positions": [
@@ -50,7 +50,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\837 стер лат M 260513 640к\\837 стер лат M 260513 640к.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\837 стер лат M 260513 640к\\837 стер лат M 260513 640к.xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\837 стер лат M 260513 640к\\837 стер лат M 260513 640к_csv.csv"
     },
     {
       "order_name": "836 стер лат S 260512 96к",
@@ -13881,7 +13884,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T12:50:55.904620",
+  "last_update": "2026-05-08T12:51:41.742335",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
