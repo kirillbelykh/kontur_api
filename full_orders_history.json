@@ -58,7 +58,7 @@
     {
       "order_name": "829 хир 7,5 260420 к заявке 5839",
       "document_id": "27f3e03c-1c21-4283-aa2f-8f41cebada8b",
-      "status": "Введен в оборот",
+      "status": "Скачан",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\829 хир 75 260420 к заявке 5839\\829 хир 75 260420 к заявке 5839.pdf, C:\\Users\\user\\Desktop\\Коды км\\829 хир 75 260420 к заявке 5839\\829 хир 7,5 260420 к заявке 5839_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\829 хир 75 260420 к заявке 5839\\829 хир 7,5 260420 к заявке 5839.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
@@ -13681,7 +13681,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T10:59:33.162497",
+  "last_update": "2026-05-08T10:59:42.105106",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
