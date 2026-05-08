@@ -81,9 +81,9 @@
     {
       "order_name": "835 лат диаг XL 260510 20к",
       "document_id": "c9e746ba-8dd6-4b78-89bd-e148f55c82e3",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\835 лат диаг XL 260510 20к\\835 лат диаг XL 260510 20к.pdf, C:\\Users\\User\\Desktop\\Коды км\\835 лат диаг XL 260510 20к\\835 лат диаг XL 260510 20к_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\835 лат диаг XL 260510 20к\\835 лат диаг XL 260510 20к.xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XL, цвет натуральный",
       "gtin": "4650118041370",
       "positions": [
@@ -102,7 +102,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\835 лат диаг XL 260510 20к\\835 лат диаг XL 260510 20к.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\835 лат диаг XL 260510 20к\\835 лат диаг XL 260510 20к.xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\835 лат диаг XL 260510 20к\\835 лат диаг XL 260510 20к_csv.csv"
     },
     {
       "order_name": "834 лат диаг L 260510 40к",
@@ -13875,7 +13878,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T12:49:42.459072",
+  "last_update": "2026-05-08T12:50:12.841479",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
