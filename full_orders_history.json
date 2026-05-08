@@ -177,8 +177,8 @@
     {
       "order_name": "824 нитрил HR L 260505 120д",
       "document_id": "75435ee7-778e-424c-b811-4f68c6a01044",
-      "status": "Выполнен",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.pdf, C:\\Users\\user\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.xls",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.pdf, C:\\Users\\User\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые высокой прочности с удлиненной крагой неопудренные текстурированные, р-р L, цвет синий",
       "gtin": "4650118043534",
@@ -199,9 +199,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д_csv.csv",
-      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.pdf",
-      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.xls"
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д_csv.csv",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\824 нитрил HR L 260505 120д\\824 нитрил HR L 260505 120д.xls"
     },
     {
       "order_name": "823 хир 7,5 260410",
@@ -13655,7 +13655,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-08T09:05:43.439533",
+  "last_update": "2026-05-08T09:06:04.478299",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
