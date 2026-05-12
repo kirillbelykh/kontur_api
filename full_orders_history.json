@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "841 лат диаг L 260504 заявка 5851",
+      "document_id": "05f0e6fe-3239-4f0c-a10f-c60cb565dccd",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
+      "gtin": "4650118041332",
+      "positions": [
+        {
+          "gtin": "4650118041332",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-12T10:39:07.648198",
+      "created_by": "User",
+      "updated_at": "2026-05-12T10:39:07.648198",
+      "updated_by": "User",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "840 стер латекс M 260501 2x125",
       "document_id": "0ce9ce5b-5908-45aa-a538-d9d4eccd7aab",
       "status": "Введен в оборот",
@@ -13945,7 +13971,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-12T10:30:16.597021",
+  "last_update": "2026-05-12T10:39:09.042527",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
