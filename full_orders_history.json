@@ -3,9 +3,9 @@
     {
       "order_name": "841 лат диаг L 260504 заявка 5851",
       "document_id": "05f0e6fe-3239-4f0c-a10f-c60cb565dccd",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851.pdf, C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851.xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041332",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851_csv.csv",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851.xls"
     },
     {
       "order_name": "840 стер латекс M 260501 2x125",
@@ -13971,7 +13974,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-12T10:39:09.042527",
+  "last_update": "2026-05-12T10:47:32.452314",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
