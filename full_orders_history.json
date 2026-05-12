@@ -81,7 +81,7 @@
     {
       "order_name": "841 лат диаг L 260504 заявка 5851",
       "document_id": "05f0e6fe-3239-4f0c-a10f-c60cb565dccd",
-      "status": "Введен в оборот",
+      "status": "Скачан",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851.pdf, C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\841 лат диаг L 260504 заявка 5851\\841 лат диаг L 260504 заявка 5851.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
@@ -14052,7 +14052,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-12T12:20:20.010069",
+  "last_update": "2026-05-12T14:12:29.064623",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
