@@ -61,9 +61,9 @@
     {
       "order_name": "842 ультра 8 260110 заявка 5860",
       "document_id": "67c703ec-e05d-43dd-9aca-b1f158eacf60",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\842 ультра 8 260110 заявка 5860\\842 ультра 8 260110 заявка 5860.pdf, C:\\Users\\User\\Desktop\\Коды км\\842 ультра 8 260110 заявка 5860\\842 ультра 8 260110 заявка 5860_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\842 ультра 8 260110 заявка 5860\\842 ультра 8 260110 заявка 5860.xls",
+      "simpl": "ультра",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 8,0",
       "gtin": "4640473507291",
       "positions": [
@@ -82,7 +82,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\842 ультра 8 260110 заявка 5860\\842 ультра 8 260110 заявка 5860.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\842 ультра 8 260110 заявка 5860\\842 ультра 8 260110 заявка 5860_csv.csv",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\842 ультра 8 260110 заявка 5860\\842 ультра 8 260110 заявка 5860.xls"
     },
     {
       "order_name": "841 лат диаг L 260504 заявка 5851",
@@ -14058,7 +14061,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-12T14:13:21.377353",
+  "last_update": "2026-05-12T14:13:49.575386",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
