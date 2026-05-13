@@ -61,7 +61,7 @@
     {
       "order_name": "855 стер лат M 250719 заявка 5886",
       "document_id": "9c356ee5-2b97-43ec-aff3-0b0b55245dfc",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\855 стер лат M 250719 заявка 5886\\855 стер лат M 250719 заявка 5886.pdf, C:\\Users\\User\\Desktop\\Коды км\\855 стер лат M 250719 заявка 5886\\855 стер лат M 250719 заявка 5886_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\855 стер лат M 250719 заявка 5886\\855 стер лат M 250719 заявка 5886.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
@@ -14235,7 +14235,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-13T10:06:16.788289",
+  "last_update": "2026-05-13T10:06:38.406503",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
