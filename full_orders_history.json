@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "852 нитрил диаг L 260325 заявка 5866",
+      "document_id": "09421466-4616-401d-9ecc-b9c3907639fe",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р L, цвет синий",
+      "gtin": "4650118044135",
+      "positions": [
+        {
+          "gtin": "4650118044135",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р L, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 3,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-13T09:40:24.978573",
+      "created_by": "User",
+      "updated_at": "2026-05-13T09:40:24.978573",
+      "updated_by": "User",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "851 хир 8,5 250623 заявка 5855",
       "document_id": "fc6f461b-ab3c-4767-a82e-d2cbf2a73545",
       "status": "Скачан",
@@ -14061,7 +14087,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-13T08:53:24.749178",
+  "last_update": "2026-05-13T09:40:26.266516",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
