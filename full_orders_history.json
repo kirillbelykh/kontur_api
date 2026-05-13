@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "857 хир 8 260424 заявка 5872",
+      "document_id": "7bab5e75-b1e2-4a18-8643-1fd533bf7f45",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 8,0",
+      "gtin": "4640473505891",
+      "positions": [
+        {
+          "gtin": "4640473505891",
+          "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 8,0",
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-13T09:40:50.203545",
+      "created_by": "User",
+      "updated_at": "2026-05-13T09:40:50.203545",
+      "updated_by": "User",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "856 хир 8 260415 заявка 5872",
       "document_id": "92645478-963d-4032-96f4-28a5a3c7b030",
       "status": "Выполнен",
@@ -14191,7 +14217,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-13T09:40:46.546144",
+  "last_update": "2026-05-13T09:40:51.476709",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
