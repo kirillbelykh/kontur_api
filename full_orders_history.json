@@ -61,7 +61,7 @@
     {
       "order_name": "858 стер лат L 250707",
       "document_id": "50889b41-29df-4e6d-9986-beeb97091d35",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\858 стер лат L 250707\\858 стер лат L 250707.pdf, C:\\Users\\User\\Desktop\\Коды км\\858 стер лат L 250707\\858 стер лат L 250707_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\858 стер лат L 250707\\858 стер лат L 250707.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
@@ -14322,7 +14322,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-13T16:19:11.082115",
+  "last_update": "2026-05-13T16:19:47.825381",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
