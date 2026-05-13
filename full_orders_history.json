@@ -116,9 +116,9 @@
     {
       "order_name": "853 хир 7,5 260410 заявка 5871",
       "document_id": "16fea938-b568-4f2f-aca5-bc8fcf40643e",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\853 хир 75 260410 заявка 5871\\853 хир 7,5 260410 заявка 5871.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473505990",
       "positions": [
@@ -137,7 +137,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": null,
+      "csv_path": null,
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\853 хир 75 260410 заявка 5871\\853 хир 7,5 260410 заявка 5871.xls"
     },
     {
       "order_name": "852 нитрил диаг L 260325 заявка 5866",
@@ -14226,7 +14229,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-13T09:59:06.351705",
+  "last_update": "2026-05-13T10:01:42.169235",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
