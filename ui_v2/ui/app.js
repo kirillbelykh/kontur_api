@@ -666,6 +666,26 @@ function updateDownloadProgressUi() {
   label.textContent = progress.label || (progress.active ? `Прогресс: ${processed}/${total}` : 'Прогресс скачивания появится во время массовой загрузки.');
 }
 
+function captureTableScrollState(container) {
+  if (!container) {
+    return null;
+  }
+  const scrollHost = container.querySelector('.table-wrapper') || container;
+  return {
+    top: scrollHost.scrollTop || 0,
+    left: scrollHost.scrollLeft || 0,
+  };
+}
+
+function restoreTableScrollState(container, snapshot) {
+  if (!container || !snapshot) {
+    return;
+  }
+  const scrollHost = container.querySelector('.table-wrapper') || container;
+  scrollHost.scrollTop = snapshot.top || 0;
+  scrollHost.scrollLeft = snapshot.left || 0;
+}
+
 function createTable(container, columns, rows, options = {}) {
   const {
     rowId = (row) => row.id || row.document_id || row.uid,
@@ -680,6 +700,7 @@ function createTable(container, columns, rows, options = {}) {
     return;
   }
 
+  const scrollState = captureTableScrollState(container);
   const selectedSet = selectedIds instanceof Set ? selectedIds : new Set(selectedIds ? [selectedIds] : []);
   const html = `
     <div class="table-wrapper ${compact ? 'is-compact' : ''}" ${maxHeight ? `style="max-height:${escapeHtml(maxHeight)}"` : ''}>
@@ -705,6 +726,7 @@ function createTable(container, columns, rows, options = {}) {
     </div>
   `;
   container.innerHTML = html;
+  restoreTableScrollState(container, scrollState);
 
   if (!onRowClick) {
     return;
@@ -875,6 +897,7 @@ function createAggregationTable(container, filteredRows) {
   }
   const pageState = getAggregationPageState(filteredRows);
   const rows = pageState.rows;
+  const scrollState = captureTableScrollState(container);
 
   const html = `
     <div class="table-wrapper" style="max-height: 520px">
@@ -929,6 +952,7 @@ function createAggregationTable(container, filteredRows) {
     </div>
   `;
   container.innerHTML = html;
+  restoreTableScrollState(container, scrollState);
   updateAggregationSelectionMeta(filteredRows, pageState);
   container.onclick = (event) => {
     const pageButton = event.target.closest('[data-agg-page]');
