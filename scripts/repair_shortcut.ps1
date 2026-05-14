@@ -75,8 +75,22 @@ function New-KonturShortcut {
     Write-Ok "Shortcut repaired: $shortcutPath"
 }
 
+function Remove-KonturShortcut {
+    param(
+        [Parameter(Mandatory = $true)][string]$ShortcutName
+    )
+
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $shortcutPath = Join-Path $desktop "$ShortcutName.lnk"
+
+    if (Test-Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
+        Write-Ok "Shortcut removed: $shortcutPath"
+    }
+}
+
 New-KonturShortcut -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 New-KonturShortcut -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
 New-KonturShortcut -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
-New-KonturShortcut -ShortcutName "KonturAccessProlongation" -LauncherFile "run_kontur_access_prolongation.vbs" -Description "Kontur API access prolongation service"
+Remove-KonturShortcut -ShortcutName "KonturAccessProlongation"
 New-KonturShortcut -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LUuYmF0") -Description "Kontur API full update and rebuild"

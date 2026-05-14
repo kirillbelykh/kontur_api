@@ -12,10 +12,11 @@ from aggregation_bulk import BulkAggregationService
 
 
 class FakeResponse:
-    def __init__(self, status_code=200, json_data=None, text=""):
+    def __init__(self, status_code=200, json_data=None, text="", headers=None):
         self.status_code = status_code
         self._json_data = json_data
         self.text = text or (json.dumps(json_data) if json_data is not None else "")
+        self.headers = headers or {}
 
     def raise_for_status(self):
         if self.status_code >= 400:
@@ -431,6 +432,103 @@ class BulkAggregationServiceTests(unittest.TestCase):
             "participant_inn": "7843316794",
             "products_list": [{"uitu": "04650118042603180000000099"}],
         })
+
+    def test_introduced_foreign_parent_disaggregates_when_create_returns_plain_text_id(self):
+        raw_codes = [
+            "01046501180412952156bej,nSIQ*?=",
+            "0104650118041295215Bb<&2ChWtC,;",
+        ]
+        sntins = raw_codes[:]
+        sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", sntins)
+        detail_calls = {"count": 0}
+        cises_calls = {"count": 0}
+        doc_info_calls = {"count": 0}
+        true_api_posts = []
+        kontur_send_payloads = []
+
+        def kontur_get(url, params=None, timeout=None):
+            path = url.split("https://mk.kontur.ru", 1)[1]
+            if path == "/api/v1/aggregates":
+                return FakeResponse(json_data={
+                    "items": [
+                        {
+                            "documentId": "doc-1",
+                            "aggregateCode": "04650118042603180000000007",
+                            "status": "readyForSend",
+                            "productGroup": "wheelChairs",
+                        }
+                    ],
+                    "total": 1,
+                })
+            if path == "/api/v1/aggregates/doc-1/codes":
+                return FakeResponse(json_data={
+                    "aggregateCodes": [{"ttisCode": code} for code in raw_codes],
+                    "reaggregationCodes": [],
+                })
+            if path == "/api/v1/aggregates/doc-1/content-for-sign":
+                return FakeResponse(json_data=sign_content)
+            if path == "/api/v1/aggregates/doc-1":
+                detail_calls["count"] += 1
+                status = "readyForSend" if detail_calls["count"] < 3 else "sentForApprove"
+                return FakeResponse(json_data={
+                    "documentId": "doc-1",
+                    "aggregateCode": "04650118042603180000000007",
+                    "status": status,
+                    "productGroup": "wheelChairs",
+                })
+            raise AssertionError(f"Unexpected GET {url} {params}")
+
+        def kontur_post(url, json=None, timeout=None):
+            kontur_send_payloads.append((url, json))
+            return FakeResponse(json_data={"ok": True})
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH_CHALLENGE"})
+            if "/doc/" in url and url.endswith("/info"):
+                doc_info_calls["count"] += 1
+                status = "REGISTERED" if doc_info_calls["count"] == 1 else "CHECKED_OK"
+                return FakeResponse(json_data={"status": status})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            true_api_posts.append((url, params, json))
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/cises/short/list"):
+                cises_calls["count"] += 1
+                parent = "04650118042603180000000099" if cises_calls["count"] == 1 else None
+                return FakeResponse(json_data=[
+                    {
+                        "result": {
+                            "requestedCis": code,
+                            "cis": code,
+                            "status": "INTRODUCED",
+                            "ownerInn": "7843316794",
+                            "parent": parent,
+                        }
+                    }
+                    for code in sntins
+                ])
+            if url.endswith("/lk/documents/create"):
+                return FakeResponse(json_data=None, text="doc-disagg-plain-1")
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        summary = service.run(
+            kontur_session=SimpleNamespace(get=kontur_get, post=kontur_post),
+            cert_provider=lambda: object(),
+            sign_base64_func=lambda cert, data, detached: "BASE64_SIGNATURE",
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            confirm_callback=lambda title, message: True,
+        )
+
+        self.assertEqual(summary.sent_for_approve, 1)
+        self.assertEqual(summary.disaggregated_parents, 1)
+        self.assertEqual(summary.errors, 0)
+        self.assertEqual(len(kontur_send_payloads), 1)
+        create_call = next(call for call in true_api_posts if call[0].endswith("/lk/documents/create"))
+        self.assertEqual(create_call[2]["type"], "DISAGGREGATION_DOCUMENT")
 
     def test_non_introduced_foreign_parent_confirm_yes_disaggregates_and_skips_current(self):
         raw_code = "01046501180412952156bej,nSIQ*?="
@@ -1241,6 +1339,68 @@ class BulkAggregationServiceTests(unittest.TestCase):
                 "лат диаг s 260316 (249к)",
             )
         )
+
+    def test_create_true_api_document_accepts_json_with_trailing_garbage(self):
+        class TrailingJsonResponse(FakeResponse):
+            def json(self):
+                raise ValueError("Extra data: line 1 column 26 (char 25)")
+
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH"})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/lk/documents/create"):
+                return TrailingJsonResponse(text='{"id":"doc-disagg-raw"} garbage')
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        document_id = service.create_true_api_document(
+            cert=object(),
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            product_group="wheelchairs",
+            document_type="DISAGGREGATION_DOCUMENT",
+            document_body={
+                "participant_inn": "7843316794",
+                "products_list": [{"uitu": "04650118042603180000000099"}],
+            },
+        )
+
+        self.assertEqual(document_id, "doc-disagg-raw")
+
+    def test_create_true_api_document_accepts_location_header_when_body_empty(self):
+        def true_get(url, params=None, headers=None, timeout=None):
+            if url.endswith("/auth/key"):
+                return FakeResponse(json_data={"uuid": "uuid-1", "data": "AUTH"})
+            raise AssertionError(f"Unexpected TRUE GET {url}")
+
+        def true_post(url, params=None, headers=None, json=None, timeout=None):
+            if url.endswith("/auth/simpleSignIn"):
+                return FakeResponse(json_data={"token": "token-1"})
+            if url.endswith("/lk/documents/create"):
+                return FakeResponse(
+                    json_data=None,
+                    text="",
+                    headers={"Location": "https://markirovka.crpt.ru/api/v3/true-api/doc/doc-disagg-header-1"},
+                )
+            raise AssertionError(f"Unexpected TRUE POST {url}")
+
+        service = self.build_service(SimpleNamespace(get=true_get, post=true_post))
+        document_id = service.create_true_api_document(
+            cert=object(),
+            sign_text_func=lambda cert, data, detached: "TEXT_SIGNATURE",
+            product_group="wheelchairs",
+            document_type="DISAGGREGATION_DOCUMENT",
+            document_body={
+                "participant_inn": "7843316794",
+                "products_list": [{"uitu": "04650118042603180000000099"}],
+            },
+        )
+
+        self.assertEqual(document_id, "doc-disagg-header-1")
 
     def test_run_tsd_refill_by_name_replays_returned_to_tsd_aggregate(self):
         raw_code = "01046501180412952156bej,nSIQ*?="

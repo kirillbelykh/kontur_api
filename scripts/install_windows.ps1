@@ -621,6 +621,19 @@ function Create-DesktopShortcut {
     Write-Ok "Shortcut created: $shortcutPath"
 }
 
+function Remove-DesktopShortcut {
+    param(
+        [Parameter(Mandatory = $true)][string]$ShortcutName
+    )
+
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $shortcutPath = Join-Path $desktop "$ShortcutName.lnk"
+    if (Test-Path $shortcutPath) {
+        Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
+        Write-Ok "Shortcut removed: $shortcutPath"
+    }
+}
+
 if ($env:OS -ne "Windows_NT") {
     throw "This installer supports Windows only."
 }
@@ -647,7 +660,7 @@ Test-BarTenderInstallation
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
-Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAccessProlongation" -LauncherFile "run_kontur_access_prolongation.vbs" -Description "Kontur API access prolongation service"
+Remove-DesktopShortcut -ShortcutName "KonturAccessProlongation"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LUuYmF0") -Description "Kontur API full update and rebuild"
 
 Write-Host ""

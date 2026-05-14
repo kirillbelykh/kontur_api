@@ -1531,6 +1531,12 @@ class BulkAggregationService:
             text = str(response.text or "").strip()
             return text or f"HTTP {response.status_code}"
 
+        if not isinstance(payload, dict):
+            if isinstance(payload, (list, tuple)):
+                return json.dumps(payload, ensure_ascii=False)
+            text = str(payload).strip()
+            return text or f"HTTP {response.status_code}"
+
         for key in ("error", "Error"):
             value = payload.get(key)
             if isinstance(value, dict):
@@ -1548,6 +1554,102 @@ class BulkAggregationService:
             if value:
                 return value
         return json.dumps(payload, ensure_ascii=False)
+
+    @staticmethod
+    def _load_json_payload_loose(response: requests.Response) -> Any:
+        try:
+            return response.json()
+        except ValueError:
+            text = str(getattr(response, "text", "") or "").strip()
+            if not text:
+                return None
+            try:
+                payload, _ = json.JSONDecoder().raw_decode(text)
+            except ValueError:
+                return None
+            return payload
+
+    @classmethod
+    def _extract_true_api_document_id(cls, response: requests.Response) -> str:
+        payload = cls._load_json_payload_loose(response)
+        document_id = cls._extract_true_api_document_id_from_payload(payload)
+        if document_id:
+            return document_id
+
+        headers = getattr(response, "headers", {}) or {}
+        location = ""
+        get_header = getattr(headers, "get", None)
+        if callable(get_header):
+            location = str(get_header("Location") or get_header("location") or "").strip()
+        document_id = cls._extract_true_api_document_id_from_text(location)
+        if document_id:
+            return document_id
+
+        text = str(getattr(response, "text", "") or "").strip()
+        document_id = cls._extract_true_api_document_id_from_text(text)
+        if document_id:
+            return document_id
+
+        preview = text[:160] if text else repr(payload)
+        raise RuntimeError(
+            f"True API не вернул document id. Ответ: {preview or f'HTTP {response.status_code}'}"
+        )
+
+    @classmethod
+    def _extract_true_api_document_id_from_payload(cls, payload: Any) -> str:
+        if isinstance(payload, dict):
+            for key in ("document_id", "documentId", "id", "number"):
+                value = str(payload.get(key) or "").strip()
+                if value:
+                    return value
+            data = payload.get("data")
+            if data is not None:
+                return cls._extract_true_api_document_id_from_payload(data)
+            return ""
+
+        if isinstance(payload, list):
+            for item in payload:
+                document_id = cls._extract_true_api_document_id_from_payload(item)
+                if document_id:
+                    return document_id
+            return ""
+
+        if payload is None:
+            return ""
+
+        return cls._extract_true_api_document_id_from_text(str(payload))
+
+    @staticmethod
+    def _extract_true_api_document_id_from_text(text: str) -> str:
+        cleaned = str(text or "").strip()
+        if not cleaned:
+            return ""
+
+        uuid_match = re.search(
+            r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
+            cleaned,
+        )
+        if uuid_match:
+            return uuid_match.group(0)
+
+        if cleaned.startswith("<"):
+            return ""
+
+        if "://" in cleaned:
+            parsed = urlparse(cleaned)
+            path_parts = [part for part in parsed.path.split("/") if part]
+            if path_parts:
+                candidate = path_parts[-1].strip().strip('"').strip("'")
+                token_match = re.match(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,}$", candidate)
+                if token_match:
+                    return token_match.group(0)
+
+        first_line = cleaned.splitlines()[0].strip().strip('"').strip("'")
+        token_match = re.match(r"^[A-Za-z0-9][A-Za-z0-9._:-]{2,}$", first_line)
+        if token_match:
+            return token_match.group(0)
+
+        return ""
 
     def wait_for_aggregate_status(
         self,
@@ -1757,12 +1859,7 @@ class BulkAggregationService:
             timeout=30,
         )
         response.raise_for_status()
-        payload = response.json()
-        document_id = (
-            payload.get("document_id")
-            or payload.get("id")
-            or payload.get("number")
-        )
+        document_id = self._extract_true_api_document_id(response)
         if not document_id:
             raise RuntimeError(f"True API не вернул document id для {document_type}")
         logger.info(
