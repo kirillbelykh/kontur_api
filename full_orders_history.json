@@ -177,7 +177,7 @@
     {
       "order_name": "865 стер лат S 260501 заявка 5893",
       "document_id": "21c66aba-e5a8-4dc6-bdb4-5299e4cde12a",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\865 стер лат S 260501 заявка 5893\\865 стер лат S 260501 заявка 5893.pdf, C:\\Users\\User\\Desktop\\Коды км\\865 стер лат S 260501 заявка 5893\\865 стер лат S 260501 заявка 5893_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\865 стер лат S 260501 заявка 5893\\865 стер лат S 260501 заявка 5893.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р S",
@@ -14641,7 +14641,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-14T10:20:12.735982",
+  "last_update": "2026-05-14T10:20:18.374031",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
