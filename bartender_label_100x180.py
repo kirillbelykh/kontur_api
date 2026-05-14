@@ -501,13 +501,18 @@ def _replace_field_value(
     allow_adjacent: bool,
 ) -> bool:
     updated = False
+    has_adjacent_value = allow_adjacent and index + 1 < len(values) and _is_plain_value_substring(values[index + 1])
+    adjacent_original_value = values[index + 1] if has_adjacent_value else ""
 
     new_current_value, inline_updated = _replace_inline_field_value(values[index], label, replacement)
     if inline_updated:
-        values[index] = new_current_value
+        if has_adjacent_value and adjacent_original_value.strip():
+            values[index] = _strip_inline_field_value(new_current_value, label)
+        else:
+            values[index] = new_current_value
         updated = True
 
-    if allow_adjacent and index + 1 < len(values) and _is_plain_value_substring(values[index + 1]):
+    if has_adjacent_value and (adjacent_original_value.strip() or not inline_updated):
         values[index + 1] = _replace_preserving_linebreak(values[index + 1], replacement)
         updated = True
 
@@ -551,6 +556,16 @@ def _replace_inline_field_value(value: str, label: str, replacement: str) -> tup
         count=1,
     )
     return updated_value, replaced_count > 0
+
+
+def _strip_inline_field_value(value: str, label: str) -> str:
+    pattern = re.compile(rf"(?iu)({re.escape(label)}\s*)(\S[^\r\n]*)")
+    stripped_value, _replaced_count = pattern.subn(
+        lambda match: match.group(1),
+        value,
+        count=1,
+    )
+    return stripped_value
 
 
 def _replace_inline_quantity_value(

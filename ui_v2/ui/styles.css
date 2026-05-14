@@ -880,3 +880,41 @@ body[data-client-mode="browser-mobile"][data-keyboard-open="true"] .sidebar {
 body[data-client-mode="browser-mobile"][data-keyboard-open="true"] .content-area {
   padding-bottom: calc(260px + env(safe-area-inset-bottom));
 }
+
+.desktop-context-menu {
+  position: fixed;
+  z-index: 9999;
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-surface) 94%, black 6%);
+  box-shadow: var(--shadow-md);
+}
+
+.desktop-context-menu.is-hidden {
+  display: none;
+}
+
+.desktop-context-menu button {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.desktop-context-menu button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-surface));
+}
+
+.desktop-context-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

@@ -172,6 +172,30 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
         self.assertIn("200", values[0])
         self.assertEqual(values[1], "пар\r   (4 диспенсера по 50 пар)")
 
+    def test_replace_field_value_prefers_adjacent_value_without_duplication(self):
+        values = ["РџР°СЂС‚РёСЏ 260110", "260110"]
+
+        updated = labels._replace_field_value(values, 0, "РџР°СЂС‚РёСЏ", "260212", allow_adjacent=True)
+
+        self.assertTrue(updated)
+        self.assertEqual(values[0], "РџР°СЂС‚РёСЏ ")
+        self.assertEqual(values[1], "260212")
+
+    def test_replace_field_value_keeps_inline_value_when_adjacent_placeholder_is_empty(self):
+        values = ["Р”Р°С‚Р° РёР·РіРѕС‚РѕРІР»РµРЅРёСЏ 2026-01", ""]
+
+        updated = labels._replace_field_value(
+            values,
+            0,
+            "Р”Р°С‚Р° РёР·РіРѕС‚РѕРІР»РµРЅРёСЏ",
+            "2026-03",
+            allow_adjacent=True,
+        )
+
+        self.assertTrue(updated)
+        self.assertEqual(values[0], "Р”Р°С‚Р° РёР·РіРѕС‚РѕРІР»РµРЅРёСЏ 2026-03")
+        self.assertEqual(values[1], "")
+
     def test_update_description_object_removes_color_line_when_value_is_empty(self):
         description_object = _make_object_xml(
             "-Диагностические перчатки\r-Цвет: nan\r-Манжета: с венчиком",

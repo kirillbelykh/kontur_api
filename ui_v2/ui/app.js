@@ -163,12 +163,16 @@ const state = {
     routeLoading: Object.fromEntries(ROUTE_KEYS.map((route) => [route, false])),
     logUpdatedAt: {},
     logLoading: {},
+    findQuery: '',
   },
 };
 
 let appInitialized = false;
 let aggregationSearchTimer = null;
 let buttonBusySequence = 0;
+let interactionFallbacksInstalled = false;
+let desktopContextMenu = null;
+let desktopContextMenuTarget = null;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -684,6 +688,273 @@ function restoreTableScrollState(container, snapshot) {
   const scrollHost = container.querySelector('.table-wrapper') || container;
   scrollHost.scrollTop = snapshot.top || 0;
   scrollHost.scrollLeft = snapshot.left || 0;
+}
+
+function isEditableElement(target) {
+  if (!target || !(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(target.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]'));
+}
+
+function matchesShortcutKey(event, code, fallbackKeys = []) {
+  if (!event) {
+    return false;
+  }
+  if (String(event.code || '').toLowerCase() === String(code || '').toLowerCase()) {
+    return true;
+  }
+  const normalizedKey = String(event.key || '').toLowerCase();
+  return fallbackKeys.some((key) => normalizedKey === String(key || '').toLowerCase());
+}
+
+function getEditableTarget(target) {
+  if (!target || !(target instanceof Element)) {
+    return null;
+  }
+  return target.closest('input, textarea, [contenteditable="true"], [contenteditable="plaintext-only"]');
+}
+
+function ensureDesktopContextMenu() {
+  if (desktopContextMenu) {
+    return desktopContextMenu;
+  }
+
+  desktopContextMenu = document.createElement('div');
+  desktopContextMenu.className = 'desktop-context-menu is-hidden';
+  desktopContextMenu.innerHTML = `
+    <button type="button" data-action="find">Найти</button>
+    <button type="button" data-action="cut">Вырезать</button>
+    <button type="button" data-action="copy">Копировать</button>
+    <button type="button" data-action="paste">Вставить</button>
+    <button type="button" data-action="select-all">Выделить всё</button>
+  `;
+  desktopContextMenu.addEventListener('click', async (event) => {
+    const button = event.target.closest('button[data-action]');
+    if (!button || button.disabled) {
+      return;
+    }
+    await runDesktopContextAction(button.dataset.action, desktopContextMenuTarget);
+    hideDesktopContextMenu();
+  });
+  document.body.appendChild(desktopContextMenu);
+  return desktopContextMenu;
+}
+
+function hideDesktopContextMenu() {
+  if (!desktopContextMenu) {
+    return;
+  }
+  desktopContextMenu.classList.add('is-hidden');
+  desktopContextMenuTarget = null;
+}
+
+function showDesktopContextMenu(clientX, clientY, target) {
+  const menu = ensureDesktopContextMenu();
+  const editableTarget = getEditableTarget(target);
+  const hasSelection = hasActiveTextSelection();
+  desktopContextMenuTarget = editableTarget || target || null;
+
+  menu.querySelectorAll('button[data-action]').forEach((button) => {
+    const action = button.dataset.action;
+    let enabled = false;
+    if (action === 'find') {
+      enabled = true;
+    } else if (action === 'copy') {
+      enabled = Boolean(editableTarget || hasSelection);
+    } else if (action === 'select-all') {
+      enabled = Boolean(editableTarget || document.body);
+    } else if (action === 'paste') {
+      enabled = Boolean(editableTarget);
+    } else if (action === 'cut') {
+      enabled = Boolean(editableTarget);
+    }
+    button.disabled = !enabled;
+  });
+
+  menu.classList.remove('is-hidden');
+  const { innerWidth, innerHeight } = window;
+  const menuRect = menu.getBoundingClientRect();
+  const nextLeft = Math.max(8, Math.min(clientX, innerWidth - menuRect.width - 8));
+  const nextTop = Math.max(8, Math.min(clientY, innerHeight - menuRect.height - 8));
+  menu.style.left = `${nextLeft}px`;
+  menu.style.top = `${nextTop}px`;
+}
+
+function dispatchEditableInput(target) {
+  if (!target) {
+    return;
+  }
+  target.dispatchEvent(new Event('input', { bubbles: true }));
+  target.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+async function pasteIntoEditableTarget(target) {
+  if (!target) {
+    return;
+  }
+  let text = '';
+  try {
+    text = await navigator.clipboard.readText();
+  } catch (_error) {
+    const manualText = window.prompt('Вставьте текст');
+    if (manualText == null) {
+      return;
+    }
+    text = manualText;
+  }
+
+  target.focus({ preventScroll: true });
+  if (typeof target.setRangeText === 'function' && Number.isInteger(target.selectionStart) && Number.isInteger(target.selectionEnd)) {
+    target.setRangeText(text, target.selectionStart, target.selectionEnd, 'end');
+    dispatchEditableInput(target);
+    return;
+  }
+
+  document.execCommand('insertText', false, text);
+  dispatchEditableInput(target);
+}
+
+function selectAllForTarget(target) {
+  if (target?.select) {
+    target.focus({ preventScroll: true });
+    target.select();
+    return;
+  }
+  document.execCommand('selectAll');
+}
+
+function performWindowFind(query, backwards = false) {
+  if (!query || typeof window.find !== 'function') {
+    return false;
+  }
+  try {
+    return Boolean(window.find(query, false, backwards, true, false, false, false));
+  } catch (_error) {
+    return false;
+  }
+}
+
+function openDesktopFind() {
+  const initialValue = state.ui.findQuery || String(window.getSelection?.() || '').trim();
+  const query = window.prompt('Введите текст для поиска', initialValue);
+  if (query == null) {
+    return;
+  }
+  const normalizedQuery = String(query).trim();
+  if (!normalizedQuery) {
+    return;
+  }
+  state.ui.findQuery = normalizedQuery;
+  const found = performWindowFind(normalizedQuery, false);
+  if (!found) {
+    showToast(`Не найдено: ${normalizedQuery}`, 'error');
+  }
+}
+
+function repeatDesktopFind(backwards = false) {
+  if (!state.ui.findQuery) {
+    openDesktopFind();
+    return;
+  }
+  const found = performWindowFind(state.ui.findQuery, backwards);
+  if (!found) {
+    showToast(`Больше совпадений не найдено: ${state.ui.findQuery}`, 'info');
+  }
+}
+
+async function runDesktopContextAction(action, target) {
+  const editableTarget = getEditableTarget(target);
+  if (action === 'find') {
+    openDesktopFind();
+    return;
+  }
+  if (action === 'paste') {
+    await pasteIntoEditableTarget(editableTarget);
+    return;
+  }
+  if (action === 'select-all') {
+    selectAllForTarget(editableTarget);
+    return;
+  }
+  if (editableTarget) {
+    editableTarget.focus({ preventScroll: true });
+  }
+  if (action === 'cut' || action === 'copy') {
+    document.execCommand(action);
+    if (action === 'cut' && editableTarget) {
+      dispatchEditableInput(editableTarget);
+    }
+  }
+}
+
+function installDesktopInteractionFallbacks() {
+  if (interactionFallbacksInstalled || CLIENT_CONFIG.browserMode || CLIENT_CONFIG.mobileMode) {
+    return;
+  }
+  interactionFallbacksInstalled = true;
+
+  document.addEventListener('keydown', (event) => {
+    const editableTarget = getEditableTarget(event.target);
+
+    if ((event.ctrlKey || event.metaKey) && matchesShortcutKey(event, 'KeyF', ['f', 'а'])) {
+      event.preventDefault();
+      openDesktopFind();
+      return;
+    }
+
+    if ((event.ctrlKey || event.metaKey) && editableTarget) {
+      if (matchesShortcutKey(event, 'KeyA', ['a', 'ф'])) {
+        event.preventDefault();
+        selectAllForTarget(editableTarget);
+        return;
+      }
+      if (matchesShortcutKey(event, 'KeyC', ['c', 'с']) || matchesShortcutKey(event, 'KeyX', ['x', 'ч'])) {
+        event.preventDefault();
+        editableTarget.focus({ preventScroll: true });
+        const command = matchesShortcutKey(event, 'KeyC', ['c', 'с']) ? 'copy' : 'cut';
+        document.execCommand(command);
+        if (command === 'cut') {
+          dispatchEditableInput(editableTarget);
+        }
+        return;
+      }
+      if (matchesShortcutKey(event, 'KeyV', ['v', 'м'])) {
+        event.preventDefault();
+        pasteIntoEditableTarget(editableTarget).catch(() => null);
+        return;
+      }
+    }
+
+    if (event.key === 'F3') {
+      event.preventDefault();
+      repeatDesktopFind(Boolean(event.shiftKey));
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      hideDesktopContextMenu();
+      return;
+    }
+
+    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+      const activeElement = document.activeElement instanceof Element ? document.activeElement : document.body;
+      const rect = activeElement.getBoundingClientRect?.() || { left: 24, top: 24, width: 0, height: 0 };
+      event.preventDefault();
+      showDesktopContextMenu(rect.left + Math.min(rect.width, 24), rect.top + Math.min(rect.height, 24), activeElement);
+    }
+  }, true);
+
+  document.addEventListener('contextmenu', (event) => {
+    showDesktopContextMenu(event.clientX, event.clientY, event.target);
+    event.preventDefault();
+  }, true);
+
+  document.addEventListener('pointerdown', () => {
+    hideDesktopContextMenu();
+  }, true);
+  window.addEventListener('blur', hideDesktopContextMenu);
+  window.addEventListener('scroll', hideDesktopContextMenu, true);
 }
 
 function createTable(container, columns, rows, options = {}) {
@@ -2659,6 +2930,7 @@ async function init() {
   setTheme(state.theme);
   installMobileViewportGuard();
   installMojibakeGuard();
+  installDesktopInteractionFallbacks();
   ensureAggregationIntroDocumentTitleField();
 
   await bindEvents();
