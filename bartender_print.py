@@ -220,10 +220,10 @@ def _prepare_template_copy(context: PrintContext) -> Path:
         pythoncom.CoUninitialize()
 
 
-def _bind_format_to_selected_printer(bt_format, printer_name: str) -> None:
+def _bind_format_to_selected_printer(bt_format, printer_name: str) -> bool:
     normalized_printer_name = str(printer_name or "").strip()
     if not normalized_printer_name:
-        return
+        return False
 
     try:
         bt_format.PrintSetup.EnablePrompting = False
@@ -232,10 +232,12 @@ def _bind_format_to_selected_printer(bt_format, printer_name: str) -> None:
 
     try:
         bt_format.PrintSetup.PrinterName = normalized_printer_name
-    except Exception as exc:
-        raise BarTenderPrintError(
-            f"Не удалось привязать шаблон BarTender к принтеру '{normalized_printer_name}': {exc}"
-        ) from exc
+        return True
+    except Exception:
+        # На части ПК смена принтера через COM ломается из-за драйвера/порта.
+        # Не блокируем печать целиком: ниже PowerShell SDK снова устанавливает
+        # выбранный принтер непосредственно перед печатью.
+        return False
 
 
 def _configure_template_objects(

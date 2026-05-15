@@ -49,10 +49,29 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
         print_setup = type("PrintSetup", (), {"EnablePrompting": True, "PrinterName": ""})()
         fake_format = type("FakeFormat", (), {"PrintSetup": print_setup})()
 
-        labels._bind_format_to_selected_printer(fake_format, "Printer 2")
+        result = labels._bind_format_to_selected_printer(fake_format, "Printer 2")
 
+        self.assertTrue(result)
         self.assertFalse(fake_format.PrintSetup.EnablePrompting)
         self.assertEqual(fake_format.PrintSetup.PrinterName, "Printer 2")
+
+    def test_bind_format_to_selected_printer_ignores_driver_failure(self):
+        class BrokenPrintSetup:
+            EnablePrompting = True
+
+            @property
+            def PrinterName(self):
+                return ""
+
+            @PrinterName.setter
+            def PrinterName(self, _value):
+                raise RuntimeError("driver failure")
+
+        fake_format = type("FakeFormat", (), {"PrintSetup": BrokenPrintSetup()})()
+
+        result = labels._bind_format_to_selected_printer(fake_format, "Printer 2")
+
+        self.assertFalse(result)
 
     def test_build_label_print_context_uses_quantity_field_for_marking_templates(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -396,10 +396,10 @@ def _prepare_template_copy(context: LabelPrint100x180Context) -> Path:
         pythoncom.CoUninitialize()
 
 
-def _bind_format_to_selected_printer(bt_format, printer_name: str) -> None:
+def _bind_format_to_selected_printer(bt_format, printer_name: str) -> bool:
     normalized_printer_name = str(printer_name or "").strip()
     if not normalized_printer_name:
-        return
+        return False
 
     try:
         bt_format.PrintSetup.EnablePrompting = False
@@ -408,10 +408,12 @@ def _bind_format_to_selected_printer(bt_format, printer_name: str) -> None:
 
     try:
         bt_format.PrintSetup.PrinterName = normalized_printer_name
-    except Exception as exc:
-        raise BarTenderLabel100x180Error(
-            f"Не удалось привязать шаблон 100x180 к принтеру '{normalized_printer_name}': {exc}"
-        ) from exc
+        return True
+    except Exception:
+        # Некоторые ПК/драйверы BarTender не дают менять принтер на COM-этапе.
+        # В таком случае не срываем печать: SDK-этап ниже всё равно повторно
+        # назначит принтер перед отправкой задания в spooler.
+        return False
 
 
 def _configure_template_objects(bt_format, context: LabelPrint100x180Context) -> None:
