@@ -3,7 +3,7 @@
     {
       "order_name": "890 стер латекс M 260513 125пар",
       "document_id": "c1f7a100-a30f-4133-a357-d3aa4c291169",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\890 стер латекс M 260513 125пар\\890 стер латекс M 260513 125пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\890 стер латекс M 260513 125пар\\890 стер латекс M 260513 125пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\890 стер латекс M 260513 125пар\\890 стер латекс M 260513 125пар.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
@@ -15113,7 +15113,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-15T10:20:35.733518",
+  "last_update": "2026-05-15T10:24:43.969914",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
