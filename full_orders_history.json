@@ -61,7 +61,7 @@
     {
       "order_name": "893 орто 8,5 260516",
       "document_id": "e2546256-118c-4b44-bc59-c969a999c920",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\893 орто 85 260516\\893 орто 85 260516.pdf, C:\\Users\\User\\Desktop\\Коды км\\893 орто 85 260516\\893 орто 8,5 260516_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\893 орто 85 260516\\893 орто 8,5 260516.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,5",
@@ -15287,7 +15287,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-15T15:51:01.256219",
+  "last_update": "2026-05-15T15:51:13.188147",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
