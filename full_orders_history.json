@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "876 хир 8,5 20224",
+      "document_id": "533d6dac-01b4-4da2-aeba-95af1b64a011",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,5",
+      "gtin": "4640473510635",
+      "positions": [
+        {
+          "gtin": "4640473510635",
+          "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,5",
+          "tnvedCode": "4015120001",
+          "quantity": 13,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-15T13:18:59.824534",
+      "created_by": "User",
+      "updated_at": "2026-05-15T13:18:59.824534",
+      "updated_by": "User",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "890 стер латекс M 260513 125пар",
       "document_id": "c1f7a100-a30f-4133-a357-d3aa4c291169",
       "status": "Выполнен",
@@ -15113,7 +15139,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-15T13:15:44.778552",
+  "last_update": "2026-05-15T13:19:01.173929",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
