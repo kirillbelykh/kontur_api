@@ -1238,7 +1238,7 @@ try {
     }
 
     if ($format.PrintSetup.SupportsSerializedLabels) {
-        $format.PrintSetup.NumberOfSerializedLabels = [Math]::Max(1, $RecordCount)
+        $format.PrintSetup.NumberOfSerializedLabels = 1
     }
 
     if ($JobName) {

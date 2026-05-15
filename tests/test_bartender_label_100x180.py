@@ -294,7 +294,7 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
             self.assertIn("$Messages.HasError", script)
             self.assertIn("без подробного сообщения", script)
             self.assertIn("exit 10", script)
-            self.assertIn("NumberOfSerializedLabels = [Math]::Max(1,", script)
+            self.assertIn("NumberOfSerializedLabels = 1", script)
 
 
 if __name__ == "__main__":

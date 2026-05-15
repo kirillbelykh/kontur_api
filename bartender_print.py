@@ -552,7 +552,7 @@ try {
         $format.PrintSetup.RecordRange = ('1-' + $LabelCount)
     }
 
-    $format.PrintSetup.NumberOfSerializedLabels = [Math]::Max(1, $LabelCount)
+    $format.PrintSetup.NumberOfSerializedLabels = 1
 
     if ($PrintNow -eq '1') {
         [Seagull.BarTender.Print.Messages]$messages = New-Object Seagull.BarTender.Print.Messages
