@@ -32,7 +32,7 @@
     {
       "order_name": "888 стер нитрил M 260515",
       "document_id": "4f7c94d6-08f7-4a52-a15b-2b16e5480946",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\888 стер нитрил M 260515\\888 стер нитрил M 260515.pdf, C:\\Users\\User\\Desktop\\Коды км\\888 стер нитрил M 260515\\888 стер нитрил M 260515_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\888 стер нитрил M 260515\\888 стер нитрил M 260515.xls",
       "simpl": "стер нитрил",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
@@ -15084,7 +15084,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-15T09:31:05.397215",
+  "last_update": "2026-05-15T09:31:11.847588",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
