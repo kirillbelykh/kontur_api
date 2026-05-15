@@ -1022,6 +1022,12 @@ def _string_contains_digits(value: str) -> bool:
 
 def _replace_adjacent_quantity_digits(current_value: str, adjacent_value: str, quantity_pairs: int) -> str:
     if _string_contains_digits(current_value):
+        if not _string_contains_digits(adjacent_value):
+            return adjacent_value
+
+        trimmed_adjacent = re.sub(r"^\s*\d+\s*", " ", str(adjacent_value or ""), count=1)
+        if trimmed_adjacent != str(adjacent_value or ""):
+            return trimmed_adjacent
         return adjacent_value
 
     updated_value, replaced_count = re.subn(

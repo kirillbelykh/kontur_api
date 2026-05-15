@@ -332,6 +332,36 @@ input:focus, select:focus, textarea:focus {
   margin-bottom: 16px;
 }
 
+.panel-header-table-tools {
+  align-items: flex-start;
+}
+
+.table-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin-left: auto;
+  min-width: 0;
+}
+
+.table-tools input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -817,6 +847,25 @@ body[data-theme="light"] .log-box {
     scroll-margin-top: 18px;
   }
 
+  .table-tools {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .table-tools input,
+  .table-tools button {
+    width: 100%;
+  }
+
+  .table-fullscreen-overlay {
+    padding: 12px;
+  }
+
+  .table-fullscreen-dialog {
+    width: 100%;
+    max-height: 94vh;
+  }
+
   .table-wrapper,
   .aggregation-list-panel .table-wrapper,
   .table-wrapper.is-compact {
@@ -917,4 +966,81 @@ body[data-client-mode="browser-mobile"][data-keyboard-open="true"] .content-area
 .desktop-context-menu button:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.desktop-find-panel {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9998;
+  display: block;
+  pointer-events: none;
+}
+
+.desktop-find-panel.is-hidden {
+  display: none;
+}
+
+.desktop-find-panel__dialog {
+  width: min(460px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bg-surface) 96%, black 4%);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+
+.desktop-find-panel__title {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.desktop-find-panel__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.desktop-find-panel__actions button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.desktop-find-panel__input {
+  width: 100%;
+}
+
+.table-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(4px);
+}
+
+.table-fullscreen-dialog {
+  width: min(1400px, 100%);
+  max-height: min(88vh, 100%);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-secondary);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.table-fullscreen-dialog .table-wrapper {
+  max-height: 72vh !important;
 }

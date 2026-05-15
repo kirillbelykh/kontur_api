@@ -155,6 +155,12 @@ const state = {
     preview: null,
     templatePage: 0,
     templatePageSize: 3,
+    tableSearch: {
+      orders: '',
+      aggregation: '',
+      marking: '',
+    },
+    fullscreenTable: '',
   },
   ui: {
     sessionUpdatedAt: 0,
@@ -173,6 +179,7 @@ let buttonBusySequence = 0;
 let interactionFallbacksInstalled = false;
 let desktopContextMenu = null;
 let desktopContextMenuTarget = null;
+let desktopFindPanel = null;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -789,13 +796,72 @@ function dispatchEditableInput(target) {
   target.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
+async function readClipboardTextValue() {
+  if (window.pywebview?.api?.read_clipboard_text) {
+    const result = await API.call('read_clipboard_text');
+    return typeof result === 'string' ? result : String(result?.text || '');
+  }
+  if (navigator.clipboard?.readText) {
+    return navigator.clipboard.readText();
+  }
+  throw new Error('Clipboard API unavailable');
+}
+
+async function writeClipboardTextValue(text) {
+  const normalizedText = String(text ?? '');
+  if (window.pywebview?.api?.write_clipboard_text) {
+    await API.call('write_clipboard_text', normalizedText);
+    return;
+  }
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(normalizedText);
+    return;
+  }
+  throw new Error('Clipboard API unavailable');
+}
+
+function getEditableSelectionText(target) {
+  if (!target) {
+    return '';
+  }
+  if (typeof target.selectionStart === 'number' && typeof target.selectionEnd === 'number') {
+    return String(target.value || '').slice(target.selectionStart, target.selectionEnd);
+  }
+  if (target.isContentEditable) {
+    const selection = window.getSelection?.();
+    return selection ? String(selection.toString() || '') : '';
+  }
+  return '';
+}
+
+function deleteEditableSelection(target) {
+  if (!target) {
+    return;
+  }
+  if (typeof target.setRangeText === 'function' && Number.isInteger(target.selectionStart) && Number.isInteger(target.selectionEnd)) {
+    target.setRangeText('', target.selectionStart, target.selectionEnd, 'start');
+    dispatchEditableInput(target);
+    return;
+  }
+  if (target.isContentEditable) {
+    const selection = window.getSelection?.();
+    if (selection?.rangeCount) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      dispatchEditableInput(target);
+    }
+  }
+}
+
 async function pasteIntoEditableTarget(target) {
   if (!target) {
     return;
   }
   let text = '';
   try {
-    text = await navigator.clipboard.readText();
+    text = await readClipboardTextValue();
   } catch (_error) {
     const manualText = window.prompt('Вставьте текст');
     if (manualText == null) {
@@ -815,6 +881,26 @@ async function pasteIntoEditableTarget(target) {
   dispatchEditableInput(target);
 }
 
+async function copySelectionToClipboard(target) {
+  const text = target ? getEditableSelectionText(target) : String(window.getSelection?.() || '');
+  if (!text) {
+    return;
+  }
+  await writeClipboardTextValue(text);
+}
+
+async function cutSelectionToClipboard(target) {
+  if (!target) {
+    return;
+  }
+  const text = getEditableSelectionText(target);
+  if (!text) {
+    return;
+  }
+  await writeClipboardTextValue(text);
+  deleteEditableSelection(target);
+}
+
 function selectAllForTarget(target) {
   if (target?.select) {
     target.focus({ preventScroll: true });
@@ -824,42 +910,108 @@ function selectAllForTarget(target) {
   document.execCommand('selectAll');
 }
 
-function performWindowFind(query, backwards = false) {
-  if (!query || typeof window.find !== 'function') {
+function ensureDesktopFindPanel() {
+  if (desktopFindPanel) {
+    return desktopFindPanel;
+  }
+
+  desktopFindPanel = document.createElement('div');
+  desktopFindPanel.className = 'desktop-find-panel is-hidden';
+  desktopFindPanel.innerHTML = `
+    <div class="desktop-find-panel__dialog">
+      <strong class="desktop-find-panel__title">Поиск</strong>
+      <input type="text" class="desktop-find-panel__input" data-find-input placeholder="Найти на странице">
+      <div class="desktop-find-panel__actions">
+        <button type="button" data-find-nav="prev" aria-label="Назад">↑</button>
+        <button type="button" data-find-nav="next" aria-label="Вперёд">↓</button>
+        <button type="button" data-find-nav="close" aria-label="Закрыть">×</button>
+      </div>
+    </div>
+  `;
+  desktopFindPanel.addEventListener('input', (event) => {
+    const input = event.target.closest('[data-find-input]');
+    if (!input) {
+      return;
+    }
+    state.ui.findQuery = String(input.value || '').trim();
+  });
+  desktopFindPanel.addEventListener('keydown', (event) => {
+    const input = event.target.closest('[data-find-input]');
+    if (!input) {
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      repeatDesktopFind(Boolean(event.shiftKey));
+      return;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      repeatDesktopFind(event.key === 'ArrowUp');
+    }
+  });
+  desktopFindPanel.addEventListener('click', (event) => {
+    const navButton = event.target.closest('button[data-find-nav]');
+    if (!navButton) {
+      return;
+    }
+    const action = navButton.dataset.findNav;
+    if (action === 'close') {
+      hideDesktopFindPanel();
+      return;
+    }
+    repeatDesktopFind(action === 'prev');
+  });
+  document.body.appendChild(desktopFindPanel);
+  return desktopFindPanel;
+}
+
+function hideDesktopFindPanel() {
+  if (!desktopFindPanel) {
+    return;
+  }
+  desktopFindPanel.classList.add('is-hidden');
+}
+
+function getDesktopFindInput() {
+  return ensureDesktopFindPanel().querySelector('[data-find-input]');
+}
+
+function runBrowserFind(query, backwards = false) {
+  const normalizedQuery = String(query || '').trim();
+  if (!normalizedQuery) {
     return false;
   }
-  try {
-    return Boolean(window.find(query, false, backwards, true, false, false, false));
-  } catch (_error) {
+  if (typeof window.find !== 'function') {
+    showToast('Поиск браузера в этом режиме недоступен.', 'error');
     return false;
   }
+  state.ui.findQuery = normalizedQuery;
+  return Boolean(window.find(normalizedQuery, false, backwards, true, false, false, false));
 }
 
 function openDesktopFind() {
+  const panel = ensureDesktopFindPanel();
+  const input = getDesktopFindInput();
   const initialValue = state.ui.findQuery || String(window.getSelection?.() || '').trim();
-  const query = window.prompt('Введите текст для поиска', initialValue);
-  if (query == null) {
-    return;
-  }
-  const normalizedQuery = String(query).trim();
-  if (!normalizedQuery) {
-    return;
-  }
-  state.ui.findQuery = normalizedQuery;
-  const found = performWindowFind(normalizedQuery, false);
-  if (!found) {
-    showToast(`Не найдено: ${normalizedQuery}`, 'error');
+  panel.classList.remove('is-hidden');
+  if (input) {
+    input.value = initialValue;
+    input.focus({ preventScroll: true });
+    input.select();
   }
 }
 
 function repeatDesktopFind(backwards = false) {
-  if (!state.ui.findQuery) {
+  const input = getDesktopFindInput();
+  const query = String(input?.value || state.ui.findQuery || '').trim();
+  if (!query) {
     openDesktopFind();
     return;
   }
-  const found = performWindowFind(state.ui.findQuery, backwards);
+  const found = runBrowserFind(query, backwards);
   if (!found) {
-    showToast(`Больше совпадений не найдено: ${state.ui.findQuery}`, 'info');
+    showToast(`Не найдено: ${query}`, 'info');
   }
 }
 
@@ -880,11 +1032,12 @@ async function runDesktopContextAction(action, target) {
   if (editableTarget) {
     editableTarget.focus({ preventScroll: true });
   }
-  if (action === 'cut' || action === 'copy') {
-    document.execCommand(action);
-    if (action === 'cut' && editableTarget) {
-      dispatchEditableInput(editableTarget);
-    }
+  if (action === 'copy') {
+    await copySelectionToClipboard(editableTarget);
+    return;
+  }
+  if (action === 'cut') {
+    await cutSelectionToClipboard(editableTarget);
   }
 }
 
@@ -896,6 +1049,7 @@ function installDesktopInteractionFallbacks() {
 
   document.addEventListener('keydown', (event) => {
     const editableTarget = getEditableTarget(event.target);
+    const findPanelVisible = desktopFindPanel && !desktopFindPanel.classList.contains('is-hidden');
 
     if ((event.ctrlKey || event.metaKey) && matchesShortcutKey(event, 'KeyF', ['f', 'а'])) {
       event.preventDefault();
@@ -913,10 +1067,8 @@ function installDesktopInteractionFallbacks() {
         event.preventDefault();
         editableTarget.focus({ preventScroll: true });
         const command = matchesShortcutKey(event, 'KeyC', ['c', 'с']) ? 'copy' : 'cut';
-        document.execCommand(command);
-        if (command === 'cut') {
-          dispatchEditableInput(editableTarget);
-        }
+        const action = command === 'copy' ? copySelectionToClipboard(editableTarget) : cutSelectionToClipboard(editableTarget);
+        Promise.resolve(action).catch(() => null);
         return;
       }
       if (matchesShortcutKey(event, 'KeyV', ['v', 'м'])) {
@@ -932,7 +1084,24 @@ function installDesktopInteractionFallbacks() {
       return;
     }
 
+    if (findPanelVisible && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      event.preventDefault();
+      repeatDesktopFind(event.key === 'ArrowUp');
+      return;
+    }
+
+    if (findPanelVisible && event.key === 'Enter') {
+      event.preventDefault();
+      repeatDesktopFind(Boolean(event.shiftKey));
+      return;
+    }
+
     if (event.key === 'Escape') {
+      if (state.labels.fullscreenTable) {
+        state.labels.fullscreenTable = '';
+        renderLabelsFullscreenTable();
+      }
+      hideDesktopFindPanel();
       hideDesktopContextMenu();
       return;
     }
@@ -950,11 +1119,27 @@ function installDesktopInteractionFallbacks() {
     event.preventDefault();
   }, true);
 
-  document.addEventListener('pointerdown', () => {
+  document.addEventListener('pointerdown', (event) => {
+    if (!desktopContextMenu || desktopContextMenu.classList.contains('is-hidden')) {
+      return;
+    }
+    if (event.target instanceof Element && event.target.closest('.desktop-context-menu')) {
+      return;
+    }
     hideDesktopContextMenu();
   }, true);
+  document.addEventListener('pointerdown', (event) => {
+    if (!desktopFindPanel || desktopFindPanel.classList.contains('is-hidden')) {
+      return;
+    }
+    if (event.target === desktopFindPanel) {
+      hideDesktopFindPanel();
+    }
+  }, true);
   window.addEventListener('blur', hideDesktopContextMenu);
+  window.addEventListener('blur', hideDesktopFindPanel);
   window.addEventListener('scroll', hideDesktopContextMenu, true);
+  window.addEventListener('scroll', hideDesktopFindPanel, true);
 }
 
 function createTable(container, columns, rows, options = {}) {
@@ -1410,6 +1595,9 @@ const Router = {
     if (!(route in ROUTES) || (CLIENT_CONFIG.disableLabels && route === 'labels')) {
       route = 'orders';
     }
+    if (route !== 'labels') {
+      state.labels.fullscreenTable = '';
+    }
     state.route = route;
     document.querySelectorAll('.nav-item').forEach((item) => {
       item.classList.toggle('is-active', item.dataset.route === route);
@@ -1611,15 +1799,12 @@ const Views = {
         ],
         state.intro.items,
         {
+          single: true,
           compact: true,
           maxHeight: '420px',
           selectedIds: state.intro.selectedIds,
-          onRowClick: (id, isSelected) => {
-            if (isSelected) {
-              state.intro.selectedIds.delete(id);
-            } else {
-              state.intro.selectedIds.add(id);
-            }
+          onRowClick: (id) => {
+            state.intro.selectedIds = new Set([id]);
             Views.intro.render();
           },
         },
@@ -1639,15 +1824,12 @@ const Views = {
         ],
         state.tsd.items,
         {
+          single: true,
           compact: true,
           maxHeight: '520px',
           selectedIds: state.tsd.selectedIds,
-          onRowClick: (id, isSelected) => {
-            if (isSelected) {
-              state.tsd.selectedIds.delete(id);
-            } else {
-              state.tsd.selectedIds.add(id);
-            }
+          onRowClick: (id) => {
+            state.tsd.selectedIds = new Set([id]);
             Views.tsd.render();
           },
         },
@@ -1738,75 +1920,20 @@ const Views = {
         });
       });
 
-      createTable(
-        $("#labels-orders-table"),
-        [
-          { label: "Заявка", key: "order_name" },
-          { label: "Полное наименование", key: "full_name" },
-          { label: "GTIN", key: "gtin" },
-          { label: "Размер", key: "size" },
-          { label: "Партия", key: "batch" },
-        ],
-        state.labels.orders,
-        {
-          single: true,
-          compact: true,
-          maxHeight: "260px",
-          selectedIds: state.labels.selectedOrderId,
-          onRowClick: (id) => {
-            state.labels.selectedOrderId = id;
-            resetLabelsManualState();
-            invalidateLabelsPreview();
-            Views.labels.render();
-          },
-        },
-      );
+      if ($('#labels-orders-search')) {
+        $('#labels-orders-search').value = state.labels.tableSearch.orders || '';
+      }
+      if ($('#labels-aggregation-search')) {
+        $('#labels-aggregation-search').value = state.labels.tableSearch.aggregation || '';
+      }
+      if ($('#labels-marking-search')) {
+        $('#labels-marking-search').value = state.labels.tableSearch.marking || '';
+      }
 
-      createTable(
-        $("#labels-aggregation-files-table"),
-        [
-          { label: "Файл", key: "name" },
-          { label: "Папка", key: "folder_name" },
-          { label: "Строк", key: "record_count" },
-        ],
-        state.labels.aggregationFiles,
-        {
-          single: true,
-          compact: true,
-          maxHeight: "260px",
-          selectedIds: state.labels.selectedAggregationPath,
-          rowId: (row) => row.path,
-          onRowClick: (id) => {
-            state.labels.selectedAggregationPath = id;
-            resetLabelsManualState();
-            invalidateLabelsPreview();
-            Views.labels.render();
-          },
-        },
-      );
-
-      createTable(
-        $("#labels-marking-files-table"),
-        [
-          { label: "Файл", key: "name" },
-          { label: "Папка", key: "folder_name" },
-          { label: "Строк", key: "record_count" },
-        ],
-        state.labels.markingFiles,
-        {
-          single: true,
-          compact: true,
-          maxHeight: "260px",
-          selectedIds: state.labels.selectedMarkingPath,
-          rowId: (row) => row.path,
-          onRowClick: (id) => {
-            state.labels.selectedMarkingPath = id;
-            resetLabelsManualState();
-            invalidateLabelsPreview();
-            Views.labels.render();
-          },
-        },
-      );
+      renderLabelsDataTable('orders', $("#labels-orders-table"));
+      renderLabelsDataTable('aggregation', $("#labels-aggregation-files-table"));
+      renderLabelsDataTable('marking', $("#labels-marking-files-table"));
+      renderLabelsFullscreenTable();
 
       const { total, selectedRecordNumber } = normalizeLabelsRecordSelection();
       const printScopeSelect = $("#labels-print-scope");
@@ -2138,6 +2265,126 @@ function selectedLabelFileMeta() {
 
 function selectedLabelsOrder() {
   return state.labels.orders.find((item) => item.document_id === state.labels.selectedOrderId) || null;
+}
+
+function getLabelsTableConfig(tableKey) {
+  if (tableKey === 'orders') {
+    return {
+      title: 'Заказы',
+      rows: state.labels.orders,
+      columns: [
+        { label: 'Заявка', key: 'order_name' },
+        { label: 'Полное наименование', key: 'full_name' },
+        { label: 'GTIN', key: 'gtin' },
+        { label: 'Размер', key: 'size' },
+        { label: 'Партия', key: 'batch' },
+      ],
+      rowId: (row) => row.document_id,
+      selectedIds: state.labels.selectedOrderId,
+      onRowClick: (id) => {
+        state.labels.selectedOrderId = id;
+        resetLabelsManualState();
+        invalidateLabelsPreview();
+        Views.labels.render();
+      },
+    };
+  }
+
+  if (tableKey === 'aggregation') {
+    return {
+      title: 'Агрег коды км',
+      rows: state.labels.aggregationFiles,
+      columns: [
+        { label: 'Файл', key: 'name' },
+        { label: 'Папка', key: 'folder_name' },
+        { label: 'Строк', key: 'record_count' },
+      ],
+      rowId: (row) => row.path,
+      selectedIds: state.labels.selectedAggregationPath,
+      onRowClick: (id) => {
+        state.labels.selectedAggregationPath = id;
+        resetLabelsManualState();
+        invalidateLabelsPreview();
+        Views.labels.render();
+      },
+    };
+  }
+
+  return {
+    title: 'Коды км',
+    rows: state.labels.markingFiles,
+    columns: [
+      { label: 'Файл', key: 'name' },
+      { label: 'Папка', key: 'folder_name' },
+      { label: 'Строк', key: 'record_count' },
+    ],
+    rowId: (row) => row.path,
+    selectedIds: state.labels.selectedMarkingPath,
+    onRowClick: (id) => {
+      state.labels.selectedMarkingPath = id;
+      resetLabelsManualState();
+      invalidateLabelsPreview();
+      Views.labels.render();
+    },
+  };
+}
+
+function filterLabelsTableRows(tableKey, rows) {
+  const query = String(state.labels.tableSearch?.[tableKey] || '').trim().toLowerCase();
+  if (!query) {
+    return rows;
+  }
+  return (rows || []).filter((row) => {
+    const haystack = Object.values(row || {})
+      .map((value) => String(value ?? '').toLowerCase())
+      .join(' ');
+    return haystack.includes(query);
+  });
+}
+
+function renderLabelsDataTable(tableKey, container, { maxHeight = '260px' } = {}) {
+  const config = getLabelsTableConfig(tableKey);
+  const filteredRows = filterLabelsTableRows(tableKey, config.rows);
+  createTable(
+    container,
+    config.columns,
+    filteredRows,
+    {
+      single: true,
+      compact: true,
+      maxHeight,
+      selectedIds: config.selectedIds,
+      rowId: config.rowId,
+      onRowClick: config.onRowClick,
+    },
+  );
+}
+
+function renderLabelsFullscreenTable() {
+  const overlay = $('#table-fullscreen-overlay');
+  const host = $('#table-fullscreen-host');
+  const title = $('#table-fullscreen-title');
+  const searchInput = $('#table-fullscreen-search');
+  const tableKey = String(state.labels.fullscreenTable || '').trim();
+  if (!overlay || !host || !title || !searchInput) {
+    return;
+  }
+
+  if (!tableKey) {
+    overlay.classList.add('is-hidden');
+    return;
+  }
+
+  const config = getLabelsTableConfig(tableKey);
+  title.textContent = config.title;
+  searchInput.value = state.labels.tableSearch?.[tableKey] || '';
+  overlay.classList.remove('is-hidden');
+  renderLabelsDataTable(tableKey, host, { maxHeight: '72vh' });
+}
+
+function updateLabelsTableSearch(tableKey, value) {
+  state.labels.tableSearch[tableKey] = String(value || '');
+  Views.labels.render();
 }
 
 function resetLabelsManualState() {
@@ -2773,6 +3020,54 @@ async function bindEvents() {
   $('#labels-template-next').addEventListener('click', () => {
     state.labels.templatePage += 1;
     Views.labels.render();
+  });
+
+  $('#labels-orders-search').addEventListener('input', (event) => {
+    updateLabelsTableSearch('orders', event.target.value);
+  });
+
+  $('#labels-aggregation-search').addEventListener('input', (event) => {
+    updateLabelsTableSearch('aggregation', event.target.value);
+  });
+
+  $('#labels-marking-search').addEventListener('input', (event) => {
+    updateLabelsTableSearch('marking', event.target.value);
+  });
+
+  $('#labels-orders-fullscreen').addEventListener('click', () => {
+    state.labels.fullscreenTable = 'orders';
+    renderLabelsFullscreenTable();
+  });
+
+  $('#labels-aggregation-fullscreen').addEventListener('click', () => {
+    state.labels.fullscreenTable = 'aggregation';
+    renderLabelsFullscreenTable();
+  });
+
+  $('#labels-marking-fullscreen').addEventListener('click', () => {
+    state.labels.fullscreenTable = 'marking';
+    renderLabelsFullscreenTable();
+  });
+
+  $('#table-fullscreen-close').addEventListener('click', () => {
+    state.labels.fullscreenTable = '';
+    renderLabelsFullscreenTable();
+  });
+
+  $('#table-fullscreen-overlay').addEventListener('click', (event) => {
+    if (event.target.id !== 'table-fullscreen-overlay') {
+      return;
+    }
+    state.labels.fullscreenTable = '';
+    renderLabelsFullscreenTable();
+  });
+
+  $('#table-fullscreen-search').addEventListener('input', (event) => {
+    const tableKey = String(state.labels.fullscreenTable || '').trim();
+    if (!tableKey) {
+      return;
+    }
+    updateLabelsTableSearch(tableKey, event.target.value);
   });
 
   $('#labels-preview-btn').addEventListener('click', async () => {

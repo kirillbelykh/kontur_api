@@ -497,15 +497,33 @@
 
           <div class="grid three-col">
             <article class="panel">
-              <div class="panel-header"><h3>Заказы</h3></div>
+              <div class="panel-header panel-header-table-tools">
+                <h3>Заказы</h3>
+                <div class="table-tools">
+                  <input id="labels-orders-search" type="text" placeholder="Поиск по таблице">
+                  <button class="secondary-btn icon-btn" type="button" id="labels-orders-fullscreen" aria-label="На весь экран" title="На весь экран">⤢</button>
+                </div>
+              </div>
               <div class="table-host" id="labels-orders-table"></div>
             </article>
             <article class="panel">
-              <div class="panel-header"><h3>Агрег коды км</h3></div>
+              <div class="panel-header panel-header-table-tools">
+                <h3>Агрег коды км</h3>
+                <div class="table-tools">
+                  <input id="labels-aggregation-search" type="text" placeholder="Поиск по таблице">
+                  <button class="secondary-btn icon-btn" type="button" id="labels-aggregation-fullscreen" aria-label="На весь экран" title="На весь экран">⤢</button>
+                </div>
+              </div>
               <div class="table-host" id="labels-aggregation-files-table"></div>
             </article>
             <article class="panel">
-              <div class="panel-header"><h3>Коды км</h3></div>
+              <div class="panel-header panel-header-table-tools">
+                <h3>Коды км</h3>
+                <div class="table-tools">
+                  <input id="labels-marking-search" type="text" placeholder="Поиск по таблице">
+                  <button class="secondary-btn icon-btn" type="button" id="labels-marking-fullscreen" aria-label="На весь экран" title="На весь экран">⤢</button>
+                </div>
+              </div>
               <div class="table-host" id="labels-marking-files-table"></div>
             </article>
           </div>
@@ -528,6 +546,18 @@
   </div>
 
   <div id="toast-host"></div>
+  <div class="table-fullscreen-overlay is-hidden" id="table-fullscreen-overlay">
+    <div class="table-fullscreen-dialog">
+      <div class="panel-header">
+        <h3 id="table-fullscreen-title">Таблица</h3>
+        <div class="inline-actions compact">
+          <input id="table-fullscreen-search" type="text" placeholder="Поиск по таблице">
+          <button class="secondary-btn" type="button" id="table-fullscreen-close">Закрыть</button>
+        </div>
+      </div>
+      <div class="table-host" id="table-fullscreen-host"></div>
+    </div>
+  </div>
   <script src="./app.js"></script>
 </body>
 </html>

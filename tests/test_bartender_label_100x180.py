@@ -155,6 +155,15 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
         self.assertTrue(updated)
         self.assertEqual(values[1], "104 пар")
 
+    def test_replace_quantity_value_removes_extra_zero_from_adjacent_suffix(self):
+        values = ["Количество 100", "0 пар"]
+
+        updated = labels._replace_quantity_value(values, 0, _make_context(quantity_pairs=60))
+
+        self.assertTrue(updated)
+        self.assertEqual(values[0], "Количество 60")
+        self.assertEqual(values[1], " пар")
+
     def test_replace_quantity_value_keeps_package_suffix_when_number_is_inline(self):
         values = ["Количество                500 ", "пар\r   (10 диспенсеров по 50 пар)"]
 

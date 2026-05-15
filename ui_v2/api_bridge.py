@@ -2729,6 +2729,63 @@ class ApiBridge:
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
+    def read_clipboard_text(self) -> Dict[str, Any]:
+        try:
+            command = (
+                "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+                "$OutputEncoding = [System.Text.Encoding]::UTF8; "
+                "Get-Clipboard -Raw"
+            )
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    command,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=5,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if result.returncode != 0:
+                raise RuntimeError((result.stderr or result.stdout or "Не удалось прочитать буфер обмена.").strip())
+            return {"text": str(result.stdout or "")}
+        except Exception as exc:
+            return {"error": str(exc)}
+
+    def write_clipboard_text(self, text: Any) -> Dict[str, Any]:
+        try:
+            command = (
+                "[Console]::InputEncoding = [System.Text.Encoding]::UTF8; "
+                "$text = [Console]::In.ReadToEnd(); "
+                "Set-Clipboard -Value $text"
+            )
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    command,
+                ],
+                input=str(text or ""),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=5,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if result.returncode != 0:
+                raise RuntimeError((result.stderr or result.stdout or "Не удалось записать в буфер обмена.").strip())
+            return {"success": True}
+        except Exception as exc:
+            return {"error": str(exc)}
+
     def prolong_kontur_access(self) -> Dict[str, Any]:
         try:
             return cookies_module.prolong_kontur_access(force=True)

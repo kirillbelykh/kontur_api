@@ -104,6 +104,31 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         prolong_mock.assert_called_once_with(force=True)
         self.assertEqual(result, expected_result)
 
+    def test_read_clipboard_text_uses_powershell_without_error(self):
+        completed = types.SimpleNamespace(returncode=0, stdout="test clip", stderr="")
+
+        with mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock:
+            result = self.bridge.read_clipboard_text()
+
+        self.assertEqual(result, {"text": "test clip"})
+        run_mock.assert_called_once()
+        command = run_mock.call_args.args[0]
+        self.assertIn("OutputEncoding", command[-1])
+        self.assertIn("Get-Clipboard -Raw", command[-1])
+
+    def test_write_clipboard_text_uses_utf8_powershell_stdin(self):
+        completed = types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock:
+            result = self.bridge.write_clipboard_text("Привет")
+
+        self.assertEqual(result, {"success": True})
+        run_mock.assert_called_once()
+        self.assertEqual(run_mock.call_args.kwargs["input"], "Привет")
+        command = run_mock.call_args.args[0]
+        self.assertIn("InputEncoding", command[-1])
+        self.assertIn("Set-Clipboard -Value $text", command[-1])
+
     def test_get_orders_view_state_uses_fast_local_history_snapshot(self):
         history_items = [
             {
