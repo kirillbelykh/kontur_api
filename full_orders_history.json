@@ -3,9 +3,9 @@
     {
       "order_name": "889 стер нитрил L 260515",
       "document_id": "7ae7cda8-eb58-44e3-b0cd-5116b0975416",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\889 стер нитрил L 260515\\889 стер нитрил L 260515.pdf, C:\\Users\\User\\Desktop\\Коды км\\889 стер нитрил L 260515\\889 стер нитрил L 260515_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\889 стер нитрил L 260515\\889 стер нитрил L 260515.xls",
+      "simpl": "стер нитрил",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118046276",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\889 стер нитрил L 260515\\889 стер нитрил L 260515.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\889 стер нитрил L 260515\\889 стер нитрил L 260515_csv.csv",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\889 стер нитрил L 260515\\889 стер нитрил L 260515.xls"
     },
     {
       "order_name": "888 стер нитрил M 260515",
@@ -15063,7 +15066,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-15T08:57:22.206003",
+  "last_update": "2026-05-15T09:10:44.281186",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
