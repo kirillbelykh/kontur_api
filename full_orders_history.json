@@ -3,8 +3,8 @@
     {
       "order_name": "876 хир 8,5 20224",
       "document_id": "533d6dac-01b4-4da2-aeba-95af1b64a011",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\876 хир 85 20224\\876 хир 85 20224.pdf, C:\\Users\\User\\Desktop\\Коды км\\876 хир 85 20224\\876 хир 8,5 20224_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\876 хир 85 20224\\876 хир 8,5 20224.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,5",
       "gtin": "4640473510635",
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\876 хир 85 20224\\876 хир 8,5 20224.xls",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\876 хир 85 20224\\876 хир 85 20224.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\876 хир 85 20224\\876 хир 8,5 20224_csv.csv"
     },
     {
       "order_name": "890 стер латекс M 260513 125пар",
@@ -15139,7 +15142,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-15T13:26:09.593422",
+  "last_update": "2026-05-15T13:27:00.427700",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
