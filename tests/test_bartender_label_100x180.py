@@ -45,6 +45,15 @@ def _make_object_xml(*values: str, object_name: str, object_type: str = labels.T
 
 
 class BarTenderLabel100x180Tests(unittest.TestCase):
+    def test_bind_format_to_selected_printer_sets_printer_name(self):
+        print_setup = type("PrintSetup", (), {"EnablePrompting": True, "PrinterName": ""})()
+        fake_format = type("FakeFormat", (), {"PrintSetup": print_setup})()
+
+        labels._bind_format_to_selected_printer(fake_format, "Printer 2")
+
+        self.assertFalse(fake_format.PrintSetup.EnablePrompting)
+        self.assertEqual(fake_format.PrintSetup.PrinterName, "Printer 2")
+
     def test_build_label_print_context_uses_quantity_field_for_marking_templates(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

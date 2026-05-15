@@ -371,6 +371,7 @@ def _prepare_template_copy(context: LabelPrint100x180Context) -> Path:
         app = win32com.client.DispatchEx("BarTender.Application")
         app.Visible = False
         bt_format = app.Formats.Open(context.template_path, False, "")
+        _bind_format_to_selected_printer(bt_format, context.printer_name)
 
         _configure_template_objects(bt_format, context)
         bt_format.SaveAs(str(temp_template_path), False)
@@ -393,6 +394,24 @@ def _prepare_template_copy(context: LabelPrint100x180Context) -> Path:
             except Exception:
                 pass
         pythoncom.CoUninitialize()
+
+
+def _bind_format_to_selected_printer(bt_format, printer_name: str) -> None:
+    normalized_printer_name = str(printer_name or "").strip()
+    if not normalized_printer_name:
+        return
+
+    try:
+        bt_format.PrintSetup.EnablePrompting = False
+    except Exception:
+        pass
+
+    try:
+        bt_format.PrintSetup.PrinterName = normalized_printer_name
+    except Exception as exc:
+        raise BarTenderLabel100x180Error(
+            f"Не удалось привязать шаблон 100x180 к принтеру '{normalized_printer_name}': {exc}"
+        ) from exc
 
 
 def _configure_template_objects(bt_format, context: LabelPrint100x180Context) -> None:
