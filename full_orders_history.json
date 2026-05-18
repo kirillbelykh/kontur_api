@@ -471,9 +471,9 @@
     {
       "order_name": "896 хир 7,0 260518 240к",
       "document_id": "116cdd8b-5d3f-41b3-97ac-bc458e57a442",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\896 хир 70 260518 240к\\896 хир 70 260518 240к.pdf, C:\\Users\\user\\Desktop\\Коды км\\896 хир 70 260518 240к\\896 хир 7,0 260518 240к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\896 хир 70 260518 240к\\896 хир 7,0 260518 240к.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473510604",
       "positions": [
@@ -492,7 +492,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\896 хир 70 260518 240к\\896 хир 70 260518 240к.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\896 хир 70 260518 240к\\896 хир 7,0 260518 240к_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\896 хир 70 260518 240к\\896 хир 7,0 260518 240к.xls"
     },
     {
       "order_name": "895 хир 8,0 260517 240к",
@@ -15781,7 +15784,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T10:05:13.350488",
+  "last_update": "2026-05-18T10:06:45.952910",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
