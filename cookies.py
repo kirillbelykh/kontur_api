@@ -1,5 +1,8 @@
 import json
+import importlib
 import os
+import shutil
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -207,6 +210,52 @@ def _hide_driver_windows(driver) -> None:
         logger.debug("Не удалось скрыть окно браузера Selenium: %s", exc)
 
 
+def _is_driver_version_mismatch_error(exc: Exception) -> bool:
+    message = str(exc or "").lower()
+    if "session not created" not in message:
+        return False
+    return (
+        "only supports chrome version" in message
+        or "current browser version is" in message
+        or "this version of chromedriver only supports chrome version" in message
+    )
+
+
+def _create_chrome_driver(
+    webdriver_module,
+    service_cls,
+    options,
+    *,
+    driver_path: Optional[Path],
+    purpose_label: str,
+):
+    normalized_driver_path = Path(driver_path) if driver_path else None
+
+    if normalized_driver_path and normalized_driver_path.exists():
+        try:
+            logger.info("%s: запускаем Selenium через локальный драйвер %s", purpose_label, normalized_driver_path)
+            service = service_cls(str(normalized_driver_path))
+            return webdriver_module.Chrome(service=service, options=options)
+        except Exception as exc:
+            if _is_driver_version_mismatch_error(exc):
+                logger.warning(
+                    "%s: локальный драйвер устарел и не подходит версии браузера, переключаемся на Selenium Manager: %s",
+                    purpose_label,
+                    exc,
+                )
+            else:
+                logger.warning(
+                    "%s: локальный драйвер не запустился, пробуем Selenium Manager: %s",
+                    purpose_label,
+                    exc,
+                )
+    else:
+        logger.warning("%s: локальный драйвер не найден (%s), пробуем Selenium Manager", purpose_label, normalized_driver_path)
+
+    logger.info("%s: запускаем Selenium через Selenium Manager", purpose_label)
+    return webdriver_module.Chrome(options=options)
+
+
 def _click_first_matching_xpath(driver, wait, by, expected_conditions, xpaths: List[str], label: str):
     last_error: Optional[Exception] = None
     for xpath in xpaths:
@@ -262,8 +311,13 @@ def _run_kontur_access_prolongation_browser_flow(
         options.add_argument("--window-position=-32000,-32000")
         options.add_argument("--window-size=1920,1080")
 
-        service = Service(str(driver_path))
-        driver = webdriver.Chrome(service=service, options=options)
+        driver = _create_chrome_driver(
+            webdriver,
+            Service,
+            options,
+            driver_path=driver_path,
+            purpose_label="Автопродление доступа",
+        )
         _hide_driver_windows(driver)
 
         wait = WebDriverWait(driver, PROLONGATION_WAIT_TIMEOUT)
@@ -502,119 +556,233 @@ def save_cookies_to_file(cookies: Dict[str, str]) -> bool:
         return False
 
 
-def get_cookies(
-    driver_path: Path = YANDEX_DRIVER_PATH,
-    browser_path: Path = YANDEX_BROWSER_PATH,
-    profile_user_data_dir: Path = PROFILE_USER_DATA_DIR,
-    profile_directory: str = PROFILE_DIRECTORY,
-    headless: bool = HEADLESS,
-    target_url: str = TARGET_URL,
-    max_retries: int = 3,
-) -> Optional[Dict[str, str]]:
+def get_cookies(driver_path: Path = YANDEX_DRIVER_PATH,
+                browser_path: Optional[Path] = YANDEX_BROWSER_PATH,
+                profile_user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
+                profile_directory: str = PROFILE_DIRECTORY,
+                headless: bool = HEADLESS,
+                target_url: str = TARGET_URL,
+                max_retries: int = 3) -> Optional[Dict[str, str]]:
+    """
+    Получает cookies через Selenium и сохраняет их в файл с timestamp.
+    Повторяет попытки при неудаче.
+    """
     try:
         from selenium import webdriver
-        from selenium.webdriver.chrome.options import Options
         from selenium.webdriver.chrome.service import Service
+        from selenium.webdriver.chrome.options import Options
         from selenium.webdriver.common.by import By
-        from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
-    except Exception as exc:
-        logger.error("Selenium не установлен или недоступен: %s", exc)
+        from selenium.webdriver.support import expected_conditions as EC
+    except Exception as e:
+        logger.exception("Selenium import failed")
+        logger.error(f"Selenium не установлен или недоступен: {e}")
         return None
 
-    win32gui = None
-    win32con = None
-    win32process = None
+    # Импорт pywin32 для скрытия окна
+    win32gui_mod = None
+    win32con_mod = None
+    win32process_mod = None
     try:
-        import win32con  # type: ignore
-        import win32gui  # type: ignore
-        import win32process  # type: ignore
-    except ImportError as exc:
-        logger.warning(
-            "pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32"
-        )
-        logger.debug("Ошибка импорта pywin32: %s", exc)
+        win32gui_mod = importlib.import_module("win32gui")
+        win32con_mod = importlib.import_module("win32con")
+        win32process_mod = importlib.import_module("win32process")
+    except ImportError as e:
+        logger.warning("pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32")
+        logger.warning(f"Ошибка импорта pywin32: {e}")
 
-    if not driver_path or not Path(driver_path).exists():
-        logger.error("Driver not found: %s", driver_path)
+    # Повторно проверяем пути на момент запуска (вдруг браузер установили после старта приложения)
+    try:
+        runtime_paths = find_yandex_paths()
+    except Exception as e:
+        runtime_paths = {"browser": None, "user_data": None, "profile": "Default"}
+        logger.warning(f"Не удалось автоматически определить пути Яндекс Браузера: {e}")
+
+    if browser_path is None and runtime_paths["browser"] is not None:
+        browser_path = runtime_paths["browser"]
+    if profile_user_data_dir is None and runtime_paths["user_data"] is not None:
+        profile_user_data_dir = runtime_paths["user_data"]
+    if not profile_directory:
+        profile_directory = runtime_paths["profile"] or "Default"
+
+    if not driver_path.exists():
+        logger.error(f"Driver not found: {driver_path}")
         return None
-    if not browser_path or not Path(browser_path).exists():
-        logger.error("Browser binary not found: %s", browser_path)
+    if browser_path is None or not browser_path.exists():
+        logger.error(f"Browser binary not found: {browser_path}")
         return None
 
-    for attempt in range(1, max_retries + 1):
-        logger.info("Попытка получения cookies #%s", attempt)
-        driver = None
-        try:
-            options = Options()
-            options.binary_location = str(browser_path)
-            options.add_argument(f"--user-data-dir={profile_user_data_dir}")
-            options.add_argument(f"--profile-directory={profile_directory}")
-            if headless:
-                options.add_argument("--headless=new")
-                options.add_argument("--no-sandbox")
-                options.add_argument("--disable-dev-shm-usage")
-                options.add_argument("--disable-gpu")
-            options.add_argument("--window-position=-32000,-32000")
-            options.add_argument("--window-size=1920,1080")
+    user_data_dir_for_option = profile_user_data_dir
+    if profile_user_data_dir and profile_user_data_dir.name.lower() == "default":
+        # Selenium ожидает путь к "User Data", а профиль задаётся отдельным параметром.
+        user_data_dir_for_option = profile_user_data_dir.parent
+        if not profile_directory:
+            profile_directory = "Default"
 
-            service = Service(str(driver_path))
-            driver = webdriver.Chrome(service=service, options=options)
-            wait = WebDriverWait(driver, WAIT_TIMEOUT)
+    if not profile_directory:
+        profile_directory = "Default"
 
-            if win32gui and win32con and win32process:
-                _hide_driver_windows(driver)
+    for attempt in range(max_retries):
+        logger.info(f"Попытка получения cookies #{attempt + 1}")
 
-            driver.get(target_url)
-            time.sleep(2.0)
-            _click_cookie_accept_if_present(driver, By)
+        launch_modes: list[tuple[str, Optional[Path], Optional[str], bool]] = []
+        if user_data_dir_for_option:
+            launch_modes.append(("profile", user_data_dir_for_option, profile_directory, True))
+        else:
+            logger.warning("Папка профиля Яндекс Браузера не определена, пробуем запуск с временным профилем")
+        launch_modes.append(("temporary", None, None, False))
 
+        for mode_name, launch_user_data_dir, launch_profile_dir, hide_window in launch_modes:
+            driver = None
+            temp_profile_dir: Optional[Path] = None
             try:
-                profile_xpath = (
-                    '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div'
-                )
-                wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath))).click()
-                time.sleep(SLEEP)
-            except Exception as exc:
-                logger.debug("Profile select error: %s", exc)
+                if mode_name == "temporary":
+                    temp_profile_dir = Path(tempfile.mkdtemp(prefix="konturapi-yandex-profile-"))
+                    launch_user_data_dir = temp_profile_dir
+                    launch_profile_dir = None
+                    logger.warning("Резервный запуск Яндекс.Браузера с временным профилем")
 
-            try:
-                wait.until(
-                    EC.element_to_be_clickable(
-                        (By.XPATH, '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]')
+                opts = Options()
+                opts.binary_location = str(browser_path)
+                if launch_user_data_dir:
+                    opts.add_argument(f"--user-data-dir={launch_user_data_dir}")
+                if launch_profile_dir:
+                    opts.add_argument(f"--profile-directory={launch_profile_dir}")
+                if headless:
+                    opts.add_argument("--headless=new")
+                    opts.add_argument("--no-sandbox")
+                    opts.add_argument("--disable-dev-shm-usage")
+                    opts.add_argument("--disable-gpu")
+                if hide_window and not headless:
+                    opts.add_argument("--window-position=-32000,-32000")
+                opts.add_argument("--window-size=1920,1080")
+                opts.add_argument("--remote-debugging-port=0")
+                opts.add_argument("--no-first-run")
+                opts.add_argument("--no-default-browser-check")
+                opts.add_argument("--disable-background-networking")
+                opts.add_argument("--disable-component-update")
+                opts.add_argument("--disable-sync")
+                opts.add_argument("--disable-features=Translate,OptimizationHints")
+
+                service = Service(str(driver_path))
+                driver = webdriver.Chrome(service=service, options=opts)
+                wait = WebDriverWait(driver, WAIT_TIMEOUT)
+
+                if mode_name == "temporary" and not headless:
+                    logger.warning(
+                        "Открылся браузер с временным профилем. Войдите в Контур вручную и дождитесь завершения."
                     )
-                ).click()
-                time.sleep(SLEEP)
-            except Exception as exc:
-                logger.debug("Warehouse select error: %s", exc)
 
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            raw_cookies = driver.get_cookies()
-            if not raw_cookies:
-                logger.warning("После загрузки страницы cookies не найдены")
-                continue
+                # Скрытие окна браузера с помощью Windows API по PID (если pywin32 доступен)
+                if hide_window and win32gui_mod and win32con_mod and win32process_mod:
+                    if driver.service is None or driver.service.process is None:
+                        logger.warning("Сервис Selenium недоступен для скрытия окна браузера")
+                        pid = None
+                    else:
+                        pid = driver.service.process.pid
+                    time.sleep(1.0)  # Ждём запуска окна
 
-            cookies = {item["name"]: item["value"] for item in raw_cookies}
-            is_valid, missing_fields = validate_cookies(cookies)
-            if not is_valid:
-                logger.warning("Полученные cookies невалидны. Отсутствуют поля: %s", missing_fields)
-                if attempt < max_retries:
-                    time.sleep(2.0)
-                continue
+                    def enum_window_callback(hwnd, results):
+                        _, window_pid = win32process_mod.GetWindowThreadProcessId(hwnd)
+                        if pid is not None and window_pid == pid:
+                            results.append(hwnd)
 
-            if save_cookies_to_file(cookies):
-                logger.info("Успешно получили и сохранили валидные cookies")
-                return dict(cookies)
-        except Exception:
-            logger.exception("get_cookies failed on attempt %s", attempt)
-        finally:
-            if driver is not None:
+                    results: list[int] = []
+                    win32gui_mod.EnumWindows(enum_window_callback, results)
+                    if results:
+                        for hwnd in results:
+                            win32gui_mod.ShowWindow(hwnd, win32con_mod.SW_HIDE)
+                        logger.info(f"Скрыто {len(results)} окон браузера по PID {pid}")
+                    else:
+                        logger.warning("Не удалось найти окна браузера по PID для скрытия")
+
+                driver.get(target_url)
+                time.sleep(2.0)  # Увеличили задержку для полной загрузки
+
+                # best-effort шаги с дополнительными проверками
                 try:
-                    driver.quit()
-                except Exception:
-                    pass
+                    # Проверяем наличие кнопки на странице
+                    cookie_btn = driver.find_elements(By.XPATH, '//*[@id="root"]/div/div/div[1]/div[1]/span/button/div[2]/span')
+                    if cookie_btn:
+                        cookie_btn[0].click()
+                        logger.info("Clicked cookie accept")
+                        time.sleep(SLEEP)
+                    else:
+                        logger.info("Cookie accept button not found on page - skipping")
+                except Exception as e:
+                    logger.info(f"Error with cookie accept button: {e} - skipping")
 
-    logger.error("Не удалось получить валидные cookies после %s попыток", max_retries)
+                try:
+                    profile_xpath = '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]/div/div/div/div/div/div'
+                    profile_el = wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath)))
+                    profile_el.click()
+                    logger.info("Clicked profile (best-effort)")
+                    time.sleep(SLEEP)
+                except Exception as e:
+                    logger.info(f"Profile select error: {e} - ignored")
+
+                try:
+                    warehouse_el = wait.until(EC.element_to_be_clickable(
+                        (By.XPATH, '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]')
+                    ))
+                    warehouse_el.click()
+                    logger.info("Clicked warehouse (fallback selector)")
+                    time.sleep(SLEEP)
+                except Exception as e:
+                    logger.info(f"Warehouse select error: {e} - ignored")
+
+                # Дополнительная проверка загрузки страницы
+                wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+                logger.info("Страница загружена (body найден)")
+
+                validation_wait_seconds = 0 if mode_name == "profile" else 120
+                deadline = time.time() + validation_wait_seconds
+                missing_fields: List[str] = []
+
+                while True:
+                    raw = driver.get_cookies()
+                    if raw:
+                        cookies = {c["name"]: c["value"] for c in raw}
+                        is_valid, missing_fields = validate_cookies(cookies)
+                        if is_valid:
+                            if save_cookies_to_file(cookies):
+                                logger.info("Успешно получили и сохранили валидные cookies")
+                                return cookies
+                            logger.error("Не удалось сохранить cookies")
+                            break
+                    else:
+                        missing_fields = ["all cookies missing"]
+
+                    if time.time() >= deadline:
+                        break
+                    time.sleep(2)
+
+                logger.warning(
+                    f"Cookies не получены в режиме {mode_name}. Отсутствуют поля: {missing_fields}"
+                )
+
+            except Exception as e:
+                logger.exception(
+                    f"get_cookies failed on attempt {attempt + 1} in mode '{mode_name}'"
+                )
+                logger.error(f"get_cookies failed: {e}")
+                error_text = str(e).lower()
+                if "devtoolsactiveport" in error_text:
+                    logger.warning(
+                        "Ошибка DevToolsActivePort: закройте все окна Яндекс.Браузера и попробуйте снова."
+                    )
+                if mode_name == "profile":
+                    logger.info("Пробуем резервный запуск без пользовательского профиля")
+            finally:
+                if driver is not None:
+                    try:
+                        driver.quit()
+                    except Exception:
+                        pass
+                if temp_profile_dir is not None:
+                    shutil.rmtree(temp_profile_dir, ignore_errors=True)
+
+    logger.error(f"Не удалось получить валидные cookies после {max_retries} попыток")
     return None
 
 
