@@ -3,9 +3,9 @@
     {
       "order_name": "938 HR лат M 260515",
       "document_id": "7f06dc63-9136-4ed1-ac73-3d83b485b969",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\938 HR лат M 260515\\938 HR лат M 260515.pdf, C:\\Users\\User\\Desktop\\Коды км\\938 HR лат M 260515\\938 HR лат M 260515_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\938 HR лат M 260515\\938 HR лат M 260515.xls",
+      "simpl": "латекс hr",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р M, цвет синий",
       "gtin": "4650118040533",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\938 HR лат M 260515\\938 HR лат M 260515.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\938 HR лат M 260515\\938 HR лат M 260515.xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\938 HR лат M 260515\\938 HR лат M 260515_csv.csv"
     },
     {
       "order_name": "937 стер нитрил L 260327",
@@ -16647,7 +16650,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T15:06:51.884641",
+  "last_update": "2026-05-18T15:11:49.712749",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
