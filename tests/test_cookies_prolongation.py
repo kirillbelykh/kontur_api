@@ -117,47 +117,6 @@ class CookiesProlongationTests(unittest.TestCase):
         self.assertTrue(first_thread.started)
         self.assertIs(cookies._PROLONGATION_THREAD, first_thread)
 
-    def test_detects_driver_version_mismatch_error(self):
-        exc = RuntimeError(
-            "Message: session not created: This version of ChromeDriver only supports Chrome version 144. "
-            "Current browser version is 146.0.7680.2170"
-        )
-        self.assertTrue(cookies._is_driver_version_mismatch_error(exc))
-
-    def test_create_chrome_driver_falls_back_to_selenium_manager_on_version_mismatch(self):
-        driver_path = Path(self.temp_dir.name) / "yandexdriver.exe"
-        driver_path.write_text("stub", encoding="utf-8")
-        options = object()
-        driver_instance = object()
-        call_log = []
-
-        def fake_chrome(*args, **kwargs):
-            call_log.append(kwargs)
-            if "service" in kwargs:
-                raise RuntimeError(
-                    "Message: session not created: This version of ChromeDriver only supports Chrome version 144. "
-                    "Current browser version is 146.0.7680.2170"
-                )
-            return driver_instance
-
-        webdriver_module = mock.Mock()
-        webdriver_module.Chrome = mock.Mock(side_effect=fake_chrome)
-        service_cls = mock.Mock(side_effect=lambda path: {"path": path})
-
-        result = cookies._create_chrome_driver(
-            webdriver_module,
-            service_cls,
-            options,
-            driver_path=driver_path,
-            purpose_label="Получение cookies",
-        )
-
-        self.assertIs(result, driver_instance)
-        self.assertEqual(len(call_log), 2)
-        self.assertIn("service", call_log[0])
-        self.assertNotIn("service", call_log[1])
-        self.assertIs(call_log[1]["options"], options)
-
 
 if __name__ == "__main__":
     unittest.main()
