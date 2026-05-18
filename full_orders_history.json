@@ -786,7 +786,7 @@
     {
       "order_name": "900 хир 7,0 260520 240к",
       "document_id": "c38173df-6b6f-41cd-91c1-f0b9dddb6986",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\900 хир 70 260520 240к\\900 хир 70 260520 240к.pdf, C:\\Users\\user\\Desktop\\Коды км\\900 хир 70 260520 240к\\900 хир 7,0 260520 240к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\900 хир 70 260520 240к\\900 хир 7,0 260520 240к.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
@@ -16215,7 +16215,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T11:30:40.662449",
+  "last_update": "2026-05-18T11:52:06.108210",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
