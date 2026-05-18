@@ -58,9 +58,9 @@
     {
       "order_name": "941 лат диаг M 260520 (114к)",
       "document_id": "c9fdce4f-3bb6-46f2-853c-7bc29b7b9d49",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\941 лат диаг M 260520 114к\\941 лат диаг M 260520 114к.pdf, C:\\Users\\User\\Desktop\\Коды км\\941 лат диаг M 260520 114к\\941 лат диаг M 260520 (114к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\941 лат диаг M 260520 114к\\941 лат диаг M 260520 (114к).xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
       "gtin": "4650118041295",
       "positions": [
@@ -79,7 +79,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\941 лат диаг M 260520 114к\\941 лат диаг M 260520 114к.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\941 лат диаг M 260520 114к\\941 лат диаг M 260520 (114к)_csv.csv",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\941 лат диаг M 260520 114к\\941 лат диаг M 260520 (114к).xls"
     },
     {
       "order_name": "940 лат диаг S 260520 (64к)",
@@ -16789,7 +16792,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T16:51:14.740939",
+  "last_update": "2026-05-18T16:52:05.709901",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
