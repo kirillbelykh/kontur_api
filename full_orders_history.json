@@ -351,7 +351,7 @@
     {
       "order_name": "915 стер лат L 260422 заявка 5972",
       "document_id": "fd99179f-2365-404a-a7cf-aacea2348212",
-      "status": "Введен в оборот",
+      "status": "Скачан",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\915 стер лат L 260422 заявка 5972\\915 стер лат L 260422 заявка 5972.pdf, C:\\Users\\User\\Desktop\\Коды км\\915 стер лат L 260422 заявка 5972\\915 стер лат L 260422 заявка 5972_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\915 стер лат L 260422 заявка 5972\\915 стер лат L 260422 заявка 5972.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
@@ -16215,7 +16215,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T12:04:51.817351",
+  "last_update": "2026-05-18T12:04:55.322145",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
