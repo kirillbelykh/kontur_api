@@ -91,6 +91,28 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
 
         self.assertEqual(result["prolongation"], fake_state)
 
+    def test_start_session_auto_refresh_starts_worker_and_triggers_immediate_run(self):
+        fake_event = mock.Mock()
+        fake_thread = mock.Mock()
+        fake_thread.is_alive.return_value = False
+        fake_runtime = types.SimpleNamespace(
+            lock=api_bridge.Lock(),
+            session_refresh_event=fake_event,
+            session_refresh_thread=None,
+        )
+
+        with (
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(api_bridge, "Thread", return_value=fake_thread) as thread_mock,
+        ):
+            result = self.bridge.start_session_auto_refresh()
+
+        self.assertEqual(result, {"success": True})
+        thread_mock.assert_called_once()
+        fake_thread.start.assert_called_once_with()
+        fake_event.set.assert_called_once_with()
+        self.assertIs(fake_runtime.session_refresh_thread, fake_thread)
+
     def test_prolong_kontur_access_calls_cookie_module_manually(self):
         expected_result = {"success": True, "performed": True}
 

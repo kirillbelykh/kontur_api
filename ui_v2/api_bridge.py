@@ -12,7 +12,7 @@ import uuid
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -263,6 +263,8 @@ class _BridgeRuntime:
         self.aggregation_cache_items: List[Dict[str, Any]] = []
         self.aggregation_cache_at = 0.0
         self.aggregation_cache_ttl_seconds = 90.0
+        self.session_refresh_event = Event()
+        self.session_refresh_thread: Optional[Thread] = None
         self._sync_history_on_startup()
         self.load_download_items_from_history()
 
@@ -336,6 +338,35 @@ def _extract_position_name(order_data: Dict[str, Any]) -> str:
 class ApiBridge:
     def __init__(self):
         _get_runtime()
+
+    def _session_auto_refresh_worker(self) -> None:
+        runtime = _get_runtime()
+        while True:
+            update_triggered = runtime.session_refresh_event.wait(timeout=runtime.session_ttl_seconds)
+            try:
+                logger.info(
+                    "Сессия UI v2: запускаем %s обновление cookies",
+                    "принудительное" if update_triggered else "плановое",
+                )
+                self._ensure_session(force_refresh=True, force_browser_refresh=True)
+                logger.info("Сессия UI v2: cookies успешно обновлены")
+            except Exception as exc:
+                logger.exception("Сессия UI v2: ошибка фонового обновления cookies: %s", exc)
+            finally:
+                runtime.session_refresh_event.clear()
+
+    def start_session_auto_refresh(self) -> Dict[str, Any]:
+        runtime = _get_runtime()
+        with runtime.lock:
+            if runtime.session_refresh_thread is None or not runtime.session_refresh_thread.is_alive():
+                runtime.session_refresh_thread = Thread(
+                    target=self._session_auto_refresh_worker,
+                    name="UiV2SessionAutoRefresh",
+                    daemon=True,
+                )
+                runtime.session_refresh_thread.start()
+            runtime.session_refresh_event.set()
+        return {"success": True}
 
     def _normalize_order_name_key(self, value: str) -> str:
         return " ".join(str(value or "").strip().lower().split())

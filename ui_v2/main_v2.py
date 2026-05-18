@@ -87,6 +87,7 @@ def _install_desktop_scroll_overrides(window: webview.Window) -> None:
 def main():
     _ensure_desktop_shortcut()
     api = ApiBridge()
+    api.start_session_auto_refresh()
     index_path = Path(__file__).resolve().parent / "ui" / "index.html"
     window = webview.create_window(
         title="KonturTestAPI [TEST]",
