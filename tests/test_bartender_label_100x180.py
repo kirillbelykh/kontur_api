@@ -304,5 +304,17 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
             self.assertIn("NumberOfSerializedLabels = 1", script)
 
 
+    def test_resolve_context_color_uses_sterile_latex_default(self):
+        color = labels._resolve_context_color("", Path("стерилка") / "стер Латекс.btw")
+        self.assertEqual(color, "натуральный")
+
+    def test_resolve_context_color_uses_sterile_nitrile_default(self):
+        color = labels._resolve_context_color("", Path("стерилка") / "стер Нитрил.btw")
+        self.assertEqual(color, "синий")
+
+    def test_resolve_context_color_uses_polymer_surgical_default(self):
+        color = labels._resolve_context_color("", Path("Хирургия") / "ХИР полимер СОВЕР.btw")
+        self.assertEqual(color, "натуральный")
+
 if __name__ == "__main__":
     unittest.main()

@@ -179,6 +179,7 @@ def resolve_order_metadata(order_data: dict[str, Any], df: pd.DataFrame) -> Orde
 
     full_name = _normalize_optional_text(row.get(FULL_NAME_COLUMN)) or _extract_position_name(order_data)
     simpl_name = _normalize_optional_text(row.get(SIMPL_COLUMN)) or _normalize_optional_text(order_data.get("simpl"))
+    template_color = _normalize_optional_text(row.get(COLOR_COLUMN))
 
     return OrderMetadata(
         document_id=document_id,
@@ -188,7 +189,7 @@ def resolve_order_metadata(order_data: dict[str, Any], df: pd.DataFrame) -> Orde
         simpl_name=simpl_name,
         size=size,
         batch=batch,
-        color=_normalize_optional_text(row.get(COLOR_COLUMN)),
+        color=template_color,
         units_per_pack=units_per_pack,
         order_quantity=order_quantity,
     )
@@ -252,6 +253,7 @@ def build_label_print_context(
         package_text = None
 
     template_category = _resolve_template_category(template_file)
+    resolved_color = _resolve_context_color(metadata.color, template_file)
     return LabelPrint100x180Context(
         document_id=metadata.document_id,
         order_name=metadata.order_name,
@@ -264,7 +266,7 @@ def build_label_print_context(
         gtin=metadata.gtin,
         size=metadata.size,
         batch=metadata.batch,
-        color=metadata.color,
+        color=resolved_color,
         manufacture_date=manufacture_date_text,
         expiration_date=expiration_date_text,
         quantity_pairs=quantity_pairs,
@@ -364,6 +366,21 @@ def _resolve_template_data_source_kind(template_path: Path) -> str:
     if category == HR_TEMPLATE_GROUP_DIR.name:
         return AGGREGATION_SOURCE_KIND
     return MARKING_SOURCE_KIND
+
+
+def _resolve_context_color(color: str, template_path: Path) -> str:
+    normalized_color = _normalize_optional_text(color)
+    if normalized_color:
+        return normalized_color
+
+    normalized_name = str(template_path.stem or "").strip().lower()
+    if "стер латекс" in normalized_name:
+        return "натуральный"
+    if "стер нитрил" in normalized_name:
+        return "синий"
+    if "полимер" in normalized_name:
+        return "натуральный"
+    return ""
 
 
 def _prepare_template_copy(context: LabelPrint100x180Context) -> Path:

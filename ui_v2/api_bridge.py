@@ -45,6 +45,7 @@ try:
         list_label_templates,
         list_marking_csv_files,
         print_label_sheet,
+        resolve_label_context_color,
         resolve_order_metadata,
     )
 except ModuleNotFoundError:
@@ -59,6 +60,7 @@ except ModuleNotFoundError:
         list_label_templates,
         list_marking_csv_files,
         print_label_sheet,
+        resolve_label_context_color,
         resolve_order_metadata,
     )
 from bartender_print import build_print_context, list_installed_printers, print_labels
@@ -4886,6 +4888,7 @@ class ApiBridge:
         size = self._normalize_label_manual_text(manual_override.get("size"))
         batch = self._normalize_label_manual_text(manual_override.get("batch"))
         color = self._normalize_label_manual_text(manual_override.get("color"))
+        resolved_color = resolve_label_context_color(color, str(template_file))
         gtin = self._normalize_label_manual_text(manual_override.get("gtin")) or str(order_data.get("gtin") or "").strip()
         units_per_pack = self._parse_label_positive_int(
             manual_override.get("units_per_pack"),
@@ -4942,7 +4945,7 @@ class ApiBridge:
             gtin=gtin,
             size=size,
             batch=batch,
-            color=color,
+            color=resolved_color,
             manufacture_date=manufacture_date_text,
             expiration_date=expiration_date_text,
             quantity_pairs=quantity_pairs,

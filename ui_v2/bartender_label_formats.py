@@ -64,6 +64,7 @@ def build_label_print_context(
     manufacture_date: str,
     expiration_date: str,
     quantity_value: str | int | None = None,
+    serial_start_number: int | None = None,
 ):
     with _patched_template_config(sheet_format):
         return base_labels.build_label_print_context(
@@ -75,6 +76,7 @@ def build_label_print_context(
             manufacture_date=manufacture_date,
             expiration_date=expiration_date,
             quantity_value=quantity_value,
+            serial_start_number=serial_start_number,
         )
 
 
@@ -92,6 +94,10 @@ def list_marking_csv_files():
 
 def resolve_order_metadata(order_data: dict[str, Any], df: pd.DataFrame):
     return base_labels.resolve_order_metadata(order_data, df)
+
+
+def resolve_label_context_color(color: str, template_path: str):
+    return base_labels._resolve_context_color(str(color or ""), Path(str(template_path or "")))
 
 
 def format_label_sheet_title(sheet_format: Any) -> str:
