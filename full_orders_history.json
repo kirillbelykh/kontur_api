@@ -322,7 +322,7 @@
     {
       "order_name": "916 стер лат M 260501 заявка 5956",
       "document_id": "4662e5ea-5ac3-4f7f-89c3-2161071e5e34",
-      "status": "Введен в оборот",
+      "status": "Скачан",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\916 стер лат M 260501 заявка 5956\\916 стер лат M 260501 заявка 5956.pdf, C:\\Users\\User\\Desktop\\Коды км\\916 стер лат M 260501 заявка 5956\\916 стер лат M 260501 заявка 5956_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\916 стер лат M 260501 заявка 5956\\916 стер лат M 260501 заявка 5956.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
@@ -16215,7 +16215,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T12:04:48.174912",
+  "last_update": "2026-05-18T12:04:51.817351",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
