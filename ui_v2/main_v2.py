@@ -98,6 +98,7 @@ def main():
         min_size=(1100, 700),
     )
     window.events.loaded += _install_desktop_scroll_overrides
+    window.events.loaded += lambda _window: api.start_session_auto_refresh()
     debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
     webview.start(debug=debug_mode)
 

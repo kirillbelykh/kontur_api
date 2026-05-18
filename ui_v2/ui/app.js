@@ -2085,6 +2085,22 @@ async function loadDownloadState(options = {}) {
   }
 }
 
+function applyImmediateDownloadItem(downloadItem) {
+  if (!downloadItem?.document_id) {
+    return;
+  }
+  state.download.items = [
+    downloadItem,
+    ...state.download.items.filter((item) => item.document_id !== downloadItem.document_id),
+  ];
+  state.download.selectedItemId = downloadItem.document_id;
+  state.download.selectedIds = new Set([downloadItem.document_id]);
+  markRouteLoaded('download');
+  if (isRouteActive('download')) {
+    Views.download.render();
+  }
+}
+
 async function loadIntroState(options = {}) {
   const { render = isRouteActive('intro') } = normalizeLoadOptions(options);
   state.ui.routeLoading.intro = true;
@@ -2658,6 +2674,9 @@ async function bindEvents() {
   $('#create-order-now-btn').addEventListener('click', async () => {
     await runAction('Создаём заказ...', async () => {
       const result = await API.call('create_order', readOrderForm());
+      if (result?.download_item) {
+        applyImmediateDownloadItem(result.download_item);
+      }
       await loadOrdersState({ force: true });
       markRoutesDirty(['download', 'intro', 'tsd', 'labels']);
       return result;
@@ -2668,6 +2687,9 @@ async function bindEvents() {
     await runAction('Выполняем очередь заказов...', async () => {
       const result = await API.call('submit_order_queue');
       await loadOrdersState({ force: true });
+      if (isRouteActive('download')) {
+        await loadDownloadState({ force: true });
+      }
       markRoutesDirty(['download', 'intro', 'tsd', 'labels']);
       return result;
     }, 'Очередь заказов выполнена.');

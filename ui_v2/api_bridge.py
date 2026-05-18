@@ -265,14 +265,25 @@ class _BridgeRuntime:
         self.aggregation_cache_ttl_seconds = 90.0
         self.session_refresh_event = Event()
         self.session_refresh_thread: Optional[Thread] = None
-        self._sync_history_on_startup()
         self.load_download_items_from_history()
+        self.history_sync_thread: Optional[Thread] = None
+        self.start_history_sync_on_startup()
 
     def _sync_history_on_startup(self) -> None:
         try:
             self.history_db.sync_with_github(force=True, push=False, reason="runtime-init")
         except Exception:
             pass
+
+    def start_history_sync_on_startup(self) -> None:
+        if self.history_sync_thread is not None and self.history_sync_thread.is_alive():
+            return
+        self.history_sync_thread = Thread(
+            target=self._sync_history_on_startup,
+            name="UiV2HistorySync",
+            daemon=True,
+        )
+        self.history_sync_thread.start()
 
     def load_download_items_from_history(self) -> None:
         existing_ids = {item.get("document_id") for item in self.download_items if item.get("document_id")}
@@ -2760,8 +2771,62 @@ class ApiBridge:
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
+    @staticmethod
+    def _read_clipboard_text_fast() -> Optional[str]:
+        try:
+            win32clipboard = importlib.import_module("win32clipboard")
+            win32con = importlib.import_module("win32con")
+        except ImportError:
+            return None
+
+        last_error: Exception | None = None
+        for _ in range(5):
+            try:
+                win32clipboard.OpenClipboard()
+                try:
+                    if win32clipboard.IsClipboardFormatAvailable(win32con.CF_UNICODETEXT):
+                        return str(win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT) or "")
+                    return ""
+                finally:
+                    win32clipboard.CloseClipboard()
+            except Exception as exc:
+                last_error = exc
+                time.sleep(0.03)
+        if last_error is not None:
+            raise last_error
+        return ""
+
+    @staticmethod
+    def _write_clipboard_text_fast(text: str) -> bool:
+        try:
+            win32clipboard = importlib.import_module("win32clipboard")
+            win32con = importlib.import_module("win32con")
+        except ImportError:
+            return False
+
+        normalized_text = str(text or "")
+        last_error: Exception | None = None
+        for _ in range(5):
+            try:
+                win32clipboard.OpenClipboard()
+                try:
+                    win32clipboard.EmptyClipboard()
+                    win32clipboard.SetClipboardData(win32con.CF_UNICODETEXT, normalized_text)
+                    return True
+                finally:
+                    win32clipboard.CloseClipboard()
+            except Exception as exc:
+                last_error = exc
+                time.sleep(0.03)
+        if last_error is not None:
+            raise last_error
+        return False
+
     def read_clipboard_text(self) -> Dict[str, Any]:
         try:
+            fast_text = self._read_clipboard_text_fast()
+            if fast_text is not None:
+                return {"text": fast_text}
             command = (
                 "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
                 "$OutputEncoding = [System.Text.Encoding]::UTF8; "
@@ -2790,6 +2855,8 @@ class ApiBridge:
 
     def write_clipboard_text(self, text: Any) -> Dict[str, Any]:
         try:
+            if self._write_clipboard_text_fast(str(text or "")):
+                return {"success": True}
             command = (
                 "[Console]::InputEncoding = [System.Text.Encoding]::UTF8; "
                 "$text = [Console]::In.ReadToEnd(); "
@@ -3097,10 +3164,9 @@ class ApiBridge:
             runtime.load_download_items_from_history()
             printers, default_printer = list_installed_printers()
             deleted_ids = self._get_deleted_document_ids()
-            session = self._ensure_session_safely("download")
             return {
                 "items": [
-                    self._serialize_download_item(item, session=session)
+                    self._serialize_download_item(item, session=None)
                     for item in runtime.download_items
                     if str(item.get("document_id") or "").strip() not in deleted_ids
                 ],

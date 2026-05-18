@@ -53,6 +53,21 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
     def test_bridge_runtime_syncs_history_before_populating_download_items(self):
         fake_history_order = {"document_id": "doc-1", "order_name": "Order 1"}
         sync_calls = []
+        started_targets = []
+
+        class FakeThread:
+            def __init__(self, *args, **kwargs):
+                self.target = kwargs.get("target")
+                self.started = False
+
+            def start(self):
+                self.started = True
+                started_targets.append(self.target)
+                if callable(self.target):
+                    self.target()
+
+            def is_alive(self):
+                return self.started
 
         class FakeHistoryDB:
             def __init__(self, *args, **kwargs):
@@ -65,13 +80,17 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             def get_orders_without_tsd(self):
                 return [fake_history_order]
 
-        with mock.patch.object(api_bridge, "OrderHistoryDB", FakeHistoryDB):
+        with (
+            mock.patch.object(api_bridge, "OrderHistoryDB", FakeHistoryDB),
+            mock.patch.object(api_bridge, "Thread", side_effect=lambda *args, **kwargs: FakeThread(*args, **kwargs)),
+        ):
             runtime = api_bridge._BridgeRuntime()
 
         self.assertEqual(
             sync_calls,
             [{"force": True, "push": False, "reason": "runtime-init"}],
         )
+        self.assertEqual(len(started_targets), 1)
         self.assertEqual(len(runtime.download_items), 1)
         self.assertEqual(runtime.download_items[0]["document_id"], "doc-1")
 
@@ -126,10 +145,19 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         prolong_mock.assert_called_once_with(force=True)
         self.assertEqual(result, expected_result)
 
+    def test_read_clipboard_text_prefers_fast_clipboard_path(self):
+        with mock.patch.object(self.bridge, "_read_clipboard_text_fast", return_value="fast clip"):
+            result = self.bridge.read_clipboard_text()
+
+        self.assertEqual(result, {"text": "fast clip"})
+
     def test_read_clipboard_text_uses_powershell_without_error(self):
         completed = types.SimpleNamespace(returncode=0, stdout="test clip", stderr="")
 
-        with mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock:
+        with (
+            mock.patch.object(self.bridge, "_read_clipboard_text_fast", return_value=None),
+            mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock,
+        ):
             result = self.bridge.read_clipboard_text()
 
         self.assertEqual(result, {"text": "test clip"})
@@ -138,10 +166,20 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertIn("OutputEncoding", command[-1])
         self.assertIn("Get-Clipboard -Raw", command[-1])
 
+    def test_write_clipboard_text_prefers_fast_clipboard_path(self):
+        with mock.patch.object(self.bridge, "_write_clipboard_text_fast", return_value=True) as write_fast_mock:
+            result = self.bridge.write_clipboard_text("Привет")
+
+        self.assertEqual(result, {"success": True})
+        write_fast_mock.assert_called_once_with("Привет")
+
     def test_write_clipboard_text_uses_utf8_powershell_stdin(self):
         completed = types.SimpleNamespace(returncode=0, stdout="", stderr="")
 
-        with mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock:
+        with (
+            mock.patch.object(self.bridge, "_write_clipboard_text_fast", return_value=False),
+            mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock,
+        ):
             result = self.bridge.write_clipboard_text("Привет")
 
         self.assertEqual(result, {"success": True})

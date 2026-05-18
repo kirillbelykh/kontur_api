@@ -197,7 +197,7 @@ def _session_manager_background_update_worker(cls):
                 "принудительное" if update_triggered else "плановое",
             )
 
-            cookies = get_valid_cookies(force_refresh=bool(update_triggered))
+            cookies = get_valid_cookies(force_refresh=True)
             if not cookies:
                 logger.warning("Сессия: новые cookies не получены, сохраняем текущую сессию")
                 cls._update_event.clear()
