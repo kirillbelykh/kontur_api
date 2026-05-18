@@ -185,9 +185,9 @@
     {
       "order_name": "927 стер лат L 260502 заявка 5954",
       "document_id": "4092c32a-39b0-43bc-9acb-a7c2082a37aa",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\927 стер лат L 260502 заявка 5954\\927 стер лат L 260502 заявка 5954.pdf, C:\\Users\\User\\Desktop\\Коды км\\927 стер лат L 260502 заявка 5954\\927 стер лат L 260502 заявка 5954_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\927 стер лат L 260502 заявка 5954\\927 стер лат L 260502 заявка 5954.xls",
+      "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4640473514060",
       "positions": [
@@ -206,7 +206,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\927 стер лат L 260502 заявка 5954\\927 стер лат L 260502 заявка 5954.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\927 стер лат L 260502 заявка 5954\\927 стер лат L 260502 заявка 5954.xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\927 стер лат L 260502 заявка 5954\\927 стер лат L 260502 заявка 5954_csv.csv"
     },
     {
       "order_name": "926 стер лат S 260512 заявка 5933 (5 пар)",
@@ -16510,7 +16513,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T12:16:26.447172",
+  "last_update": "2026-05-18T12:16:58.284912",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
