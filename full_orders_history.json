@@ -4188,7 +4188,7 @@
       "order_name": "781 лат 2-хл L 260503 40д",
       "document_id": "664f803d-6a68-48ff-aff4-3082d678756f",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д.pdf, C:\\Users\\user\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д_csv.csv",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д.pdf, C:\\Users\\User\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д.xls",
       "simpl": "латекс 2-хлор",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные двойного хлорирования текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041158",
@@ -4209,9 +4209,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": null,
-      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д.pdf",
-      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д_csv.csv"
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д.xls",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\781 лат 2-хл L 260503 40д\\781 лат 2-хл L 260503 40д_csv.csv"
     },
     {
       "order_name": "779 лат 2-хл S 260503 120д",
@@ -16621,7 +16621,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T13:38:20.876827",
+  "last_update": "2026-05-18T13:38:40.901131",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
