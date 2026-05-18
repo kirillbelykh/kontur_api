@@ -839,5 +839,105 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             self.assertTrue(any("BarTender принял задание" in message for message in logged_messages))
 
 
+    def test_resolve_label_print_selection_supports_range(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            csv_path = temp_root / "codes.csv"
+            csv_path.write_text(
+                "010000000000000021AAA\t04650118041257\tName A\n"
+                "010000000000000021BBB\t04650118041257\tName B\n"
+                "010000000000000021CCC\t04650118041257\tName C\n",
+                encoding="utf-8",
+            )
+
+            selection = self.bridge._resolve_label_print_selection(
+                template_info={"data_source_kind": "marking"},
+                csv_path=str(csv_path),
+                payload={
+                    "print_scope": "range",
+                    "range_start": 2,
+                    "range_end": 3,
+                },
+            )
+
+            self.assertEqual(selection["print_scope"], "range")
+            self.assertEqual(selection["selected_record_number"], 2)
+            self.assertEqual(selection["selected_record_end_number"], 3)
+            self.assertEqual(selection["range_record_count"], 2)
+            selected_csv = Path(selection["csv_path"])
+            selected_text = selected_csv.read_text(encoding="utf-8-sig")
+            self.assertIn("010000000000000021BBB", selected_text)
+            self.assertIn("010000000000000021CCC", selected_text)
+            self.assertNotIn("010000000000000021AAA", selected_text)
+            self.bridge._cleanup_label_selection(selection)
+            self.assertFalse(selected_csv.exists())
+
+    def test_print_100x180_label_logs_range_print(self):
+        order_data = {"document_id": "doc-1", "order_name": "Р—Р°РєР°Р· 1"}
+        range_context = types.SimpleNamespace(document_id="doc-1", order_name="Р—Р°РєР°Р· 1")
+        selection = {
+            "print_scope": "range",
+            "selected_record_number": 100,
+            "selected_record_end_number": 200,
+            "range_record_count": 101,
+            "record_preview": {"value_short": "CODE-100"},
+            "cleanup_path": "temp.csv",
+        }
+        fake_runtime = types.SimpleNamespace(
+            history_db=types.SimpleNamespace(get_order_by_document_id=lambda document_id: order_data if document_id == "doc-1" else None)
+        )
+
+        background_jobs = []
+
+        def capture_background_job(**kwargs):
+            background_jobs.append(kwargs)
+
+        with (
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(
+                self.bridge,
+                "_resolve_label_template_info",
+                return_value={"path": "template.btw", "name": "РЁР°Р±Р»РѕРЅ"},
+            ),
+            mock.patch.object(self.bridge, "_resolve_label_print_selection", return_value=selection),
+            mock.patch.object(
+                self.bridge,
+                "_resolve_label_context",
+                return_value={"context": range_context, "used_manual_override": False},
+            ),
+            mock.patch.object(self.bridge, "_serialize_label_preview", return_value={"document_id": "doc-1", "order_name": "Р—Р°РєР°Р· 1"}),
+            mock.patch.object(self.bridge, "_cleanup_label_selection") as cleanup_mock,
+            mock.patch.object(self.bridge, "_run_background_job", side_effect=capture_background_job),
+            mock.patch.object(api_bridge, "print_label_sheet") as print_mock,
+            mock.patch.object(self.bridge, "_log") as log_mock,
+        ):
+            result = self.bridge.print_100x180_label(
+                {
+                    "sheet_format": "100x180",
+                    "document_id": "doc-1",
+                    "template_path": "template.btw",
+                    "csv_path": "codes.csv",
+                    "printer_name": "Printer",
+                    "manufacture_date": "01-01-2026",
+                    "expiration_date": "01-01-2031",
+                    "quantity_value": "200",
+                    "print_scope": "range",
+                    "range_start": 100,
+                    "range_end": 200,
+                }
+            )
+
+            self.assertTrue(result["success"])
+            self.assertEqual(len(background_jobs), 1)
+            background_jobs[0]["action"]()
+            print_mock.assert_called_once_with(range_context)
+            background_jobs[0]["cleanup"]()
+            cleanup_mock.assert_called_once_with(
+                selection,
+                delay_seconds=api_bridge.LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS,
+            )
+            logged_messages = [str(call.args[1]) for call in log_mock.call_args_list]
+            self.assertTrue(any("100" in message and "200" in message for message in logged_messages))
+
 if __name__ == "__main__":
     unittest.main()

@@ -152,6 +152,8 @@ const state = {
     selectedMarkingPath: '',
     printScope: 'all',
     selectedRecordNumber: 1,
+    rangeStartNumber: 1,
+    rangeEndNumber: 1,
     preview: null,
     templatePage: 0,
     templatePageSize: 3,
@@ -1935,9 +1937,16 @@ const Views = {
       renderLabelsDataTable('marking', $("#labels-marking-files-table"));
       renderLabelsFullscreenTable();
 
-      const { total, selectedRecordNumber } = normalizeLabelsRecordSelection();
+      const {
+        total,
+        selectedRecordNumber,
+        rangeStartNumber,
+        rangeEndNumber,
+      } = normalizeLabelsRecordSelection();
       const printScopeSelect = $("#labels-print-scope");
       const recordInput = $("#labels-record-number");
+      const rangeStartInput = $("#labels-range-start");
+      const rangeEndInput = $("#labels-range-end");
       const prevButton = $("#labels-record-prev");
       const nextButton = $("#labels-record-next");
       const infoBox = $("#labels-record-info");
@@ -1949,6 +1958,18 @@ const Views = {
         recordInput.min = total > 0 ? "1" : "0";
         recordInput.max = total > 0 ? String(total) : "";
         recordInput.disabled = state.labels.printScope !== "single" || total <= 0;
+      }
+      if (rangeStartInput) {
+        rangeStartInput.value = String(rangeStartNumber || 1);
+        rangeStartInput.min = total > 0 ? "1" : "0";
+        rangeStartInput.max = total > 0 ? String(total) : "";
+        rangeStartInput.disabled = state.labels.printScope !== "range" || total <= 0;
+      }
+      if (rangeEndInput) {
+        rangeEndInput.value = String(rangeEndNumber || 1);
+        rangeEndInput.min = total > 0 ? "1" : "0";
+        rangeEndInput.max = total > 0 ? String(total) : "";
+        rangeEndInput.disabled = state.labels.printScope !== "range" || total <= 0;
       }
       if (prevButton) {
         prevButton.disabled = state.labels.printScope !== "single" || total <= 0 || selectedRecordNumber <= 1;
@@ -2446,15 +2467,67 @@ function invalidateLabelsPreview() {
   state.labels.preview = null;
 }
 
+function formatPreview(preview) {
+  if (!preview) {
+    return 'Р’С‹Р±РµСЂРёС‚Рµ С€Р°Р±Р»РѕРЅ, С„Р°Р№Р» Рё Р·Р°РєР°Р·, Р·Р°С‚РµРј РЅР°Р¶РјРёС‚Рµ В«РџРѕРєР°Р·Р°С‚СЊ РєРѕРЅС‚РµРєСЃС‚В».';
+  }
+  const lines = [
+    `Р—Р°РєР°Р·: ${preview.order_name}` ,
+    `Р¤РѕСЂРјР°С‚: ${preview.sheet_format_label || preview.sheet_format || '100x180'}` ,
+    `РЁР°Р±Р»РѕРЅ: ${preview.template_category} / ${preview.data_source_kind}` ,
+    `Р РµР¶РёРј РїРµС‡Р°С‚Рё: ${preview.print_scope_label || 'Р’РµСЃСЊ С„Р°Р№Р»'}` ,
+    `Р Р°Р·РјРµСЂ: ${preview.size}` ,
+    `РџР°СЂС‚РёСЏ: ${preview.batch}` ,
+    `Р¦РІРµС‚: ${preview.color || 'вЂ”'}` ,
+    `Р”Р°С‚Р° РёР·РіРѕС‚РѕРІР»РµРЅРёСЏ: ${preview.manufacture_date}` ,
+    `РЎСЂРѕРє РіРѕРґРЅРѕСЃС‚Рё: ${preview.expiration_date}` ,
+    `РљРѕР»РёС‡РµСЃС‚РІРѕ: ${preview.quantity_pairs} ${preview.quantity_pairs_word}` ,
+    `РЈРїР°РєРѕРІРєР°: ${preview.package_text || 'РЅРµ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ'}` ,
+    `Р­С‚РёРєРµС‚РѕРє Рє РїРµС‡Р°С‚Рё: ${preview.label_count}` ,
+  ];
+  if (preview.total_record_count) {
+    lines.push(`Р—Р°РїРёСЃРµР№ РІ С„Р°Р№Р»Рµ: ${preview.total_record_count}`);
+  }
+  if (
+    preview.selected_record_number
+    && preview.selected_record_end_number
+    && preview.selected_record_end_number !== preview.selected_record_number
+  ) {
+    lines.push(`Р’С‹Р±СЂР°РЅ РґРёР°РїР°Р·РѕРЅ: ${preview.selected_record_number}вЂ“${preview.selected_record_end_number}`);
+    lines.push(`Р—Р°РїРёСЃРµР№ РІ РґРёР°РїР°Р·РѕРЅРµ: ${preview.range_record_count || preview.label_count}`);
+  } else if (preview.selected_record_number) {
+    lines.push(`Р’С‹Р±СЂР°РЅР° Р·Р°РїРёСЃСЊ: ${preview.selected_record_number} РёР· ${preview.total_record_count || preview.label_count}`);
+  }
+  if (preview.selected_code_label && preview.selected_code_value_short) {
+    lines.push(`${preview.selected_code_label}: ${preview.selected_code_value_short}`);
+  }
+  if (preview.selected_code_gtin) {
+    lines.push(`GTIN РІС‹Р±СЂР°РЅРЅРѕР№ Р·Р°РїРёСЃРё: ${preview.selected_code_gtin}`);
+  }
+  if (preview.selected_code_name) {
+    lines.push(`РќР°РёРјРµРЅРѕРІР°РЅРёРµ РІС‹Р±СЂР°РЅРЅРѕР№ Р·Р°РїРёСЃРё: ${preview.selected_code_name}`);
+  }
+  return lines.join('\n');
+}
+
 function normalizeLabelsRecordSelection() {
   const file = selectedLabelFileMeta();
   const total = Math.max(0, Number(file?.record_count || 0));
   let selectedRecordNumber = Math.max(1, Number.parseInt(state.labels.selectedRecordNumber || 1, 10) || 1);
+  let rangeStartNumber = Math.max(1, Number.parseInt(state.labels.rangeStartNumber || 1, 10) || 1);
+  let rangeEndNumber = Math.max(1, Number.parseInt(state.labels.rangeEndNumber || rangeStartNumber, 10) || rangeStartNumber);
   if (total > 0) {
     selectedRecordNumber = Math.min(selectedRecordNumber, total);
+    rangeStartNumber = Math.min(rangeStartNumber, total);
+    rangeEndNumber = Math.min(rangeEndNumber, total);
+  }
+  if (rangeEndNumber < rangeStartNumber) {
+    rangeEndNumber = rangeStartNumber;
   }
   state.labels.selectedRecordNumber = selectedRecordNumber;
-  return { file, total, selectedRecordNumber };
+  state.labels.rangeStartNumber = rangeStartNumber;
+  state.labels.rangeEndNumber = rangeEndNumber;
+  return { file, total, selectedRecordNumber, rangeStartNumber, rangeEndNumber };
 }
 
 function labelsRecordInfoText() {
@@ -2524,6 +2597,162 @@ function ensureLabelsSelectivePrintUi() {
 
   recordInput.addEventListener('change', () => {
     state.labels.selectedRecordNumber = Number.parseInt(recordInput.value || '1', 10) || 1;
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  prevButton.addEventListener('click', () => {
+    state.labels.printScope = 'single';
+    state.labels.selectedRecordNumber = Math.max(1, (Number(state.labels.selectedRecordNumber || 1) || 1) - 1);
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  nextButton.addEventListener('click', () => {
+    const { total } = normalizeLabelsRecordSelection();
+    state.labels.printScope = 'single';
+    if (total > 0) {
+      state.labels.selectedRecordNumber = Math.min(total, (Number(state.labels.selectedRecordNumber || 1) || 1) + 1);
+    } else {
+      state.labels.selectedRecordNumber = (Number(state.labels.selectedRecordNumber || 1) || 1) + 1;
+    }
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+}
+
+function normalizeLabelsRecordSelection() {
+  const file = selectedLabelFileMeta();
+  const total = Math.max(0, Number(file?.record_count || 0));
+  let selectedRecordNumber = Math.max(1, Number.parseInt(state.labels.selectedRecordNumber || 1, 10) || 1);
+  let rangeStartNumber = Math.max(1, Number.parseInt(state.labels.rangeStartNumber || 1, 10) || 1);
+  let rangeEndNumber = Math.max(1, Number.parseInt(state.labels.rangeEndNumber || rangeStartNumber, 10) || rangeStartNumber);
+  if (total > 0) {
+    selectedRecordNumber = Math.min(selectedRecordNumber, total);
+    rangeStartNumber = Math.min(rangeStartNumber, total);
+    rangeEndNumber = Math.min(rangeEndNumber, total);
+  }
+  if (rangeEndNumber < rangeStartNumber) {
+    rangeEndNumber = rangeStartNumber;
+  }
+  state.labels.selectedRecordNumber = selectedRecordNumber;
+  state.labels.rangeStartNumber = rangeStartNumber;
+  state.labels.rangeEndNumber = rangeEndNumber;
+  return { file, total, selectedRecordNumber, rangeStartNumber, rangeEndNumber };
+}
+
+function labelsRecordInfoText() {
+  const {
+    total,
+    selectedRecordNumber,
+    rangeStartNumber,
+    rangeEndNumber,
+  } = normalizeLabelsRecordSelection();
+  if (!total) {
+    return 'РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ С„Р°Р№Р» СЃ РєРѕРґР°РјРё РґР»СЏ РїРµС‡Р°С‚Рё.';
+  }
+  if (state.labels.printScope === 'all') {
+    return `РЎРµР№С‡Р°СЃ РЅР° РїРµС‡Р°С‚СЊ РїРѕР№РґС‘С‚ РІРµСЃСЊ С„Р°Р№Р»: ${total} СЌС‚РёРєРµС‚РѕРє.`;
+  }
+  if (state.labels.printScope === 'range') {
+    let text = `РќР° РїРµС‡Р°С‚СЊ РїРѕР№РґС‘С‚ РґРёР°РїР°Р·РѕРЅ Р·Р°РїРёСЃРµР№ в„–${rangeStartNumber}вЂ“${rangeEndNumber} РёР· ${total}. Р’СЃРµРіРѕ СЌС‚РёРєРµС‚РѕРє: ${Math.max(0, rangeEndNumber - rangeStartNumber + 1)}.`;
+    const rangePreview = state.labels.preview;
+    if (
+      rangePreview
+      && rangePreview.print_scope === 'range'
+      && Number(rangePreview.selected_record_number || 0) === rangeStartNumber
+      && Number(rangePreview.selected_record_end_number || 0) === rangeEndNumber
+      && rangePreview.selected_code_value_short
+    ) {
+      text += ` ${rangePreview.selected_code_label || 'РџРµСЂРІС‹Р№ РєРѕРґ'}: ${rangePreview.selected_code_value_short}.`;
+    }
+    return text;
+  }
+  let text = `Р’С‹Р±СЂР°РЅР° Р·Р°РїРёСЃСЊ в„–${selectedRecordNumber} РёР· ${total}. РќР°Р¶РјРёС‚Рµ В«РџРѕРєР°Р·Р°С‚СЊ РєРѕРЅС‚РµРєСЃС‚В», С‡С‚РѕР±С‹ РїСЂРѕРІРµСЂРёС‚СЊ РєРѕРґ РїРµСЂРµРґ РїРµС‡Р°С‚СЊСЋ.`;
+  const preview = state.labels.preview;
+  if (
+    preview
+    && preview.print_scope === 'single'
+    && Number(preview.selected_record_number || 0) === selectedRecordNumber
+    && preview.selected_code_value_short
+  ) {
+    text += ` ${preview.selected_code_label || 'РљРѕРґ'}: ${preview.selected_code_value_short}.`;
+  }
+  return text;
+}
+
+function ensureLabelsSelectivePrintUi() {
+  const panel = document.querySelector('#view-labels .panel');
+  const formGrid = panel?.querySelector('.form-grid');
+  if (!panel || !formGrid) {
+    return;
+  }
+  if (!$('#labels-selective-print-controls')) {
+    formGrid.insertAdjacentHTML('afterend', `
+      <div class="form-grid" id="labels-selective-print-controls">
+        <label class="field">
+          <span>Р§С‚Рѕ РїРµС‡Р°С‚Р°С‚СЊ</span>
+          <select id="labels-print-scope">
+            <option value="all">Р’РµСЃСЊ С„Р°Р№Р»</option>
+            <option value="single">РћРґРЅСѓ СЌС‚РёРєРµС‚РєСѓ РїРѕ РїРѕСЂСЏРґРєСѓ</option>
+            <option value="range">Р”РёР°РїР°Р·РѕРЅ СЌС‚РёРєРµС‚РѕРє</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>РќРѕРјРµСЂ СЌС‚РёРєРµС‚РєРё РїРѕ РїРѕСЂСЏРґРєСѓ</span>
+          <input id="labels-record-number" type="number" min="1" step="1" placeholder="1">
+        </label>
+        <label class="field">
+          <span>Р”РёР°РїР°Р·РѕРЅ Р·Р°РїРёСЃРµР№</span>
+          <div class="inline-actions compact wrap">
+            <input id="labels-range-start" type="number" min="1" step="1" placeholder="С 1">
+            <input id="labels-range-end" type="number" min="1" step="1" placeholder="По 200">
+          </div>
+        </label>
+      </div>
+      <div class="inline-actions compact wrap" id="labels-record-stepper">
+        <button class="secondary-btn" type="button" id="labels-record-prev">РџСЂРµРґС‹РґСѓС‰Р°СЏ</button>
+        <button class="secondary-btn" type="button" id="labels-record-next">РЎР»РµРґСѓСЋС‰Р°СЏ</button>
+      </div>
+      <div class="inline-note" id="labels-record-info">РЎРЅР°С‡Р°Р»Р° РІС‹Р±РµСЂРёС‚Рµ С„Р°Р№Р» СЃ РєРѕРґР°РјРё РґР»СЏ РїРµС‡Р°С‚Рё.</div>
+    `);
+  }
+
+  const scopeSelect = $('#labels-print-scope');
+  const recordInput = $('#labels-record-number');
+  const rangeStartInput = $('#labels-range-start');
+  const rangeEndInput = $('#labels-range-end');
+  const prevButton = $('#labels-record-prev');
+  const nextButton = $('#labels-record-next');
+  if (!scopeSelect || scopeSelect.dataset.bound === '1') {
+    return;
+  }
+
+  scopeSelect.dataset.bound = '1';
+  scopeSelect.addEventListener('change', () => {
+    const nextScope = String(scopeSelect.value || 'all');
+    state.labels.printScope = nextScope === 'single' || nextScope === 'range' ? nextScope : 'all';
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  recordInput.addEventListener('change', () => {
+    state.labels.printScope = 'single';
+    state.labels.selectedRecordNumber = Number.parseInt(recordInput.value || '1', 10) || 1;
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  rangeStartInput.addEventListener('change', () => {
+    state.labels.printScope = 'range';
+    state.labels.rangeStartNumber = Number.parseInt(rangeStartInput.value || '1', 10) || 1;
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  rangeEndInput.addEventListener('change', () => {
+    state.labels.printScope = 'range';
+    state.labels.rangeEndNumber = Number.parseInt(rangeEndInput.value || '1', 10) || 1;
     invalidateLabelsPreview();
     Views.labels.render();
   });
@@ -3105,6 +3334,8 @@ async function bindEvents() {
         quantity_value: $('#labels-quantity-value').value,
         print_scope: state.labels.printScope,
         record_number: state.labels.printScope === 'single' ? state.labels.selectedRecordNumber : null,
+        range_start: state.labels.printScope === 'range' ? state.labels.rangeStartNumber : null,
+        range_end: state.labels.printScope === 'range' ? state.labels.rangeEndNumber : null,
         manual_override: readLabelsManualOverride(),
       });
       if (result.needs_manual_input) {
@@ -3138,6 +3369,8 @@ async function bindEvents() {
         quantity_value: $('#labels-quantity-value').value,
         print_scope: state.labels.printScope,
         record_number: state.labels.printScope === 'single' ? state.labels.selectedRecordNumber : null,
+        range_start: state.labels.printScope === 'range' ? state.labels.rangeStartNumber : null,
+        range_end: state.labels.printScope === 'range' ? state.labels.rangeEndNumber : null,
         manual_override: readLabelsManualOverride(),
       });
       if (result.needs_manual_input) {

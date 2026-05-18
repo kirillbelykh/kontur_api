@@ -4660,7 +4660,7 @@ class ApiBridge:
         payload: Dict[str, Any],
     ) -> Dict[str, Any]:
         print_scope = str(payload.get("print_scope") or "all").strip().lower()
-        if print_scope not in {"all", "single"}:
+        if print_scope not in {"all", "single", "range"}:
             print_scope = "all"
 
         normalized_csv_path = str(csv_path or "").strip()
@@ -4670,12 +4670,50 @@ class ApiBridge:
         rows, delimiter = self._read_label_csv_rows(Path(normalized_csv_path))
         total_record_count = len(rows)
         if print_scope != "single":
+            if print_scope == "range":
+                range_start = self._parse_label_positive_int(
+                    payload.get("range_start"),
+                    field_name="Начальный номер этикетки",
+                )
+                range_end = self._parse_label_positive_int(
+                    payload.get("range_end"),
+                    field_name="Конечный номер этикетки",
+                )
+                if range_start > range_end:
+                    raise RuntimeError("Начальный номер диапазона не может быть больше конечного.")
+                if range_start > total_record_count or range_end > total_record_count:
+                    raise RuntimeError(
+                        f"Диапазон этикеток должен быть в пределах от 1 до {total_record_count}."
+                    )
+
+                selected_rows = rows[range_start - 1:range_end]
+                record_preview = self._build_label_record_preview(
+                    selected_rows[0],
+                    str(template_info.get("data_source_kind") or MARKING_SOURCE_KIND),
+                )
+                temp_csv_path = Path(tempfile.gettempdir()) / f"kontur_ui_v2_label_{uuid.uuid4().hex}.csv"
+                with temp_csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
+                    writer = csv.writer(csv_file, delimiter=delimiter, lineterminator="\n")
+                    writer.writerows(selected_rows)
+
+                return {
+                    "print_scope": "range",
+                    "csv_path": str(temp_csv_path),
+                    "cleanup_path": str(temp_csv_path),
+                    "total_record_count": total_record_count,
+                    "selected_record_number": range_start,
+                    "selected_record_end_number": range_end,
+                    "range_record_count": len(selected_rows),
+                    "record_preview": record_preview,
+                }
             return {
                 "print_scope": "all",
                 "csv_path": normalized_csv_path,
                 "cleanup_path": None,
                 "total_record_count": total_record_count,
                 "selected_record_number": None,
+                "selected_record_end_number": None,
+                "range_record_count": total_record_count,
                 "record_preview": None,
             }
 
@@ -4707,6 +4745,8 @@ class ApiBridge:
             "cleanup_path": str(temp_csv_path),
             "total_record_count": total_record_count,
             "selected_record_number": selected_record_number,
+            "selected_record_end_number": selected_record_number,
+            "range_record_count": 1,
             "record_preview": record_preview,
         }
 
@@ -4823,6 +4863,7 @@ class ApiBridge:
         expiration_date: Any,
         quantity_value: Any,
         manual_override: Dict[str, Any],
+        serial_start_number: Any = None,
     ):
         template_path = str(template_info.get("path") or "").strip()
         template_file = Path(template_path)
@@ -4882,6 +4923,13 @@ class ApiBridge:
             dispenser_count = 0
             package_text = None
 
+        serial_start_number_value = None
+        if serial_start_number is not None:
+            serial_start_number_value = self._parse_label_positive_int(
+                serial_start_number,
+                field_name="Стартовый номер этикетки",
+            )
+
         return SimpleNamespace(
             document_id=str(order_data.get("document_id") or "").strip(),
             order_name=str(order_data.get("order_name") or "").strip(),
@@ -4902,6 +4950,7 @@ class ApiBridge:
             units_per_pack=units_per_pack,
             dispenser_count=dispenser_count,
             package_text=package_text,
+            serial_start_number=serial_start_number_value,
         )
 
     def _resolve_label_context(
@@ -4923,6 +4972,7 @@ class ApiBridge:
             "manufacture_date": str(payload.get("manufacture_date") or ""),
             "expiration_date": str(payload.get("expiration_date") or ""),
             "quantity_value": payload.get("quantity_value"),
+            "serial_start_number": selection.get("selected_record_number"),
         }
         try:
             return {
@@ -4942,6 +4992,7 @@ class ApiBridge:
                         expiration_date=payload.get("expiration_date"),
                         quantity_value=payload.get("quantity_value"),
                         manual_override=manual_override,
+                        serial_start_number=selection.get("selected_record_number"),
                     ),
                     "used_manual_override": True,
                 }
@@ -4961,6 +5012,13 @@ class ApiBridge:
     @staticmethod
     def _serialize_label_preview(context, selection: Dict[str, Any], *, sheet_format: str) -> Dict[str, Any]:
         record_preview = selection.get("record_preview") or {}
+        print_scope = selection.get("print_scope") or "all"
+        if print_scope == "single":
+            print_scope_label = "Одна этикетка"
+        elif print_scope == "range":
+            print_scope_label = "Диапазон этикеток"
+        else:
+            print_scope_label = "Весь файл"
         return {
             "document_id": context.document_id,
             "order_name": context.order_name,
@@ -4983,10 +5041,12 @@ class ApiBridge:
             "units_per_pack": context.units_per_pack,
             "dispenser_count": context.dispenser_count,
             "package_text": context.package_text,
-            "print_scope": selection.get("print_scope") or "all",
-            "print_scope_label": "Одна этикетка" if selection.get("print_scope") == "single" else "Весь файл",
+            "print_scope": print_scope,
+            "print_scope_label": print_scope_label,
             "total_record_count": int(selection.get("total_record_count") or context.label_count or 0),
             "selected_record_number": selection.get("selected_record_number"),
+            "selected_record_end_number": selection.get("selected_record_end_number"),
+            "range_record_count": int(selection.get("range_record_count") or context.label_count or 0),
             "selected_code_label": record_preview.get("label") or "",
             "selected_code_value": record_preview.get("value") or "",
             "selected_code_value_short": record_preview.get("value_short") or "",
@@ -5086,6 +5146,17 @@ class ApiBridge:
                     accepted_message = (
                         f"BarTender принял задание печати одной этикетки {sheet_format_label}: "
                         f"{context.order_name}, запись №{selection.get('selected_record_number')}"
+                    )
+                elif selection.get("print_scope") == "range":
+                    queued_message = (
+                        f"Печать диапазона этикеток {sheet_format_label} поставлена в фоновую очередь: "
+                        f"{context.order_name}, записи №{selection.get('selected_record_number')}"
+                        f"–{selection.get('selected_record_end_number')}"
+                    )
+                    accepted_message = (
+                        f"BarTender принял задание печати диапазона этикеток {sheet_format_label}: "
+                        f"{context.order_name}, записи №{selection.get('selected_record_number')}"
+                        f"–{selection.get('selected_record_end_number')}"
                     )
                 else:
                     queued_message = f"Печать {sheet_format_label} поставлена в фоновую очередь: {context.order_name}"

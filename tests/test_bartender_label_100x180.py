@@ -271,6 +271,13 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
         labels._reset_serial_text_object(found_object)
         self.assertEqual(labels._get_substring_values(found_object)[0], "001")
 
+    def test_reset_serial_text_object_uses_range_start_number(self):
+        serial_text_object = _make_object_xml("001", object_name="Text 1")
+
+        labels._reset_serial_text_object(serial_text_object, 100)
+
+        self.assertEqual(labels._get_substring_values(serial_text_object)[0], "100")
+
     def test_ensure_unique_label_values_raises_for_duplicate_marking_codes(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_path = Path(temp_dir) / "codes.csv"

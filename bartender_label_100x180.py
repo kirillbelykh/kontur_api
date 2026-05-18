@@ -108,6 +108,7 @@ class LabelPrint100x180Context:
     units_per_pack: int
     dispenser_count: int
     package_text: str | None
+    serial_start_number: int | None = None
 
 
 def list_100x180_templates() -> list[LabelTemplateInfo]:
@@ -203,6 +204,7 @@ def build_label_print_context(
     manufacture_date: str,
     expiration_date: str,
     quantity_value: str | int | None = None,
+    serial_start_number: int | None = None,
 ) -> LabelPrint100x180Context:
     template_file = Path(template_path)
     if not template_file.exists():
@@ -227,6 +229,11 @@ def build_label_print_context(
     data_source_kind = _resolve_template_data_source_kind(template_file)
 
     quantity_pairs = _parse_quantity_pairs(quantity_value)
+    serial_start_number_value = None
+    if serial_start_number is not None:
+        serial_start_number_value = int(serial_start_number)
+        if serial_start_number_value < 1:
+            raise BarTenderLabel100x180Error("Стартовый номер этикетки должен быть не меньше 1.")
 
     if data_source_kind == AGGREGATION_SOURCE_KIND:
         if quantity_pairs % metadata.units_per_pack != 0:
@@ -265,6 +272,7 @@ def build_label_print_context(
         units_per_pack=metadata.units_per_pack,
         dispenser_count=dispenser_count,
         package_text=package_text,
+        serial_start_number=serial_start_number_value,
     )
 
 
@@ -454,7 +462,7 @@ def _configure_template_objects(bt_format, context: LabelPrint100x180Context) ->
         _update_description_object(description_object, context.color)
 
     if serial_text_object is not None:
-        _reset_serial_text_object(serial_text_object)
+        _reset_serial_text_object(serial_text_object, context.serial_start_number)
     if copies_object is not None:
         _write_first_substring_value(copies_object, "1")
     if serial_object is not None:
@@ -739,12 +747,12 @@ def _write_first_substring_value(object_element: ET.Element, value: str) -> None
     _set_substring_values(object_element, values)
 
 
-def _reset_serial_text_object(object_element: ET.Element) -> None:
+def _reset_serial_text_object(object_element: ET.Element, start_number: int | None = None) -> None:
     values = _get_substring_values(object_element)
     if not values:
         return
 
-    values[0] = _replace_preserving_linebreak(values[0], _build_serial_seed(values[0]))
+    values[0] = _replace_preserving_linebreak(values[0], _build_serial_seed(values[0], start_number))
     _set_substring_values(object_element, values)
 
 
@@ -1069,11 +1077,13 @@ def _replace_adjacent_quantity_digits(current_value: str, adjacent_value: str, q
     return updated_value
 
 
-def _build_serial_seed(value: str) -> str:
+def _build_serial_seed(value: str, start_number: int | None = None) -> str:
     stripped_value = str(value or "").strip()
+    seed_number = int(start_number) if start_number is not None else 1
+    seed_text = str(max(1, seed_number))
     if stripped_value.isdigit() and len(stripped_value) > 1:
-        return str(1).zfill(len(stripped_value))
-    return "1"
+        return seed_text.zfill(max(len(stripped_value), len(seed_text)))
+    return seed_text
 
 
 def _pluralize_ru(value: int, singular: str, few: str, many: str) -> str:
