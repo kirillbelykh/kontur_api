@@ -3,9 +3,9 @@
     {
       "order_name": "939 HR лат M 260515 (9к)",
       "document_id": "64efa30f-2a01-4c7d-8dcb-da67722e024d",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\939 HR лат M 260515 9к\\939 HR лат M 260515 9к.pdf, C:\\Users\\User\\Desktop\\Коды км\\939 HR лат M 260515 9к\\939 HR лат M 260515 (9к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\939 HR лат M 260515 9к\\939 HR лат M 260515 (9к).xls",
+      "simpl": "латекс hr",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р M, цвет синий",
       "gtin": "4650118040533",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\939 HR лат M 260515 9к\\939 HR лат M 260515 9к.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\939 HR лат M 260515 9к\\939 HR лат M 260515 (9к).xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\939 HR лат M 260515 9к\\939 HR лат M 260515 (9к)_csv.csv"
     },
     {
       "order_name": "938 HR лат M 260515",
@@ -16676,7 +16679,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T16:15:10.821327",
+  "last_update": "2026-05-18T16:20:57.490447",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
