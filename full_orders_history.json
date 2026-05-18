@@ -32,7 +32,7 @@
     {
       "order_name": "933 стер лат M 260513 заявка 5965",
       "document_id": "f68a4742-ae3e-4c87-9add-eae0bfec3446",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\933 стер лат M 260513 заявка 5965\\933 стер лат M 260513 заявка 5965.pdf, C:\\Users\\User\\Desktop\\Коды км\\933 стер лат M 260513 заявка 5965\\933 стер лат M 260513 заявка 5965_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\933 стер лат M 260513 заявка 5965\\933 стер лат M 260513 заявка 5965.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
@@ -16534,7 +16534,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-18T12:35:10.123128",
+  "last_update": "2026-05-18T12:35:20.720989",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
