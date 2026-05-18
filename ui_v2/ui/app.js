@@ -2777,6 +2777,205 @@ function ensureLabelsSelectivePrintUi() {
   });
 }
 
+function formatPreview(preview) {
+  if (!preview) {
+    return 'Выберите шаблон, файл и заказ, затем нажмите «Показать контекст».';
+  }
+  const lines = [
+    `Заказ: ${preview.order_name}`,
+    `Формат: ${preview.sheet_format_label || preview.sheet_format || '100x180'}`,
+    `Шаблон: ${preview.template_category} / ${preview.data_source_kind}`,
+    `Режим печати: ${preview.print_scope_label || 'Весь файл'}`,
+    `Размер: ${preview.size}`,
+    `Партия: ${preview.batch}`,
+    `Цвет: ${preview.color || '—'}`,
+    `Дата изготовления: ${preview.manufacture_date}`,
+    `Срок годности: ${preview.expiration_date}`,
+    `Количество: ${preview.quantity_pairs} ${preview.quantity_pairs_word}`,
+    `Упаковка: ${preview.package_text || 'не используется'}`,
+    `Этикеток к печати: ${preview.label_count}`,
+  ];
+  if (preview.total_record_count) {
+    lines.push(`Записей в файле: ${preview.total_record_count}`);
+  }
+  if (
+    preview.selected_record_number
+    && preview.selected_record_end_number
+    && preview.selected_record_end_number !== preview.selected_record_number
+  ) {
+    lines.push(`Выбран диапазон: ${preview.selected_record_number}-${preview.selected_record_end_number}`);
+    lines.push(`Записей в диапазоне: ${preview.range_record_count || preview.label_count}`);
+  } else if (preview.selected_record_number) {
+    lines.push(`Выбрана запись: ${preview.selected_record_number} из ${preview.total_record_count || preview.label_count}`);
+  }
+  if (preview.selected_code_label && preview.selected_code_value_short) {
+    lines.push(`${preview.selected_code_label}: ${preview.selected_code_value_short}`);
+  }
+  if (preview.selected_code_gtin) {
+    lines.push(`GTIN выбранной записи: ${preview.selected_code_gtin}`);
+  }
+  if (preview.selected_code_name) {
+    lines.push(`Наименование выбранной записи: ${preview.selected_code_name}`);
+  }
+  return lines.join('\n');
+}
+
+function normalizeLabelsRecordSelection() {
+  const file = selectedLabelFileMeta();
+  const total = Math.max(0, Number(file?.record_count || 0));
+  let selectedRecordNumber = Math.max(1, Number.parseInt(state.labels.selectedRecordNumber || 1, 10) || 1);
+  let rangeStartNumber = Math.max(1, Number.parseInt(state.labels.rangeStartNumber || 1, 10) || 1);
+  let rangeEndNumber = Math.max(1, Number.parseInt(state.labels.rangeEndNumber || rangeStartNumber, 10) || rangeStartNumber);
+  if (total > 0) {
+    selectedRecordNumber = Math.min(selectedRecordNumber, total);
+    rangeStartNumber = Math.min(rangeStartNumber, total);
+    rangeEndNumber = Math.min(rangeEndNumber, total);
+  }
+  if (rangeEndNumber < rangeStartNumber) {
+    rangeEndNumber = rangeStartNumber;
+  }
+  state.labels.selectedRecordNumber = selectedRecordNumber;
+  state.labels.rangeStartNumber = rangeStartNumber;
+  state.labels.rangeEndNumber = rangeEndNumber;
+  return { file, total, selectedRecordNumber, rangeStartNumber, rangeEndNumber };
+}
+
+function labelsRecordInfoText() {
+  const {
+    total,
+    selectedRecordNumber,
+    rangeStartNumber,
+    rangeEndNumber,
+  } = normalizeLabelsRecordSelection();
+  if (!total) {
+    return 'Сначала выберите файл с кодами для печати.';
+  }
+  if (state.labels.printScope === 'all') {
+    return `Сейчас на печать пойдёт весь файл: ${total} этикеток.`;
+  }
+  if (state.labels.printScope === 'range') {
+    let text = `На печать пойдёт диапазон записей №${rangeStartNumber}-${rangeEndNumber} из ${total}. Всего этикеток: ${Math.max(0, rangeEndNumber - rangeStartNumber + 1)}.`;
+    const rangePreview = state.labels.preview;
+    if (
+      rangePreview
+      && rangePreview.print_scope === 'range'
+      && Number(rangePreview.selected_record_number || 0) === rangeStartNumber
+      && Number(rangePreview.selected_record_end_number || 0) === rangeEndNumber
+      && rangePreview.selected_code_value_short
+    ) {
+      text += ` ${rangePreview.selected_code_label || 'Первый код'}: ${rangePreview.selected_code_value_short}.`;
+    }
+    return text;
+  }
+  let text = `Выбрана запись №${selectedRecordNumber} из ${total}. Нажмите «Показать контекст», чтобы проверить код перед печатью.`;
+  const preview = state.labels.preview;
+  if (
+    preview
+    && preview.print_scope === 'single'
+    && Number(preview.selected_record_number || 0) === selectedRecordNumber
+    && preview.selected_code_value_short
+  ) {
+    text += ` ${preview.selected_code_label || 'Код'}: ${preview.selected_code_value_short}.`;
+  }
+  return text;
+}
+
+function ensureLabelsSelectivePrintUi() {
+  const panel = document.querySelector('#view-labels .panel');
+  const formGrid = panel?.querySelector('.form-grid');
+  if (!panel || !formGrid) {
+    return;
+  }
+  if (!$('#labels-selective-print-controls')) {
+    formGrid.insertAdjacentHTML('afterend', `
+      <div class="form-grid" id="labels-selective-print-controls">
+        <label class="field">
+          <span>Что печатать</span>
+          <select id="labels-print-scope">
+            <option value="all">Весь файл</option>
+            <option value="single">Одну этикетку по порядку</option>
+            <option value="range">Диапазон этикеток</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Номер этикетки по порядку</span>
+          <input id="labels-record-number" type="number" min="1" step="1" placeholder="1">
+        </label>
+        <label class="field">
+          <span>Диапазон записей</span>
+          <div class="inline-actions compact wrap">
+            <input id="labels-range-start" type="number" min="1" step="1" placeholder="С 1">
+            <input id="labels-range-end" type="number" min="1" step="1" placeholder="По 200">
+          </div>
+        </label>
+      </div>
+      <div class="inline-actions compact wrap" id="labels-record-stepper">
+        <button class="secondary-btn" type="button" id="labels-record-prev">Предыдущая</button>
+        <button class="secondary-btn" type="button" id="labels-record-next">Следующая</button>
+      </div>
+      <div class="inline-note" id="labels-record-info">Сначала выберите файл с кодами для печати.</div>
+    `);
+  }
+
+  const scopeSelect = $('#labels-print-scope');
+  const recordInput = $('#labels-record-number');
+  const rangeStartInput = $('#labels-range-start');
+  const rangeEndInput = $('#labels-range-end');
+  const prevButton = $('#labels-record-prev');
+  const nextButton = $('#labels-record-next');
+  if (!scopeSelect || scopeSelect.dataset.bound === '1') {
+    return;
+  }
+
+  scopeSelect.dataset.bound = '1';
+  scopeSelect.addEventListener('change', () => {
+    const nextScope = String(scopeSelect.value || 'all');
+    state.labels.printScope = nextScope === 'single' || nextScope === 'range' ? nextScope : 'all';
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  recordInput.addEventListener('change', () => {
+    state.labels.printScope = 'single';
+    state.labels.selectedRecordNumber = Number.parseInt(recordInput.value || '1', 10) || 1;
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  rangeStartInput.addEventListener('change', () => {
+    state.labels.printScope = 'range';
+    state.labels.rangeStartNumber = Number.parseInt(rangeStartInput.value || '1', 10) || 1;
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  rangeEndInput.addEventListener('change', () => {
+    state.labels.printScope = 'range';
+    state.labels.rangeEndNumber = Number.parseInt(rangeEndInput.value || '1', 10) || 1;
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  prevButton.addEventListener('click', () => {
+    state.labels.printScope = 'single';
+    state.labels.selectedRecordNumber = Math.max(1, (Number(state.labels.selectedRecordNumber || 1) || 1) - 1);
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+
+  nextButton.addEventListener('click', () => {
+    const { total } = normalizeLabelsRecordSelection();
+    state.labels.printScope = 'single';
+    if (total > 0) {
+      state.labels.selectedRecordNumber = Math.min(total, (Number(state.labels.selectedRecordNumber || 1) || 1) + 1);
+    } else {
+      state.labels.selectedRecordNumber = (Number(state.labels.selectedRecordNumber || 1) || 1) + 1;
+    }
+    invalidateLabelsPreview();
+    Views.labels.render();
+  });
+}
+
 async function refreshCurrentRouteState(options = {}) {
   return maybeRefreshRouteState(state.route, options);
 }
