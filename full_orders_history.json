@@ -32,7 +32,7 @@
     {
       "order_name": "944 стер лат L 260502 заявка 5969",
       "document_id": "7d08074e-72b0-4576-8371-5e0863ee5d59",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\944 стер лат L 260502 заявка 5969\\944 стер лат L 260502 заявка 5969.pdf, C:\\Users\\User\\Desktop\\Коды км\\944 стер лат L 260502 заявка 5969\\944 стер лат L 260502 заявка 5969_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\944 стер лат L 260502 заявка 5969\\944 стер лат L 260502 заявка 5969.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
@@ -16853,7 +16853,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-19T09:01:38.740348",
+  "last_update": "2026-05-19T09:02:13.504171",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
