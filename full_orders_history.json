@@ -235,7 +235,7 @@
     {
       "order_name": "937 стер нитрил L 260327",
       "document_id": "d81c04da-c5e5-4521-ab61-750af4e06388",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\937 стер нитрил L 260327\\937 стер нитрил L 260327.pdf, C:\\Users\\User\\Desktop\\Коды км\\937 стер нитрил L 260327\\937 стер нитрил L 260327_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\937 стер нитрил L 260327\\937 стер нитрил L 260327.xls",
       "simpl": "стер нитрил",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
@@ -16853,7 +16853,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-19T11:40:57.532547",
+  "last_update": "2026-05-19T11:41:14.048539",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
