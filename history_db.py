@@ -39,7 +39,7 @@ class OrderHistoryDB:
         self.repo_root = Path(__file__).resolve().parent
         self.db_file = self._resolve_path(db_file or DEFAULT_HISTORY_FILE)
         self.legacy_db_files = self._build_legacy_paths(legacy_db_files)
-        self.sync_branch = sync_branch or os.getenv(SYNC_BRANCH_ENV, DEFAULT_SYNC_BRANCH)
+        self.sync_branch: str = sync_branch or os.getenv(SYNC_BRANCH_ENV) or DEFAULT_SYNC_BRANCH
         self.sync_enabled = self._resolve_sync_enabled(sync_enabled)
         self.sync_cache_dir = self.repo_root / SYNC_CACHE_DIR
         self._last_sync_pull_at = 0.0
@@ -47,8 +47,8 @@ class OrderHistoryDB:
         self._last_logged_total_orders: Optional[int] = None
         self._last_logged_without_tsd: Optional[int] = None
 
-        self._sync_rel_path = self._resolve_sync_relative_path()
-        self._origin_url = self._detect_origin_url() if self.sync_enabled else None
+        self._sync_rel_path: Optional[Path] = self._resolve_sync_relative_path()
+        self._origin_url: Optional[str] = self._detect_origin_url() if self.sync_enabled else None
         if self.sync_enabled and (not self._sync_rel_path or not self._origin_url):
             self.sync_enabled = False
 

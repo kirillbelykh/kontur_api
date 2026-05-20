@@ -183,9 +183,9 @@ def _click_cookie_accept_if_present(driver, by) -> None:
 
 def _hide_driver_windows(driver) -> None:
     try:
-        import win32con  # type: ignore
-        import win32gui  # type: ignore
-        import win32process  # type: ignore
+        import win32con
+        import win32gui
+        import win32process
     except ImportError as exc:
         logger.debug("pywin32 недоступен для скрытия окна браузера: %s", exc)
         return
@@ -199,7 +199,7 @@ def _hide_driver_windows(driver) -> None:
             if window_pid == pid:
                 results.append(hwnd)
 
-        handles = []
+        handles: list[int] = []
         win32gui.EnumWindows(enum_window_callback, handles)
         for hwnd in handles:
             win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
@@ -227,8 +227,8 @@ def _click_first_matching_xpath(driver, wait, by, expected_conditions, xpaths: L
 
 def _run_kontur_access_prolongation_browser_flow(
     driver_path: Path = YANDEX_DRIVER_PATH,
-    browser_path: Path = YANDEX_BROWSER_PATH,
-    profile_user_data_dir: Path = PROFILE_USER_DATA_DIR,
+    browser_path: Optional[Path] = YANDEX_BROWSER_PATH,
+    profile_user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
     profile_directory: str = PROFILE_DIRECTORY,
     headless: bool = HEADLESS,
     target_url: str = PROLONGATION_URL,
@@ -504,8 +504,8 @@ def save_cookies_to_file(cookies: Dict[str, str]) -> bool:
 
 def get_cookies(
     driver_path: Path = YANDEX_DRIVER_PATH,
-    browser_path: Path = YANDEX_BROWSER_PATH,
-    profile_user_data_dir: Path = PROFILE_USER_DATA_DIR,
+    browser_path: Optional[Path] = YANDEX_BROWSER_PATH,
+    profile_user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
     profile_directory: str = PROFILE_DIRECTORY,
     headless: bool = HEADLESS,
     target_url: str = TARGET_URL,

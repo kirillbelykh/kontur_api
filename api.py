@@ -520,6 +520,9 @@ def codes_order(session: requests.Session, document_number: str,
         resp.raise_for_status()
         created = resp.json()
         document_id = created.get("id") if isinstance(created, dict) else str(created).strip('"')
+        if not document_id:
+            logger.error("Создание документа %s: Контур не вернул ID документа", document_number)
+            return None
     except Exception as e:
         logger.error("Создание документа %s: %s", document_number, e)
         return None

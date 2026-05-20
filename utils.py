@@ -109,14 +109,10 @@ def save_snapshot(to_process) -> bool:
 
 
 def find_yandex_paths() -> Dict[str, Optional[Path]]:
-    """
-    Автоматически находит пути Яндекс Браузера и пользовательских данных.
-    Возвращает словарь с ключами 'browser', 'user_data', 'profile'.
-    """
-    paths = {
+    """Find Yandex Browser and its default user-data directory."""
+    paths: Dict[str, Optional[Path]] = {
         'browser': None,
         'user_data': None,
-        'profile': "Vinsent O`neal"
     }
 
     # Поиск браузера через реестр
@@ -137,9 +133,9 @@ def find_yandex_paths() -> Dict[str, Optional[Path]]:
             Path(os.environ.get('PROGRAMFILES', '')) / "Yandex/YandexBrowser/Application/browser.exe",
             Path(os.environ.get('PROGRAMFILES(X86)', '')) / "Yandex/YandexBrowser/Application/browser.exe",
         ]
-        for browser_path in possible_browser_paths:
-            if browser_path.exists():
-                paths['browser'] = browser_path
+        for candidate_browser_path in possible_browser_paths:
+            if candidate_browser_path.exists():
+                paths['browser'] = candidate_browser_path
                 break
 
     # Поиск папки с пользовательскими данными

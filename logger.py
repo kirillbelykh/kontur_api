@@ -1,3 +1,7 @@
+"""Shared application logger with Windows-safe UTF-8 output."""
+
+from __future__ import annotations
+
 import logging
 import os
 import sys
@@ -17,6 +21,7 @@ logger.propagate = False
 
 
 def _configure_standard_streams() -> None:
+    """Prefer UTF-8 console output; fall back silently for frozen GUI builds."""
     for stream_name in ("stdout", "stderr"):
         stream = getattr(sys, stream_name, None)
         reconfigure = getattr(stream, "reconfigure", None)
@@ -29,12 +34,14 @@ def _configure_standard_streams() -> None:
 
 
 class SafeRotatingFileHandler(RotatingFileHandler):
-    def doRollover(self):
+    """Rotating file handler that keeps logging alive if rollover is locked."""
+
+    def doRollover(self) -> None:
         try:
             super().doRollover()
         except OSError:
-            # На Windows старое и новое приложение могут держать lookup.log одновременно.
-            # Пропускаем ротацию, чтобы логирование не ломало основной сценарий.
+            # On Windows an old and a new app instance may hold lookup.log at once.
+            # Skipping rollover is safer than breaking the active workflow.
             pass
 
 
