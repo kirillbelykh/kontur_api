@@ -232,6 +232,38 @@ class OrderHistoryDBTests(unittest.TestCase):
         self.assertEqual(saved_order["updated_at"], original_updated_at)
         self.assertEqual(saved_order["updated_by"], "pc-1")
 
+    def test_update_orders_batch_syncs_once_for_multiple_status_updates(self):
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            startup_sync="none",
+        )
+        db.add_order({
+            "document_id": "DOC-BATCH-1",
+            "order_name": "batch one",
+            "status": "created",
+        })
+        db.add_order({
+            "document_id": "DOC-BATCH-2",
+            "order_name": "batch two",
+            "status": "processing",
+        })
+
+        with patch.object(db, "_sync_with_github_locked", autospec=True, return_value=False) as sync_mock:
+            changed = db.update_orders_batch(
+                [
+                    {"document_id": "DOC-BATCH-1", "status": "released"},
+                    {"document_id": "DOC-BATCH-2", "status": "received"},
+                ],
+                push=True,
+                reason="status_sync",
+            )
+
+        self.assertEqual(changed, 2)
+        sync_mock.assert_called_once()
+        self.assertEqual(db.get_order_by_document_id("DOC-BATCH-1")["status"], "released")
+        self.assertEqual(db.get_order_by_document_id("DOC-BATCH-2")["status"], "received")
+
 
 if __name__ == "__main__":
     unittest.main()

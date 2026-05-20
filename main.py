@@ -27,6 +27,7 @@ from queue_utils import (
     is_order_ready_for_intro,
     is_order_ready_for_tsd,
     remove_order_by_document_id,
+    translate_order_status,
 )
 from get_thumb import get_thumbprint
 from history_db import OrderHistoryDB
@@ -4183,12 +4184,12 @@ class App(ctk.CTk):
             expiration_entry.insert(0, expiration_date)
 
     def _should_auto_download_order(self, item: dict) -> bool:
+        status = str(item.get("status") or "").strip()
         return (
-            not item.get("from_history", False)
-            and not item.get("downloading", False)
+            not item.get("downloading", False)
             and not item.get("filename")
             and item.get("document_id") not in self.sent_to_tsd_items
-            and item.get("status") in {"Ожидает", "Генерируется"}
+            and status in {"Ожидает", "Создан", "Генерируется", "created", "processing"}
         )
 
     def _sync_history_from_download_item(self, item: dict):
@@ -4225,6 +4226,25 @@ class App(ctk.CTk):
                     time.sleep(10)
                     
                     # Получаем заказы, которые ожидают скачивания и НЕ являются заказами из истории
+                    history_updates = []
+                    for known_item in [item for item in self.download_list if item.get("document_id")]:
+                        if known_item.get("downloading"):
+                            continue
+                        try:
+                            known_status = self._check_order_status(known_item["document_id"])
+                            history_updates.append({
+                                "document_id": known_item.get("document_id"),
+                                "status": known_status,
+                            })
+                            known_item["status"] = known_status
+                        except Exception as status_error:
+                            logger.debug("Ошибка обновления статуса заказа %s: %s", known_item.get("document_id"), status_error)
+                    if history_updates:
+                        self.history_db.update_orders_batch(history_updates, push=True, reason="status_sync")
+                        self.after(0, self.update_download_tree)
+                        self.after(0, self.update_introduction_tree)
+                        self.after(0, self.update_tsd_tree)
+
                     pending_orders = [
                         item for item in self.download_list
                         if self._should_auto_download_order(item)
@@ -4254,10 +4274,10 @@ class App(ctk.CTk):
                                 # Запускаем скачивание в отдельном потоке
                                 self.download_executor.submit(self._download_order, item)
                             elif status in ('processing', 'created'):
-                                item['status'] = 'Генерируется'
+                                item['status'] = status
                                 self.after(0, self.update_download_tree)
                             elif status == 'error':
-                                item['status'] = 'Ошибка генерации'
+                                item['status'] = status
                                 self.after(0, self.update_download_tree)
                                 
                         except Exception as e:
@@ -4372,7 +4392,7 @@ class App(ctk.CTk):
         
         # Добавляем записи из download_list
         for item in self.download_list:
-            status = item.get("status", "Неизвестно")
+            status = translate_order_status(item.get("status", "Неизвестно"))
             
             # Добавляем иконку для заказов из истории
             if item.get('from_history'):
@@ -5416,7 +5436,7 @@ class App(ctk.CTk):
                     vals = (
                         item.get("order_name", ""), 
                         item.get("document_id", ""), 
-                        item.get("status", ""), 
+                        translate_order_status(item.get("status", "")), 
                         item.get("filename", "")
                     )
                     self.intro_tree.insert("", "end", iid=item.get("document_id"), values=vals)
@@ -6077,7 +6097,7 @@ class App(ctk.CTk):
                 vals = (
                     item.get("order_name"), 
                     document_id, 
-                    item.get("status"), 
+                    translate_order_status(item.get("status")), 
                     item.get("filename") or ""
                 )
                 self.tsd_tree.insert("", "end", iid=document_id, values=vals)

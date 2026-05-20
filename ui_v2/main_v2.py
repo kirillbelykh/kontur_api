@@ -88,6 +88,7 @@ def main():
     _ensure_desktop_shortcut()
     api = ApiBridge()
     api.start_session_auto_refresh()
+    api.start_order_status_auto_refresh()
     index_path = Path(__file__).resolve().parent / "ui" / "index.html"
     window = webview.create_window(
         title="KonturTestAPI [TEST]",
@@ -99,6 +100,7 @@ def main():
     )
     window.events.loaded += _install_desktop_scroll_overrides
     window.events.loaded += lambda _window: api.start_session_auto_refresh()
+    window.events.loaded += lambda _window: api.start_order_status_auto_refresh()
     debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
     webview.start(debug=debug_mode)
 
