@@ -586,12 +586,20 @@ class ApiBridge:
                         return codes
         return codes
 
-    def _resolve_document_status(self, session: Optional[requests.Session], document_id: str, fallback_status: str) -> Dict[str, Any]:
+    def _resolve_document_status(self, session: Optional[requests.Session], document_id: str, fallback_status: str, *, tab_type: str = "orders") -> Dict[str, Any]:
+        """Определяет статус заказа.
+        tab_type='orders' - запрос к /api/v1/codes-order (статусы заказов кодов)
+        tab_type='intro'  - запрос к /api/v1/codes-introduction (статусы ввода в оборот)
+        tab_type='tsd'    - запрос к /api/v1/codes-introduction (статусы ТСД)
+        """
         runtime = _get_runtime()
         normalized_id = str(document_id or "").strip()
+        cache_prefix = f"{tab_type}_" if tab_type != "orders" else ""
+        cache_key = f"{cache_prefix}{normalized_id}"
         translated_fallback = _translate_status(fallback_status)
         if translated_fallback in {
             "Скачан",
+            "Не скачаны",
             "Введен в оборот",
             "Ошибка ввода",
             "Ошибка ТСД",
@@ -609,19 +617,32 @@ class ApiBridge:
                 "source": "history",
             }
 
-        cached = runtime.document_status_cache.get(normalized_id)
+        cached = runtime.document_status_cache.get(cache_key)
         now = time.time()
         if cached and now - float(cached.get("timestamp") or 0.0) < DOCUMENT_STATUS_CACHE_TTL_SECONDS:
             return dict(cached.get("payload") or {})
 
         try:
-            raw_status = check_order_status(session, normalized_id)
+            base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+            if tab_type in ("intro", "tsd"):
+                # Для ввода в оборот и ТСД используем codes-introduction
+                resp = session.get(
+                    f"{base_url}/api/v1/codes-introduction/{normalized_id}/production",
+                    headers={"Connection": "close"},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                doc = resp.json()
+                raw_status = str(doc.get("documentStatus") or doc.get("status") or "unknown")
+            else:
+                # Для заказов кодов используем codes-order
+                raw_status = check_order_status(session, normalized_id)
             payload = {
                 "raw": raw_status,
                 "label": _translate_status(raw_status),
                 "source": "kontur",
             }
-            runtime.document_status_cache[normalized_id] = {"timestamp": now, "payload": payload}
+            runtime.document_status_cache[cache_key] = {"timestamp": now, "payload": payload}
             return payload
         except Exception:
             return {
@@ -697,6 +718,7 @@ class ApiBridge:
         *,
         session: Optional[requests.Session] = None,
         include_marking_status: bool = False,
+        tab_type: str = "orders",
     ) -> Dict[str, Any]:
         fallback_status = str(order_data.get("status") or "").strip()
         translated_fallback = _translate_status(fallback_status)
@@ -711,6 +733,7 @@ class ApiBridge:
                 session,
                 str(order_data.get("document_id") or "").strip(),
                 fallback_status,
+                tab_type=tab_type,
             )
         marking_status = self._resolve_marking_status(order_data) if include_marking_status else None
         final_status = marking_status or document_status
@@ -734,12 +757,14 @@ class ApiBridge:
         *,
         session: Optional[requests.Session] = None,
         include_marking_status: bool = False,
+        tab_type: str = "orders",
     ) -> Dict[str, Any]:
         merged = self._merge_order_data(item)
         status_payload = self._compose_status_payload(
             merged,
             session=session,
             include_marking_status=include_marking_status,
+            tab_type=tab_type,
         )
         tsd_created = bool(merged.get("tsd_created", False))
         return {
@@ -869,11 +894,13 @@ class ApiBridge:
         *,
         session: Optional[requests.Session] = None,
         include_marking_status: bool = False,
+        tab_type: str = "orders",
     ) -> Dict[str, Any]:
         return self._serialize_order_record(
             item,
             session=session,
             include_marking_status=include_marking_status,
+            tab_type=tab_type,
         )
 
     def _serialize_download_item(
@@ -882,11 +909,13 @@ class ApiBridge:
         *,
         session: Optional[requests.Session] = None,
         include_marking_status: bool = False,
+        tab_type: str = "orders",
     ) -> Dict[str, Any]:
         payload = self._serialize_order_record(
             item,
             session=session,
             include_marking_status=include_marking_status,
+            tab_type=tab_type,
         )
         payload["from_history"] = bool(item.get("from_history"))
         return payload
@@ -3570,6 +3599,7 @@ class ApiBridge:
                         item,
                         session=None,
                         include_marking_status=False,
+                        tab_type="intro",
                     )
                     for item in intro_items
                 ]
@@ -3954,6 +3984,7 @@ class ApiBridge:
                         item,
                         session=session,
                         include_marking_status=bool(live) and self._should_include_marking_status(item),
+                        tab_type="tsd",
                     )
                     for item in orders[:120]
                 ],
