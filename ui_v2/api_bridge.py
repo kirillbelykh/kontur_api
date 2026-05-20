@@ -245,6 +245,14 @@ def _format_datetime_value(value: Any) -> str:
         return text[:19].replace("T", " ")
 
 
+def _order_freshness_sort_key(item: Dict[str, Any]) -> tuple[str, str, str]:
+    history_data = item.get("history_data") if isinstance(item.get("history_data"), dict) else {}
+    updated_at = str(item.get("updated_at") or history_data.get("updated_at") or "").strip()
+    created_at = str(item.get("created_at") or history_data.get("created_at") or "").strip()
+    document_id = str(item.get("document_id") or "").strip()
+    return (updated_at or created_at, created_at, document_id)
+
+
 class _BridgeRuntime:
     def __init__(self):
         self.root_dir = Path(__file__).resolve().parent.parent
@@ -3361,6 +3369,7 @@ class ApiBridge:
                 if str(item.get("document_id") or "").strip()
                 and str(item.get("document_id") or "").strip() not in deleted_ids
             ]
+            intro_items.sort(key=_order_freshness_sort_key, reverse=True)
             return {
                 "items": [
                     self._normalize_history_item(
