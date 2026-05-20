@@ -135,12 +135,12 @@
       ],
       "created_at": "2026-05-20T10:09:49.974696",
       "created_by": "user",
-      "updated_at": "2026-05-20T13:17:59.076707",
-      "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "updated_at": "2026-05-20T15:07:34.280821",
+      "updated_by": "User",
+      "tsd_created": true,
+      "tsd_created_at": "2026-05-20T15:07:34.280821",
+      "tsd_intro_number": "22d4c786-70ba-4565-b95e-bcdc9a9e90da",
+      "tsd_created_by": "User",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\949 лат диаг M 260521 485к\\949 лат диаг M 260521 485к.pdf",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\949 лат диаг M 260521 485к\\949 лат диаг M 260521 (485к)_csv.csv",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\949 лат диаг M 260521 485к\\949 лат диаг M 260521 (485к).xls"
@@ -17123,8 +17123,8 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-20T13:55:45.175220",
+  "last_update": "2026-05-20T15:07:35.624987",
   "created_by": "sklad",
-  "updated_by": "user",
-  "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
+  "updated_by": "User",
+  "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
 }
