@@ -79,15 +79,7 @@ from options import (
     venchik_options,
     venchik_required,
 )
-from queue_utils import (
-    get_download_tab_status,
-    get_intro_tab_status,
-    get_tsd_tab_status,
-    has_local_downloaded_files,
-    is_order_ready_for_intro,
-    is_order_ready_for_tsd,
-    remove_order_by_document_id,
-)
+from queue_utils import is_order_ready_for_intro, is_order_ready_for_tsd, remove_order_by_document_id
 from utils import get_tnved_code, make_session_with_cookies
 
 LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS = 300
@@ -322,9 +314,7 @@ def _get_runtime() -> _BridgeRuntime:
 def _history_order_to_download_item(order_data: Dict[str, Any]) -> Dict[str, Any]:
     filename = order_data.get("filename")
     csv_path = order_data.get("csv_path")
-    status = str(order_data.get("status") or "").strip()
-    if not status:
-        status = "downloaded" if has_local_downloaded_files(order_data) else "created"
+    status = "Скачан" if filename or csv_path else "Из истории"
     return {
         "order_name": str(order_data.get("order_name") or "").strip(),
         "document_id": str(order_data.get("document_id") or "").strip(),
@@ -942,30 +932,6 @@ class ApiBridge:
         payload["from_history"] = bool(item.get("from_history"))
         return payload
 
-    def _decorate_download_tab_item(self, item: Dict[str, Any], *, session: Optional[requests.Session] = None) -> Dict[str, Any]:
-        payload = self._serialize_download_item(item, session=session)
-        payload["status"] = get_download_tab_status(item)
-        payload["status_summary"] = ""
-        return payload
-
-    def _decorate_intro_tab_item(self, item: Dict[str, Any], *, session: Optional[requests.Session] = None) -> Dict[str, Any]:
-        payload = self._normalize_history_item(item, session=session, include_marking_status=False)
-        payload["status"] = get_intro_tab_status(item)
-        payload["status_summary"] = ""
-        return payload
-
-    def _decorate_tsd_tab_item(self, item: Dict[str, Any], *, session: Optional[requests.Session] = None) -> Dict[str, Any]:
-        payload = self._normalize_history_item(
-            item,
-            session=session,
-            include_marking_status=False,
-        )
-        tsd_status = get_tsd_tab_status(item)
-        payload["status"] = tsd_status
-        payload["tsd_status"] = tsd_status
-        payload["status_summary"] = ""
-        return payload
-
     def _serialize_queue_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "uid": item.get("uid"),
@@ -1320,8 +1286,8 @@ class ApiBridge:
     ) -> Dict[str, Any]:
         csv_path = self._resolve_order_csv_path(item)
         if csv_path:
-            if str(item.get("status") or "").strip() != "downloaded":
-                item["status"] = "downloaded"
+            if str(item.get("status") or "").strip() != "Скачан":
+                item["status"] = "Скачан"
                 self._sync_history_from_download_item(item)
             return item
 
@@ -1362,7 +1328,7 @@ class ApiBridge:
             if not filename:
                 raise RuntimeError("Сервис не вернул ни одного сохранённого файла.")
             item["filename"] = filename
-            item["status"] = "downloaded"
+            item["status"] = "Скачан"
             self._sync_history_from_download_item(item)
             self._log("download", f"{log_prefix}Успешно скачан: {filename}")
             return self._serialize_download_item(item)
@@ -3277,7 +3243,7 @@ class ApiBridge:
             deleted_ids = self._get_deleted_document_ids()
             return {
                 "items": [
-                    self._decorate_download_tab_item(item, session=None)
+                    self._serialize_download_item(item, session=None)
                     for item in runtime.download_items
                     if str(item.get("document_id") or "").strip() not in deleted_ids
                 ],
@@ -3318,18 +3284,18 @@ class ApiBridge:
                 if not document_id or document_id in deleted_ids:
                     continue
 
-                if has_local_downloaded_files(item):
-                    if item.get("status") != "downloaded":
-                        item["status"] = "downloaded"
+                if item.get("filename") or item.get("csv_path"):
+                    if item.get("status") != "Скачан":
+                        item["status"] = "Скачан"
                         self._sync_history_from_download_item(item)
-                    updated.append(self._decorate_download_tab_item(item, session=session))
+                    updated.append(self._serialize_download_item(item, session=session))
                     continue
 
                 raw_status = check_order_status(session, document_id)
                 item["status"] = raw_status
                 if raw_status in {"released", "received"} and auto_download:
                     self._download_order_internal(session, item, log_prefix="Автоскачивание: ")
-                updated.append(self._decorate_download_tab_item(item, session=session))
+                updated.append(self._serialize_download_item(item, session=session))
 
             self._log("download", "Синхронизация статусов завершена")
             return {"success": True, "items": updated, "state": self.get_download_state()}
@@ -3472,9 +3438,10 @@ class ApiBridge:
             ]
             return {
                 "items": [
-                    self._decorate_intro_tab_item(
+                    self._normalize_history_item(
                         item,
                         session=None,
+                        include_marking_status=False,
                     )
                     for item in intro_items
                 ]
@@ -3528,7 +3495,7 @@ class ApiBridge:
                 )
 
                 if ok:
-                    item["status"] = "introduced"
+                    item["status"] = "Введен в оборот"
                     self._sync_history_from_download_item(item)
                     self._log("intro", f"Успешно: {item.get('order_name')} ({result.get('introduction_id')})")
                     results.append({"document_id": document_id, "result": result})
@@ -3695,9 +3662,10 @@ class ApiBridge:
             orders.sort(key=lambda row: str(row.get("created_at") or ""), reverse=True)
             return {
                 "items": [
-                    self._decorate_tsd_tab_item(
+                    self._normalize_history_item(
                         item,
                         session=session,
+                        include_marking_status=bool(live) and self._should_include_marking_status(item),
                     )
                     for item in orders[:120]
                 ],

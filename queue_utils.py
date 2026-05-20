@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import Any
 
 
@@ -39,52 +38,6 @@ def translate_order_status(value: Any) -> str:
     if not raw:
         return "Неизвестно"
     return STATUS_LABELS.get(raw, STATUS_LABELS.get(raw.lower(), raw))
-
-
-def _iter_order_file_candidates(item: dict[str, Any]):
-    for key in ("csv_path", "pdf_path", "xls_path", "filename"):
-        value = item.get(key)
-        if not value:
-            continue
-        chunks = [value] if not isinstance(value, str) else value.split(",")
-        for chunk in chunks:
-            candidate = str(chunk or "").strip()
-            if candidate:
-                yield candidate
-
-
-def has_local_downloaded_files(item: dict[str, Any]) -> bool:
-    for candidate in _iter_order_file_candidates(item):
-        try:
-            if Path(candidate).exists():
-                return True
-        except OSError:
-            continue
-    return False
-
-
-def get_download_tab_status(item: dict[str, Any]) -> str:
-    return "Скачан" if has_local_downloaded_files(item) else "Не скачан"
-
-
-def get_intro_tab_status(item: dict[str, Any]) -> str:
-    raw = normalize_status_key(item.get("status"))
-    raw_lower = raw.lower()
-    if raw_lower in {"introduced", "applied"} or raw in {"Введен в оборот", "Введены в оборот"}:
-        return "Введены в оборот"
-    return "Не введены в оборот"
-
-
-def get_tsd_tab_status(item: dict[str, Any]) -> str:
-    raw = normalize_status_key(item.get("status"))
-    raw_lower = raw.lower()
-    if get_intro_tab_status(item) == "Введены в оборот":
-        return "Введены в оборот"
-    if bool(item.get("tsd_created")):
-        return "Отправлено"
-    if raw_lower in {"released", "received", "downloaded"} or raw in {"Скачан", "Готов для ТСД"} or is_order_ready_for_tsd(item):
-        return "Наполнен на ТСД"
-    return "Не отправлено"
 
 
 def is_order_ready_for_intro(item: dict[str, Any]) -> bool:

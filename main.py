@@ -24,9 +24,6 @@ from cookies import get_valid_cookies
 from utils import make_session_with_cookies, get_tnved_code, save_snapshot, save_order_history
 from date_defaults import get_default_production_window
 from queue_utils import (
-    get_download_tab_status,
-    get_intro_tab_status,
-    get_tsd_tab_status,
     is_order_ready_for_intro,
     is_order_ready_for_tsd,
     remove_order_by_document_id,
@@ -4395,7 +4392,7 @@ class App(ctk.CTk):
         
         # Добавляем записи из download_list
         for item in self.download_list:
-            status = get_download_tab_status(item)
+            status = translate_order_status(item.get("status", "Неизвестно"))
             
             # Добавляем иконку для заказов из истории
             if item.get('from_history'):
@@ -5439,7 +5436,7 @@ class App(ctk.CTk):
                     vals = (
                         item.get("order_name", ""), 
                         item.get("document_id", ""), 
-                        get_intro_tab_status(item), 
+                        translate_order_status(item.get("status", "")), 
                         item.get("filename", "")
                     )
                     self.intro_tree.insert("", "end", iid=item.get("document_id"), values=vals)
@@ -6100,7 +6097,7 @@ class App(ctk.CTk):
                 vals = (
                     item.get("order_name"), 
                     document_id, 
-                    get_tsd_tab_status(item),
+                    translate_order_status(item.get("status")), 
                     item.get("filename") or ""
                 )
                 self.tsd_tree.insert("", "end", iid=document_id, values=vals)
