@@ -77,7 +77,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             def sync_with_github(self, **kwargs):
                 sync_calls.append(kwargs)
 
-            def get_orders_without_tsd(self):
+            def get_all_orders(self):
                 return [fake_history_order]
 
         with (

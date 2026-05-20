@@ -971,7 +971,7 @@ class App(ctk.CTk):
     def _load_history_to_download_list(self):
         """Загружает заказы без заданий на ТСД из истории в download_list"""
         try:
-            history_orders = self.history_db.get_orders_without_tsd()
+            history_orders = self.history_db.get_all_orders()
 
             existing_ids = {item.get("document_id") for item in self.download_list}
 
@@ -982,8 +982,11 @@ class App(ctk.CTk):
                     download_item = {
                         "order_name": order.get("order_name"),
                         "document_id": order.get("document_id"),
-                        "status": "Из истории",  # Специальный статус для заказов из истории
+                        "status": "Скачан" if order.get("filename") or order.get("csv_path") else "Из истории",
                         "filename": order.get("filename"),
+                        "csv_path": order.get("csv_path"),
+                        "pdf_path": order.get("pdf_path"),
+                        "xls_path": order.get("xls_path"),
                         "simpl": order.get("simpl"),
                         "full_name": order.get("full_name"),
                         "gtin": order.get("gtin"),
@@ -997,6 +1000,8 @@ class App(ctk.CTk):
 
             if hasattr(self, 'tsd_tree'):
                 self.update_tsd_tree()
+            if hasattr(self, 'intro_tree'):
+                self.update_introduction_tree()
                 
             print(f"📚 Всего загружено {loaded_count} заказов из истории (автоскачивание отключено)")
             

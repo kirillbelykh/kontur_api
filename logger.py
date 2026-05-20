@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from logging.handlers import RotatingFileHandler
 
 
@@ -15,6 +16,18 @@ logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 logger.propagate = False
 
 
+def _configure_standard_streams() -> None:
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        reconfigure = getattr(stream, "reconfigure", None)
+        if not callable(reconfigure):
+            continue
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
 class SafeRotatingFileHandler(RotatingFileHandler):
     def doRollover(self):
         try:
@@ -23,6 +36,9 @@ class SafeRotatingFileHandler(RotatingFileHandler):
             # На Windows старое и новое приложение могут держать lookup.log одновременно.
             # Пропускаем ротацию, чтобы логирование не ломало основной сценарий.
             pass
+
+
+_configure_standard_streams()
 
 
 if not logger.handlers:

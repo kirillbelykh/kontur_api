@@ -289,7 +289,7 @@ class _BridgeRuntime:
 
     def load_download_items_from_history(self) -> None:
         existing_ids = {item.get("document_id") for item in self.download_items if item.get("document_id")}
-        for order in self.history_db.get_orders_without_tsd():
+        for order in self.history_db.get_all_orders():
             document_id = str(order.get("document_id") or "").strip()
             if not document_id or document_id in existing_ids:
                 continue
