@@ -7571,7 +7571,7 @@
     {
       "order_name": "698 стер лат L 260202 120пар",
       "document_id": "9a33f1ee-e27a-4a0d-a1b4-7c533815b034",
-      "status": "received",
+      "status": "error",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\698 стер лат L 260202 120пар\\698 стер лат L 260202 120пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\698 стер лат L 260202 120пар\\698 стер лат L 260202 120пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\698 стер лат L 260202 120пар\\698 стер лат L 260202 120пар.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
@@ -7587,7 +7587,7 @@
       ],
       "created_at": "2026-04-16T09:01:48.559394",
       "created_by": "user",
-      "updated_at": "2026-05-20T13:17:59.145704",
+      "updated_at": "2026-05-20T13:20:43.965193",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -15255,13 +15255,13 @@
     {
       "document_id": "b3405088-dca7-4f62-bf9e-ce6f37e39af6",
       "order_name": "1557 хир 7,0 заявка 4190",
-      "status": "received",
+      "status": "error",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4650118042858",
       "created_at": "2025-11-21T10:32:20.016271",
       "created_by": "sklad",
-      "updated_at": "2026-05-20T13:17:59.208492",
+      "updated_at": "2026-05-20T13:20:43.973347",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -17123,7 +17123,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-20T13:18:01.313702",
+  "last_update": "2026-05-20T13:20:45.831882",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
