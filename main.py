@@ -5410,8 +5410,21 @@ class App(ctk.CTk):
             for item in self.intro_tree.get_children():
                 self.intro_tree.delete(item)
             
+            def _intro_sort_key(row: dict):
+                history_data = row.get("history_data") if isinstance(row.get("history_data"), dict) else {}
+                updated_at = str(row.get("updated_at") or history_data.get("updated_at") or "")
+                created_at = str(row.get("created_at") or history_data.get("created_at") or "")
+                document_id = str(row.get("document_id") or "")
+                return (updated_at or created_at, created_at, document_id)
+
+            intro_items = sorted(
+                [item for item in self.download_list if is_order_ready_for_intro(item)],
+                key=_intro_sort_key,
+                reverse=True,
+            )
+
             # Добавить записи из self.download_list
-            for item in self.download_list:
+            for item in intro_items:
                 if is_order_ready_for_intro(item):
                     vals = (
                         item.get("order_name", ""), 

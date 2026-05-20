@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import csv
+import importlib
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import tempfile
 import time
 import uuid
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from threading import Event, Lock, Thread
@@ -70,6 +72,7 @@ from date_defaults import get_default_production_window
 from get_gtin import lookup_by_gtin, lookup_gtin
 from get_thumb import find_certificate_thumbprint
 from history_db import OrderHistoryDB
+from logger import logger
 from options import (
     color_options,
     simplified_options,
@@ -105,9 +108,15 @@ STATUS_LABELS = {
     "inProgress": "В обработке",
     "introduced": "Введен в оборот",
     "processing": "Генерируется",
-    "received": "Доступен для скачивания",
-    "released": "Доступен для скачивания",
+    "received": "Коды получены",
+    "released": "Выпущен",
+    "sendForRelease": "Заказывается",
+    "sendforrelease": "Заказывается",
     "sentForApprove": "Отправлен на подпись",
+    "sentForIntroduction": "Отправлен на подпись",
+    "sentforintroduction": "Отправлен на подпись",
+    "waitChecking": "На проверке",
+    "waitchecking": "На проверке",
     "approveFailed": "Не зарегистрирован",
     "approved": "Зарегистрирован",
     "readyForSend": "Готов к проведению",
@@ -123,6 +132,9 @@ STATUS_LABELS = {
     "RETIRED": "Выведен из оборота",
     "DISAGGREGATED": "Расформирован",
     "disaggregated": "Расформирован",
+    "introductionFailed": "Ошибка ввода в оборот",
+    "crptSendingError": "Ошибка отправки в ЧЗ",
+    "relatedDocumentFailed": "Ошибка связанного документа",
     "UNKNOWN": "Неизвестно",
 }
 
@@ -387,6 +399,20 @@ class ApiBridge:
                 )
                 runtime.session_refresh_thread.start()
             runtime.session_refresh_event.set()
+
+        # Запускаем фоновое обновление статусов при старте
+        self._start_background_status_updater()
+
+        # Автоматическая пролонгация доступа при запуске
+        def _prolong_on_startup() -> None:
+            try:
+                cookies_module.prolong_kontur_access(force=True)
+                self._log("orders", "Пролонгация доступа выполнена при запуске")
+            except Exception as exc:
+                logger.exception("Ошибка пролонгации доступа при запуске: %s", exc)
+
+        Thread(target=_prolong_on_startup, name="UiV2ProlongOnStartup", daemon=True).start()
+
         return {"success": True}
 
     def _normalize_order_name_key(self, value: str) -> str:
@@ -3174,17 +3200,185 @@ class ApiBridge:
             runtime.load_download_items_from_history()
             printers, default_printer = list_installed_printers()
             deleted_ids = self._get_deleted_document_ids()
+            items = []
+            for item in runtime.download_items:
+                if str(item.get("document_id") or "").strip() in deleted_ids:
+                    continue
+                serialized = self._serialize_download_item(item, session=None)
+                # Проверяем наличие файла на диске для статуса "Скачаны"/"Не скачаны"
+                file_status = self._check_codes_file_on_disk(item)
+                if file_status == "Не скачаны":
+                    serialized["status"] = "Не скачаны"
+                items.append(serialized)
             return {
-                "items": [
-                    self._serialize_download_item(item, session=None)
-                    for item in runtime.download_items
-                    if str(item.get("document_id") or "").strip() not in deleted_ids
-                ],
+                "items": items,
                 "printers": printers,
                 "default_printer": default_printer,
             }
         except Exception as exc:
             return {"error": str(exc)}
+
+    def get_order_details(self, document_id: str) -> Dict[str, Any]:
+        """Возвращает подробные метаданные заказа для отображения в модальном окне.
+        Делает запрос в Контур по ID заказа и возвращает все поля на русском языке."""
+        try:
+            normalized_id = str(document_id or "").strip()
+            if not normalized_id:
+                raise RuntimeError("Не указан ID заказа.")
+
+            session = self._ensure_session_safely()
+
+            # Пробуем получить детали заказа кодов
+            kontur_data = None
+            source_type = "codes-order"
+            try:
+                if session:
+                    base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+                    response = session.get(
+                        f"{base_url}/api/v1/codes-order/{normalized_id}",
+                        headers={"Connection": "close"},
+                        timeout=15,
+                    )
+                    if response.status_code == 200:
+                        kontur_data = response.json()
+            except Exception:
+                pass
+
+            # Если не нашли как заказ кодов, пробуем как ввод в оборот
+            if not kontur_data:
+                try:
+                    if session:
+                        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+                        response = session.get(
+                            f"{base_url}/api/v1/codes-introduction/{normalized_id}/production",
+                            headers={"Connection": "close"},
+                            timeout=15,
+                        )
+                        if response.status_code == 200:
+                            kontur_data = response.json()
+                            source_type = "codes-introduction"
+                except Exception:
+                    pass
+
+            # Собираем локальные данные из истории
+            local_data = self._find_order_data(normalized_id)
+            if not local_data:
+                local_data = _get_runtime().history_db.get_order_by_document_id(normalized_id)
+
+            # Формируем читабельный вывод
+            fields = []
+
+            def add_field(label: str, value: Any, *, raw_key: str = "") -> None:
+                translated = _translate_status(value) if raw_key == "status" or raw_key.endswith("Status") else str(value or "")
+                fields.append({
+                    "label": label,
+                    "value": translated if translated != str(value or "") else _format_datetime_value(value) if value and any(c.isdigit() for c in str(value)[:4]) else str(value or "—"),
+                    "raw_key": raw_key,
+                })
+
+            add_field("Номер заявки", local_data.get("order_name") if local_data else kontur_data.get("documentNumber") if kontur_data else "", raw_key="order_name")
+            add_field("ID документа", normalized_id, raw_key="document_id")
+
+            if kontur_data:
+                doc_status = str(kontur_data.get("documentStatus") or kontur_data.get("status") or "")
+                add_field("Статус", doc_status, raw_key="status")
+
+                if source_type == "codes-order":
+                    add_field("Тип выпуска", kontur_data.get("releaseMethodType", ""), raw_key="releaseMethodType")
+                    add_field("Группа товаров", kontur_data.get("productGroup", ""), raw_key="productGroup")
+                    add_field("Дата создания", kontur_data.get("createdDate", ""), raw_key="createdDate")
+                    add_field("Дата обновления", kontur_data.get("updatedDate", ""), raw_key="updatedDate")
+                    add_field("Комментарий", kontur_data.get("comment", ""), raw_key="comment")
+                    add_field("Количество позиций", kontur_data.get("positionsCount"), raw_key="positionsCount")
+                    add_field("Запрошено кодов", kontur_data.get("requestedCodesCount"), raw_key="requestedCodesCount")
+                    add_field("Получено кодов", kontur_data.get("receivedCodesCount"), raw_key="receivedCodesCount")
+                    add_field("Есть поставщик", "Да" if kontur_data.get("hasServiceProvider") else "Нет", raw_key="hasServiceProvider")
+                    add_field("С единицами для наборов", "Да" if kontur_data.get("withUnitsForSets") else "Нет", raw_key="withUnitsForSets")
+
+                    events = kontur_data.get("events")
+                    if events:
+                        for event in events:
+                            event_status = str(event.get("status") or "")
+                            event_date = str(event.get("date") or "")
+                            add_field(f"Событие: {_translate_status(event_status)}", event_date, raw_key=f"event_{event_status}")
+
+                    actions = kontur_data.get("actions")
+                    if actions:
+                        for action_key, action_val in actions.items():
+                            add_field(f"Действие: {action_key}", "Да" if action_val else "Нет", raw_key=f"action_{action_key}")
+
+                    positions = kontur_data.get("positions")
+                    if positions:
+                        for i, pos in enumerate(positions):
+                            add_field(f"Позиция {i+1}: наименование", pos.get("name", ""), raw_key=f"pos_{i}_name")
+                            add_field(f"Позиция {i+1}: GTIN", pos.get("gtin", ""), raw_key=f"pos_{i}_gtin")
+                            add_field(f"Позиция {i+1}: количество", pos.get("quantity"), raw_key=f"pos_{i}_quantity")
+                            add_field(f"Позиция {i+1}: статус", pos.get("status", ""), raw_key=f"pos_{i}_status")
+
+                    related_intro = kontur_data.get("relatedCodesIntroductionInfo")
+                    if related_intro:
+                        add_field("Связанный ввод в оборот: статус", related_intro.get("status", ""), raw_key="relatedIntro_status")
+
+                    related_util = kontur_data.get("relatedUtilisationReportInfo")
+                    if related_util:
+                        add_field("Связанный отчёт об утилизации: статус", related_util.get("status", ""), raw_key="relatedUtil_status")
+
+                else:  # codes-introduction
+                    add_field("Тип ввода", kontur_data.get("codesIntroductionType", ""), raw_key="codesIntroductionType")
+                    add_field("Группа товаров", kontur_data.get("productGroup", ""), raw_key="productGroup")
+                    add_field("Дата создания", kontur_data.get("createdDate", ""), raw_key="createdDate")
+                    add_field("Способ заполнения", kontur_data.get("fillingMethod", ""), raw_key="fillingMethod")
+                    add_field("Тип производства", kontur_data.get("productionType", ""), raw_key="productionType")
+                    add_field("Тип использования", kontur_data.get("usageType", ""), raw_key="usageType")
+                    add_field("Тип срока годности", kontur_data.get("expirationType", ""), raw_key="expirationType")
+                    add_field("Дата производства", kontur_data.get("productionDate", ""), raw_key="productionDate")
+                    add_field("Дата истечения", kontur_data.get("expirationDate", ""), raw_key="expirationDate")
+                    add_field("Номер партии", kontur_data.get("batchNumber", ""), raw_key="batchNumber")
+                    if kontur_data.get("containsUtilisationReport"):
+                        add_field("Содержит отчёт об утилизации", "Да", raw_key="containsUtilisationReport")
+
+                    events = kontur_data.get("events")
+                    if events:
+                        for event in events:
+                            event_status = str(event.get("status") or event.get("newStatus") or "")
+                            event_date = str(event.get("date") or "")
+                            add_field(f"Событие: {_translate_status(event_status)}", event_date, raw_key=f"event_{event_status}")
+
+                    positions = kontur_data.get("positions")
+                    if positions:
+                        for i, pos in enumerate(positions):
+                            add_field(f"Позиция {i+1}: наименование", pos.get("name", ""), raw_key=f"pos_{i}_name")
+                            add_field(f"Позиция {i+1}: GTIN", pos.get("gtin", ""), raw_key=f"pos_{i}_gtin")
+                            add_field(f"Позиция {i+1}: кодов", pos.get("codesCount"), raw_key=f"pos_{i}_codesCount")
+
+                    related_order = kontur_data.get("relatedCodesOrderInfo")
+                    if related_order:
+                        add_field("Связанный заказ кодов: статус", related_order.get("status", ""), raw_key="relatedOrder_status")
+                        add_field("Связанный заказ кодов: номер", related_order.get("number", ""), raw_key="relatedOrder_number")
+
+            else:
+                add_field("Статус (локальный)", local_data.get("status") if local_data else "—", raw_key="status")
+                add_field("Тип товара", local_data.get("simpl") if local_data else "—", raw_key="simpl")
+                add_field("GTIN", local_data.get("gtin") if local_data else "—", raw_key="gtin")
+
+            add_field("Локальный статус загрузки", self._check_codes_file_on_disk(local_data) if local_data else "—", raw_key="file_status")
+
+            if local_data:
+                csv_path = local_data.get("csv_path") or ""
+                if csv_path:
+                    add_field("Путь к CSV", csv_path, raw_key="csv_path")
+                pdf_path = local_data.get("pdf_path") or ""
+                if pdf_path:
+                    add_field("Путь к PDF", pdf_path, raw_key="pdf_path")
+
+            return {
+                "success": True,
+                "fields": fields,
+                "document_id": normalized_id,
+                "source_type": source_type if kontur_data else "local",
+            }
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
 
     def restore_orders_from_history(self, document_ids: Sequence[str]) -> Dict[str, Any]:
         try:
@@ -3382,6 +3576,166 @@ class ApiBridge:
             }
         except Exception as exc:
             return {"error": str(exc)}
+
+    def _fetch_codes_orders_batch(self, session: requests.Session) -> Dict[str, Dict[str, Any]]:
+        """Пакетно получает статусы заказов из Контура.
+        Возвращает словарь {documentNumber: {status, ...metadata}}."""
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        warehouse_id = str(os.getenv("WAREHOUSE_ID") or getattr(api_module, "WAREHOUSE_ID", ""))
+        if not warehouse_id:
+            return {}
+        result: Dict[str, Dict[str, Any]] = {}
+        limit = 100
+        offset = 0
+        try:
+            while True:
+                response = session.get(
+                    f"{base_url}/api/v1/codes-order",
+                    params={
+                        "warehouseId": warehouse_id,
+                        "limit": limit,
+                        "offset": offset,
+                        "sortField": "updateDate",
+                        "sortOrder": "descending",
+                    },
+                    headers={"Connection": "close"},
+                    timeout=30,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                items = payload.get("items") or []
+                for item in items:
+                    doc_number = str(item.get("documentNumber") or "").strip()
+                    if doc_number:
+                        result[doc_number] = item
+                total = int(payload.get("total") or len(items))
+                offset += len(items)
+                if not items or offset >= total:
+                    break
+            return result
+        except Exception:
+            logger.exception("Ошибка пакетного получения статусов заказов")
+            return result
+
+    def _fetch_introductions_batch(self, session: requests.Session) -> Dict[str, Dict[str, Any]]:
+        """Пакетно получает статусы ввода в оборот из Контура.
+        Возвращает словарь {documentNumber: {status, ...metadata}}."""
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        warehouse_id = str(os.getenv("WAREHOUSE_ID") or getattr(api_module, "WAREHOUSE_ID", ""))
+        if not warehouse_id:
+            return {}
+        result: Dict[str, Dict[str, Any]] = {}
+        limit = 100
+        offset = 0
+        try:
+            while True:
+                response = session.get(
+                    f"{base_url}/api/v1/codes-introduction",
+                    params={
+                        "warehouseId": warehouse_id,
+                        "limit": limit,
+                        "offset": offset,
+                        "sortField": "updateDate",
+                        "sortOrder": "descending",
+                    },
+                    headers={"Connection": "close"},
+                    timeout=30,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                items = payload.get("items") or []
+                for item in items:
+                    doc_number = str(item.get("documentNumber") or "").strip()
+                    if doc_number:
+                        result[doc_number] = item
+                total = int(payload.get("total") or len(items))
+                offset += len(items)
+                if not items or offset >= total:
+                    break
+            return result
+        except Exception:
+            logger.exception("Ошибка пакетного получения статусов ввода в оборот")
+            return result
+
+    def _background_status_updater(self) -> None:
+        """Фоновый воркер, обновляющий статусы из Контура каждые 30 секунд."""
+        runtime = _get_runtime()
+        while True:
+            try:
+                time.sleep(30)
+                session = self._ensure_session_safely()
+                if not session:
+                    continue
+
+                # Параллельно получаем статусы заказов и ввода
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    future_orders = executor.submit(self._fetch_codes_orders_batch, session)
+                    future_intro = executor.submit(self._fetch_introductions_batch, session)
+                    orders_by_number = future_orders.result(timeout=60)
+                    intro_by_number = future_intro.result(timeout=60)
+
+                # Обновляем кеш статусов заказов
+                for item in runtime.download_items:
+                    doc_id = str(item.get("document_id") or "").strip()
+                    order_name = str(item.get("order_name") or "").strip()
+                    if order_name and order_name in orders_by_number:
+                        kontur_item = orders_by_number[order_name]
+                        raw_status = str(kontur_item.get("documentStatus") or kontur_item.get("status") or "").strip()
+                        if raw_status:
+                            runtime.document_status_cache[doc_id] = {
+                                "timestamp": time.time(),
+                                "payload": {
+                                    "raw": raw_status,
+                                    "label": _translate_status(raw_status),
+                                    "source": "kontur",
+                                },
+                            }
+                # Обновляем кеш для ввода в оборот
+                for item in runtime.history_db.get_all_orders():
+                    doc_id = str(item.get("document_id") or "").strip()
+                    order_name = str(item.get("order_name") or "").strip()
+                    if order_name and order_name in intro_by_number:
+                        kontur_item = intro_by_number[order_name]
+                        raw_status = str(kontur_item.get("documentStatus") or "").strip()
+                        if raw_status:
+                            runtime.document_status_cache[f"intro_{doc_id}"] = {
+                                "timestamp": time.time(),
+                                "payload": {
+                                    "raw": raw_status,
+                                    "label": _translate_status(raw_status),
+                                    "source": "kontur",
+                                },
+                            }
+            except Exception:
+                logger.exception("Ошибка в фоновом обновлении статусов")
+
+    def _start_background_status_updater(self) -> None:
+        """Запускает фоновый воркер обновления статусов."""
+        runtime = _get_runtime()
+        thread = Thread(
+            target=self._background_status_updater,
+            name="UiV2BackgroundStatusUpdater",
+            daemon=True,
+        )
+        thread.start()
+        self._log("orders", "Фоновое обновление статусов запущено")
+
+    def _check_codes_file_on_disk(self, item: Dict[str, Any]) -> str:
+        """Проверяет, существует ли CSV-файл с кодами на диске.
+        Возвращает 'Скачаны' если файл есть, 'Не скачаны' если нет."""
+        csv_path = self._resolve_order_csv_path(item)
+        if csv_path:
+            return "Скачаны"
+        history_data = item.get("history_data") or {}
+        for field in ("csv_path", "filename"):
+            value = str(history_data.get(field) or item.get(field) or "").strip()
+            if value and Path(value).exists():
+                return "Скачаны"
+            if value:
+                for chunk in str(value).split(","):
+                    if Path(chunk.strip()).exists():
+                        return "Скачаны"
+        return "Не скачаны"
 
     def introduce_orders(
         self,
