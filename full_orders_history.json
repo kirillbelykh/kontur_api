@@ -32,8 +32,8 @@
     {
       "order_name": "952 хир 7,5 260423 заявка 5973",
       "document_id": "db090bcd-7cf5-4ba0-ac0a-9889d43c3ee8",
-      "status": "received",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 75 260423 заявка 5973.pdf, C:\\Users\\user\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973.xls",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 75 260423 заявка 5973.pdf, C:\\Users\\User\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973.xls",
       "simpl": "хир",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473505884",
@@ -54,9 +54,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 75 260423 заявка 5973.pdf",
-      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973_csv.csv",
-      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973.xls"
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 75 260423 заявка 5973.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973_csv.csv",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\952 хир 75 260423 заявка 5973\\952 хир 7,5 260423 заявка 5973.xls"
     },
     {
       "order_name": "951 HR лат M 260402 заявка 5976",
@@ -17114,7 +17114,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-20T12:14:10.820510",
+  "last_update": "2026-05-20T12:14:32.504775",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
