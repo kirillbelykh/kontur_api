@@ -634,31 +634,6 @@ class OrderHistoryDB:
         except Exception as e:
             logger.error(f"Ошибка добавления заказа {order_data.get('document_id')}: {e}")
 
-    def update_orders_batch(self, orders_data: List[Dict[str, Any]], *, push: bool = True, reason: str = "batch_update") -> int:
-        """Пакетно обновляет несколько заказов одним сохранением и одним sync."""
-        try:
-            normalized_orders = [dict(item) for item in orders_data if item.get("document_id")]
-            if not normalized_orders:
-                return 0
-
-            with self._io_lock:
-                data = self._load_data()
-                changed_count = 0
-                for order_data in normalized_orders:
-                    if self._upsert_order_in_data(data, order_data):
-                        changed_count += 1
-
-                if not changed_count:
-                    return 0
-
-                self._save_data(data)
-                self._sync_with_github_locked(push=push, reason=reason)
-                logger.info("Пакетно обновлено заказов: %s", changed_count)
-                return changed_count
-        except Exception as e:
-            logger.error("Ошибка пакетного обновления заказов: %s", e)
-            return 0
-
     def mark_tsd_created(self, document_id: str, intro_number: str):
         """Помечает заказ как отправленный на ТСД."""
         try:

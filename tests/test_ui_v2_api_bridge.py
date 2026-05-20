@@ -225,48 +225,6 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertEqual(normalized_ids, [f"doc-{index}" for index in range(1, 251)])
         ensure_session_mock.assert_not_called()
 
-    def test_resolve_document_status_uses_cached_kontur_status_without_session(self):
-        fake_runtime = types.SimpleNamespace(
-            document_status_cache={
-                "doc-1": {
-                    "timestamp": api_bridge.time.time(),
-                    "payload": {"raw": "released", "label": "Доступен для скачивания", "source": "kontur"},
-                }
-            }
-        )
-
-        with mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime):
-            payload = self.bridge._resolve_document_status(None, "doc-1", "created")
-
-        self.assertEqual(payload["raw"], "released")
-        self.assertEqual(payload["label"], "Доступен для скачивания")
-        self.assertEqual(payload["source"], "kontur")
-
-    def test_sync_live_order_statuses_updates_runtime_and_history_in_batch(self):
-        history_db = mock.Mock()
-        history_db.get_all_orders.return_value = [{"document_id": "doc-1", "status": "created"}]
-        runtime = types.SimpleNamespace(
-            download_items=[{"document_id": "doc-1", "status": "created"}],
-            session_orders=[],
-            document_status_cache={},
-            history_db=history_db,
-        )
-
-        with (
-            mock.patch.object(api_bridge, "_get_runtime", return_value=runtime),
-            mock.patch.object(self.bridge, "_ensure_session", return_value=object()),
-            mock.patch.object(api_bridge, "check_order_status", return_value="released"),
-        ):
-            updated = self.bridge._sync_live_order_statuses()
-
-        self.assertEqual(updated, 1)
-        self.assertEqual(runtime.download_items[0]["status"], "released")
-        history_db.update_orders_batch.assert_called_once_with(
-            [{"document_id": "doc-1", "status": "released"}],
-            push=True,
-            reason="status_sync",
-        )
-
     def test_create_aggregation_codes_splits_large_request_into_99_batches(self):
         batch_calls = []
 

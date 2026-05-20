@@ -91,8 +91,6 @@ DOCUMENT_STATUS_CACHE_TTL_SECONDS = 60
 CODE_STATUS_CACHE_TTL_SECONDS = 180
 CODE_STATUS_SAMPLE_SIZE = 25
 TRUE_STATUS_WORKER_TIMEOUT_SECONDS = 25
-ORDER_STATUS_BACKGROUND_SYNC_INTERVAL_SECONDS = 15
-ORDER_STATUS_BACKGROUND_SYNC_HISTORY_LIMIT = 250
 DELETED_ORDERS_DIRNAME = "Удаленные"
 DELETED_ORDERS_FILE = "deleted_orders.json"
 MARKING_CODES_DIRNAME = "\u041a\u043e\u0434\u044b \u043a\u043c"
@@ -269,8 +267,6 @@ class _BridgeRuntime:
         self.aggregation_cache_ttl_seconds = 90.0
         self.session_refresh_event = Event()
         self.session_refresh_thread: Optional[Thread] = None
-        self.status_sync_event = Event()
-        self.status_sync_thread: Optional[Thread] = None
         self.load_download_items_from_history()
         self.history_sync_thread: Optional[Thread] = None
         self.start_history_sync_on_startup()
@@ -383,29 +379,6 @@ class ApiBridge:
                 )
                 runtime.session_refresh_thread.start()
             runtime.session_refresh_event.set()
-        return {"success": True}
-
-    def _order_status_auto_refresh_worker(self) -> None:
-        runtime = _get_runtime()
-        while True:
-            runtime.status_sync_event.wait(ORDER_STATUS_BACKGROUND_SYNC_INTERVAL_SECONDS)
-            runtime.status_sync_event.clear()
-            try:
-                self._sync_live_order_statuses()
-            except Exception as exc:
-                self._log("orders", f"Ошибка фонового обновления статусов: {exc}")
-
-    def start_order_status_auto_refresh(self) -> Dict[str, Any]:
-        runtime = _get_runtime()
-        with runtime.lock:
-            if runtime.status_sync_thread is None or not runtime.status_sync_thread.is_alive():
-                runtime.status_sync_thread = Thread(
-                    target=self._order_status_auto_refresh_worker,
-                    name="UiV2OrderStatusRefresh",
-                    daemon=True,
-                )
-                runtime.status_sync_thread.start()
-            runtime.status_sync_event.set()
         return {"success": True}
 
     def _normalize_order_name_key(self, value: str) -> str:
@@ -583,17 +556,29 @@ class ApiBridge:
         runtime = _get_runtime()
         normalized_id = str(document_id or "").strip()
         translated_fallback = _translate_status(fallback_status)
-        cached = runtime.document_status_cache.get(normalized_id)
-        now = time.time()
-        if cached and now - float(cached.get("timestamp") or 0.0) < DOCUMENT_STATUS_CACHE_TTL_SECONDS:
-            return dict(cached.get("payload") or {})
-
+        if translated_fallback in {
+            "Скачан",
+            "Введен в оборот",
+            "Ошибка ввода",
+            "Ошибка ТСД",
+            "Отправлено на ТСД",
+        }:
+            return {
+                "raw": str(fallback_status or "").strip(),
+                "label": translated_fallback,
+                "source": "history",
+            }
         if not normalized_id or session is None:
             return {
                 "raw": str(fallback_status or "").strip(),
                 "label": translated_fallback,
                 "source": "history",
             }
+
+        cached = runtime.document_status_cache.get(normalized_id)
+        now = time.time()
+        if cached and now - float(cached.get("timestamp") or 0.0) < DOCUMENT_STATUS_CACHE_TTL_SECONDS:
+            return dict(cached.get("payload") or {})
 
         try:
             raw_status = check_order_status(session, normalized_id)
@@ -610,66 +595,6 @@ class ApiBridge:
                 "label": translated_fallback,
                 "source": "history",
             }
-
-    def _collect_status_sync_candidates(self) -> List[Dict[str, Any]]:
-        runtime = _get_runtime()
-        load_download_items = getattr(runtime, "load_download_items_from_history", None)
-        if callable(load_download_items):
-            load_download_items()
-        merged_by_id: Dict[str, Dict[str, Any]] = {}
-
-        def remember(item: Dict[str, Any]) -> None:
-            document_id = str(item.get("document_id") or "").strip()
-            if not document_id:
-                return
-            merged_by_id[document_id] = self._merge_order_data(merged_by_id.get(document_id) or {}, item)
-
-        for item in runtime.session_orders:
-            remember(item)
-        for item in runtime.download_items:
-            remember(item)
-        for item in runtime.history_db.get_all_orders()[:ORDER_STATUS_BACKGROUND_SYNC_HISTORY_LIMIT]:
-            remember(item)
-        return list(merged_by_id.values())
-
-    def _sync_live_order_statuses(self) -> int:
-        session = self._ensure_session()
-        runtime = _get_runtime()
-        history_updates: List[Dict[str, Any]] = []
-
-        for item in self._collect_status_sync_candidates():
-            document_id = str(item.get("document_id") or "").strip()
-            if not document_id:
-                continue
-            try:
-                raw_status = str(check_order_status(session, document_id) or "").strip()
-            except Exception:
-                continue
-            if not raw_status:
-                continue
-
-            runtime.document_status_cache[document_id] = {
-                "timestamp": time.time(),
-                "payload": {
-                    "raw": raw_status,
-                    "label": _translate_status(raw_status),
-                    "source": "kontur",
-                },
-            }
-            history_updates.append({"document_id": document_id, "status": raw_status})
-
-            for collection in (runtime.download_items, runtime.session_orders):
-                for target in collection:
-                    if str(target.get("document_id") or "").strip() != document_id:
-                        continue
-                    if target.get("downloading"):
-                        continue
-                    target["status"] = raw_status
-                    target["status_raw"] = raw_status
-
-        if history_updates:
-            runtime.history_db.update_orders_batch(history_updates, push=True, reason="status_sync")
-        return len(history_updates)
 
     def _resolve_marking_status_via_worker(self, csv_path: str) -> Optional[Dict[str, Any]]:
         worker_path = Path(__file__).resolve().parent / "true_status_worker.py"
