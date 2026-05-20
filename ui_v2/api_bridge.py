@@ -3586,6 +3586,7 @@ class ApiBridge:
     def get_intro_state(self) -> Dict[str, Any]:
         try:
             deleted_ids = self._get_deleted_document_ids()
+            session = self._ensure_session_safely("intro")
             intro_items = [
                 item
                 for item in self._collect_known_orders()
@@ -3597,7 +3598,7 @@ class ApiBridge:
                 "items": [
                     self._normalize_history_item(
                         item,
-                        session=None,
+                        session=session,
                         include_marking_status=False,
                         tab_type="intro",
                     )
@@ -3967,7 +3968,7 @@ class ApiBridge:
         try:
             runtime = _get_runtime()
             deleted_ids = self._get_deleted_document_ids()
-            session = self._ensure_session_safely("tsd") if live else None
+            session = self._ensure_session_safely("tsd")
             orders: List[Dict[str, Any]] = []
             for item in runtime.history_db.get_all_orders():
                 document_id = str(item.get("document_id") or "").strip()
