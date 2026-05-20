@@ -4970,7 +4970,7 @@
     {
       "order_name": "770 стер латекс M 260422 5пар",
       "document_id": "71f8f9ba-6b1d-478d-9158-f37560747d74",
-      "status": "received",
+      "status": "error",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\770 стер латекс M 260422 5пар\\770 стер латекс M 260422 5пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\770 стер латекс M 260422 5пар\\770 стер латекс M 260422 5пар_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\770 стер латекс M 260422 5пар\\770 стер латекс M 260422 5пар.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
@@ -4986,7 +4986,7 @@
       ],
       "created_at": "2026-04-29T12:37:59.214014",
       "created_by": "user",
-      "updated_at": "2026-05-20T13:17:59.124808",
+      "updated_at": "2026-05-20T13:27:57.550327",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -16547,13 +16547,13 @@
     {
       "document_id": "805e44cc-3fda-4c1b-841f-86a182291a44",
       "order_name": "1478 HR лат M заявка 4185",
-      "status": "error",
+      "status": "received",
       "simpl": "латекс hr",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р M, цвет синий",
       "gtin": "4650118040533",
       "created_at": "2025-11-17T16:29:26.378116",
       "created_by": "sklad",
-      "updated_at": "2026-05-20T13:25:29.179607",
+      "updated_at": "2026-05-20T13:27:57.572415",
       "updated_by": "user",
       "tsd_created": false,
       "tsd_created_at": null,
@@ -17123,7 +17123,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-20T13:25:31.049188",
+  "last_update": "2026-05-20T13:27:59.193500",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
