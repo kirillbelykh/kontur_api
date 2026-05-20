@@ -11,7 +11,7 @@ import tempfile
 import time
 import uuid
 from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 from threading import Event, Lock, Thread
@@ -94,6 +94,9 @@ DOCUMENT_STATUS_CACHE_TTL_SECONDS = 60
 CODE_STATUS_CACHE_TTL_SECONDS = 180
 CODE_STATUS_SAMPLE_SIZE = 25
 TRUE_STATUS_WORKER_TIMEOUT_SECONDS = 25
+LIVE_STATUS_REFRESH_INTERVAL_SECONDS = 30
+LIVE_STATUS_PAGE_LIMIT = 1000
+LIVE_STATUS_MAX_WORKERS = 2
 DELETED_ORDERS_DIRNAME = "Удаленные"
 DELETED_ORDERS_FILE = "deleted_orders.json"
 MARKING_CODES_DIRNAME = "\u041a\u043e\u0434\u044b \u043a\u043c"
@@ -136,6 +139,35 @@ STATUS_LABELS = {
     "crptSendingError": "Ошибка отправки в ЧЗ",
     "relatedDocumentFailed": "Ошибка связанного документа",
     "UNKNOWN": "Неизвестно",
+}
+
+ORDER_STATUS_LABELS = {
+    "created": "Создан",
+    "sendForRelease": "Заказывается",
+    "sendforrelease": "Заказывается",
+    "released": "Выпущены",
+    "received": "Коды получены",
+}
+
+INTRO_STATUS_LABELS = {
+    "created": "Создан",
+    "waitChecking": "На проверке",
+    "sentForIntroduction": "Отправлен на подпись",
+    "introduced": "Введены в оборот",
+    "readyForSend": "Готов к отправке",
+    "hasErrors": "Есть ошибки",
+    "doesNotHaveErrors": "Проверен без ошибок",
+}
+
+TSD_STATUS_LABELS = {
+    "created": "Отправлено",
+    "waitChecking": "На проверке",
+    "sentForIntroduction": "Отправлен на подпись",
+    "introduced": "Введены в оборот",
+    "readyForSend": "Наполнен на ТСД",
+    "returnedToTsd": "Возвращен на ТСД",
+    "tsdProcessStart": "Отправлено",
+    "approveFailed": "Не принят",
 }
 
 AGGREGATION_TABLE_STATUSES = (
@@ -239,6 +271,27 @@ def _translate_status(value: Any) -> str:
     return _normalize_ui_text(translated)
 
 
+def _translate_order_status(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "Неизвестно"
+    return _normalize_ui_text(ORDER_STATUS_LABELS.get(raw, ORDER_STATUS_LABELS.get(raw.lower(), _translate_status(raw))))
+
+
+def _translate_intro_status(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "Не введены в оборот"
+    return _normalize_ui_text(INTRO_STATUS_LABELS.get(raw, INTRO_STATUS_LABELS.get(raw.lower(), _translate_status(raw))))
+
+
+def _translate_tsd_status(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "Не отправлено"
+    return _normalize_ui_text(TSD_STATUS_LABELS.get(raw, TSD_STATUS_LABELS.get(raw.lower(), _translate_intro_status(raw))))
+
+
 def _format_status_counts(counts: Counter[str]) -> str:
     parts = []
     for raw_status, count in counts.items():
@@ -287,6 +340,15 @@ class _BridgeRuntime:
         self.aggregation_cache_ttl_seconds = 90.0
         self.session_refresh_event = Event()
         self.session_refresh_thread: Optional[Thread] = None
+        self.live_status_event = Event()
+        self.live_status_thread: Optional[Thread] = None
+        self.live_status_refreshing = False
+        self.live_status_last_refresh_at = 0.0
+        self.live_order_by_id: Dict[str, Dict[str, Any]] = {}
+        self.live_order_by_number: Dict[str, Dict[str, Any]] = {}
+        self.live_intro_by_order_id: Dict[str, Dict[str, Any]] = {}
+        self.live_intro_by_document_id: Dict[str, Dict[str, Any]] = {}
+        self.live_intro_by_number: Dict[str, Dict[str, Any]] = {}
         self.load_download_items_from_history()
         self.history_sync_thread: Optional[Thread] = None
         self.start_history_sync_on_startup()
@@ -399,20 +461,7 @@ class ApiBridge:
                 )
                 runtime.session_refresh_thread.start()
             runtime.session_refresh_event.set()
-
-        # Запускаем фоновое обновление статусов при старте
         self._start_background_status_updater()
-
-        # Автоматическая пролонгация доступа при запуске
-        def _prolong_on_startup() -> None:
-            try:
-                cookies_module.prolong_kontur_access(force=True)
-                self._log("orders", "Пролонгация доступа выполнена при запуске")
-            except Exception as exc:
-                logger.exception("Ошибка пролонгации доступа при запуске: %s", exc)
-
-        Thread(target=_prolong_on_startup, name="UiV2ProlongOnStartup", daemon=True).start()
-
         return {"success": True}
 
     def _normalize_order_name_key(self, value: str) -> str:
@@ -586,6 +635,71 @@ class ApiBridge:
                         return codes
         return codes
 
+    def _live_order_meta_for(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+        runtime = _get_runtime()
+        document_id = str(order_data.get("document_id") or "").strip()
+        order_name = str(order_data.get("order_name") or order_data.get("documentNumber") or "").strip()
+        return dict(
+            (runtime.live_order_by_id.get(document_id) if document_id else None)
+            or (runtime.live_order_by_number.get(order_name) if order_name else None)
+            or {}
+        )
+
+    def _live_intro_meta_for_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+        runtime = _get_runtime()
+        document_id = str(order_data.get("document_id") or "").strip()
+        order_name = str(order_data.get("order_name") or order_data.get("documentNumber") or "").strip()
+        introduction_id = str(
+            order_data.get("introductionDocumentId")
+            or order_data.get("introduction_document_id")
+            or order_data.get("tsd_intro_number")
+            or ""
+        ).strip()
+        return dict(
+            (runtime.live_intro_by_order_id.get(document_id) if document_id else None)
+            or (runtime.live_intro_by_document_id.get(introduction_id) if introduction_id else None)
+            or (runtime.live_intro_by_number.get(order_name) if order_name else None)
+            or {}
+        )
+
+    def _live_order_status_payload(self, order_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        meta = self._live_order_meta_for(order_data)
+        raw_status = str(meta.get("documentStatus") or meta.get("status") or "").strip()
+        if not raw_status:
+            return None
+        return {
+            "raw": raw_status,
+            "label": _translate_order_status(raw_status),
+            "source": "kontur",
+            "summary": self._build_live_status_summary(meta),
+        }
+
+    def _live_intro_status_payload(self, order_data: Dict[str, Any], *, for_tsd: bool = False) -> Optional[Dict[str, Any]]:
+        meta = self._live_intro_meta_for_order(order_data)
+        raw_status = str(meta.get("documentStatus") or meta.get("status") or "").strip()
+        if not raw_status:
+            return None
+        return {
+            "raw": raw_status,
+            "label": _translate_tsd_status(raw_status) if for_tsd else _translate_intro_status(raw_status),
+            "source": "kontur",
+            "summary": self._build_live_status_summary(meta),
+        }
+
+    def _build_live_status_summary(self, meta: Dict[str, Any]) -> str:
+        parts: List[str] = []
+        updated_at = _format_datetime_value(meta.get("updatedDate") or meta.get("updated_at") or "")
+        if updated_at:
+            parts.append(f"обновлено {updated_at}")
+        requested = meta.get("requestedCodesCount")
+        received = meta.get("receivedCodesCount")
+        codes_count = meta.get("codesCount")
+        if requested not in (None, "") and received not in (None, ""):
+            parts.append(f"кодов {received}/{requested}")
+        elif codes_count not in (None, ""):
+            parts.append(f"кодов {codes_count}")
+        return ", ".join(parts)
+
     def _resolve_document_status(self, session: Optional[requests.Session], document_id: str, fallback_status: str, *, tab_type: str = "orders") -> Dict[str, Any]:
         """Определяет статус заказа.
         tab_type='orders' - запрос к /api/v1/codes-order (статусы заказов кодов)
@@ -722,19 +836,52 @@ class ApiBridge:
     ) -> Dict[str, Any]:
         fallback_status = str(order_data.get("status") or "").strip()
         translated_fallback = _translate_status(fallback_status)
-        if order_data.get("tsd_created") and translated_fallback in {"Ожидает", "Выполнен", "Отправлено на ТСД"}:
+
+        if tab_type == "download":
+            local_status = self._check_codes_file_on_disk(order_data)
+            return {
+                "status": local_status,
+                "status_raw": local_status,
+                "status_source": "local",
+                "status_summary": "",
+            }
+
+        if tab_type == "intro":
+            document_status = self._live_intro_status_payload(order_data) or {
+                "raw": fallback_status,
+                "label": _translate_intro_status(fallback_status),
+                "source": "history",
+            }
+        elif tab_type == "tsd":
+            document_status = self._live_intro_status_payload(order_data, for_tsd=True)
+            if document_status is None:
+                if order_data.get("tsd_created"):
+                    document_status = {
+                        "raw": "tsd_created",
+                        "label": "Отправлено",
+                        "source": "history",
+                    }
+                else:
+                    document_status = {
+                        "raw": fallback_status,
+                        "label": "Не отправлено",
+                        "source": "history",
+                    }
+        elif order_data.get("tsd_created") and translated_fallback in {"Ожидает", "Выполнен", "Отправлено на ТСД"}:
             document_status = {
                 "raw": fallback_status,
                 "label": translated_fallback,
                 "source": "history",
             }
         else:
-            document_status = self._resolve_document_status(
-                session,
-                str(order_data.get("document_id") or "").strip(),
-                fallback_status,
-                tab_type=tab_type,
-            )
+            document_status = self._live_order_status_payload(order_data)
+            if document_status is None:
+                document_status = self._resolve_document_status(
+                    session,
+                    str(order_data.get("document_id") or "").strip(),
+                    fallback_status,
+                    tab_type=tab_type,
+                )
         marking_status = self._resolve_marking_status(order_data) if include_marking_status else None
         final_status = marking_status or document_status
         return {
@@ -760,6 +907,7 @@ class ApiBridge:
         tab_type: str = "orders",
     ) -> Dict[str, Any]:
         merged = self._merge_order_data(item)
+        live_meta = self._live_intro_meta_for_order(merged) if tab_type in {"intro", "tsd"} else self._live_order_meta_for(merged)
         status_payload = self._compose_status_payload(
             merged,
             session=session,
@@ -767,9 +915,17 @@ class ApiBridge:
             tab_type=tab_type,
         )
         tsd_created = bool(merged.get("tsd_created", False))
+        live_document_id = str(live_meta.get("documentId") or "").strip()
+        intro_document_id = ""
+        if tab_type in {"intro", "tsd"}:
+            intro_document_id = live_document_id
+        else:
+            intro_document_id = str(live_meta.get("introductionDocumentId") or "").strip()
         return {
-            "order_name": str(merged.get("order_name") or merged.get("document_number") or "").strip(),
+            "order_name": str(merged.get("order_name") or live_meta.get("documentNumber") or merged.get("document_number") or "").strip(),
             "document_id": str(merged.get("document_id") or "").strip(),
+            "kontur_document_id": live_document_id,
+            "introduction_document_id": intro_document_id,
             "status": status_payload["status"],
             "status_raw": status_payload["status_raw"],
             "status_source": status_payload["status_source"],
@@ -781,11 +937,11 @@ class ApiBridge:
             "csv_path": merged.get("csv_path") or "",
             "pdf_path": merged.get("pdf_path") or "",
             "xls_path": merged.get("xls_path") or "",
-            "created_at": merged.get("created_at") or "",
-            "updated_at": merged.get("updated_at") or "",
+            "created_at": merged.get("created_at") or live_meta.get("createdDate") or "",
+            "updated_at": merged.get("updated_at") or live_meta.get("updatedDate") or "",
             "tsd_created": tsd_created,
             "tsd_intro_number": merged.get("tsd_intro_number") or "",
-            "tsd_status": _translate_status("tsd_created" if tsd_created else "tsd_not_created"),
+            "tsd_status": status_payload["status"] if tab_type == "tsd" else _translate_status("tsd_created" if tsd_created else "tsd_not_created"),
             "can_intro": is_order_ready_for_intro(merged),
             "can_tsd": is_order_ready_for_tsd(merged) or tsd_created,
         }
@@ -2976,6 +3132,7 @@ class ApiBridge:
 
     def get_orders_view_state(self) -> Dict[str, Any]:
         try:
+            self._start_background_status_updater()
             runtime = _get_runtime()
             deleted_ids = self._get_deleted_document_ids()
             history_items: List[Dict[str, Any]] = []
@@ -3225,6 +3382,7 @@ class ApiBridge:
 
     def get_download_state(self) -> Dict[str, Any]:
         try:
+            self._start_background_status_updater()
             runtime = _get_runtime()
             runtime.load_download_items_from_history()
             printers, default_printer = list_installed_printers()
@@ -3233,11 +3391,7 @@ class ApiBridge:
             for item in runtime.download_items:
                 if str(item.get("document_id") or "").strip() in deleted_ids:
                     continue
-                serialized = self._serialize_download_item(item, session=None)
-                # Проверяем наличие файла на диске для статуса "Скачаны"/"Не скачаны"
-                file_status = self._check_codes_file_on_disk(item)
-                if file_status == "Не скачаны":
-                    serialized["status"] = "Не скачаны"
+                serialized = self._serialize_download_item(item, session=None, tab_type="download")
                 items.append(serialized)
             return {
                 "items": items,
@@ -3583,40 +3737,53 @@ class ApiBridge:
             self._log("download", f"Ошибка печати термоэтикеток: {exc}")
             return {"success": False, "error": str(exc)}
 
-    def get_intro_state(self) -> Dict[str, Any]:
+    def get_intro_state(self, search_text: str = "") -> Dict[str, Any]:
         try:
+            self._start_background_status_updater()
             deleted_ids = self._get_deleted_document_ids()
-            session = self._ensure_session_safely("intro")
-            intro_items = [
-                item
-                for item in self._collect_known_orders()
-                if str(item.get("document_id") or "").strip()
-                and str(item.get("document_id") or "").strip() not in deleted_ids
-            ]
+            normalized_search = str(search_text or "").strip()
+            intro_items = []
+            for item in self._collect_known_orders():
+                document_id = str(item.get("document_id") or "").strip()
+                if not document_id or document_id in deleted_ids:
+                    continue
+                if normalized_search:
+                    haystack = " ".join(
+                        str(value or "")
+                        for value in (
+                            item.get("order_name"),
+                            item.get("full_name"),
+                            item.get("gtin"),
+                            document_id,
+                        )
+                    ).lower()
+                    if normalized_search.lower() not in haystack:
+                        continue
+                intro_items.append(item)
             intro_items.sort(key=_order_freshness_sort_key, reverse=True)
             return {
                 "items": [
                     self._normalize_history_item(
                         item,
-                        session=session,
+                        session=None,
                         include_marking_status=False,
                         tab_type="intro",
                     )
                     for item in intro_items
-                ]
+                ],
+                "live_updated_at": _get_runtime().live_status_last_refresh_at,
             }
         except Exception as exc:
             return {"error": str(exc)}
 
-    def _fetch_codes_orders_batch(self, session: requests.Session) -> Dict[str, Dict[str, Any]]:
-        """Пакетно получает статусы заказов из Контура.
-        Возвращает словарь {documentNumber: {status, ...metadata}}."""
+    def _fetch_codes_orders_batch(self, session: requests.Session) -> Dict[str, Dict[str, Dict[str, Any]]]:
         base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
         warehouse_id = str(os.getenv("WAREHOUSE_ID") or getattr(api_module, "WAREHOUSE_ID", ""))
         if not warehouse_id:
-            return {}
-        result: Dict[str, Dict[str, Any]] = {}
-        limit = 100
+            return {"by_id": {}, "by_number": {}}
+        by_id: Dict[str, Dict[str, Any]] = {}
+        by_number: Dict[str, Dict[str, Any]] = {}
+        limit = LIVE_STATUS_PAGE_LIMIT
         offset = 0
         try:
             while True:
@@ -3636,27 +3803,30 @@ class ApiBridge:
                 payload = response.json()
                 items = payload.get("items") or []
                 for item in items:
+                    doc_id = str(item.get("documentId") or "").strip()
                     doc_number = str(item.get("documentNumber") or "").strip()
+                    if doc_id:
+                        by_id[doc_id] = item
                     if doc_number:
-                        result[doc_number] = item
+                        by_number[doc_number] = item
                 total = int(payload.get("total") or len(items))
                 offset += len(items)
                 if not items or offset >= total:
                     break
-            return result
+            return {"by_id": by_id, "by_number": by_number}
         except Exception:
             logger.exception("Ошибка пакетного получения статусов заказов")
-            return result
+            return {"by_id": by_id, "by_number": by_number}
 
-    def _fetch_introductions_batch(self, session: requests.Session) -> Dict[str, Dict[str, Any]]:
-        """Пакетно получает статусы ввода в оборот из Контура.
-        Возвращает словарь {documentNumber: {status, ...metadata}}."""
+    def _fetch_introductions_batch(self, session: requests.Session) -> Dict[str, Dict[str, Dict[str, Any]]]:
         base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
         warehouse_id = str(os.getenv("WAREHOUSE_ID") or getattr(api_module, "WAREHOUSE_ID", ""))
         if not warehouse_id:
-            return {}
-        result: Dict[str, Dict[str, Any]] = {}
-        limit = 100
+            return {"by_order_id": {}, "by_document_id": {}, "by_number": {}}
+        by_order_id: Dict[str, Dict[str, Any]] = {}
+        by_document_id: Dict[str, Dict[str, Any]] = {}
+        by_number: Dict[str, Dict[str, Any]] = {}
+        limit = LIVE_STATUS_PAGE_LIMIT
         offset = 0
         try:
             while True:
@@ -3676,80 +3846,81 @@ class ApiBridge:
                 payload = response.json()
                 items = payload.get("items") or []
                 for item in items:
+                    doc_id = str(item.get("documentId") or "").strip()
+                    order_id = str(item.get("codesOrderDocumentId") or "").strip()
                     doc_number = str(item.get("documentNumber") or "").strip()
+                    if doc_id:
+                        by_document_id[doc_id] = item
+                    if order_id:
+                        by_order_id[order_id] = item
                     if doc_number:
-                        result[doc_number] = item
+                        by_number[doc_number] = item
                 total = int(payload.get("total") or len(items))
                 offset += len(items)
                 if not items or offset >= total:
                     break
-            return result
+            return {"by_order_id": by_order_id, "by_document_id": by_document_id, "by_number": by_number}
         except Exception:
             logger.exception("Ошибка пакетного получения статусов ввода в оборот")
-            return result
+            return {"by_order_id": by_order_id, "by_document_id": by_document_id, "by_number": by_number}
+
+    def _refresh_live_status_cache_once(self) -> None:
+        runtime = _get_runtime()
+        if runtime.live_status_refreshing:
+            return
+        runtime.live_status_refreshing = True
+        try:
+            session = self._ensure_session_safely()
+            if not session:
+                return
+            with ThreadPoolExecutor(max_workers=LIVE_STATUS_MAX_WORKERS) as executor:
+                future_orders = executor.submit(self._fetch_codes_orders_batch, session)
+                future_intro = executor.submit(self._fetch_introductions_batch, session)
+                orders_payload = future_orders.result(timeout=90)
+                intro_payload = future_intro.result(timeout=90)
+            with runtime.lock:
+                runtime.live_order_by_id = dict(orders_payload.get("by_id") or {})
+                runtime.live_order_by_number = dict(orders_payload.get("by_number") or {})
+                runtime.live_intro_by_order_id = dict(intro_payload.get("by_order_id") or {})
+                runtime.live_intro_by_document_id = dict(intro_payload.get("by_document_id") or {})
+                runtime.live_intro_by_number = dict(intro_payload.get("by_number") or {})
+                runtime.live_status_last_refresh_at = time.time()
+        finally:
+            runtime.live_status_refreshing = False
 
     def _background_status_updater(self) -> None:
-        """Фоновый воркер, обновляющий статусы из Контура каждые 30 секунд."""
         runtime = _get_runtime()
         while True:
             try:
-                time.sleep(30)
-                session = self._ensure_session_safely()
-                if not session:
-                    continue
-
-                # Параллельно получаем статусы заказов и ввода
-                with ThreadPoolExecutor(max_workers=2) as executor:
-                    future_orders = executor.submit(self._fetch_codes_orders_batch, session)
-                    future_intro = executor.submit(self._fetch_introductions_batch, session)
-                    orders_by_number = future_orders.result(timeout=60)
-                    intro_by_number = future_intro.result(timeout=60)
-
-                # Обновляем кеш статусов заказов
-                for item in runtime.download_items:
-                    doc_id = str(item.get("document_id") or "").strip()
-                    order_name = str(item.get("order_name") or "").strip()
-                    if order_name and order_name in orders_by_number:
-                        kontur_item = orders_by_number[order_name]
-                        raw_status = str(kontur_item.get("documentStatus") or kontur_item.get("status") or "").strip()
-                        if raw_status:
-                            runtime.document_status_cache[doc_id] = {
-                                "timestamp": time.time(),
-                                "payload": {
-                                    "raw": raw_status,
-                                    "label": _translate_status(raw_status),
-                                    "source": "kontur",
-                                },
-                            }
-                # Обновляем кеш для ввода в оборот
-                for item in runtime.history_db.get_all_orders():
-                    doc_id = str(item.get("document_id") or "").strip()
-                    order_name = str(item.get("order_name") or "").strip()
-                    if order_name and order_name in intro_by_number:
-                        kontur_item = intro_by_number[order_name]
-                        raw_status = str(kontur_item.get("documentStatus") or "").strip()
-                        if raw_status:
-                            runtime.document_status_cache[f"intro_{doc_id}"] = {
-                                "timestamp": time.time(),
-                                "payload": {
-                                    "raw": raw_status,
-                                    "label": _translate_status(raw_status),
-                                    "source": "kontur",
-                                },
-                            }
+                self._refresh_live_status_cache_once()
             except Exception:
                 logger.exception("Ошибка в фоновом обновлении статусов")
+            runtime.live_status_event.wait(timeout=LIVE_STATUS_REFRESH_INTERVAL_SECONDS)
+            runtime.live_status_event.clear()
 
     def _start_background_status_updater(self) -> None:
-        """Запускает фоновый воркер обновления статусов."""
         runtime = _get_runtime()
-        thread = Thread(
-            target=self._background_status_updater,
-            name="UiV2BackgroundStatusUpdater",
-            daemon=True,
-        )
-        thread.start()
-        self._log("orders", "Фоновое обновление статусов запущено")
+        if not hasattr(runtime, "live_status_event") or not hasattr(runtime, "live_status_thread"):
+            return
+        lock = getattr(runtime, "lock", None)
+
+        def _start_locked() -> None:
+            if runtime.live_status_thread is not None and runtime.live_status_thread.is_alive():
+                runtime.live_status_event.set()
+                return
+            runtime.live_status_thread = Thread(
+                target=self._background_status_updater,
+                name="UiV2BackgroundStatusUpdater",
+                daemon=True,
+            )
+            runtime.live_status_thread.start()
+            runtime.live_status_event.set()
+
+        if lock is None:
+            _start_locked()
+        else:
+            with lock:
+                _start_locked()
 
     def _check_codes_file_on_disk(self, item: Dict[str, Any]) -> str:
         """Проверяет, существует ли CSV-файл с кодами на диске.
@@ -3964,32 +4135,47 @@ class ApiBridge:
             self._log("intro", f"Ошибка точного ввода в оборот: {exc}")
             return {"success": False, "error": str(exc)}
 
-    def get_tsd_state(self, live: bool = False) -> Dict[str, Any]:
+    def get_tsd_state(self, live: bool = False, search_text: str = "") -> Dict[str, Any]:
         try:
+            self._start_background_status_updater()
             runtime = _get_runtime()
             deleted_ids = self._get_deleted_document_ids()
-            session = self._ensure_session_safely("tsd")
+            normalized_search = str(search_text or "").strip()
             orders: List[Dict[str, Any]] = []
             for item in runtime.history_db.get_all_orders():
                 document_id = str(item.get("document_id") or "").strip()
                 if not document_id or document_id in deleted_ids:
                     continue
                 download_like = _history_order_to_download_item(item)
-                if item.get("tsd_created") or is_order_ready_for_tsd(download_like):
-                    orders.append(item)
+                if not (item.get("tsd_created") or is_order_ready_for_tsd(download_like) or self._live_intro_meta_for_order(item)):
+                    continue
+                if normalized_search:
+                    haystack = " ".join(
+                        str(value or "")
+                        for value in (
+                            item.get("order_name"),
+                            item.get("full_name"),
+                            item.get("gtin"),
+                            document_id,
+                        )
+                    ).lower()
+                    if normalized_search.lower() not in haystack:
+                        continue
+                orders.append(item)
 
-            orders.sort(key=lambda row: str(row.get("created_at") or ""), reverse=True)
+            orders.sort(key=_order_freshness_sort_key, reverse=True)
             return {
                 "items": [
                     self._normalize_history_item(
                         item,
-                        session=session,
+                        session=None,
                         include_marking_status=bool(live) and self._should_include_marking_status(item),
                         tab_type="tsd",
                     )
-                    for item in orders[:120]
+                    for item in orders[:300]
                 ],
                 "live": bool(live),
+                "live_updated_at": runtime.live_status_last_refresh_at,
             }
         except Exception as exc:
             return {"error": str(exc)}

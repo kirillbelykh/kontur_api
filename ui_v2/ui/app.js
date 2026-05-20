@@ -51,10 +51,10 @@ const UI_PERF = {
     labels: 20000,
   },
   routeAutoRefreshMs: {
-    orders: 60000,
-    download: 60000,
-    intro: 75000,
-    tsd: 75000,
+    orders: 15000,
+    download: 15000,
+    intro: 15000,
+    tsd: 15000,
     aggregation: 180000,
     labels: 120000,
   },
@@ -172,6 +172,7 @@ const state = {
     logUpdatedAt: {},
     logLoading: {},
     findQuery: '',
+    detailsLoading: false,
   },
 };
 
@@ -182,6 +183,7 @@ let interactionFallbacksInstalled = false;
 let desktopContextMenu = null;
 let desktopContextMenuTarget = null;
 let desktopFindPanel = null;
+let orderDetailsModal = null;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -732,6 +734,7 @@ function ensureDesktopContextMenu() {
   desktopContextMenu = document.createElement('div');
   desktopContextMenu.className = 'desktop-context-menu is-hidden';
   desktopContextMenu.innerHTML = `
+    <button type="button" data-action="details">Подробнее</button>
     <button type="button" data-action="find">Найти</button>
     <button type="button" data-action="cut">Вырезать</button>
     <button type="button" data-action="copy">Копировать</button>
@@ -750,6 +753,46 @@ function ensureDesktopContextMenu() {
   return desktopContextMenu;
 }
 
+function findKnownOrderRow(documentId) {
+  const normalizedId = String(documentId || '').trim();
+  if (!normalizedId) {
+    return null;
+  }
+  const collections = [
+    state.orders.sessionOrders,
+    state.orders.history,
+    state.orders.deletedOrders,
+    state.download.items,
+    state.intro.items,
+    state.tsd.items,
+    state.labels.orders,
+  ];
+  for (const collection of collections) {
+    const found = (collection || []).find((item) => {
+      return String(item?.document_id || '').trim() === normalizedId
+        || String(item?.kontur_document_id || '').trim() === normalizedId
+        || String(item?.introduction_document_id || '').trim() === normalizedId;
+    });
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
+function getContextDocumentId(target) {
+  if (!target || !(target instanceof Element)) {
+    return '';
+  }
+  const row = target.closest('tr[data-row-id]');
+  const rowId = String(row?.dataset?.rowId || '').trim();
+  if (!rowId) {
+    return '';
+  }
+  const knownRow = findKnownOrderRow(rowId);
+  return String(knownRow?.document_id || rowId || '').trim();
+}
+
 function hideDesktopContextMenu() {
   if (!desktopContextMenu) {
     return;
@@ -762,12 +805,16 @@ function showDesktopContextMenu(clientX, clientY, target) {
   const menu = ensureDesktopContextMenu();
   const editableTarget = getEditableTarget(target);
   const hasSelection = hasActiveTextSelection();
+  const detailsDocumentId = getContextDocumentId(target);
   desktopContextMenuTarget = editableTarget || target || null;
 
   menu.querySelectorAll('button[data-action]').forEach((button) => {
     const action = button.dataset.action;
     let enabled = false;
-    if (action === 'find') {
+    if (action === 'details') {
+      enabled = Boolean(detailsDocumentId);
+      button.dataset.documentId = detailsDocumentId;
+    } else if (action === 'find') {
       enabled = true;
     } else if (action === 'copy') {
       enabled = Boolean(editableTarget || hasSelection);
@@ -912,6 +959,110 @@ function selectAllForTarget(target) {
   document.execCommand('selectAll');
 }
 
+function ensureOrderDetailsModal() {
+  if (orderDetailsModal) {
+    return orderDetailsModal;
+  }
+  orderDetailsModal = document.createElement('div');
+  orderDetailsModal.className = 'order-details-overlay is-hidden';
+  orderDetailsModal.innerHTML = `
+    <div class="order-details-dialog" role="dialog" aria-modal="true" aria-labelledby="order-details-title">
+      <div class="order-details-header">
+        <div>
+          <h3 id="order-details-title">Подробнее о заказе</h3>
+          <p id="order-details-subtitle">Метаданные из Контура и локальной истории</p>
+        </div>
+        <button class="secondary-btn icon-btn" type="button" data-details-close aria-label="Закрыть">×</button>
+      </div>
+      <div class="order-details-content" id="order-details-content"></div>
+    </div>
+  `;
+  orderDetailsModal.addEventListener('click', (event) => {
+    if (event.target === orderDetailsModal || event.target.closest('[data-details-close]')) {
+      hideOrderDetailsModal();
+    }
+  });
+  document.body.appendChild(orderDetailsModal);
+  return orderDetailsModal;
+}
+
+function hideOrderDetailsModal() {
+  if (orderDetailsModal) {
+    orderDetailsModal.classList.add('is-hidden');
+  }
+}
+
+function groupDetailsFields(fields) {
+  const sections = [
+    { title: 'Основное', fields: [] },
+    { title: 'Позиции', fields: [] },
+    { title: 'События', fields: [] },
+    { title: 'Связанные документы', fields: [] },
+    { title: 'Локальные файлы', fields: [] },
+    { title: 'Остальное', fields: [] },
+  ];
+  const pickSection = (field) => {
+    const label = String(field?.label || '').toLowerCase();
+    const rawKey = String(field?.raw_key || '').toLowerCase();
+    if (label.startsWith('позиция') || rawKey.startsWith('pos_')) return sections[1];
+    if (label.startsWith('событие') || rawKey.startsWith('event_')) return sections[2];
+    if (label.includes('связанный') || rawKey.startsWith('related')) return sections[3];
+    if (rawKey.includes('path') || label.includes('путь') || label.includes('локальный')) return sections[4];
+    if (sections[0].fields.length < 16) return sections[0];
+    return sections[5];
+  };
+  (fields || []).forEach((field) => pickSection(field).fields.push(field));
+  return sections.filter((section) => section.fields.length);
+}
+
+function renderOrderDetails(payload) {
+  const modal = ensureOrderDetailsModal();
+  const content = modal.querySelector('#order-details-content');
+  const subtitle = modal.querySelector('#order-details-subtitle');
+  const fields = Array.isArray(payload?.fields) ? payload.fields : [];
+  subtitle.textContent = payload?.document_id ? `Документ ${payload.document_id}` : 'Метаданные из Контура и локальной истории';
+  if (!fields.length) {
+    content.innerHTML = '<div class="table-empty">Метаданные по заказу не найдены.</div>';
+    return;
+  }
+  content.innerHTML = groupDetailsFields(fields).map((section) => `
+    <section class="order-details-section">
+      <h4>${escapeHtml(section.title)}</h4>
+      <dl>
+        ${section.fields.map((field) => `
+          <div>
+            <dt>${escapeHtml(field.label || '')}</dt>
+            <dd>${escapeHtml(field.value || '—')}</dd>
+          </div>
+        `).join('')}
+      </dl>
+    </section>
+  `).join('');
+}
+
+async function openOrderDetails(documentId) {
+  const normalizedId = String(documentId || '').trim();
+  if (!normalizedId || state.ui.detailsLoading) {
+    return;
+  }
+  state.ui.detailsLoading = true;
+  const modal = ensureOrderDetailsModal();
+  modal.classList.remove('is-hidden');
+  modal.querySelector('#order-details-content').innerHTML = '<div class="table-empty">Загружаем метаданные...</div>';
+  try {
+    const payload = await API.call('get_order_details', normalizedId);
+    if (payload?.success === false) {
+      throw new Error(payload.error || 'Не удалось получить метаданные заказа.');
+    }
+    renderOrderDetails(payload);
+  } catch (error) {
+    modal.querySelector('#order-details-content').innerHTML = `<div class="table-empty">${escapeHtml(error.message)}</div>`;
+    showToast(error.message, 'error');
+  } finally {
+    state.ui.detailsLoading = false;
+  }
+}
+
 function ensureDesktopFindPanel() {
   if (desktopFindPanel) {
     return desktopFindPanel;
@@ -1019,6 +1170,10 @@ function repeatDesktopFind(backwards = false) {
 
 async function runDesktopContextAction(action, target) {
   const editableTarget = getEditableTarget(target);
+  if (action === 'details') {
+    await openOrderDetails(getContextDocumentId(target));
+    return;
+  }
   if (action === 'find') {
     openDesktopFind();
     return;
@@ -1103,6 +1258,7 @@ function installDesktopInteractionFallbacks() {
         state.labels.fullscreenTable = '';
         renderLabelsFullscreenTable();
       }
+      hideOrderDetailsModal();
       hideDesktopFindPanel();
       hideDesktopContextMenu();
       return;
