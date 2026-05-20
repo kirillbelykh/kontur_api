@@ -3,9 +3,9 @@
     {
       "order_name": "953 хир 7,5 260328 заявка 5973",
       "document_id": "8d6e66be-d2cd-4a23-bc67-5cf20c163c8a",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\953 хир 75 260328 заявка 5973\\953 хир 75 260328 заявка 5973.pdf, C:\\Users\\user\\Desktop\\Коды км\\953 хир 75 260328 заявка 5973\\953 хир 7,5 260328 заявка 5973_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\953 хир 75 260328 заявка 5973\\953 хир 7,5 260328 заявка 5973.xls",
+      "simpl": "хир",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473505884",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\953 хир 75 260328 заявка 5973\\953 хир 75 260328 заявка 5973.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\953 хир 75 260328 заявка 5973\\953 хир 7,5 260328 заявка 5973_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\953 хир 75 260328 заявка 5973\\953 хир 7,5 260328 заявка 5973.xls"
     },
     {
       "order_name": "952 хир 7,5 260423 заявка 5973",
@@ -17111,7 +17114,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-20T11:43:05.720293",
+  "last_update": "2026-05-20T11:44:12.612649",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
