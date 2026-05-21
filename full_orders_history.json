@@ -19,12 +19,12 @@
       ],
       "created_at": "2026-05-21T09:59:47.747202",
       "created_by": "user",
-      "updated_at": "2026-05-21T09:59:47.747202",
+      "updated_at": "2026-05-21T10:10:28.118045",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "tsd_created": true,
+      "tsd_created_at": "2026-05-21T10:10:28.118045",
+      "tsd_intro_number": "9c34b9d6-5bc2-4f5f-849f-1f961c846acf",
+      "tsd_created_by": "user",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\тест 111\\тест 111_csv.csv",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\тест 111\\тест 111.pdf",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\тест 111\\тест 111.xls"
@@ -17178,7 +17178,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-21T10:09:57.538176",
+  "last_update": "2026-05-21T10:10:30.042197",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
