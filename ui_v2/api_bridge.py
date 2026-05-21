@@ -128,6 +128,7 @@ STATUS_LABELS = {
     "tsdProcessStart": "На ТСД",
     "tsd_created": "Отправлено на ТСД",
     "tsd_not_created": "Не отправлено на ТСД",
+    "archived": "В архиве",
     "INTRODUCED": "Введен в оборот",
     "APPLIED": "В обороте",
     "EMITTED": "Эмитирован",
@@ -147,6 +148,7 @@ ORDER_STATUS_LABELS = {
     "sendforrelease": "Заказывается",
     "released": "Выпущены",
     "received": "Коды получены",
+    "archived": "В архиве",
 }
 
 INTRO_STATUS_LABELS = {
@@ -157,6 +159,7 @@ INTRO_STATUS_LABELS = {
     "readyForSend": "Готов к отправке",
     "hasErrors": "Есть ошибки",
     "doesNotHaveErrors": "Проверен без ошибок",
+    "archived": "В архиве",
 }
 
 TSD_STATUS_LABELS = {
@@ -168,6 +171,7 @@ TSD_STATUS_LABELS = {
     "returnedToTsd": "Возвращен на ТСД",
     "tsdProcessStart": "Отправлено",
     "approveFailed": "Не принят",
+    "archived": "В архиве",
 }
 
 AGGREGATION_TABLE_STATUSES = (
@@ -639,9 +643,11 @@ class ApiBridge:
         runtime = _get_runtime()
         document_id = str(order_data.get("document_id") or "").strip()
         order_name = str(order_data.get("order_name") or order_data.get("documentNumber") or "").strip()
+        live_order_by_id = getattr(runtime, "live_order_by_id", {}) or {}
+        live_order_by_number = getattr(runtime, "live_order_by_number", {}) or {}
         return dict(
-            (runtime.live_order_by_id.get(document_id) if document_id else None)
-            or (runtime.live_order_by_number.get(order_name) if order_name else None)
+            (live_order_by_id.get(document_id) if document_id else None)
+            or (live_order_by_number.get(order_name) if order_name else None)
             or {}
         )
 
@@ -655,12 +661,45 @@ class ApiBridge:
             or order_data.get("tsd_intro_number")
             or ""
         ).strip()
+        live_intro_by_order_id = getattr(runtime, "live_intro_by_order_id", {}) or {}
+        live_intro_by_document_id = getattr(runtime, "live_intro_by_document_id", {}) or {}
+        live_intro_by_number = getattr(runtime, "live_intro_by_number", {}) or {}
         return dict(
-            (runtime.live_intro_by_order_id.get(document_id) if document_id else None)
-            or (runtime.live_intro_by_document_id.get(introduction_id) if introduction_id else None)
-            or (runtime.live_intro_by_number.get(order_name) if order_name else None)
+            (live_intro_by_order_id.get(document_id) if document_id else None)
+            or (live_intro_by_document_id.get(introduction_id) if introduction_id else None)
+            or (live_intro_by_number.get(order_name) if order_name else None)
             or {}
         )
+
+    def _is_archived_order(self, order_data: Dict[str, Any]) -> bool:
+        merged = self._merge_order_data(order_data)
+        live_order_meta = self._live_order_meta_for(merged)
+        live_intro_meta = self._live_intro_meta_for_order(merged)
+        status_values = [
+            merged.get("status"),
+            merged.get("documentStatus"),
+            merged.get("document_status"),
+            merged.get("relatedDocumentsStatus"),
+            live_order_meta.get("status"),
+            live_order_meta.get("documentStatus"),
+            live_intro_meta.get("status"),
+            live_intro_meta.get("documentStatus"),
+        ]
+        return any(str(value or "").strip().lower() == "archived" for value in status_values)
+
+    def _intro_status_for_order(self, order_data: Dict[str, Any]) -> Dict[str, str]:
+        live_intro_meta = self._live_intro_meta_for_order(order_data)
+        live_order_meta = self._live_order_meta_for(order_data)
+        raw_status = str(
+            live_intro_meta.get("documentStatus")
+            or live_intro_meta.get("status")
+            or live_order_meta.get("relatedDocumentsStatus")
+            or order_data.get("relatedDocumentsStatus")
+            or ""
+        ).strip()
+        if not raw_status:
+            return {"raw": "", "label": ""}
+        return {"raw": raw_status, "label": _translate_intro_status(raw_status)}
 
     def _live_order_status_payload(self, order_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         meta = self._live_order_meta_for(order_data)
@@ -916,6 +955,7 @@ class ApiBridge:
         )
         tsd_created = bool(merged.get("tsd_created", False))
         live_document_id = str(live_meta.get("documentId") or "").strip()
+        intro_status_payload = self._intro_status_for_order(merged)
         intro_document_id = ""
         if tab_type in {"intro", "tsd"}:
             intro_document_id = live_document_id
@@ -930,6 +970,8 @@ class ApiBridge:
             "status_raw": status_payload["status_raw"],
             "status_source": status_payload["status_source"],
             "status_summary": status_payload["status_summary"],
+            "intro_status": intro_status_payload["label"],
+            "intro_status_raw": intro_status_payload["raw"],
             "simpl": str(merged.get("simpl") or merged.get("simpl_name") or "").strip(),
             "full_name": _extract_position_name(merged),
             "gtin": _extract_gtin(merged),
@@ -945,6 +987,14 @@ class ApiBridge:
             "can_intro": is_order_ready_for_intro(merged),
             "can_tsd": is_order_ready_for_tsd(merged) or tsd_created,
         }
+
+    def _fresh_order_sort_key(self, item: Dict[str, Any]) -> tuple[str, str, str]:
+        merged = self._merge_order_data(item)
+        live_meta = self._live_order_meta_for(merged)
+        updated_at = str(live_meta.get("updatedDate") or merged.get("updated_at") or "").strip()
+        created_at = str(live_meta.get("createdDate") or merged.get("created_at") or "").strip()
+        document_id = str(merged.get("document_id") or "").strip()
+        return (updated_at or created_at, created_at, document_id)
 
     def _run_with_session_retry(
         self,
@@ -1781,6 +1831,7 @@ class ApiBridge:
         introduction_id: str,
         *,
         timeout_seconds: float = 180.0,
+        log_channel: str = "aggregation",
     ) -> Dict[str, Any]:
         base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
         deadline = time.time() + timeout_seconds
@@ -1799,7 +1850,7 @@ class ApiBridge:
                 last_payload = payload
             status = str(payload.get("status") or "").strip()
             if status != last_status:
-                self._log("aggregation", f"Проверка кодов {introduction_id}: {status or 'неизвестно'}")
+                self._log(log_channel, f"Проверка кодов {introduction_id}: {status or 'неизвестно'}")
                 last_status = status
             if status in terminal_statuses:
                 return last_payload
@@ -2021,6 +2072,7 @@ class ApiBridge:
         introduction_id: str,
         *,
         cert: Any,
+        log_channel: str = "aggregation",
     ) -> Dict[str, Any]:
         base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
         generated = session.get(
@@ -2069,7 +2121,7 @@ class ApiBridge:
             send_payload = {"raw": send_response.text}
         current_status = str(final_intro.get("documentStatus") or final_intro.get("status") or "").strip()
         self._log(
-            "aggregation",
+            log_channel,
             f"Документ ввода в оборот {introduction_id} отправлен. Текущий статус: {current_status or 'неизвестно'}.",
         )
         return {
@@ -3139,6 +3191,8 @@ class ApiBridge:
             for item in runtime.history_db.get_all_orders():
                 if str(item.get("document_id") or "").strip() in deleted_ids:
                     continue
+                if self._is_archived_order(item):
+                    continue
                 history_items.append(item)
                 if len(history_items) >= 250:
                     break
@@ -3390,6 +3444,8 @@ class ApiBridge:
             items = []
             for item in runtime.download_items:
                 if str(item.get("document_id") or "").strip() in deleted_ids:
+                    continue
+                if self._is_archived_order(item):
                     continue
                 serialized = self._serialize_download_item(item, session=None, tab_type="download")
                 items.append(serialized)
@@ -3747,6 +3803,8 @@ class ApiBridge:
                 document_id = str(item.get("document_id") or "").strip()
                 if not document_id or document_id in deleted_ids:
                     continue
+                if self._is_archived_order(item):
+                    continue
                 if normalized_search:
                     haystack = " ".join(
                         str(value or "")
@@ -3760,7 +3818,7 @@ class ApiBridge:
                     if normalized_search.lower() not in haystack:
                         continue
                 intro_items.append(item)
-            intro_items.sort(key=_order_freshness_sort_key, reverse=True)
+            intro_items.sort(key=self._fresh_order_sort_key, reverse=True)
             return {
                 "items": [
                     self._normalize_history_item(
@@ -4146,8 +4204,10 @@ class ApiBridge:
                 document_id = str(item.get("document_id") or "").strip()
                 if not document_id or document_id in deleted_ids:
                     continue
+                if self._is_archived_order(item):
+                    continue
                 download_like = _history_order_to_download_item(item)
-                if not (item.get("tsd_created") or is_order_ready_for_tsd(download_like) or self._live_intro_meta_for_order(item)):
+                if not (item.get("tsd_created") or is_order_ready_for_tsd(download_like) or self._live_intro_meta_for_order(item) or self._live_order_meta_for(item)):
                     continue
                 if normalized_search:
                     haystack = " ".join(
@@ -4163,7 +4223,7 @@ class ApiBridge:
                         continue
                 orders.append(item)
 
-            orders.sort(key=_order_freshness_sort_key, reverse=True)
+            orders.sort(key=self._fresh_order_sort_key, reverse=True)
             return {
                 "items": [
                     self._normalize_history_item(
@@ -4260,6 +4320,93 @@ class ApiBridge:
             }
         except Exception as exc:
             self._log("tsd", f"Ошибка создания заданий на ТСД: {exc}")
+            return {"success": False, "error": str(exc)}
+
+    def _resolve_tsd_introduction_id(self, document_id: str) -> str:
+        normalized_id = str(document_id or "").strip()
+        if not normalized_id:
+            return ""
+
+        runtime = _get_runtime()
+        if normalized_id in runtime.live_intro_by_document_id:
+            return normalized_id
+
+        item = self._find_download_item(normalized_id)
+        if not item:
+            history_order = runtime.history_db.get_order_by_document_id(normalized_id)
+            if isinstance(history_order, dict):
+                item = _history_order_to_download_item(history_order)
+        if not item:
+            item = {"document_id": normalized_id}
+
+        live_meta = self._live_intro_meta_for_order(item)
+        return str(
+            live_meta.get("documentId")
+            or item.get("tsd_intro_number")
+            or item.get("introduction_document_id")
+            or item.get("introductionDocumentId")
+            or ""
+        ).strip()
+
+    def sign_tsd_introduction(self, document_id: str) -> Dict[str, Any]:
+        try:
+            normalized_id = str(document_id or "").strip()
+            if not normalized_id:
+                raise RuntimeError("Выберите заказ для подписи.")
+
+            self._start_background_status_updater()
+            session = self._ensure_session()
+            cert = self._get_certificate()
+            if not cert:
+                raise RuntimeError("Не найден сертификат для подписи.")
+
+            introduction_id = self._resolve_tsd_introduction_id(normalized_id)
+            if not introduction_id:
+                raise RuntimeError("Не найден документ ввода в оборот для выбранного заказа.")
+
+            document_state = self._get_intro_document_state(session, introduction_id)
+            raw_status = str(document_state.get("documentStatus") or document_state.get("status") or "").strip()
+            if raw_status and raw_status != "readyForSend":
+                raise RuntimeError(
+                    f"Документ {introduction_id} сейчас в статусе '{_translate_tsd_status(raw_status)}'. "
+                    "Подписать можно только статус 'Наполнен на ТСД'."
+                )
+
+            codes_check = self._wait_for_intro_codes_check(
+                session,
+                introduction_id,
+                timeout_seconds=120.0,
+                log_channel="tsd",
+            )
+            check_status = str(codes_check.get("status") or "").strip()
+            if check_status not in {"doesNotHaveErrors", "checked", "noErrors"}:
+                raise RuntimeError(
+                    f"Проверка кодов не пройдена: {check_status or 'неизвестно'}. "
+                    "Подпись и отправка отменены."
+                )
+
+            self._log("tsd", f"Подписываем и вводим в оборот документ {introduction_id}.")
+            send_result = self._sign_and_send_intro_document(
+                session,
+                introduction_id,
+                cert=cert,
+                log_channel="tsd",
+            )
+
+            runtime = _get_runtime()
+            runtime.document_status_cache.pop(normalized_id, None)
+            runtime.document_status_cache.pop(f"tsd_{introduction_id}", None)
+            runtime.live_status_event.set()
+            return {
+                "success": True,
+                "document_id": normalized_id,
+                "introduction_id": introduction_id,
+                "codes_check": codes_check,
+                "result": send_result,
+                "state": self.get_tsd_state(live=True),
+            }
+        except Exception as exc:
+            self._log("tsd", f"Ошибка подписи ТСД: {exc}")
             return {"success": False, "error": str(exc)}
 
     def _list_aggregation_documents(

@@ -143,9 +143,11 @@
           <div class="grid orders-workspace">
             <div class="grid orders-history-stack">
               <article class="panel">
-                <div class="panel-header">
+                <div class="panel-header panel-header-table-tools">
                   <h3>История заказов</h3>
-                  <div class="inline-actions compact">
+                  <div class="table-tools">
+                    <input id="orders-history-search" type="text" placeholder="Поиск по истории">
+                    <button class="secondary-btn icon-btn" type="button" id="orders-history-fullscreen" title="Открыть на весь экран" aria-label="Открыть историю заказов на весь экран">⤢</button>
                     <button class="secondary-btn" id="orders-delete-btn">Удалить</button>
                     <button class="secondary-btn" id="orders-toggle-deleted-btn">Удаленные</button>
                   </div>
@@ -204,6 +206,12 @@
                 <div class="progress-strip__bar" id="download-progress-bar"></div>
               </div>
               <div class="progress-strip__label" id="download-progress-label">Прогресс скачивания появится во время массовой загрузки.</div>
+              <div class="panel-header panel-header-table-tools table-subheader">
+                <h4>Заказы</h4>
+                <div class="table-tools">
+                  <input id="download-items-search" type="text" placeholder="Поиск по заказам">
+                </div>
+              </div>
               <div class="table-host" id="download-items-table"></div>
             </article>
           </div>
@@ -249,6 +257,13 @@
                   <button class="secondary-btn" id="intro-refresh-btn">Обновить список заказов</button>
                 </div>
               </div>
+              <div class="panel-header panel-header-table-tools table-subheader">
+                <h4>Заказы</h4>
+                <div class="table-tools">
+                  <select id="intro-status-filter"></select>
+                  <input id="intro-items-search" type="text" placeholder="Поиск по заказам">
+                </div>
+              </div>
               <div class="table-host" id="intro-items-table"></div>
             </article>
           </div>
@@ -289,7 +304,13 @@
                 </label>
               </div>
               <div class="table-card">
-                <h4>Активные заявки</h4>
+                <div class="panel-header panel-header-table-tools table-subheader">
+                  <h4>Заказы</h4>
+                  <div class="table-tools">
+                    <select id="tsd-status-filter"></select>
+                    <input id="tsd-items-search" type="text" placeholder="Поиск по заказам">
+                  </div>
+                </div>
                 <div class="table-host" id="tsd-items-table"></div>
               </div>
             </article>

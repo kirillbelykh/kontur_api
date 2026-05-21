@@ -350,6 +350,25 @@ input:focus, select:focus, textarea:focus {
   min-width: 0;
 }
 
+.table-tools select {
+  min-width: 170px;
+}
+
+.table-subheader {
+  margin: 14px 0 10px;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.table-subheader .table-tools {
+  margin-left: 0;
+}
+
+.cell-note-success {
+  color: var(--success);
+  font-weight: 700;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

@@ -83,6 +83,8 @@ const state = {
     selectedHistoryId: '',
     selectedDeletedId: '',
     showDeleted: false,
+    historySearch: '',
+    fullscreenTable: '',
   },
   download: {
     items: [],
@@ -92,6 +94,8 @@ const state = {
     recordNumber: '',
     selectedItemId: '',
     selectedIds: new Set(),
+    searchQuery: '',
+    lastClickedIndex: -1,
     autoDownload: false,
     progress: {
       active: false,
@@ -103,10 +107,14 @@ const state = {
   intro: {
     items: [],
     selectedIds: new Set(),
+    searchQuery: '',
+    statusFilter: '',
   },
   tsd: {
     items: [],
     selectedIds: new Set(),
+    searchQuery: '',
+    statusFilter: '',
     liveLoadedAt: 0,
     liveRefreshRunning: false,
   },
@@ -735,6 +743,7 @@ function ensureDesktopContextMenu() {
   desktopContextMenu.className = 'desktop-context-menu is-hidden';
   desktopContextMenu.innerHTML = `
     <button type="button" data-action="details">Подробнее</button>
+    <button type="button" data-action="sign-tsd-intro">Подписать и ввести в оборот</button>
     <button type="button" data-action="find">Найти</button>
     <button type="button" data-action="cut">Вырезать</button>
     <button type="button" data-action="copy">Копировать</button>
@@ -806,6 +815,7 @@ function showDesktopContextMenu(clientX, clientY, target) {
   const editableTarget = getEditableTarget(target);
   const hasSelection = hasActiveTextSelection();
   const detailsDocumentId = getContextDocumentId(target);
+  const knownRow = findKnownOrderRow(detailsDocumentId);
   desktopContextMenuTarget = editableTarget || target || null;
 
   menu.querySelectorAll('button[data-action]').forEach((button) => {
@@ -813,6 +823,9 @@ function showDesktopContextMenu(clientX, clientY, target) {
     let enabled = false;
     if (action === 'details') {
       enabled = Boolean(detailsDocumentId);
+      button.dataset.documentId = detailsDocumentId;
+    } else if (action === 'sign-tsd-intro') {
+      enabled = Boolean(detailsDocumentId) && state.route === 'tsd' && Boolean(knownRow);
       button.dataset.documentId = detailsDocumentId;
     } else if (action === 'find') {
       enabled = true;
@@ -1170,11 +1183,36 @@ function repeatDesktopFind(backwards = false) {
 
 async function runDesktopContextAction(action, target) {
   const editableTarget = getEditableTarget(target);
-  if (action === 'details') {
-    await openOrderDetails(getContextDocumentId(target));
-    return;
-  }
-  if (action === 'find') {
+	  if (action === 'details') {
+	    await openOrderDetails(getContextDocumentId(target));
+	    return;
+	  }
+	  if (action === 'sign-tsd-intro') {
+	    const documentId = getContextDocumentId(target);
+	    if (!documentId) {
+	      showToast('Выберите заказ для подписи.', 'error');
+	      return;
+	    }
+	    if (!window.confirm('Подписать и ввести в оборот?')) {
+	      return;
+	    }
+	    await runAction('Подписываем и вводим в оборот...', async () => {
+	      const result = await API.call('sign_tsd_introduction', documentId);
+	      if (result?.success === false) {
+	        throw new Error(result.error || 'Не удалось подписать и ввести в оборот.');
+	      }
+	      state.tsd.selectedIds = new Set([documentId]);
+	      if (result?.state?.items) {
+	        state.tsd.items = result.state.items;
+	      } else {
+	        await loadTsdState({ force: true, live: true });
+	      }
+	      markRoutesDirty(['orders', 'download', 'intro']);
+	      return result;
+	    }, 'Документ подписан и отправлен в ГИС МТ.');
+	    return;
+	  }
+	  if (action === 'find') {
     openDesktopFind();
     return;
   }
@@ -1258,6 +1296,10 @@ function installDesktopInteractionFallbacks() {
         state.labels.fullscreenTable = '';
         renderLabelsFullscreenTable();
       }
+      if (state.orders.fullscreenTable) {
+        state.orders.fullscreenTable = '';
+        renderOrdersFullscreenTable();
+      }
       hideOrderDetailsModal();
       hideDesktopFindPanel();
       hideDesktopContextMenu();
@@ -1323,11 +1365,11 @@ function createTable(container, columns, rows, options = {}) {
           <tr>${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr>
         </thead>
         <tbody>
-          ${rows.map((row) => {
+          ${rows.map((row, rowIndex) => {
             const id = String(rowId(row) ?? '');
             const selected = selectedSet.has(id);
             return `
-              <tr data-row-id="${escapeHtml(id)}" class="${selected ? 'is-selected' : ''}">
+              <tr data-row-id="${escapeHtml(id)}" data-row-index="${rowIndex}" class="${selected ? 'is-selected' : ''}">
                 ${columns.map((column) => {
                   const cell = typeof column.render === 'function' ? column.render(row) : escapeHtml(row[column.key] ?? '');
                   return `<td>${cell}</td>`;
@@ -1351,14 +1393,18 @@ function createTable(container, columns, rows, options = {}) {
       if (event.target.closest('button, a, input, select, textarea, label')) {
         return;
       }
+      if (event.ctrlKey || event.metaKey || event.shiftKey) {
+        event.preventDefault();
+      }
       if (hasActiveTextSelection()) {
         return;
       }
       const id = rowEl.dataset.rowId;
+      const rowIndex = Number(rowEl.dataset.rowIndex || 0);
       if (single) {
-        onRowClick(id, undefined, event);
+        onRowClick(id, undefined, event, rowIndex);
       } else {
-        onRowClick(id, rowEl.classList.contains('is-selected'), event);
+        onRowClick(id, rowEl.classList.contains('is-selected'), event, rowIndex);
       }
     });
   });
@@ -1605,6 +1651,86 @@ function renderStatusCell(row) {
   return `${statusPill(row?.status)}${summary}`;
 }
 
+function renderOrderStatusWithIntro(row) {
+  const baseStatus = renderStatusCell(row);
+  const introRaw = String(row?.intro_status_raw || '').trim().toLowerCase();
+  const introLabel = String(row?.intro_status || '').trim();
+  const introduced = introRaw === 'introduced' || introLabel === 'Введены в оборот' || introLabel === 'Введен в оборот';
+  return introduced
+    ? `${baseStatus}<span class="cell-note cell-note-success">Введены в оборот</span>`
+    : baseStatus;
+}
+
+function rowMatchesSearch(row, query) {
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+  if (!normalizedQuery) {
+    return true;
+  }
+  return Object.values(row || {})
+    .map((value) => String(value ?? '').toLowerCase())
+    .join(' ')
+    .includes(normalizedQuery);
+}
+
+function getFilteredRows(rows, { query = '', status = '', statusKeys = ['status'] } = {}) {
+  const normalizedStatus = String(status || '').trim();
+  return (rows || []).filter((row) => {
+    if (!rowMatchesSearch(row, query)) {
+      return false;
+    }
+    if (!normalizedStatus) {
+      return true;
+    }
+    return statusKeys.some((key) => String(row?.[key] || '').trim() === normalizedStatus);
+  });
+}
+
+function getStatusFilterOptions(rows, { statusKey = 'status', placeholder = 'Все статусы' } = {}) {
+  const values = [...new Set((rows || []).map((row) => String(row?.[statusKey] || '').trim()).filter(Boolean))];
+  return [{ value: '', label: placeholder }].concat(values.map((value) => ({ value, label: value })));
+}
+
+function setInputValue(selector, value) {
+  const element = $(selector);
+  if (element && element.value !== String(value || '')) {
+    element.value = String(value || '');
+  }
+}
+
+function updateSelectOptions(selector, options, value) {
+  const element = $(selector);
+  if (!element) {
+    return;
+  }
+  fillSelectOptions(element, options);
+  element.value = [...element.options].some((option) => option.value === value) ? value : '';
+}
+
+function updateMultiSelectionFromClick(stateSlice, visibleRows, id, isSelected, event, rowIndex) {
+  const normalizedId = String(id || '');
+  if (!normalizedId) {
+    return;
+  }
+  if (event?.shiftKey && Number.isInteger(stateSlice.lastClickedIndex) && stateSlice.lastClickedIndex >= 0) {
+    const start = Math.min(stateSlice.lastClickedIndex, rowIndex);
+    const end = Math.max(stateSlice.lastClickedIndex, rowIndex);
+    visibleRows.slice(start, end + 1).forEach((row) => {
+      if (row?.document_id) {
+        stateSlice.selectedIds.add(row.document_id);
+      }
+    });
+  } else if (event?.ctrlKey || event?.metaKey) {
+    if (isSelected) {
+      stateSlice.selectedIds.delete(normalizedId);
+    } else {
+      stateSlice.selectedIds.add(normalizedId);
+    }
+  } else {
+    stateSlice.selectedIds = new Set([normalizedId]);
+  }
+  stateSlice.lastClickedIndex = rowIndex;
+}
+
 function formatPreview(preview) {
   if (!preview) {
     return 'Выберите шаблон, файл и заказ, затем нажмите «Показать контекст».';
@@ -1753,9 +1879,12 @@ const Router = {
     if (!(route in ROUTES) || (CLIENT_CONFIG.disableLabels && route === 'labels')) {
       route = 'orders';
     }
-    if (route !== 'labels') {
-      state.labels.fullscreenTable = '';
-    }
+	    if (route !== 'labels') {
+	      state.labels.fullscreenTable = '';
+	    }
+	    if (route !== 'orders') {
+	      state.orders.fullscreenTable = '';
+	    }
     state.route = route;
     document.querySelectorAll('.nav-item').forEach((item) => {
       item.classList.toggle('is-active', item.dataset.route === route);
@@ -1828,8 +1957,11 @@ const Views = {
         toggleDeletedBtn.textContent = state.orders.showDeleted ? 'Скрыть удаленные' : 'Удаленные';
       }
 
-      createTable(
-        $('#orders-queue-table'),
+	      setInputValue('#orders-history-search', state.orders.historySearch);
+	      const historyRows = getFilteredRows(state.orders.history, { query: state.orders.historySearch });
+
+	      createTable(
+	        $('#orders-queue-table'),
         [
           { label: 'Заявка', key: 'order_name' },
           { label: 'Товар', key: 'simpl_name' },
@@ -1866,10 +1998,10 @@ const Views = {
         [
           { label: 'Заявка', key: 'order_name' },
           { label: 'Полное наименование', key: 'full_name' },
-          { label: 'Статус', render: (row) => renderStatusCell(row) },
+          { label: 'Статус', render: (row) => renderOrderStatusWithIntro(row) },
           { label: 'GTIN', key: 'gtin' },
         ],
-        state.orders.history,
+        historyRows,
         {
           single: true,
           compact: true,
@@ -1881,6 +2013,7 @@ const Views = {
           },
         },
       );
+      renderOrdersFullscreenTable();
 
       if (state.orders.showDeleted) {
         createTable(
@@ -1915,10 +2048,12 @@ const Views = {
       if ($('#download-record-number')) {
         $('#download-record-number').value = state.download.recordNumber || '';
       }
-      updateDownloadSelectionMeta();
-      updateDownloadProgressUi();
+	      updateDownloadSelectionMeta();
+	      updateDownloadProgressUi();
+	      setInputValue('#download-items-search', state.download.searchQuery);
+	      const downloadRows = getFilteredRows(state.download.items, { query: state.download.searchQuery });
 
-      createTable(
+	      createTable(
         $('#download-items-table'),
         [
           { label: 'Заявка', key: 'order_name' },
@@ -1927,27 +2062,33 @@ const Views = {
           { label: 'GTIN', key: 'gtin' },
           { label: 'Файлы', key: 'file_label' },
         ],
-        state.download.items,
+	        downloadRows,
         {
           compact: true,
           maxHeight: '520px',
           selectedIds: state.download.selectedIds,
-          onRowClick: (id, isSelected) => {
-            state.download.selectedItemId = id;
-            if (isSelected) {
-              state.download.selectedIds.delete(id);
-            } else {
-              state.download.selectedIds.add(id);
-            }
-            Views.download.render();
-          },
+	          onRowClick: (id, isSelected, event, rowIndex) => {
+	            state.download.selectedItemId = id;
+	            updateMultiSelectionFromClick(state.download, downloadRows, id, isSelected, event, rowIndex);
+	            Views.download.render();
+	          },
         },
       );
     },
   },
-  intro: {
-    render() {
-      createTable(
+	  intro: {
+	    render() {
+	      setInputValue('#intro-items-search', state.intro.searchQuery);
+	      updateSelectOptions(
+	        '#intro-status-filter',
+	        getStatusFilterOptions(state.intro.items, { statusKey: 'status', placeholder: 'Все статусы' }),
+	        state.intro.statusFilter,
+	      );
+	      const introRows = getFilteredRows(
+	        state.intro.items,
+	        { query: state.intro.searchQuery, status: state.intro.statusFilter, statusKeys: ['status'] },
+	      );
+	      createTable(
         $('#intro-items-table'),
         [
           { label: 'Заявка', key: 'order_name' },
@@ -1955,7 +2096,7 @@ const Views = {
           { label: 'Статус', render: (row) => renderStatusCell(row) },
           { label: 'GTIN', key: 'gtin' },
         ],
-        state.intro.items,
+	        introRows,
         {
           single: true,
           compact: true,
@@ -1969,9 +2110,19 @@ const Views = {
       );
     },
   },
-  tsd: {
-    render() {
-      createTable(
+	  tsd: {
+	    render() {
+	      setInputValue('#tsd-items-search', state.tsd.searchQuery);
+	      updateSelectOptions(
+	        '#tsd-status-filter',
+	        getStatusFilterOptions(state.tsd.items, { statusKey: 'tsd_status', placeholder: 'Все статусы' }),
+	        state.tsd.statusFilter,
+	      );
+	      const tsdRows = getFilteredRows(
+	        state.tsd.items,
+	        { query: state.tsd.searchQuery, status: state.tsd.statusFilter, statusKeys: ['tsd_status'] },
+	      );
+	      createTable(
         $('#tsd-items-table'),
         [
           { label: 'Заявка', key: 'order_name' },
@@ -1980,7 +2131,7 @@ const Views = {
           { label: 'На ТСД', render: (row) => statusPill(row.tsd_status) },
           { label: 'GTIN', key: 'gtin' },
         ],
-        state.tsd.items,
+	        tsdRows,
         {
           single: true,
           compact: true,
@@ -2578,6 +2729,46 @@ function renderLabelsFullscreenTable() {
 function updateLabelsTableSearch(tableKey, value) {
   state.labels.tableSearch[tableKey] = String(value || '');
   Views.labels.render();
+}
+
+function renderOrdersFullscreenTable() {
+  const overlay = $('#table-fullscreen-overlay');
+  const host = $('#table-fullscreen-host');
+  const title = $('#table-fullscreen-title');
+  const searchInput = $('#table-fullscreen-search');
+  if (!overlay || !host || !title || !searchInput) {
+    return;
+  }
+  if (state.orders.fullscreenTable !== 'history') {
+    if (!state.labels.fullscreenTable) {
+      overlay.classList.add('is-hidden');
+    }
+    return;
+  }
+  title.textContent = 'История заказов';
+  searchInput.value = state.orders.historySearch || '';
+  overlay.classList.remove('is-hidden');
+  const rows = getFilteredRows(state.orders.history, { query: state.orders.historySearch });
+  createTable(
+    host,
+    [
+      { label: 'Заявка', key: 'order_name' },
+      { label: 'Полное наименование', key: 'full_name' },
+      { label: 'Статус', render: (row) => renderOrderStatusWithIntro(row) },
+      { label: 'GTIN', key: 'gtin' },
+    ],
+    rows,
+    {
+      single: true,
+      compact: true,
+      maxHeight: '72vh',
+      selectedIds: state.orders.selectedHistoryId,
+      onRowClick: (id) => {
+        state.orders.selectedHistoryId = id;
+        Views.orders.render();
+      },
+    },
+  );
 }
 
 function resetLabelsManualState() {
@@ -3307,10 +3498,20 @@ async function bindEvents() {
     }, 'Заказ перемещен в Удаленные.');
   });
 
-  $('#orders-toggle-deleted-btn').addEventListener('click', () => {
-    state.orders.showDeleted = !state.orders.showDeleted;
-    Views.orders.render();
-  });
+	  $('#orders-toggle-deleted-btn').addEventListener('click', () => {
+	    state.orders.showDeleted = !state.orders.showDeleted;
+	    Views.orders.render();
+	  });
+
+	  $('#orders-history-search').addEventListener('input', (event) => {
+	    state.orders.historySearch = event.target.value || '';
+	    Views.orders.render();
+	  });
+
+	  $('#orders-history-fullscreen').addEventListener('click', () => {
+	    state.orders.fullscreenTable = 'history';
+	    renderOrdersFullscreenTable();
+	  });
 
   $('#orders-restore-deleted-btn').addEventListener('click', async () => {
     await runAction('Восстанавливаем заказ...', async () => {
@@ -3321,7 +3522,7 @@ async function bindEvents() {
     }, 'Заказ восстановлен.');
   });
 
-  $('#download-refresh-btn').addEventListener('click', async () => {
+	  $('#download-refresh-btn').addEventListener('click', async () => {
     state.download.autoDownload = $('#download-auto-checkbox').checked;
     await runAction('Синхронизируем статусы загрузки...', async () => {
       const result = await API.call('sync_download_statuses', state.download.autoDownload);
@@ -3329,7 +3530,13 @@ async function bindEvents() {
       markRoutesDirty(['intro', 'tsd', 'labels']);
       return result;
     }, 'Статусы загрузки обновлены.');
-  });
+	  });
+
+	  $('#download-items-search').addEventListener('input', (event) => {
+	    state.download.searchQuery = event.target.value || '';
+	    state.download.lastClickedIndex = -1;
+	    Views.download.render();
+	  });
 
   $('#download-manual-btn').addEventListener('click', async () => {
     await runAction('Скачиваем выбранный заказ...', async () => {
@@ -3425,12 +3632,32 @@ async function bindEvents() {
     }, 'Ввод в оборот завершён.');
   });
 
-  $('#intro-refresh-btn').addEventListener('click', async () => {
+	  $('#intro-refresh-btn').addEventListener('click', async () => {
     await runAction('Обновляем список заказов для ввода в оборот...', async () => {
       const result = await loadIntroState({ force: true });
       return result || { success: true };
     }, 'Список заказов обновлён.');
-  });
+	  });
+
+	  $('#intro-items-search').addEventListener('input', (event) => {
+	    state.intro.searchQuery = event.target.value || '';
+	    Views.intro.render();
+	  });
+
+	  $('#intro-status-filter').addEventListener('change', (event) => {
+	    state.intro.statusFilter = event.target.value || '';
+	    Views.intro.render();
+	  });
+
+	  $('#tsd-items-search').addEventListener('input', (event) => {
+	    state.tsd.searchQuery = event.target.value || '';
+	    Views.tsd.render();
+	  });
+
+	  $('#tsd-status-filter').addEventListener('change', (event) => {
+	    state.tsd.statusFilter = event.target.value || '';
+	    Views.tsd.render();
+	  });
 
   $('#tsd-run-btn').addEventListener('click', async () => {
     await runAction('Создаём задания на ТСД...', async () => {
@@ -3655,21 +3882,30 @@ async function bindEvents() {
     renderLabelsFullscreenTable();
   });
 
-  $('#table-fullscreen-close').addEventListener('click', () => {
-    state.labels.fullscreenTable = '';
-    renderLabelsFullscreenTable();
-  });
+	  $('#table-fullscreen-close').addEventListener('click', () => {
+	    state.labels.fullscreenTable = '';
+	    state.orders.fullscreenTable = '';
+	    renderLabelsFullscreenTable();
+	    renderOrdersFullscreenTable();
+	  });
 
   $('#table-fullscreen-overlay').addEventListener('click', (event) => {
     if (event.target.id !== 'table-fullscreen-overlay') {
       return;
-    }
-    state.labels.fullscreenTable = '';
-    renderLabelsFullscreenTable();
-  });
+	    }
+	    state.labels.fullscreenTable = '';
+	    state.orders.fullscreenTable = '';
+	    renderLabelsFullscreenTable();
+	    renderOrdersFullscreenTable();
+	  });
 
-  $('#table-fullscreen-search').addEventListener('input', (event) => {
-    const tableKey = String(state.labels.fullscreenTable || '').trim();
+	  $('#table-fullscreen-search').addEventListener('input', (event) => {
+	    if (state.orders.fullscreenTable === 'history') {
+	      state.orders.historySearch = event.target.value || '';
+	      Views.orders.render();
+	      return;
+	    }
+	    const tableKey = String(state.labels.fullscreenTable || '').trim();
     if (!tableKey) {
       return;
     }
