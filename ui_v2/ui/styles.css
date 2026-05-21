@@ -470,6 +470,11 @@ input:focus, select:focus, textarea:focus {
   max-height: 260px;
 }
 
+.table-wrapper.no-row-text-select .table th,
+.table-wrapper.no-row-text-select .table td {
+  user-select: none;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

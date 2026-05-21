@@ -687,6 +687,25 @@ class ApiBridge:
         ]
         return any(str(value or "").strip().lower() == "archived" for value in status_values)
 
+    def _is_hidden_service_order(self, order_data: Dict[str, Any]) -> bool:
+        merged = self._merge_order_data(order_data)
+        live_order_meta = self._live_order_meta_for(merged)
+        live_intro_meta = self._live_intro_meta_for_order(merged)
+        names = [
+            merged.get("order_name"),
+            merged.get("documentNumber"),
+            merged.get("document_number"),
+            live_order_meta.get("documentNumber"),
+            live_intro_meta.get("documentNumber"),
+        ]
+        for value in names:
+            normalized = " ".join(str(value or "").strip().split()).upper()
+            if not normalized:
+                continue
+            if normalized == "УДАЛИТЬ" or normalized.startswith("CONCURRENT "):
+                return True
+        return False
+
     def _intro_status_for_order(self, order_data: Dict[str, Any]) -> Dict[str, str]:
         live_intro_meta = self._live_intro_meta_for_order(order_data)
         live_order_meta = self._live_order_meta_for(order_data)
@@ -3459,6 +3478,8 @@ class ApiBridge:
                     continue
                 if self._is_archived_order(item):
                     continue
+                if self._is_hidden_service_order(item):
+                    continue
                 serialized = self._serialize_download_item(item, session=None, tab_type="download")
                 items.append(serialized)
             return {
@@ -3816,6 +3837,8 @@ class ApiBridge:
                 if not document_id or document_id in deleted_ids:
                     continue
                 if self._is_archived_order(item):
+                    continue
+                if self._is_hidden_service_order(item):
                     continue
                 if normalized_search:
                     haystack = " ".join(
@@ -4217,6 +4240,8 @@ class ApiBridge:
                 if not document_id or document_id in deleted_ids:
                     continue
                 if self._is_archived_order(item):
+                    continue
+                if self._is_hidden_service_order(item):
                     continue
                 download_like = _history_order_to_download_item(item)
                 if not (item.get("tsd_created") or is_order_ready_for_tsd(download_like) or self._live_intro_meta_for_order(item) or self._live_order_meta_for(item)):

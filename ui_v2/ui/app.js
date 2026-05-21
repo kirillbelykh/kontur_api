@@ -1350,6 +1350,7 @@ function createTable(container, columns, rows, options = {}) {
     onRowClick,
     compact = false,
     maxHeight = '',
+    preventTextSelection = false,
   } = options;
   if (!rows?.length) {
     container.innerHTML = '<div class="table-empty">Данных пока нет.</div>';
@@ -1359,7 +1360,7 @@ function createTable(container, columns, rows, options = {}) {
   const scrollState = captureTableScrollState(container);
   const selectedSet = selectedIds instanceof Set ? selectedIds : new Set(selectedIds ? [selectedIds] : []);
   const html = `
-    <div class="table-wrapper ${compact ? 'is-compact' : ''}" ${maxHeight ? `style="max-height:${escapeHtml(maxHeight)}"` : ''}>
+    <div class="table-wrapper ${compact ? 'is-compact' : ''} ${preventTextSelection ? 'no-row-text-select' : ''}" ${maxHeight ? `style="max-height:${escapeHtml(maxHeight)}"` : ''}>
       <table class="table ${compact ? 'table-compact' : ''}">
         <thead>
           <tr>${columns.map((column) => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr>
@@ -1389,6 +1390,11 @@ function createTable(container, columns, rows, options = {}) {
   }
 
   container.querySelectorAll('tbody tr[data-row-id]').forEach((rowEl) => {
+    rowEl.addEventListener('mousedown', (event) => {
+      if (preventTextSelection && !event.target.closest('button, a, input, select, textarea, label')) {
+        event.preventDefault();
+      }
+    });
     rowEl.addEventListener('click', (event) => {
       if (event.target.closest('button, a, input, select, textarea, label')) {
         return;
@@ -2066,6 +2072,7 @@ const Views = {
         {
           compact: true,
           maxHeight: '520px',
+          preventTextSelection: true,
           selectedIds: state.download.selectedIds,
 	          onRowClick: (id, isSelected, event, rowIndex) => {
 	            state.download.selectedItemId = id;
