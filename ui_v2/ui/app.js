@@ -61,7 +61,7 @@ const UI_PERF = {
 };
 
 const state = {
-  theme: localStorage.getItem('kontur-ui-v2-theme') || 'dark',
+  theme: localStorage.getItem('kontur-ui-v2-theme-choice') || 'light',
   route: 'orders',
   session: {},
   options: {
@@ -1770,7 +1770,7 @@ function formatPreview(preview) {
 function setTheme(theme) {
   state.theme = theme;
   document.body.dataset.theme = theme;
-  localStorage.setItem('kontur-ui-v2-theme', theme);
+  localStorage.setItem('kontur-ui-v2-theme-choice', theme);
   $('#theme-toggle-btn').textContent = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
 }
 

@@ -1092,7 +1092,18 @@ class ApiBridge:
         return thumbprint
 
     def _get_certificate(self):
-        return find_certificate_by_thumbprint(self._get_thumbprint())
+        runtime = _get_runtime()
+        thumbprint = self._get_thumbprint()
+        cert = find_certificate_by_thumbprint(thumbprint)
+        if cert:
+            return cert
+        if thumbprint:
+            self._log("session", "Сертификат по сохраненному thumbprint не найден, пробуем найти любой доступный сертификат.")
+            runtime.cached_thumbprint = None
+        cert = find_certificate_by_thumbprint(None)
+        if cert:
+            runtime.cached_thumbprint = str(getattr(cert, "Thumbprint", "") or "").lower() or None
+        return cert
 
     def _normalize_history_item(
         self,
@@ -2120,9 +2131,10 @@ class ApiBridge:
         except Exception:
             send_payload = {"raw": send_response.text}
         current_status = str(final_intro.get("documentStatus") or final_intro.get("status") or "").strip()
+        current_status_label = _translate_intro_status(current_status) if current_status else "Ожидание нанесения"
         self._log(
             log_channel,
-            f"Документ ввода в оборот {introduction_id} отправлен. Текущий статус: {current_status or 'неизвестно'}.",
+            f"Документ ввода в оборот {introduction_id} отправлен. Текущий статус: {current_status_label}.",
         )
         return {
             "generated_count": len(items),
