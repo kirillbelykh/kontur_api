@@ -52,6 +52,12 @@ body {
   overflow: hidden;
 }
 
+body.auth-splash-active .app-shell {
+  filter: blur(8px) saturate(0.86);
+  transform: scale(0.985);
+  pointer-events: none;
+}
+
 body[data-client-mode="browser"],
 body[data-client-mode="browser-mobile"] {
   overflow: auto;
@@ -148,6 +154,7 @@ input:focus, select:focus, textarea:focus {
   grid-template-columns: 240px minmax(0, 1fr);
   min-height: 100vh;
   min-height: var(--app-height);
+  transition: filter 0.7s ease, transform 0.7s ease;
 }
 
 .sidebar {
@@ -159,7 +166,18 @@ input:focus, select:focus, textarea:focus {
   gap: 22px;
 }
 
-.brand-block h1,
+.brand-logo {
+  display: block;
+  width: min(172px, 100%);
+  height: auto;
+  margin: 4px auto 0;
+  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.16));
+}
+
+body[data-theme="dark"] .brand-logo {
+  filter: invert(1) brightness(1.9) drop-shadow(0 12px 24px rgba(8, 12, 20, 0.28));
+}
+
 .topbar h2,
 .panel-header h3,
 .table-card h4 {
@@ -798,6 +816,167 @@ body[data-theme="light"] .log-box {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.auth-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.52), transparent 28%),
+    linear-gradient(135deg, #d7e0df 0%, #aab9b5 48%, #849692 100%);
+  color: #f8fbfb;
+  transition: opacity 0.8s ease, visibility 0.8s ease;
+}
+
+.auth-splash.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.auth-splash__ambient {
+  position: absolute;
+  width: 42vw;
+  height: 42vw;
+  border-radius: 999px;
+  filter: blur(34px);
+  opacity: 0.28;
+  animation: authDrift 8s ease-in-out infinite alternate;
+}
+
+.auth-splash__ambient--left {
+  left: -14vw;
+  top: 12vh;
+  background: #f1f8f6;
+}
+
+.auth-splash__ambient--right {
+  right: -12vw;
+  bottom: 2vh;
+  background: #718680;
+  animation-delay: -2.4s;
+}
+
+.auth-splash__scene {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 28px;
+  width: min(820px, calc(100vw - 48px));
+  padding: 42px 24px;
+  text-align: center;
+}
+
+.auth-ring {
+  position: relative;
+  width: min(430px, 72vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  animation: authRingRotate 10s linear infinite;
+  filter: drop-shadow(0 42px 32px rgba(37, 50, 48, 0.24));
+}
+
+.auth-ring::before,
+.auth-ring::after,
+.auth-ring span {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border-radius: 42% 58% 44% 56% / 55% 42% 58% 45%;
+  border: 22px solid rgba(236, 247, 245, 0.78);
+  box-shadow:
+    inset 0 0 18px rgba(255, 255, 255, 0.88),
+    inset 20px -16px 28px rgba(114, 135, 130, 0.22),
+    0 0 20px rgba(255, 255, 255, 0.16);
+  transform: rotate(var(--rotate, 0deg)) scale(var(--scale, 1));
+}
+
+.auth-ring::after {
+  --rotate: 28deg;
+  --scale: 0.965;
+  opacity: 0.82;
+}
+
+.auth-ring span:nth-child(2) { --rotate: 14deg; --scale: 1.015; opacity: 0.54; }
+.auth-ring span:nth-child(3) { --rotate: 42deg; --scale: 0.99; opacity: 0.52; }
+.auth-ring span:nth-child(4) { --rotate: 70deg; --scale: 1.01; opacity: 0.48; }
+.auth-ring span:nth-child(5) { --rotate: 98deg; --scale: 0.985; opacity: 0.46; }
+.auth-ring span:nth-child(6) { --rotate: 126deg; --scale: 1.005; opacity: 0.43; }
+.auth-ring span:nth-child(7) { --rotate: 154deg; --scale: 0.995; opacity: 0.4; }
+.auth-ring span:nth-child(8) { --rotate: 182deg; --scale: 1.008; opacity: 0.38; }
+.auth-ring span:nth-child(9) { --rotate: 210deg; --scale: 0.988; opacity: 0.36; }
+.auth-ring span:nth-child(10) { --rotate: 238deg; --scale: 1.004; opacity: 0.34; }
+.auth-ring span:nth-child(11) { --rotate: 266deg; --scale: 0.992; opacity: 0.32; }
+.auth-ring span:nth-child(12) { --rotate: 294deg; --scale: 1.002; opacity: 0.3; }
+.auth-ring span:nth-child(13) { --rotate: 322deg; --scale: 0.996; opacity: 0.28; }
+
+.auth-ring__core {
+  width: 36%;
+  aspect-ratio: 1;
+  border-radius: 38% 62% 48% 52% / 54% 42% 58% 46%;
+  background: radial-gradient(circle, rgba(220, 231, 228, 0.5), rgba(132, 150, 145, 0.12) 68%, transparent 70%);
+  box-shadow: inset 0 0 26px rgba(255, 255, 255, 0.32);
+  animation: authPulse 2.8s ease-in-out infinite;
+}
+
+.auth-splash__copy {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-shadow: 0 2px 18px rgba(37, 50, 48, 0.18);
+}
+
+.auth-splash__logo {
+  width: 178px;
+  height: auto;
+  opacity: 0.88;
+  filter: invert(1) brightness(1.9) drop-shadow(0 8px 22px rgba(37, 50, 48, 0.18));
+}
+
+.auth-splash__copy p {
+  margin: 8px 0 0;
+  font-size: clamp(18px, 2.4vw, 28px);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.auth-splash__copy small {
+  color: rgba(248, 251, 251, 0.78);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-splash__continue {
+  min-width: 168px;
+  color: #f8fbfb;
+  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+}
+
+.auth-splash__continue:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@keyframes authRingRotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes authPulse {
+  0%, 100% { transform: scale(0.94); opacity: 0.54; }
+  50% { transform: scale(1.06); opacity: 0.86; }
+}
+
+@keyframes authDrift {
+  from { transform: translate3d(-2%, -2%, 0) scale(0.96); }
+  to { transform: translate3d(3%, 4%, 0) scale(1.04); }
 }
 
 @media (max-width: 1200px) {

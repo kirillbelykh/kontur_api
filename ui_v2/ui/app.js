@@ -181,6 +181,8 @@ const state = {
     logLoading: {},
     findQuery: '',
     detailsLoading: false,
+    authSplashDismissed: false,
+    authPollTimer: null,
   },
 };
 
@@ -192,6 +194,16 @@ let desktopContextMenu = null;
 let desktopContextMenuTarget = null;
 let desktopFindPanel = null;
 let orderDetailsModal = null;
+const AUTH_HINTS = {
+  idle: 'Подготавливаем защищенное подключение',
+  queued: 'Запрос на авторизацию поставлен в очередь',
+  starting: 'Запускаем обновление сессии',
+  browser: 'Открываем браузер и собираем cookies',
+  cookies: 'Проверяем cookies Контур.Маркировки',
+  validating: 'Проверяем доступ к API',
+  ready: 'Можно начинать работу',
+  error: 'Можно продолжить вручную или обновить сессию',
+};
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -1880,6 +1892,86 @@ function applySessionInfo(info) {
   setStatusText(text, hasSession);
 }
 
+function setAuthSplashVisible(visible) {
+  const splash = $('#auth-splash');
+  if (!splash) {
+    return;
+  }
+  splash.classList.toggle('is-hidden', !visible);
+  document.body.classList.toggle('auth-splash-active', visible);
+}
+
+function updateAuthSplash(payload = {}) {
+  const splash = $('#auth-splash');
+  if (!splash) {
+    return;
+  }
+  const currentState = String(payload.state || 'idle');
+  const status = $('#auth-splash-status');
+  const hint = $('#auth-splash-hint');
+  if (status) {
+    status.textContent = payload.message || AUTH_HINTS[currentState] || 'Готовим авторизацию...';
+  }
+  if (hint) {
+    hint.textContent = payload.error || AUTH_HINTS[currentState] || 'Ожидаем ответ Контур.Маркировки';
+  }
+  splash.dataset.authState = currentState;
+  if ((payload.ready || payload.has_session) && !state.ui.authSplashDismissed) {
+    window.setTimeout(() => {
+      state.ui.authSplashDismissed = true;
+      setAuthSplashVisible(false);
+      if (state.ui.authPollTimer) {
+        window.clearInterval(state.ui.authPollTimer);
+        state.ui.authPollTimer = null;
+      }
+    }, 650);
+  }
+}
+
+async function pollAuthSplash() {
+  if (state.ui.authSplashDismissed) {
+    return;
+  }
+  try {
+    const payload = await API.call('get_auth_state');
+    updateAuthSplash(payload || {});
+    if (payload?.ready || payload?.has_session) {
+      await refreshSessionInfo(false);
+    }
+  } catch (error) {
+    updateAuthSplash({
+      state: 'error',
+      message: 'Авторизация еще не завершена.',
+      error: error.message,
+      ready: false,
+    });
+  }
+}
+
+function startAuthSplash() {
+  if (state.ui.authSplashDismissed) {
+    setAuthSplashVisible(false);
+    return;
+  }
+  setAuthSplashVisible(true);
+  updateAuthSplash({ state: 'starting', message: 'Готовим авторизацию...' });
+  pollAuthSplash().catch(() => null);
+  if (!state.ui.authPollTimer) {
+    state.ui.authPollTimer = window.setInterval(() => {
+      pollAuthSplash().catch(() => null);
+    }, 900);
+  }
+}
+
+function dismissAuthSplashManually() {
+  state.ui.authSplashDismissed = true;
+  setAuthSplashVisible(false);
+  if (state.ui.authPollTimer) {
+    window.clearInterval(state.ui.authPollTimer);
+    state.ui.authPollTimer = null;
+  }
+}
+
 const Router = {
   go(route) {
     if (!(route in ROUTES) || (CLIENT_CONFIG.disableLabels && route === 'labels')) {
@@ -3412,6 +3504,10 @@ async function bindEvents() {
     setTheme(state.theme === 'dark' ? 'light' : 'dark');
   });
 
+  $('#auth-splash-continue').addEventListener('click', () => {
+    dismissAuthSplashManually();
+  });
+
   $('#refresh-session-btn').addEventListener('click', async () => {
     await runAction('Обновляем сессию...', async () => {
       const result = await API.call('refresh_session');
@@ -4076,6 +4172,7 @@ async function init() {
   appInitialized = true;
   applyClientConfig();
   setTheme(state.theme);
+  startAuthSplash();
   installMobileViewportGuard();
   installMojibakeGuard();
   installDesktopInteractionFallbacks();

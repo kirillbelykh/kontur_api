@@ -344,6 +344,10 @@ class _BridgeRuntime:
         self.aggregation_cache_ttl_seconds = 90.0
         self.session_refresh_event = Event()
         self.session_refresh_thread: Optional[Thread] = None
+        self.auth_state = "idle"
+        self.auth_message = "Готовим авторизацию..."
+        self.auth_error = ""
+        self.auth_updated_at = time.time()
         self.live_status_event = Event()
         self.live_status_thread: Optional[Thread] = None
         self.live_status_refreshing = False
@@ -443,13 +447,25 @@ class ApiBridge:
         while True:
             update_triggered = runtime.session_refresh_event.wait(timeout=runtime.session_ttl_seconds)
             try:
+                runtime.auth_state = "starting"
+                runtime.auth_message = "Запускаем обновление сессии..."
+                runtime.auth_error = ""
+                runtime.auth_updated_at = time.time()
                 logger.info(
                     "Сессия UI v2: запускаем %s обновление cookies",
                     "принудительное" if update_triggered else "плановое",
                 )
                 self._ensure_session(force_refresh=True, force_browser_refresh=True)
+                runtime.auth_state = "ready"
+                runtime.auth_message = "Авторизация завершена. Сессия активна."
+                runtime.auth_error = ""
+                runtime.auth_updated_at = time.time()
                 logger.info("Сессия UI v2: cookies успешно обновлены")
             except Exception as exc:
+                runtime.auth_state = "error"
+                runtime.auth_message = "Не удалось завершить авторизацию."
+                runtime.auth_error = str(exc)
+                runtime.auth_updated_at = time.time()
                 logger.exception("Сессия UI v2: ошибка фонового обновления cookies: %s", exc)
             finally:
                 runtime.session_refresh_event.clear()
@@ -464,6 +480,10 @@ class ApiBridge:
                     daemon=True,
                 )
                 runtime.session_refresh_thread.start()
+            runtime.auth_state = "queued"
+            runtime.auth_message = "Ожидаем запуск авторизации..."
+            runtime.auth_error = ""
+            runtime.auth_updated_at = time.time()
             runtime.session_refresh_event.set()
         self._start_background_status_updater()
         return {"success": True}
@@ -1083,15 +1103,39 @@ class ApiBridge:
             if force_refresh or runtime.session is None or age >= runtime.session_ttl_seconds:
                 cookies: Optional[Dict[str, str]]
                 if force_browser_refresh:
+                    runtime.auth_state = "browser"
+                    runtime.auth_message = "Открываем браузер и собираем cookies..."
+                    runtime.auth_error = ""
+                    runtime.auth_updated_at = time.time()
                     cookies = cookies_module.get_cookies()
                 elif force_refresh:
+                    runtime.auth_state = "cookies"
+                    runtime.auth_message = "Проверяем сохраненные cookies..."
+                    runtime.auth_error = ""
+                    runtime.auth_updated_at = time.time()
                     cookies = get_valid_cookies() or cookies_module.get_cookies()
                 else:
+                    runtime.auth_state = "cookies"
+                    runtime.auth_message = "Проверяем действующую сессию..."
+                    runtime.auth_error = ""
+                    runtime.auth_updated_at = time.time()
                     cookies = get_valid_cookies()
                 if not cookies:
+                    runtime.auth_state = "error"
+                    runtime.auth_message = "Cookies не получены."
+                    runtime.auth_error = "Не удалось получить валидные cookies для Контур.Маркировки."
+                    runtime.auth_updated_at = time.time()
                     raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
+                runtime.auth_state = "validating"
+                runtime.auth_message = "Проверяем доступ к Контур.Маркировке..."
+                runtime.auth_error = ""
+                runtime.auth_updated_at = time.time()
                 runtime.session = make_session_with_cookies(cookies)
                 runtime.session_created_at = time.time()
+                runtime.auth_state = "ready"
+                runtime.auth_message = "Сессия активна."
+                runtime.auth_error = ""
+                runtime.auth_updated_at = time.time()
             return runtime.session
 
     def _ensure_session_safely(self, log_channel: str | None = None) -> Optional[requests.Session]:
@@ -3060,6 +3104,25 @@ class ApiBridge:
                 }
         except Exception as exc:
             return {"error": str(exc)}
+
+    def get_auth_state(self) -> Dict[str, Any]:
+        try:
+            runtime = _get_runtime()
+            age = time.time() - runtime.session_created_at if runtime.session_created_at else 0.0
+            has_session = runtime.session is not None
+            state = runtime.auth_state or ("ready" if has_session else "idle")
+            message = runtime.auth_message or ("Сессия активна." if has_session else "Готовим авторизацию...")
+            return {
+                "state": state,
+                "message": message,
+                "error": runtime.auth_error,
+                "has_session": has_session,
+                "ready": has_session and state == "ready",
+                "updated_at": runtime.auth_updated_at,
+                "minutes_until_update": round(max(0.0, runtime.session_ttl_seconds - age) / 60.0, 2),
+            }
+        except Exception as exc:
+            return {"state": "error", "message": "Ошибка авторизации.", "error": str(exc), "ready": False}
 
     def get_default_date_window(self) -> Dict[str, str]:
         production_date, expiration_date = get_default_production_window()
