@@ -1786,10 +1786,16 @@ function formatPreview(preview) {
 }
 
 function setTheme(theme) {
-  state.theme = theme;
-  document.body.dataset.theme = theme;
-  localStorage.setItem('kontur-ui-v2-theme-choice', theme);
-  $('#theme-toggle-btn').textContent = theme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+  const normalizedTheme = ['light', 'aura', 'dark'].includes(theme) ? theme : 'light';
+  state.theme = normalizedTheme;
+  document.body.dataset.theme = normalizedTheme;
+  localStorage.setItem('kontur-ui-v2-theme-choice', normalizedTheme);
+  const nextLabels = {
+    light: 'Тема: Атмосфера',
+    aura: 'Тема: Тёмная',
+    dark: 'Тема: Светлая',
+  };
+  $('#theme-toggle-btn').textContent = nextLabels[normalizedTheme] || nextLabels.light;
 }
 
 function ensureAggregationIntroDocumentTitleField() {
@@ -3501,7 +3507,8 @@ async function bindEvents() {
   });
 
   $('#theme-toggle-btn').addEventListener('click', () => {
-    setTheme(state.theme === 'dark' ? 'light' : 'dark');
+    const nextTheme = state.theme === 'light' ? 'aura' : state.theme === 'aura' ? 'dark' : 'light';
+    setTheme(nextTheme);
   });
 
   $('#auth-splash-continue').addEventListener('click', () => {

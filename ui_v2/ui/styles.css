@@ -35,6 +35,24 @@ body[data-theme="light"] {
   --shadow: 0 16px 38px rgba(40, 63, 110, 0.12);
 }
 
+body[data-theme="aura"] {
+  --bg-primary: #dfe8e6;
+  --bg-secondary: rgba(255, 255, 255, 0.56);
+  --bg-surface: rgba(248, 252, 251, 0.48);
+  --bg-hover: rgba(255, 255, 255, 0.42);
+  --border: rgba(65, 83, 80, 0.18);
+  --border-focus: rgba(74, 104, 100, 0.36);
+  --accent: #5f7f79;
+  --accent-hover: #4d6964;
+  --text-primary: #162321;
+  --text-secondary: #546764;
+  --text-muted: #879793;
+  --success: #2f9e64;
+  --warning: #b7791f;
+  --danger: #c2414b;
+  --shadow: 0 24px 58px rgba(74, 91, 88, 0.16);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -44,8 +62,20 @@ html, body {
   min-height: 100%;
   width: 100%;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: var(--bg-primary);
+  background:
+    radial-gradient(circle at 52% 16%, rgba(255, 255, 255, 0.38), transparent 31%),
+    var(--bg-primary);
   color: var(--text-primary);
+}
+
+body[data-theme="aura"] {
+  font-family: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 54% 18%, rgba(255, 255, 255, 0.72), transparent 29%),
+    radial-gradient(circle at 8% 18%, rgba(255, 255, 255, 0.36), transparent 24%),
+    radial-gradient(circle at 88% 84%, rgba(119, 143, 138, 0.28), transparent 30%),
+    linear-gradient(135deg, #edf3f1 0%, #d7e1de 46%, #c4d0cc 100%);
+  background-attachment: fixed;
 }
 
 body {
@@ -84,6 +114,13 @@ button {
   transition: background-color 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
+body[data-theme="aura"] button {
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6d8983, #4f6d68);
+  box-shadow: 0 14px 28px rgba(71, 91, 86, 0.18);
+  font-weight: 650;
+}
+
 button:hover {
   background: var(--accent-hover);
   transform: translateY(-1px);
@@ -120,6 +157,13 @@ button.is-busy::before {
   color: var(--text-primary);
 }
 
+body[data-theme="aura"] .secondary-btn {
+  background: rgba(255, 255, 255, 0.38);
+  border-color: rgba(67, 86, 82, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 10px 24px rgba(83, 100, 96, 0.08);
+  backdrop-filter: blur(14px);
+}
+
 .secondary-btn:hover {
   background: var(--bg-hover);
 }
@@ -144,6 +188,15 @@ input, select, textarea {
   scroll-margin-top: 24px;
 }
 
+body[data-theme="aura"] input,
+body[data-theme="aura"] select,
+body[data-theme="aura"] textarea {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(16px);
+}
+
 input:focus, select:focus, textarea:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
@@ -164,6 +217,14 @@ input:focus, select:focus, textarea:focus {
   display: flex;
   flex-direction: column;
   gap: 22px;
+}
+
+body[data-theme="aura"] .sidebar {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.22)),
+    linear-gradient(165deg, rgba(198, 213, 210, 0.74), rgba(238, 246, 244, 0.42));
+  backdrop-filter: blur(22px) saturate(1.12);
+  box-shadow: 18px 0 52px rgba(83, 100, 96, 0.12);
 }
 
 .brand-logo {
@@ -225,6 +286,12 @@ body[data-theme="dark"] .brand-logo {
   justify-content: flex-start;
 }
 
+body[data-theme="aura"] .nav-item {
+  border-radius: 18px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
 .nav-item:hover {
   background: var(--bg-hover);
 }
@@ -233,6 +300,14 @@ body[data-theme="dark"] .brand-logo {
   background: rgba(37, 99, 235, 0.12);
   border-color: rgba(37, 99, 235, 0.3);
   box-shadow: inset 4px 0 0 var(--accent);
+}
+
+body[data-theme="aura"] .nav-item.is-active {
+  background: rgba(255, 255, 255, 0.52);
+  border-color: rgba(95, 127, 121, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    0 12px 28px rgba(78, 96, 92, 0.13);
 }
 
 .sidebar-footer {
@@ -249,6 +324,11 @@ body[data-theme="dark"] .brand-logo {
   gap: 6px;
 }
 
+body[data-theme="aura"] .session-card {
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(18px);
+}
+
 .main-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) 28px;
@@ -263,6 +343,12 @@ body[data-theme="dark"] .brand-logo {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+body[data-theme="aura"] .topbar {
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(24px) saturate(1.08);
+  box-shadow: 0 18px 48px rgba(83, 100, 96, 0.12);
 }
 
 .topbar-actions,
@@ -342,6 +428,31 @@ body[data-theme="dark"] .brand-logo {
   box-shadow: var(--shadow);
   padding: 20px;
   min-width: 0;
+}
+
+body[data-theme="aura"] .panel,
+body[data-theme="aura"] .table-card,
+body[data-theme="aura"] .info-card,
+body[data-theme="aura"] .preview-box,
+body[data-theme="aura"] .table-host,
+body[data-theme="aura"] .template-card,
+body[data-theme="aura"] .log-box {
+  background: rgba(255, 255, 255, 0.46);
+  border-color: rgba(67, 86, 82, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 22px 54px rgba(83, 100, 96, 0.13);
+  backdrop-filter: blur(22px) saturate(1.08);
+}
+
+body[data-theme="aura"] .panel {
+  border-radius: 24px;
+}
+
+body[data-theme="aura"] .panel-header h3,
+body[data-theme="aura"] .topbar h2,
+body[data-theme="aura"] .table-card h4 {
+  letter-spacing: -0.03em;
 }
 
 .panel-header {
@@ -510,6 +621,11 @@ body[data-theme="dark"] .brand-logo {
   letter-spacing: 0.03em;
 }
 
+body[data-theme="aura"] .table thead th {
+  background: rgba(245, 250, 249, 0.76);
+  backdrop-filter: blur(14px);
+}
+
 .table th,
 .table td {
   padding: 11px 12px;
@@ -529,6 +645,14 @@ body[data-theme="dark"] .brand-logo {
 
 .table tbody tr.is-selected {
   background: rgba(37, 99, 235, 0.14);
+}
+
+body[data-theme="aura"] .table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.34);
+}
+
+body[data-theme="aura"] .table tbody tr.is-selected {
+  background: rgba(95, 127, 121, 0.2);
 }
 
 .table.table-compact th,
