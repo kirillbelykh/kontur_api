@@ -1922,7 +1922,7 @@ function updateAuthSplash(payload = {}) {
     hint.textContent = payload.error || AUTH_HINTS[currentState] || 'Ожидаем ответ Контур.Маркировки';
   }
   splash.dataset.authState = currentState;
-  if ((payload.ready || payload.has_session) && !state.ui.authSplashDismissed) {
+  if (payload.ready && !state.ui.authSplashDismissed) {
     window.setTimeout(() => {
       state.ui.authSplashDismissed = true;
       setAuthSplashVisible(false);
@@ -1941,7 +1941,7 @@ async function pollAuthSplash() {
   try {
     const payload = await API.call('get_auth_state');
     updateAuthSplash(payload || {});
-    if (payload?.ready || payload?.has_session) {
+    if (payload?.ready) {
       await refreshSessionInfo(false);
     }
   } catch (error) {

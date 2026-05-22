@@ -348,6 +348,8 @@ class _BridgeRuntime:
         self.auth_message = "Готовим авторизацию..."
         self.auth_error = ""
         self.auth_updated_at = time.time()
+        self.auth_cycle_id = 0
+        self.auth_completed_cycle_id = 0
         self.live_status_event = Event()
         self.live_status_thread: Optional[Thread] = None
         self.live_status_refreshing = False
@@ -447,6 +449,7 @@ class ApiBridge:
         while True:
             update_triggered = runtime.session_refresh_event.wait(timeout=runtime.session_ttl_seconds)
             try:
+                cycle_id = runtime.auth_cycle_id
                 runtime.auth_state = "starting"
                 runtime.auth_message = "Запускаем обновление сессии..."
                 runtime.auth_error = ""
@@ -459,6 +462,7 @@ class ApiBridge:
                 runtime.auth_state = "ready"
                 runtime.auth_message = "Авторизация завершена. Сессия активна."
                 runtime.auth_error = ""
+                runtime.auth_completed_cycle_id = cycle_id
                 runtime.auth_updated_at = time.time()
                 logger.info("Сессия UI v2: cookies успешно обновлены")
             except Exception as exc:
@@ -473,6 +477,10 @@ class ApiBridge:
     def start_session_auto_refresh(self) -> Dict[str, Any]:
         runtime = _get_runtime()
         with runtime.lock:
+            if not hasattr(runtime, "auth_cycle_id"):
+                runtime.auth_cycle_id = 0
+            if not hasattr(runtime, "auth_completed_cycle_id"):
+                runtime.auth_completed_cycle_id = 0
             if runtime.session_refresh_thread is None or not runtime.session_refresh_thread.is_alive():
                 runtime.session_refresh_thread = Thread(
                     target=self._session_auto_refresh_worker,
@@ -483,6 +491,7 @@ class ApiBridge:
             runtime.auth_state = "queued"
             runtime.auth_message = "Ожидаем запуск авторизации..."
             runtime.auth_error = ""
+            runtime.auth_cycle_id += 1
             runtime.auth_updated_at = time.time()
             runtime.session_refresh_event.set()
         self._start_background_status_updater()
@@ -3110,6 +3119,8 @@ class ApiBridge:
             runtime = _get_runtime()
             age = time.time() - runtime.session_created_at if runtime.session_created_at else 0.0
             has_session = runtime.session is not None
+            cycle_id = int(getattr(runtime, "auth_cycle_id", 0) or 0)
+            completed_cycle_id = int(getattr(runtime, "auth_completed_cycle_id", 0) or 0)
             state = runtime.auth_state or ("ready" if has_session else "idle")
             message = runtime.auth_message or ("Сессия активна." if has_session else "Готовим авторизацию...")
             return {
@@ -3117,7 +3128,9 @@ class ApiBridge:
                 "message": message,
                 "error": runtime.auth_error,
                 "has_session": has_session,
-                "ready": has_session and state == "ready",
+                "ready": has_session and state == "ready" and completed_cycle_id >= cycle_id,
+                "cycle_id": cycle_id,
+                "completed_cycle_id": completed_cycle_id,
                 "updated_at": runtime.auth_updated_at,
                 "minutes_until_update": round(max(0.0, runtime.session_ttl_seconds - age) / 60.0, 2),
             }
