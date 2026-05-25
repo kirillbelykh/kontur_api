@@ -133,9 +133,9 @@
     {
       "order_name": "961 нитрил диаг XS 260525 (9к)",
       "document_id": "db57362c-b357-4468-96c2-190401a28041",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\961 нитрил диаг XS 260525 9к\\961 нитрил диаг XS 260525 9к.pdf, C:\\Users\\User\\Desktop\\Коды км\\961 нитрил диаг XS 260525 9к\\961 нитрил диаг XS 260525 (9к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\961 нитрил диаг XS 260525 9к\\961 нитрил диаг XS 260525 (9к).xls",
+      "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р XS, цвет синий",
       "gtin": "4650118043954",
       "positions": [
@@ -154,7 +154,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\961 нитрил диаг XS 260525 9к\\961 нитрил диаг XS 260525 (9к).xls",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\961 нитрил диаг XS 260525 9к\\961 нитрил диаг XS 260525 9к.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\961 нитрил диаг XS 260525 9к\\961 нитрил диаг XS 260525 (9к)_csv.csv"
     },
     {
       "order_name": "960 нитрил диаг фиолет S 260525 (13к)",
@@ -17479,7 +17482,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-25T09:14:56.018757",
+  "last_update": "2026-05-25T09:15:28.578435",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
