@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "960 нитрил диаг фиолет S 260525 (13к)",
+      "document_id": "679c9421-cc2c-4cd1-8867-12d5411598d1",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет фиолетовый",
+      "gtin": "4650118044043",
+      "positions": [
+        {
+          "gtin": "4650118044043",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет фиолетовый",
+          "tnvedCode": "4015120009",
+          "quantity": 130,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-25T09:09:43.160765",
+      "created_by": "User",
+      "updated_at": "2026-05-25T09:09:43.160765",
+      "updated_by": "User",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "959 лат диаг XS 260524 280д",
       "document_id": "1d27dd51-db27-4cb4-9d0a-9c397846cbb3",
       "status": "Скачан",
@@ -17294,7 +17320,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-25T08:47:41.499651",
+  "last_update": "2026-05-25T09:09:44.505555",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
