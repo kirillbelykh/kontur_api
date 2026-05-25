@@ -3,9 +3,9 @@
     {
       "order_name": "986 стер лат L 260526 160к",
       "document_id": "71176952-5728-4a47-9b42-70fa92b684b4",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\986 стер лат L 260526 160к\\986 стер лат L 260526 160к.pdf, C:\\Users\\user\\Desktop\\Коды км\\986 стер лат L 260526 160к\\986 стер лат L 260526 160к_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\986 стер лат L 260526 160к\\986 стер лат L 260526 160к.xls",
+      "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118040069",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\986 стер лат L 260526 160к\\986 стер лат L 260526 160к.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\986 стер лат L 260526 160к\\986 стер лат L 260526 160к_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\986 стер лат L 260526 160к\\986 стер лат L 260526 160к.xls"
     },
     {
       "order_name": "986 стер лат L 260526 604к",
@@ -17630,7 +17633,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-25T10:08:41.398257",
+  "last_update": "2026-05-25T10:11:57.977884",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
