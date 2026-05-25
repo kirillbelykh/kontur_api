@@ -107,9 +107,9 @@
     {
       "order_name": "962 нитрил диаг M 260525 (12к)",
       "document_id": "28c4ede1-6a26-41d4-aeda-185d31b4f6dd",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\962 нитрил диаг M 260525 12к\\962 нитрил диаг M 260525 12к.pdf, C:\\Users\\User\\Desktop\\Коды км\\962 нитрил диаг M 260525 12к\\962 нитрил диаг M 260525 (12к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\962 нитрил диаг M 260525 12к\\962 нитрил диаг M 260525 (12к).xls",
+      "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет синий",
       "gtin": "4650118044074",
       "positions": [
@@ -128,7 +128,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\962 нитрил диаг M 260525 12к\\962 нитрил диаг M 260525 (12к).xls",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\962 нитрил диаг M 260525 12к\\962 нитрил диаг M 260525 12к.pdf",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\962 нитрил диаг M 260525 12к\\962 нитрил диаг M 260525 (12к)_csv.csv"
     },
     {
       "order_name": "961 нитрил диаг XS 260525 (9к)",
@@ -17482,7 +17485,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-25T09:15:28.578435",
+  "last_update": "2026-05-25T09:16:05.131289",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
