@@ -251,6 +251,42 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertEqual(batch_calls, [("латекс S", 99), ("латекс S", 99), ("латекс S", 52)])
         invalidate_mock.assert_called_once_with()
 
+    def test_archive_selected_aggregations_posts_archive_for_each_unique_id(self):
+        post_calls = []
+
+        class FakeSession:
+            def post(self, url, **kwargs):
+                post_calls.append((url, kwargs))
+                return types.SimpleNamespace(raise_for_status=lambda: None)
+
+        fake_runtime = types.SimpleNamespace(
+            bulk_aggregation_service=types.SimpleNamespace(kontur_base_url="https://mk.kontur.ru")
+        )
+
+        with (
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(
+                self.bridge,
+                "_run_with_session_retry",
+                side_effect=lambda action, **_kwargs: action(FakeSession()),
+            ),
+            mock.patch.object(self.bridge, "_invalidate_aggregation_cache") as invalidate_mock,
+            mock.patch.object(self.bridge, "_log"),
+        ):
+            result = self.bridge.archive_selected_aggregations(["doc-1", "doc-2", "doc-1", ""])
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["archived_count"], 2)
+        self.assertEqual(
+            [url for url, _kwargs in post_calls],
+            [
+                "https://mk.kontur.ru/api/v1/aggregates/doc-1/archive",
+                "https://mk.kontur.ru/api/v1/aggregates/doc-2/archive",
+            ],
+        )
+        self.assertTrue(all(kwargs["timeout"] == 30 for _url, kwargs in post_calls))
+        invalidate_mock.assert_called_once_with()
+
     def test_create_tsd_tasks_allows_repeat_send_for_order_already_sent_to_tsd(self):
         history_order = {
             "document_id": "doc-1",

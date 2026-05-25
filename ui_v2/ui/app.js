@@ -3921,6 +3921,18 @@ async function bindEvents() {
     }, 'Проведение выбранных АК завершено.');
   });
 
+  $('#agg-archive-selected-btn').addEventListener('click', async () => {
+    await runAction('Архивируем выбранные АК...', async () => {
+      const selectedIds = Array.from(state.aggregation.selectedIds);
+      if (!selectedIds.length) {
+        throw new Error('Выберите хотя бы один АК.');
+      }
+      const result = await API.call('archive_selected_aggregations', selectedIds);
+      await loadAggregationState({ force: true });
+      return result;
+    }, 'Выбранные АК отправлены в архив.');
+  });
+
   $('#agg-intro-selected-btn').addEventListener('click', async () => {
     await runAction('Вводим в оборот коды из выбранных АК...', async () => {
       const selectedIds = Array.from(state.aggregation.selectedIds);

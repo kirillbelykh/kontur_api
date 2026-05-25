@@ -4922,6 +4922,50 @@ class ApiBridge:
             self._log("aggregation", f"Ошибка проведения выбранных АК: {exc}")
             return {"success": False, "error": str(exc)}
 
+    def archive_selected_aggregations(self, document_ids: Sequence[str]) -> Dict[str, Any]:
+        try:
+            normalized_ids = [
+                str(document_id or "").strip()
+                for document_id in document_ids
+                if str(document_id or "").strip()
+            ]
+            normalized_ids = list(dict.fromkeys(normalized_ids))
+            if not normalized_ids:
+                raise RuntimeError("Выберите хотя бы один АК.")
+
+            self._log("aggregation", f"Архивируем выбранные АК: {len(normalized_ids)} шт.")
+
+            def _run(session: requests.Session) -> Dict[str, Any]:
+                service = _get_runtime().bulk_aggregation_service
+                archived_ids: List[str] = []
+                for index, document_id in enumerate(normalized_ids, start=1):
+                    self._log(
+                        "aggregation",
+                        f"Отправляем АК в архив: {document_id} ({index}/{len(normalized_ids)})",
+                    )
+                    response = session.post(
+                        f"{service.kontur_base_url}/api/v1/aggregates/{document_id}/archive",
+                        timeout=30,
+                    )
+                    response.raise_for_status()
+                    archived_ids.append(document_id)
+                return {"archived_count": len(archived_ids), "archived_ids": archived_ids}
+
+            result = self._run_with_session_retry(
+                _run,
+                log_channel="aggregation",
+                retry_message="Обновляем сессию перед повторной архивацией выбранных АК",
+            )
+            self._invalidate_aggregation_cache()
+            self._log(
+                "aggregation",
+                f"Архивация выбранных АК завершена: {result['archived_count']} шт.",
+            )
+            return {"success": True, **result}
+        except Exception as exc:
+            self._log("aggregation", f"Ошибка архивации выбранных АК: {exc}")
+            return {"success": False, "error": str(exc)}
+
     def introduce_selected_aggregations(
         self,
         document_ids: Sequence[str],
