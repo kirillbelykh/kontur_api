@@ -145,7 +145,7 @@
     {
       "order_name": "966 HR лат XL 260525 (2к)",
       "document_id": "1bbe6706-2957-460c-a3d0-56a6663b6a21",
-      "status": "Скачан",
+      "status": "received",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\966 HR лат XL 260525 2к\\966 HR лат XL 260525 2к.pdf, C:\\Users\\User\\Desktop\\Коды км\\966 HR лат XL 260525 2к\\966 HR лат XL 260525 (2к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\966 HR лат XL 260525 2к\\966 HR лат XL 260525 (2к).xls",
       "simpl": "латекс hr",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р XL, цвет синий",
@@ -17639,7 +17639,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-26T16:34:54.195852",
+  "last_update": "2026-05-26T16:39:32.837388",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
