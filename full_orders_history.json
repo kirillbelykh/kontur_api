@@ -319,7 +319,7 @@
     {
       "order_name": "960 нитрил диаг фиолет S 260525 (13к)",
       "document_id": "679c9421-cc2c-4cd1-8867-12d5411598d1",
-      "status": "Скачан",
+      "status": "received",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\960 нитрил диаг фиолет S 260525 13к\\960 нитрил диаг фиолет S 260525 13к.pdf, C:\\Users\\User\\Desktop\\Коды км\\960 нитрил диаг фиолет S 260525 13к\\960 нитрил диаг фиолет S 260525 (13к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\960 нитрил диаг фиолет S 260525 13к\\960 нитрил диаг фиолет S 260525 (13к).xls",
       "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет фиолетовый",
@@ -17639,7 +17639,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-26T17:08:11.894615",
+  "last_update": "2026-05-26T17:11:57.344685",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
