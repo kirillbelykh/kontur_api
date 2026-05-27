@@ -3289,10 +3289,12 @@ class ApiBridge:
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
-    def get_orders_view_state(self) -> Dict[str, Any]:
+    def get_orders_view_state(self, force_sync: bool = False) -> Dict[str, Any]:
         try:
             self._start_background_status_updater()
             runtime = _get_runtime()
+            if force_sync:
+                runtime.history_db.sync_with_github(force=True, push=False, reason="orders_view_refresh")
             deleted_ids = self._get_deleted_document_ids()
             history_items: List[Dict[str, Any]] = []
             for item in runtime.history_db.get_all_orders():
@@ -3301,8 +3303,6 @@ class ApiBridge:
                 if self._is_archived_order(item):
                     continue
                 history_items.append(item)
-                if len(history_items) >= 250:
-                    break
 
             return {
                 "queue": [self._serialize_queue_item(item) for item in runtime.order_queue],

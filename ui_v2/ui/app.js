@@ -2442,10 +2442,10 @@ async function maybeRefreshRouteState(route, options = {}) {
 }
 
 async function loadOrdersState(options = {}) {
-  const { render = isRouteActive('orders') } = normalizeLoadOptions(options);
+  const { force = false, render = isRouteActive('orders') } = normalizeLoadOptions(options);
   state.ui.routeLoading.orders = true;
   try {
-    const result = await API.call('get_orders_view_state');
+    const result = await API.call('get_orders_view_state', Boolean(force));
     state.orders.queue = result.queue || [];
     state.orders.sessionOrders = result.session_orders || [];
     state.orders.history = result.history || [];
@@ -3622,6 +3622,14 @@ async function bindEvents() {
 	    state.orders.fullscreenTable = 'history';
 	    renderOrdersFullscreenTable();
 	  });
+
+  $('#orders-history-refresh-btn').addEventListener('click', async () => {
+    await runAction('Синхронизируем историю заказов...', async () => {
+      await loadOrdersState({ force: true });
+      markRoutesDirty(['download', 'intro', 'tsd', 'labels']);
+      return { success: true };
+    }, 'История заказов обновлена.');
+  });
 
   $('#orders-restore-deleted-btn').addEventListener('click', async () => {
     await runAction('Восстанавливаем заказ...', async () => {

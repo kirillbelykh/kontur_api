@@ -21,6 +21,8 @@ SYNC_ENABLED_ENV = "HISTORY_SYNC_ENABLED"
 SYNC_CACHE_DIR = ".history_sync_cache"
 SYNC_PULL_INTERVAL_SECONDS = 20
 SYNC_PUSH_RETRIES = 3
+GIT_INDEX_LOCK_STALE_SECONDS = 30
+GIT_INDEX_LOCK_WAIT_SECONDS = 10
 
 
 class OrderHistoryDB:
@@ -372,10 +374,35 @@ class OrderHistoryDB:
             kwargs["stderr"] = subprocess.DEVNULL
 
         result = subprocess.run(["git"] + args, cwd=str(cwd), check=False, **kwargs)
-        if check and result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        if result.returncode != 0 and self._is_git_index_lock_error(stderr):
+            self._wait_for_git_index_lock(cwd)
+            result = subprocess.run(["git"] + args, cwd=str(cwd), check=False, **kwargs)
             stderr = (result.stderr or "").strip()
+        if check and result.returncode != 0:
             raise RuntimeError(f"git {' '.join(args)} failed: {stderr}")
         return result
+
+    def _is_git_index_lock_error(self, stderr: str) -> bool:
+        normalized = str(stderr or "").lower()
+        return "index.lock" in normalized and "file exists" in normalized
+
+    def _wait_for_git_index_lock(self, repo_dir: Path) -> None:
+        lock_path = repo_dir / ".git" / "index.lock"
+        deadline = time.time() + GIT_INDEX_LOCK_WAIT_SECONDS
+        while lock_path.exists() and time.time() < deadline:
+            try:
+                age_seconds = time.time() - lock_path.stat().st_mtime
+                if age_seconds >= GIT_INDEX_LOCK_STALE_SECONDS:
+                    lock_path.unlink()
+                    logger.warning("Удален зависший git index.lock для синхронизации истории: %s", lock_path)
+                    return
+            except FileNotFoundError:
+                return
+            except Exception as exc:
+                logger.warning("Не удалось проверить git index.lock %s: %s", lock_path, exc)
+                return
+            time.sleep(0.25)
 
     def _detect_origin_url(self) -> Optional[str]:
         try:
