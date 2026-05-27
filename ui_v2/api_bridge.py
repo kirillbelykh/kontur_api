@@ -359,13 +359,14 @@ class _BridgeRuntime:
         self.live_intro_by_order_id: Dict[str, Dict[str, Any]] = {}
         self.live_intro_by_document_id: Dict[str, Dict[str, Any]] = {}
         self.live_intro_by_number: Dict[str, Dict[str, Any]] = {}
-        self.load_download_items_from_history()
+        self.load_download_items_from_history(sync=False)
         self.history_sync_thread: Optional[Thread] = None
         self.start_history_sync_on_startup()
 
     def _sync_history_on_startup(self) -> None:
         try:
             self.history_db.sync_with_github(force=True, push=False, reason="runtime-init")
+            self.load_download_items_from_history(sync=False)
         except Exception:
             pass
 
@@ -379,9 +380,16 @@ class _BridgeRuntime:
         )
         self.history_sync_thread.start()
 
-    def load_download_items_from_history(self) -> None:
+    def load_download_items_from_history(self, sync: bool = True) -> None:
         existing_ids = {item.get("document_id") for item in self.download_items if item.get("document_id")}
-        for order in self.history_db.get_all_orders():
+        if sync:
+            history_orders = self.history_db.get_all_orders()
+        else:
+            with self.history_db._io_lock:  # type: ignore[attr-defined]
+                payload = self.history_db._load_data()  # type: ignore[attr-defined]
+            history_orders = list(payload.get("orders") or [])
+            self.history_db._sort_orders(history_orders)  # type: ignore[attr-defined]
+        for order in history_orders:
             document_id = str(order.get("document_id") or "").strip()
             if not document_id or document_id in existing_ids:
                 continue
@@ -3325,6 +3333,28 @@ class ApiBridge:
             }
         except Exception as exc:
             return {"error": str(exc)}
+
+    def export_order_history(self) -> Dict[str, Any]:
+        try:
+            runtime = _get_runtime()
+            self._log("orders", "Выгружаем историю заказов в GitHub")
+            changed = runtime.history_db.sync_with_github(
+                force=True,
+                push=True,
+                reason="orders_manual_export",
+            )
+            runtime.load_download_items_from_history(sync=False)
+            history_count = len(runtime.history_db.get_all_orders())
+            self._log("orders", f"История заказов выгружена: {history_count} записей")
+            return {
+                "success": True,
+                "changed": bool(changed),
+                "history_count": history_count,
+                "state": self.get_orders_view_state(force_sync=False),
+            }
+        except Exception as exc:
+            self._log("orders", f"Ошибка выгрузки истории заказов: {exc}")
+            return {"success": False, "error": str(exc)}
 
     def add_order_item(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:

@@ -15,7 +15,7 @@ from history_db import OrderHistoryDB
 
 # ------------------- Инициализация окружения -------------------
 load_dotenv()
-history_db = OrderHistoryDB()
+history_db = OrderHistoryDB(startup_sync="none")
 
 # ------------------- Константы конфигурации -------------------
 BASE: str = os.getenv("BASE_URL", "")

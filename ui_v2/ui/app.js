@@ -3623,6 +3623,14 @@ async function bindEvents() {
 	    renderOrdersFullscreenTable();
 	  });
 
+  $('#orders-history-export-btn').addEventListener('click', async () => {
+    await runAction('Выгружаем историю заказов...', async () => {
+      const result = await API.call('export_order_history');
+      await loadOrdersState({ force: false });
+      return result;
+    }, 'История заказов выгружена.');
+  });
+
   $('#orders-history-refresh-btn').addEventListener('click', async () => {
     await runAction('Синхронизируем историю заказов...', async () => {
       await loadOrdersState({ force: true });
