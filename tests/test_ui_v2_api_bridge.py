@@ -196,19 +196,19 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertIn("InputEncoding", command[-1])
         self.assertIn("Set-Clipboard -Value $text", command[-1])
 
-    def test_get_orders_view_state_returns_full_local_history_snapshot(self):
-        history_items = [
+    def test_get_orders_view_state_returns_kontur_orders_snapshot(self):
+        kontur_items = [
             {
                 "document_id": f"doc-{index}",
                 "order_name": f"Order {index}",
-                "status": "created",
+                "status": "received",
             }
             for index in range(300)
         ]
         fake_runtime = types.SimpleNamespace(
             order_queue=[],
             session_orders=[],
-            history_db=types.SimpleNamespace(get_all_orders=lambda: history_items),
+            history_db=types.SimpleNamespace(get_all_orders=lambda: []),
         )
         normalized_ids = []
 
@@ -220,7 +220,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
 
         with (
             mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
-            mock.patch.object(self.bridge, "_ensure_session_safely") as ensure_session_mock,
+            mock.patch.object(self.bridge, "_get_kontur_order_items", return_value=kontur_items) as kontur_mock,
             mock.patch.object(self.bridge, "_get_deleted_document_ids", return_value={"doc-0"}),
             mock.patch.object(self.bridge, "_load_deleted_orders", return_value=[]),
             mock.patch.object(self.bridge, "_normalize_history_item", side_effect=fake_normalize),
@@ -230,32 +230,25 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertNotIn("error", result)
         self.assertEqual(len(result["history"]), 299)
         self.assertEqual(normalized_ids, [f"doc-{index}" for index in range(1, 300)])
-        ensure_session_mock.assert_not_called()
+        kontur_mock.assert_called_once_with(force_refresh=False)
 
-    def test_get_orders_view_state_force_syncs_history(self):
-        sync_calls = []
-        history_db = types.SimpleNamespace(
-            get_all_orders=lambda: [],
-            sync_with_github=lambda **kwargs: sync_calls.append(kwargs),
-        )
+    def test_get_orders_view_state_force_refreshes_kontur_orders(self):
         fake_runtime = types.SimpleNamespace(
             order_queue=[],
             session_orders=[],
-            history_db=history_db,
+            history_db=types.SimpleNamespace(get_all_orders=lambda: []),
         )
 
         with (
             mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(self.bridge, "_get_kontur_order_items", return_value=[]) as kontur_mock,
             mock.patch.object(self.bridge, "_get_deleted_document_ids", return_value=set()),
             mock.patch.object(self.bridge, "_load_deleted_orders", return_value=[]),
         ):
             result = self.bridge.get_orders_view_state(force_sync=True)
 
         self.assertNotIn("error", result)
-        self.assertEqual(
-            sync_calls,
-            [{"force": True, "push": False, "reason": "orders_view_refresh"}],
-        )
+        kontur_mock.assert_called_once_with(force_refresh=True)
 
     def test_export_order_history_pushes_history(self):
         sync_calls = []

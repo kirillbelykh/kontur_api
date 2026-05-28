@@ -97,6 +97,7 @@ TRUE_STATUS_WORKER_TIMEOUT_SECONDS = 25
 LIVE_STATUS_REFRESH_INTERVAL_SECONDS = 30
 LIVE_STATUS_PAGE_LIMIT = 1000
 LIVE_STATUS_MAX_WORKERS = 2
+KONTUR_ORDERS_CACHE_TTL_SECONDS = 60
 DELETED_ORDERS_DIRNAME = "Удаленные"
 DELETED_ORDERS_FILE = "deleted_orders.json"
 MARKING_CODES_DIRNAME = "\u041a\u043e\u0434\u044b \u043a\u043c"
@@ -359,6 +360,8 @@ class _BridgeRuntime:
         self.live_intro_by_order_id: Dict[str, Dict[str, Any]] = {}
         self.live_intro_by_document_id: Dict[str, Dict[str, Any]] = {}
         self.live_intro_by_number: Dict[str, Dict[str, Any]] = {}
+        self.kontur_orders_cache_items: List[Dict[str, Any]] = []
+        self.kontur_orders_cache_at = 0.0
         self.load_download_items_from_history(sync=False)
         self.history_sync_thread: Optional[Thread] = None
         self.start_history_sync_on_startup()
@@ -528,9 +531,9 @@ class ApiBridge:
             if self._normalize_order_name_key(item.get("order_name")) == normalized:
                 raise RuntimeError(f"Заявка с названием '{order_name}' уже существует в активных заказах.")
 
-        for item in runtime.history_db.get_all_orders():
+        for item in self._get_kontur_order_items():
             if self._normalize_order_name_key(item.get("order_name")) == normalized:
-                raise RuntimeError(f"Заявка с названием '{order_name}' уже существует в истории заказов.")
+                raise RuntimeError(f"Заявка с названием '{order_name}' уже существует в Контур.Маркировке.")
 
     def _log(self, channel: str, message: str) -> None:
         runtime = _get_runtime()
@@ -707,6 +710,76 @@ class ApiBridge:
             or (live_intro_by_number.get(order_name) if order_name else None)
             or {}
         )
+
+    def _kontur_order_to_local_order(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        document_id = str(item.get("documentId") or item.get("document_id") or "").strip()
+        document_number = str(item.get("documentNumber") or item.get("order_name") or "").strip()
+        document_status = str(item.get("documentStatus") or item.get("status") or "").strip()
+        created_at = str(item.get("createdDate") or item.get("created_at") or "").strip()
+        updated_at = str(item.get("updatedDate") or item.get("updated_at") or "").strip()
+        requested_count = item.get("requestedCodesCount")
+        received_count = item.get("receivedCodesCount")
+        local_item = {
+            "order_name": document_number,
+            "document_id": document_id,
+            "status": document_status,
+            "status_raw": document_status,
+            "created_at": created_at,
+            "updated_at": updated_at,
+            "codes_count": requested_count or received_count or 0,
+            "requested_codes_count": requested_count,
+            "received_codes_count": received_count,
+            "product_group": item.get("productGroup") or "",
+            "cisType": item.get("cisType") or "",
+            "comment": item.get("comment") or "",
+            "release_method_type": item.get("releaseMethodType") or "",
+            "positions_count": item.get("positionsCount"),
+            "introductionDocumentId": item.get("introductionDocumentId") or "",
+            "utilizationReportDocumentId": item.get("utilizationReportDocumentId") or "",
+            "relatedDocumentsStatus": item.get("relatedDocumentsStatus") or "",
+            "allowCreateIntroduction": item.get("allowCreateIntroduction"),
+            "allowDelete": item.get("allowDelete"),
+            "from_kontur": True,
+            "history_data": dict(item),
+        }
+        return local_item
+
+    def _kontur_order_items_from_cache(self) -> List[Dict[str, Any]]:
+        runtime = _get_runtime()
+        cached = getattr(runtime, "kontur_orders_cache_items", []) or []
+        return [dict(item) for item in cached]
+
+    def _get_kontur_order_items(self, *, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        runtime = _get_runtime()
+        now = time.time()
+        cached_at = float(getattr(runtime, "kontur_orders_cache_at", 0.0) or 0.0)
+        cached_items = getattr(runtime, "kontur_orders_cache_items", []) or []
+        if cached_items and not force_refresh and now - cached_at < KONTUR_ORDERS_CACHE_TTL_SECONDS:
+            return self._kontur_order_items_from_cache()
+
+        session = self._ensure_session_safely("orders")
+        if not session:
+            return self._kontur_order_items_from_cache()
+
+        payload = self._fetch_codes_orders_batch(session)
+        raw_items = list((payload.get("by_id") or {}).values())
+        items = [self._kontur_order_to_local_order(item) for item in raw_items]
+        items.sort(key=self._fresh_order_sort_key, reverse=True)
+        with runtime.lock:
+            runtime.kontur_orders_cache_items = [dict(item) for item in items]
+            runtime.kontur_orders_cache_at = time.time()
+            runtime.live_order_by_id = dict(payload.get("by_id") or {})
+            runtime.live_order_by_number = dict(payload.get("by_number") or {})
+        return items
+
+    def _get_kontur_order_item(self, document_id: str) -> Optional[Dict[str, Any]]:
+        normalized_id = str(document_id or "").strip()
+        if not normalized_id:
+            return None
+        for item in self._get_kontur_order_items():
+            if str(item.get("document_id") or "").strip() == normalized_id:
+                return item
+        return None
 
     def _is_archived_order(self, order_data: Dict[str, Any]) -> bool:
         merged = self._merge_order_data(order_data)
@@ -1522,10 +1595,14 @@ class ApiBridge:
 
     def _collect_known_orders(self) -> List[Dict[str, Any]]:
         runtime = _get_runtime()
-        runtime.load_download_items_from_history()
         merged_by_id: Dict[str, Dict[str, Any]] = {}
 
-        for source in (runtime.session_orders, runtime.download_items, runtime.history_db.get_all_orders()):
+        for source in (
+            self._get_kontur_order_items(),
+            runtime.session_orders,
+            runtime.download_items,
+            runtime.history_db.get_all_orders(),
+        ):
             for item in source:
                 document_id = str(item.get("document_id") or "").strip()
                 if not document_id:
@@ -1562,6 +1639,9 @@ class ApiBridge:
         history_order = _get_runtime().history_db.get_order_by_document_id(normalized_id)
         if isinstance(history_order, dict):
             return _history_order_to_download_item(history_order)
+        kontur_order = self._get_kontur_order_item(normalized_id)
+        if isinstance(kontur_order, dict):
+            return kontur_order
         return None
 
     def _ensure_order_downloaded_for_intro(
@@ -3301,11 +3381,9 @@ class ApiBridge:
         try:
             self._start_background_status_updater()
             runtime = _get_runtime()
-            if force_sync:
-                runtime.history_db.sync_with_github(force=True, push=False, reason="orders_view_refresh")
             deleted_ids = self._get_deleted_document_ids()
             history_items: List[Dict[str, Any]] = []
-            for item in runtime.history_db.get_all_orders():
+            for item in self._get_kontur_order_items(force_refresh=bool(force_sync)):
                 if str(item.get("document_id") or "").strip() in deleted_ids:
                     continue
                 if self._is_archived_order(item):
@@ -3575,11 +3653,10 @@ class ApiBridge:
         try:
             self._start_background_status_updater()
             runtime = _get_runtime()
-            runtime.load_download_items_from_history()
             printers, default_printer = list_installed_printers()
             deleted_ids = self._get_deleted_document_ids()
             items = []
-            for item in runtime.download_items:
+            for item in self._collect_known_orders():
                 if str(item.get("document_id") or "").strip() in deleted_ids:
                     continue
                 if self._is_archived_order(item):
@@ -3811,6 +3888,8 @@ class ApiBridge:
     def manual_download_order(self, document_id: str) -> Dict[str, Any]:
         try:
             item = self._find_download_item(str(document_id or "").strip())
+            if not item:
+                item = self._get_order_for_document_id(str(document_id or "").strip())
             if not item:
                 raise RuntimeError("Заказ не найден в активном списке загрузок.")
             session = self._ensure_session()
@@ -4080,6 +4159,12 @@ class ApiBridge:
             with runtime.lock:
                 runtime.live_order_by_id = dict(orders_payload.get("by_id") or {})
                 runtime.live_order_by_number = dict(orders_payload.get("by_number") or {})
+                runtime.kontur_orders_cache_items = [
+                    self._kontur_order_to_local_order(item)
+                    for item in runtime.live_order_by_id.values()
+                ]
+                runtime.kontur_orders_cache_items.sort(key=self._fresh_order_sort_key, reverse=True)
+                runtime.kontur_orders_cache_at = time.time()
                 runtime.live_intro_by_order_id = dict(intro_payload.get("by_order_id") or {})
                 runtime.live_intro_by_document_id = dict(intro_payload.get("by_document_id") or {})
                 runtime.live_intro_by_number = dict(intro_payload.get("by_number") or {})
@@ -4341,7 +4426,7 @@ class ApiBridge:
             deleted_ids = self._get_deleted_document_ids()
             normalized_search = str(search_text or "").strip()
             orders: List[Dict[str, Any]] = []
-            for item in runtime.history_db.get_all_orders():
+            for item in self._collect_known_orders():
                 document_id = str(item.get("document_id") or "").strip()
                 if not document_id or document_id in deleted_ids:
                     continue
@@ -4415,6 +4500,8 @@ class ApiBridge:
                     if history_order:
                         item = _history_order_to_download_item(history_order)
                     else:
+                        item = self._get_kontur_order_item(document_id)
+                    if not item:
                         errors.append({"document_id": document_id, "error": "Заказ не найден"})
                         continue
 
@@ -4479,6 +4566,8 @@ class ApiBridge:
             history_order = runtime.history_db.get_order_by_document_id(normalized_id)
             if isinstance(history_order, dict):
                 item = _history_order_to_download_item(history_order)
+        if not item:
+            item = self._get_kontur_order_item(normalized_id)
         if not item:
             item = {"document_id": normalized_id}
 

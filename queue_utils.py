@@ -15,6 +15,8 @@ TSD_READY_STATUSES = DOWNLOADED_STATUSES | {
     "Скачивается",
     "Готов для ТСД",
     "Готов для задания на ТСД",
+    "released",
+    "received",
 }
 
 
