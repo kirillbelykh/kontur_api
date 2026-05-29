@@ -98,6 +98,8 @@ LIVE_STATUS_REFRESH_INTERVAL_SECONDS = 30
 LIVE_STATUS_PAGE_LIMIT = 1000
 LIVE_STATUS_MAX_WORKERS = 2
 KONTUR_ORDERS_CACHE_TTL_SECONDS = 60
+KONTUR_ORDER_METADATA_PREFETCH_LIMIT = 20
+KONTUR_ORDER_METADATA_MAX_WORKERS = 8
 DELETED_ORDERS_DIRNAME = "Удаленные"
 DELETED_ORDERS_FILE = "deleted_orders.json"
 MARKING_CODES_DIRNAME = "\u041a\u043e\u0434\u044b \u043a\u043c"
@@ -362,6 +364,7 @@ class _BridgeRuntime:
         self.live_intro_by_number: Dict[str, Dict[str, Any]] = {}
         self.kontur_orders_cache_items: List[Dict[str, Any]] = []
         self.kontur_orders_cache_at = 0.0
+        self.kontur_order_metadata_cache: Dict[str, Dict[str, Any]] = {}
         self.load_download_items_from_history(sync=False)
         self.history_sync_thread: Optional[Thread] = None
         self.start_history_sync_on_startup()
@@ -840,10 +843,132 @@ class ApiBridge:
         }
         return local_item
 
+    def _merge_kontur_order_metadata(self, item: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
+        if not metadata:
+            return item
+        merged = dict(item)
+        positions = metadata.get("positions")
+        if isinstance(positions, list) and positions:
+            merged["positions"] = positions
+            merged["positions_count"] = len(positions)
+        if metadata.get("full_name"):
+            merged["full_name"] = str(metadata.get("full_name") or "").strip()
+        if metadata.get("gtin"):
+            merged["gtin"] = str(metadata.get("gtin") or "").strip()
+        history_data = dict(merged.get("history_data") or {})
+        if positions:
+            history_data["positions"] = positions
+        if merged.get("full_name"):
+            history_data["full_name"] = merged.get("full_name")
+        if merged.get("gtin"):
+            history_data["gtin"] = merged.get("gtin")
+        merged["history_data"] = history_data
+        return merged
+
+    def _fetch_kontur_order_metadata(self, session: requests.Session, document_id: str) -> Dict[str, Any]:
+        normalized_id = str(document_id or "").strip()
+        if not normalized_id:
+            return {}
+        runtime = _get_runtime()
+        cached = getattr(runtime, "kontur_order_metadata_cache", {}) or {}
+        cached_metadata = cached.get(normalized_id)
+        if isinstance(cached_metadata, dict):
+            return dict(cached_metadata)
+
+        base_url = str(os.getenv("BASE_URL") or "https://mk.kontur.ru").rstrip("/")
+        detail_payload: Dict[str, Any] = {}
+        positions: List[Dict[str, Any]] = []
+        try:
+            response = session.get(
+                f"{base_url}/api/v1/codes-order/{normalized_id}",
+                headers={"Connection": "close"},
+                timeout=15,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, dict):
+                detail_payload = payload
+                positions = _extract_kontur_order_positions(payload)
+        except Exception:
+            detail_payload = {}
+
+        if not positions:
+            try:
+                response = session.get(
+                    f"{base_url}/api/v1/documents/{normalized_id}/positions",
+                    headers={"Connection": "close"},
+                    timeout=15,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if isinstance(payload, list):
+                    positions = _extract_kontur_order_positions({"positions": payload})
+                elif isinstance(payload, dict):
+                    positions = _extract_kontur_order_positions(payload)
+            except Exception:
+                positions = []
+
+        metadata_source = dict(detail_payload)
+        if positions:
+            metadata_source["positions"] = positions
+        metadata = {
+            "positions": positions,
+            "full_name": _extract_position_name(metadata_source),
+            "gtin": _extract_gtin(metadata_source),
+        }
+        with runtime.lock:
+            runtime.kontur_order_metadata_cache[normalized_id] = dict(metadata)
+        return metadata
+
+    def _enrich_kontur_orders_with_metadata(
+        self,
+        session: requests.Session,
+        items: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        if not items:
+            return items
+        runtime = _get_runtime()
+        enriched = [dict(item) for item in items]
+        pending: List[tuple[int, str]] = []
+        cached = getattr(runtime, "kontur_order_metadata_cache", {}) or {}
+        for index, item in enumerate(enriched):
+            document_id = str(item.get("document_id") or "").strip()
+            if not document_id:
+                continue
+            metadata = cached.get(document_id)
+            if isinstance(metadata, dict):
+                enriched[index] = self._merge_kontur_order_metadata(item, metadata)
+            elif index < KONTUR_ORDER_METADATA_PREFETCH_LIMIT:
+                pending.append((index, document_id))
+
+        if pending:
+            worker_count = min(KONTUR_ORDER_METADATA_MAX_WORKERS, len(pending))
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                future_map = {
+                    executor.submit(self._fetch_kontur_order_metadata, session, document_id): index
+                    for index, document_id in pending
+                }
+                for future, index in future_map.items():
+                    try:
+                        metadata = future.result(timeout=20)
+                    except Exception:
+                        metadata = {}
+                    if metadata:
+                        enriched[index] = self._merge_kontur_order_metadata(enriched[index], metadata)
+        return enriched
+
     def _kontur_order_items_from_cache(self) -> List[Dict[str, Any]]:
         runtime = _get_runtime()
         cached = getattr(runtime, "kontur_orders_cache_items", []) or []
         return [dict(item) for item in cached]
+
+    def _kontur_orders_need_visible_metadata(self, items: Sequence[Dict[str, Any]]) -> bool:
+        for item in list(items)[:KONTUR_ORDER_METADATA_PREFETCH_LIMIT]:
+            if not str(item.get("document_id") or "").strip():
+                continue
+            if not str(item.get("full_name") or "").strip() or not str(item.get("gtin") or "").strip():
+                return True
+        return False
 
     def _get_kontur_order_items(self, *, force_refresh: bool = False) -> List[Dict[str, Any]]:
         runtime = _get_runtime()
@@ -851,6 +976,13 @@ class ApiBridge:
         cached_at = float(getattr(runtime, "kontur_orders_cache_at", 0.0) or 0.0)
         cached_items = getattr(runtime, "kontur_orders_cache_items", []) or []
         if cached_items and not force_refresh and now - cached_at < KONTUR_ORDERS_CACHE_TTL_SECONDS:
+            if self._kontur_orders_need_visible_metadata(cached_items):
+                session = self._ensure_session_safely("orders")
+                if session:
+                    items = self._enrich_kontur_orders_with_metadata(session, self._kontur_order_items_from_cache())
+                    with runtime.lock:
+                        runtime.kontur_orders_cache_items = [dict(item) for item in items]
+                    return items
             return self._kontur_order_items_from_cache()
 
         session = self._ensure_session_safely("orders")
@@ -861,6 +993,7 @@ class ApiBridge:
         raw_items = list((payload.get("by_id") or {}).values())
         items = [self._kontur_order_to_local_order(item) for item in raw_items]
         items.sort(key=self._fresh_order_sort_key, reverse=True)
+        items = self._enrich_kontur_orders_with_metadata(session, items)
         with runtime.lock:
             runtime.kontur_orders_cache_items = [dict(item) for item in items]
             runtime.kontur_orders_cache_at = time.time()
@@ -4252,14 +4385,16 @@ class ApiBridge:
                 future_intro = executor.submit(self._fetch_introductions_batch, session)
                 orders_payload = future_orders.result(timeout=90)
                 intro_payload = future_intro.result(timeout=90)
+            kontur_items = [
+                self._kontur_order_to_local_order(item)
+                for item in (orders_payload.get("by_id") or {}).values()
+            ]
+            kontur_items.sort(key=self._fresh_order_sort_key, reverse=True)
+            kontur_items = self._enrich_kontur_orders_with_metadata(session, kontur_items)
             with runtime.lock:
                 runtime.live_order_by_id = dict(orders_payload.get("by_id") or {})
                 runtime.live_order_by_number = dict(orders_payload.get("by_number") or {})
-                runtime.kontur_orders_cache_items = [
-                    self._kontur_order_to_local_order(item)
-                    for item in runtime.live_order_by_id.values()
-                ]
-                runtime.kontur_orders_cache_items.sort(key=self._fresh_order_sort_key, reverse=True)
+                runtime.kontur_orders_cache_items = [dict(item) for item in kontur_items]
                 runtime.kontur_orders_cache_at = time.time()
                 runtime.live_intro_by_order_id = dict(intro_payload.get("by_order_id") or {})
                 runtime.live_intro_by_document_id = dict(intro_payload.get("by_document_id") or {})
