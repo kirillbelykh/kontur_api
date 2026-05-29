@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-os.environ.setdefault("LOG_FILE", str(Path(__file__).resolve().parent.parent / "lookup.log"))
+os.environ.setdefault("LOG_FILE", str(Path(__file__).resolve().parent.parent / "runtime" / "logs" / "lookup.log"))
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 try:
@@ -33,7 +33,9 @@ def _ensure_desktop_shortcut() -> None:
     shortcut_path = Path.home() / "Desktop" / "KonturTestAPI.lnk"
     script_path = Path(__file__).resolve()
     repo_root = script_path.parent.parent
-    icon_path = repo_root / "icon.ico"
+    icon_path = repo_root / "assets" / "icons" / "icon.ico"
+    if not icon_path.exists():
+        icon_path = repo_root / "icon.ico"
 
     try:
         import win32com.client  # type: ignore

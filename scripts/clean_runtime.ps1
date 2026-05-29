@@ -32,6 +32,12 @@ $patterns = @(
     "last_snapshot.json"
 )
 
+$cacheDirs = @(
+    ".mypy_cache",
+    ".pytest_cache",
+    "__pycache__"
+)
+
 $seenFiles = @{}
 foreach ($pattern in $patterns) {
     Get-ChildItem -Path $ProjectDir -Filter $pattern -File -Recurse -ErrorAction SilentlyContinue |
@@ -45,6 +51,20 @@ foreach ($pattern in $patterns) {
             $seenFiles[$_.FullName] = $true
             if ($PSCmdlet.ShouldProcess($_.FullName, "Remove runtime file")) {
                 Remove-Item -LiteralPath $_.FullName -Force
+            }
+        }
+}
+
+foreach ($dirName in $cacheDirs) {
+    Get-ChildItem -Path $ProjectDir -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Name -eq $dirName -and
+            $_.FullName -notmatch "\\.git\\" -and
+            $_.FullName -notmatch "\\.venv\\"
+        } |
+        ForEach-Object {
+            if ($PSCmdlet.ShouldProcess($_.FullName, "Remove cache directory")) {
+                Remove-Item -LiteralPath $_.FullName -Recurse -Force
             }
         }
 }

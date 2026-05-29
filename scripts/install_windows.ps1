@@ -295,7 +295,10 @@ function Ensure-YandexBrowser {
         return $browserPath
     }
 
-    $localInstaller = Join-Path $ProjectDir "Yandex.exe"
+    $localInstaller = Join-Path $ProjectDir "runtime\installers\Yandex.exe"
+    if (-not (Test-Path $localInstaller)) {
+        $localInstaller = Join-Path $ProjectDir "Yandex.exe"
+    }
     if (Test-Path $localInstaller) {
         Write-WarnMsg "Trying bundled Yandex.exe installer"
         $silentArgSets = @(
@@ -612,7 +615,10 @@ function Create-DesktopShortcut {
         $shortcut.Description = $Description
     }
 
-    $iconPath = Join-Path $ProjectDir "icon.ico"
+    $iconPath = Join-Path $ProjectDir "assets\icons\icon.ico"
+    if (-not (Test-Path $iconPath)) {
+        $iconPath = Join-Path $ProjectDir "icon.ico"
+    }
     if (Test-Path $iconPath) {
         $shortcut.IconLocation = $iconPath
     }

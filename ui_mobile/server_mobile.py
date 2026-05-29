@@ -25,7 +25,7 @@ CERTS_DIR = Path(__file__).resolve().parent / "certs"
 
 sys.path.insert(0, str(REPO_ROOT / "ui_v2"))
 sys.path.insert(0, str(REPO_ROOT))
-os.environ.setdefault("LOG_FILE", str(REPO_ROOT / "lookup.log"))
+os.environ.setdefault("LOG_FILE", str(REPO_ROOT / "runtime" / "logs" / "lookup.log"))
 load_dotenv(REPO_ROOT / ".env")
 
 from api_bridge import ApiBridge  # noqa: E402
@@ -206,7 +206,9 @@ class MobileRequestHandler(SimpleHTTPRequestHandler):
             self._write_json(CLIENT_CONFIG)
             return
         if path == "/favicon.ico":
-            icon = REPO_ROOT / "icon.ico"
+            icon = REPO_ROOT / "assets" / "icons" / "icon.ico"
+            if not icon.exists():
+                icon = REPO_ROOT / "icon.ico"
             if icon.exists():
                 self._write_bytes(icon.read_bytes(), content_type="image/x-icon")
             else:

@@ -6,9 +6,14 @@ import logging
 import os
 import sys
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 
-LOG_FILE = os.getenv("LOG_FILE", "lookup.log")
+RUNTIME_DIR = Path(os.getenv("KONTUR_RUNTIME_DIR", "runtime"))
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR = RUNTIME_DIR / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = os.getenv("LOG_FILE", str(LOG_DIR / "lookup.log"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_MAX_BYTES = 5 * 1024 * 1024
 LOG_BACKUP_COUNT = 3

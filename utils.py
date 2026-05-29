@@ -8,16 +8,22 @@ from dataclasses import asdict
 from datetime import datetime
 from logger import logger
 
-COOKIES_FILE = Path("cookies.json")
+RUNTIME_DIR = Path(os.getenv("KONTUR_RUNTIME_DIR", "runtime"))
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+STATE_DIR = RUNTIME_DIR / "state"
+STATE_DIR.mkdir(parents=True, exist_ok=True)
+COOKIES_FILE = STATE_DIR / "cookies.json"
+LEGACY_COOKIES_FILE = Path("cookies.json")
 
 # ---------------- helpers ----------------
 
 def load_cookies() -> Optional[Dict[str, str]]:
     """Загружает cookies из файла, если они существуют и корректны."""
-    if not COOKIES_FILE.exists():
+    cookies_file = COOKIES_FILE if COOKIES_FILE.exists() else LEGACY_COOKIES_FILE
+    if not cookies_file.exists():
         return None
     try:
-        data = json.loads(COOKIES_FILE.read_text(encoding="utf-8"))
+        data = json.loads(cookies_file.read_text(encoding="utf-8"))
         if isinstance(data, dict) and data:
             return data
     except Exception as e:
@@ -100,7 +106,9 @@ def save_snapshot(to_process) -> bool:
             d = asdict(x)
             d["_uid"] = getattr(x, "_uid", None)
             snapshot.append(d)
-        with open("last_snapshot.json", "w", encoding="utf-8") as f:
+        snapshot_path = STATE_DIR / "last_snapshot.json"
+        snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+        with snapshot_path.open("w", encoding="utf-8") as f:
             json.dump(snapshot, f, ensure_ascii=False, indent=2)
         return True
     except Exception as e:

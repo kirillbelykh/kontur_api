@@ -16,7 +16,12 @@ PROFILE_USER_DATA_DIR = paths["user_data"]
 PROFILE_DIRECTORY = "Vinsent O`neal"
 HEADLESS = False
 
-COOKIES_FILE = Path("kontur_cookies.json")
+RUNTIME_DIR = Path(os.getenv("KONTUR_RUNTIME_DIR", "runtime"))
+RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+AUTH_RUNTIME_DIR = RUNTIME_DIR / "auth"
+AUTH_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+COOKIES_FILE = AUTH_RUNTIME_DIR / "kontur_cookies.json"
+LEGACY_COOKIES_FILE = Path("kontur_cookies.json")
 TARGET_URL = "https://mk.kontur.ru/organizations/5cda50fa-523f-4bb5-85b6-66d7241b23cd/warehouses"
 WAIT_TIMEOUT = 20
 SLEEP = 1.0
@@ -24,7 +29,8 @@ COOKIE_TTL = 13 * 60
 PROLONGATION_URL = "https://mk.kontur.ru/organizations/5cda50fa-523f-4bb5-85b6-66d7241b23cd/settings#organization_settings_anchor_prolongation_token"
 PROLONGATION_BUTTON_XPATH = "/html/body/div[1]/div/div/div[2]/div/div/div[1]/div[3]/div[1]/div[2]/div[6]/span/button/div[2]/span[2]"
 PROLONGATION_SIGN_BUTTON_XPATH = "/html/body/div[5]/div/div[2]/div/div/div/div/div[2]/div[3]/div/div/div/div[2]/div/div/span[1]/span/button/div[2]/span[2]"
-PROLONGATION_STATE_FILE = Path("kontur_access_prolongation.json")
+PROLONGATION_STATE_FILE = AUTH_RUNTIME_DIR / "kontur_access_prolongation.json"
+LEGACY_PROLONGATION_STATE_FILE = Path("kontur_access_prolongation.json")
 PROLONGATION_WAIT_TIMEOUT = 30
 DEFAULT_PROLONGATION_INTERVAL_HOURS = 9.0
 PROLONGATION_ENABLED_ENV = "KONTUR_ACCESS_PROLONGATION_ENABLED"
@@ -93,20 +99,22 @@ def _prolongation_interval_seconds() -> float:
 
 
 def _load_prolongation_state() -> Dict[str, Any]:
-    if not PROLONGATION_STATE_FILE.exists():
+    state_file = PROLONGATION_STATE_FILE if PROLONGATION_STATE_FILE.exists() else LEGACY_PROLONGATION_STATE_FILE
+    if not state_file.exists():
         return {}
     try:
-        payload = json.loads(PROLONGATION_STATE_FILE.read_text(encoding="utf-8"))
+        payload = json.loads(state_file.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        logger.warning("Автопродление доступа: не удалось разобрать %s", PROLONGATION_STATE_FILE)
+        logger.warning("Автопродление доступа: не удалось разобрать %s", state_file)
         return {}
     except Exception:
-        logger.exception("Автопродление доступа: ошибка чтения %s", PROLONGATION_STATE_FILE)
+        logger.exception("Автопродление доступа: ошибка чтения %s", state_file)
         return {}
     return payload if isinstance(payload, dict) else {}
 
 
 def _save_prolongation_state(payload: Dict[str, Any]) -> None:
+    PROLONGATION_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
     PROLONGATION_STATE_FILE.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -452,12 +460,13 @@ def load_cookies_from_file() -> Optional[Dict[str, str]]:
         if _MEMOIZED_COOKIES and _cookies_are_fresh(_MEMOIZED_TIMESTAMP):
             return dict(_MEMOIZED_COOKIES)
 
-    if not COOKIES_FILE.exists():
+    cookies_file = COOKIES_FILE if COOKIES_FILE.exists() else LEGACY_COOKIES_FILE
+    if not cookies_file.exists():
         logger.info("Файл cookies не существует")
         return None
 
     try:
-        data = json.loads(COOKIES_FILE.read_text(encoding="utf-8"))
+        data = json.loads(cookies_file.read_text(encoding="utf-8"))
         cookies = data.get("cookies")
         timestamp = float(data.get("timestamp", 0) or 0)
 
@@ -493,6 +502,7 @@ def save_cookies_to_file(cookies: Dict[str, str]) -> bool:
             "timestamp": timestamp,
             "cookies": cookies,
         }
+        COOKIES_FILE.parent.mkdir(parents=True, exist_ok=True)
         COOKIES_FILE.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         _remember_cookies(cookies, timestamp)
         logger.info("Cookies сохранены в %s", COOKIES_FILE)
