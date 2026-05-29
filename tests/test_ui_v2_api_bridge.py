@@ -250,6 +250,35 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertNotIn("error", result)
         kontur_mock.assert_called_once_with(force_refresh=True)
 
+    def test_kontur_order_mapping_preserves_product_metadata(self):
+        item = {
+            "documentId": "doc-1",
+            "documentNumber": "Order 1",
+            "documentStatus": "received",
+            "positions": [
+                {
+                    "productName": "Перчатки хирургические полимер СОВЕР",
+                    "productGtin": "04650118041257",
+                }
+            ],
+        }
+
+        result = self.bridge._kontur_order_to_local_order(item)
+
+        self.assertEqual(result["full_name"], "Перчатки хирургические полимер СОВЕР")
+        self.assertEqual(result["gtin"], "04650118041257")
+        self.assertEqual(
+            result["positions"],
+            [
+                {
+                    "productName": "Перчатки хирургические полимер СОВЕР",
+                    "productGtin": "04650118041257",
+                    "name": "Перчатки хирургические полимер СОВЕР",
+                    "gtin": "04650118041257",
+                }
+            ],
+        )
+
     def test_export_order_history_pushes_history(self):
         sync_calls = []
         load_calls = []

@@ -437,7 +437,19 @@ def _extract_gtin(order_data: Dict[str, Any]) -> str:
         return gtin
     positions = order_data.get("positions")
     if isinstance(positions, list) and positions:
-        return str(positions[0].get("gtin") or "").strip()
+        for position in positions:
+            if not isinstance(position, dict):
+                continue
+            gtin = str(
+                position.get("gtin")
+                or position.get("productGtin")
+                or position.get("product_gtin")
+                or position.get("consumerPackageGtin")
+                or position.get("consumer_package_gtin")
+                or ""
+            ).strip()
+            if gtin:
+                return gtin
     return ""
 
 
@@ -447,8 +459,85 @@ def _extract_position_name(order_data: Dict[str, Any]) -> str:
         return full_name
     positions = order_data.get("positions")
     if isinstance(positions, list) and positions:
-        return str(positions[0].get("name") or "").strip()
+        for position in positions:
+            if not isinstance(position, dict):
+                continue
+            full_name = str(
+                position.get("name")
+                or position.get("fullName")
+                or position.get("full_name")
+                or position.get("productName")
+                or position.get("product_name")
+                or position.get("nomenclatureName")
+                or position.get("nomenclature_name")
+                or ""
+            ).strip()
+            if full_name:
+                return full_name
     return ""
+
+
+def _extract_kontur_order_positions(order_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    raw_positions = (
+        order_data.get("positions")
+        or order_data.get("rows")
+        or order_data.get("items")
+        or order_data.get("products")
+        or []
+    )
+    positions: List[Dict[str, Any]] = []
+    if isinstance(raw_positions, dict):
+        raw_positions = raw_positions.get("rows") or raw_positions.get("items") or []
+    if isinstance(raw_positions, list):
+        for position in raw_positions:
+            if not isinstance(position, dict):
+                continue
+            gtin = str(
+                position.get("gtin")
+                or position.get("productGtin")
+                or position.get("product_gtin")
+                or position.get("consumerPackageGtin")
+                or position.get("consumer_package_gtin")
+                or ""
+            ).strip()
+            name = str(
+                position.get("name")
+                or position.get("fullName")
+                or position.get("full_name")
+                or position.get("productName")
+                or position.get("product_name")
+                or position.get("nomenclatureName")
+                or position.get("nomenclature_name")
+                or ""
+            ).strip()
+            normalized = dict(position)
+            if gtin:
+                normalized["gtin"] = gtin
+            if name:
+                normalized["name"] = name
+            positions.append(normalized)
+
+    top_level_gtin = str(
+        order_data.get("gtin")
+        or order_data.get("productGtin")
+        or order_data.get("product_gtin")
+        or order_data.get("consumerPackageGtin")
+        or order_data.get("consumer_package_gtin")
+        or ""
+    ).strip()
+    top_level_name = str(
+        order_data.get("full_name")
+        or order_data.get("fullName")
+        or order_data.get("name")
+        or order_data.get("productName")
+        or order_data.get("product_name")
+        or order_data.get("nomenclatureName")
+        or order_data.get("nomenclature_name")
+        or ""
+    ).strip()
+    if (top_level_gtin or top_level_name) and not positions:
+        positions.append({"gtin": top_level_gtin, "name": top_level_name})
+    return positions
 
 
 class ApiBridge:
@@ -719,6 +808,10 @@ class ApiBridge:
         updated_at = str(item.get("updatedDate") or item.get("updated_at") or "").strip()
         requested_count = item.get("requestedCodesCount")
         received_count = item.get("receivedCodesCount")
+        positions = _extract_kontur_order_positions(item)
+        metadata_source = dict(item)
+        if positions:
+            metadata_source["positions"] = positions
         local_item = {
             "order_name": document_number,
             "document_id": document_id,
@@ -734,6 +827,9 @@ class ApiBridge:
             "comment": item.get("comment") or "",
             "release_method_type": item.get("releaseMethodType") or "",
             "positions_count": item.get("positionsCount"),
+            "positions": positions,
+            "full_name": _extract_position_name(metadata_source),
+            "gtin": _extract_gtin(metadata_source),
             "introductionDocumentId": item.get("introductionDocumentId") or "",
             "utilizationReportDocumentId": item.get("utilizationReportDocumentId") or "",
             "relatedDocumentsStatus": item.get("relatedDocumentsStatus") or "",
