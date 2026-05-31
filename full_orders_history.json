@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1043 нитрил диаг бел М 260531 (5к)",
+      "document_id": "acaaa2c9-5d98-4f69-9214-075ef959147d",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет белый",
+      "gtin": "4650118044067",
+      "positions": [
+        {
+          "gtin": "4650118044067",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет белый",
+          "tnvedCode": "4015120009",
+          "quantity": 50,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-05-31T10:34:17.383792",
+      "created_by": "user",
+      "updated_at": "2026-05-31T10:34:17.383792",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1042 хир 9 260531 (50пар)",
       "document_id": "e8c01931-8fb9-45e3-8401-f584f5b65d4f",
       "status": "Выполнен",
@@ -18037,7 +18063,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-05-31T10:34:13.541426",
+  "last_update": "2026-05-31T10:34:19.178835",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\.history_sync_cache\\full_orders_history.json"
