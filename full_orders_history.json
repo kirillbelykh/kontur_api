@@ -151,7 +151,7 @@
       "order_name": "1041 хир 8 260531 (50пар)",
       "document_id": "8ed8e9b7-5f69-4f3a-96da-06116d828b5c",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf, C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
       "gtin": "4640473506003",
@@ -172,9 +172,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
-      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv",
-      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf"
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf"
     },
     {
       "order_name": "1040 хир 7 260531 (50пар)",
@@ -18176,7 +18176,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-01T13:52:39.742574",
+  "last_update": "2026-06-01T13:55:12.349911",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
