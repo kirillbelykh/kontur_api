@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1045 хир 8 260527 заявка 6170",
+      "document_id": "0b2426e3-bbc2-44c1-985c-b26b34420b40",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
+      "gtin": "4640473507109",
+      "positions": [
+        {
+          "gtin": "4640473507109",
+          "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-06-01T16:23:05.710312",
+      "created_by": "User",
+      "updated_at": "2026-06-01T16:23:05.710312",
+      "updated_by": "User",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1025 нитрил диаг L партия 260528 (1600д)",
       "document_id": "7f909b3d-d768-40b2-b587-66eadb08a068",
       "status": "Скачан",
@@ -18176,7 +18202,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-01T13:55:34.370611",
+  "last_update": "2026-06-01T16:23:07.259954",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
