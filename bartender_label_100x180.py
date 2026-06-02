@@ -66,6 +66,16 @@ def _is_bartender_process_limit_error(message: str) -> bool:
     )
 
 
+def _should_fallback_to_com_print(message: str) -> bool:
+    normalized = str(message or "").strip().lower()
+    if not normalized:
+        return False
+    return _is_bartender_process_limit_error(normalized) or (
+        "permission to run bartender" in normalized
+        or "does not have permission to run bartender" in normalized
+    )
+
+
 def _cleanup_headless_bartender_processes() -> None:
     command = (
         "$targets = Get-Process bartend -ErrorAction SilentlyContinue | "
@@ -1187,6 +1197,7 @@ def _run_sdk_database_print(
 
     last_error = ""
     cleanup_attempted = False
+    fallback_error = ""
     try:
         for attempt in range(1, PRINT_SUBMIT_ATTEMPTS + 1):
             try:
@@ -1234,10 +1245,170 @@ def _run_sdk_database_print(
         except OSError:
             pass
 
+    if print_now and _should_fallback_to_com_print(last_error):
+        try:
+            _run_com_database_print(
+                template_path=template_path,
+                csv_path=csv_path,
+                record_count=record_count,
+                job_name=job_name,
+                printer_name=printer_name,
+            )
+            return
+        except Exception as exc:
+            fallback_error = str(exc).strip()
+
+    error_parts = []
+    if last_error:
+        error_parts.append(f"Причина SDK: {last_error}")
+    if fallback_error:
+        error_parts.append(f"Резервная COM-печать тоже не сработала: {fallback_error}")
+
     raise BarTenderLabel100x180Error(
         "Не удалось отправить печать этикеток 100x180 в BarTender."
-        + (f" Причина: {last_error}" if last_error else "")
+        + (f" {' '.join(error_parts)}" if error_parts else "")
     )
+
+
+def _run_com_database_print(
+    template_path: Path,
+    csv_path: Path,
+    record_count: int,
+    job_name: str,
+    *,
+    printer_name: str | None = None,
+) -> None:
+    import pythoncom
+    import win32com.client  # type: ignore
+
+    pythoncom.CoInitialize()
+    app = None
+    bt_format = None
+
+    try:
+        app = win32com.client.DispatchEx("BarTender.Application")
+        app.Visible = True
+        bt_format = app.Formats.Open(str(template_path), False, "")
+        _bind_format_to_selected_printer(bt_format, str(printer_name or ""))
+        _rebind_com_text_database(bt_format, csv_path)
+        _configure_com_print_setup(
+            bt_format,
+            record_count=record_count,
+            job_name=job_name,
+        )
+        bt_format.PrintOut(False, False)
+    except BarTenderLabel100x180Error:
+        raise
+    except Exception as exc:
+        raise BarTenderLabel100x180Error(str(exc)) from exc
+    finally:
+        if bt_format is not None:
+            try:
+                bt_format.Close(BT_DO_NOT_SAVE_CHANGES)
+            except Exception:
+                pass
+        if app is not None:
+            try:
+                app.Quit(BT_DO_NOT_SAVE_CHANGES)
+            except Exception:
+                pass
+        pythoncom.CoUninitialize()
+
+
+def _rebind_com_text_database(bt_format, csv_path: Path) -> None:
+    databases = getattr(bt_format, "Databases", None)
+    if databases is None:
+        raise BarTenderLabel100x180Error("В шаблоне 100x180 нет Databases для COM-печати.")
+
+    bt_database = None
+    access_errors: list[str] = []
+    for accessor_name in ("GetDatabase", "Item"):
+        accessor = getattr(databases, accessor_name, None)
+        if accessor is None:
+            continue
+        try:
+            bt_database = accessor(1)
+            if bt_database is not None:
+                break
+        except Exception as exc:
+            access_errors.append(str(exc).strip())
+
+    if bt_database is None:
+        details = f": {' | '.join(access_errors)}" if access_errors else ""
+        raise BarTenderLabel100x180Error(
+            "В шаблоне 100x180 не удалось найти текстовую базу данных для COM-печати"
+            + details
+        )
+
+    update_errors: list[str] = []
+    text_file = getattr(bt_database, "TextFile", None)
+    if text_file is not None:
+        try:
+            text_file.FileName = str(csv_path)
+            return
+        except Exception as exc:
+            update_errors.append(str(exc).strip())
+
+    try:
+        bt_database.FileName = str(csv_path)
+        return
+    except Exception as exc:
+        update_errors.append(str(exc).strip())
+
+    details = f": {' | '.join(update_errors)}" if update_errors else ""
+    raise BarTenderLabel100x180Error(
+        f"Не удалось переназначить CSV для COM-печати 100x180{details}"
+    )
+
+
+def _configure_com_print_setup(bt_format, *, record_count: int, job_name: str) -> None:
+    if record_count < 1:
+        raise BarTenderLabel100x180Error("В CSV нет записей для печати.")
+
+    print_setup = getattr(bt_format, "PrintSetup", None)
+    if print_setup is None:
+        raise BarTenderLabel100x180Error("BarTender не вернул PrintSetup для COM-печати 100x180.")
+
+    try:
+        bt_format.UseDatabase = True
+    except Exception:
+        pass
+
+    for attribute_name, attribute_value in (
+        ("UseDatabase", True),
+        ("ReloadTextDatabaseFields", True),
+        ("EnablePrompting", False),
+        ("SelectRecordsAtPrint", False),
+    ):
+        try:
+            setattr(print_setup, attribute_name, attribute_value)
+        except Exception:
+            pass
+
+    if job_name:
+        try:
+            print_setup.JobName = job_name
+        except Exception:
+            pass
+
+    try:
+        if getattr(print_setup, "SupportsIdenticalCopies", False):
+            print_setup.IdenticalCopiesOfLabel = 1
+    except Exception:
+        pass
+
+    try:
+        if getattr(print_setup, "SupportsSerializedLabels", False):
+            print_setup.NumberOfSerializedLabels = 1
+    except Exception:
+        pass
+
+    try:
+        print_setup.RecordRange = "1" if record_count == 1 else f"1-{record_count}"
+    except Exception as exc:
+        raise BarTenderLabel100x180Error(
+            f"Не удалось настроить RecordRange для COM-печати 100x180: {exc}"
+        ) from exc
 
 
 def _build_powershell_script() -> str:

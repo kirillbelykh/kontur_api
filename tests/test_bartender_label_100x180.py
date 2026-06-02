@@ -342,6 +342,46 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
         sleep_mock.assert_called_once_with(labels.PRINT_SUBMIT_RETRY_DELAY_SECONDS)
 
 
+    def test_run_sdk_database_print_falls_back_to_com_print_for_permission_error(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            csv_path = temp_root / "codes.csv"
+            sdk_path = temp_root / "Seagull.BarTender.Print.dll"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path.write_text("010000000000000021ABC\t04650118041257\tTest\n", encoding="utf-8-sig")
+            sdk_path.write_text("sdk", encoding="utf-8")
+
+            failed_attempt = mock.Mock(
+                returncode=1,
+                stdout="",
+                stderr="The user account does not have permission to run BarTender.",
+            )
+
+            with (
+                mock.patch.object(labels, "BARTENDER_SDK_DLL", sdk_path),
+                mock.patch.object(labels.subprocess, "run", return_value=failed_attempt) as run_mock,
+                mock.patch.object(labels, "_run_com_database_print") as com_print_mock,
+                mock.patch.object(labels.time, "sleep") as sleep_mock,
+            ):
+                labels._run_sdk_database_print(
+                    template_path=template_path,
+                    csv_path=csv_path,
+                    record_count=1,
+                    job_name="Order 1",
+                    printer_name="Printer",
+                )
+
+        self.assertEqual(run_mock.call_count, labels.PRINT_SUBMIT_ATTEMPTS)
+        self.assertEqual(sleep_mock.call_count, labels.PRINT_SUBMIT_ATTEMPTS - 1)
+        com_print_mock.assert_called_once_with(
+            template_path=template_path,
+            csv_path=csv_path,
+            record_count=1,
+            job_name="Order 1",
+            printer_name="Printer",
+        )
+
     def test_resolve_context_color_uses_sterile_latex_default(self):
         color = labels._resolve_context_color("", Path("стерилка") / "стер Латекс.btw")
         self.assertEqual(color, "натуральный")
