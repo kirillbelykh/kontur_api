@@ -29,9 +29,9 @@
     {
       "order_name": "1048 стер нитрил XL заявка 6239 (5 пар)",
       "document_id": "2d07968f-e0c5-43cb-86de-290640d3d29a",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1048 стер нитрил XL заявка 6239 5 пар\\1048 стер нитрил XL заявка 6239 5 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1048 стер нитрил XL заявка 6239 5 пар\\1048 стер нитрил XL заявка 6239 (5 пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1048 стер нитрил XL заявка 6239 5 пар\\1048 стер нитрил XL заявка 6239 (5 пар).xls",
+      "simpl": "стер нитрил",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р XL",
       "gtin": "4640473511342",
       "positions": [
@@ -50,7 +50,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1048 стер нитрил XL заявка 6239 5 пар\\1048 стер нитрил XL заявка 6239 (5 пар)_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1048 стер нитрил XL заявка 6239 5 пар\\1048 стер нитрил XL заявка 6239 5 пар.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1048 стер нитрил XL заявка 6239 5 пар\\1048 стер нитрил XL заявка 6239 (5 пар).xls"
     },
     {
       "order_name": "1047 нитрил диаг М 260325 (4к)",
@@ -18312,7 +18315,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-02T16:01:23.877903",
+  "last_update": "2026-06-02T16:16:03.514541",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
