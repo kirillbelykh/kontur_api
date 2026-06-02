@@ -25,6 +25,7 @@ MARKING_CODES_DIR = Path.home() / "Desktop" / "Коды км"
 BARTENDER_SDK_DLL = Path(
     r"C:\Program Files\Seagull\BarTender 2022\SDK\Assemblies\Seagull.BarTender.Print.dll"
 )
+BARTENDER_EXE_NAME = "bartend.exe"
 POWERSHELL_EXE = "powershell.exe"
 TEMP_PRINT_ARTIFACT_RETENTION_SECONDS = 300
 PRINT_SUBMIT_ATTEMPTS = 2
@@ -73,6 +74,20 @@ def _should_fallback_to_com_print(message: str) -> bool:
     return _is_bartender_process_limit_error(normalized) or (
         "permission to run bartender" in normalized
         or "does not have permission to run bartender" in normalized
+    )
+
+
+def _resolve_bartender_exe_path() -> Path:
+    candidate_paths = [
+        BARTENDER_SDK_DLL.parents[2] / BARTENDER_EXE_NAME,
+        Path(r"C:\Program Files\Seagull\BarTender 2022") / BARTENDER_EXE_NAME,
+        Path(r"C:\Program Files (x86)\Seagull\BarTender 2022") / BARTENDER_EXE_NAME,
+    ]
+    for candidate_path in candidate_paths:
+        if candidate_path.exists():
+            return candidate_path
+    raise BarTenderLabel100x180Error(
+        f"Не найден {BARTENDER_EXE_NAME}. Проверьте установку BarTender."
     )
 
 
@@ -1257,6 +1272,18 @@ def _run_sdk_database_print(
             return
         except Exception as exc:
             fallback_error = str(exc).strip()
+            try:
+                _run_bartender_command_line_print(
+                    template_path=template_path,
+                    csv_path=csv_path,
+                    job_name=job_name,
+                    printer_name=printer_name,
+                )
+                return
+            except Exception as cli_exc:
+                fallback_error = (
+                    f"{fallback_error} | Командная печать BarTender тоже не сработала: {cli_exc}"
+                ).strip()
 
     error_parts = []
     if last_error:
@@ -1409,6 +1436,55 @@ def _configure_com_print_setup(bt_format, *, record_count: int, job_name: str) -
         raise BarTenderLabel100x180Error(
             f"Не удалось настроить RecordRange для COM-печати 100x180: {exc}"
         ) from exc
+
+
+def _run_bartender_command_line_print(
+    template_path: Path,
+    csv_path: Path,
+    job_name: str,
+    *,
+    printer_name: str | None = None,
+) -> None:
+    bartender_exe_path = _resolve_bartender_exe_path()
+    command = [
+        str(bartender_exe_path),
+        "/RUN",
+        f"/AF={template_path}",
+        f"/D={csv_path}",
+        "/P",
+        "/X",
+        "/NOSPLASH",
+    ]
+    if printer_name:
+        command.append(f"/PRN={printer_name}")
+    if job_name:
+        command.append(f"/PrintJobName={job_name}")
+
+    try:
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS + 30,
+        )
+    except FileNotFoundError as exc:
+        raise BarTenderLabel100x180Error(
+            f"Не найден {bartender_exe_path}. Проверьте установку BarTender."
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise BarTenderLabel100x180Error(
+            "BarTender не завершил командную печать вовремя."
+        ) from exc
+
+    if completed.returncode != 0:
+        error_text = _extract_process_error(completed.stderr or completed.stdout)
+        raise BarTenderLabel100x180Error(
+            "BarTender вернул ошибку при командной печати."
+            + (f" Причина: {error_text}" if error_text else "")
+        )
 
 
 def _build_powershell_script() -> str:
