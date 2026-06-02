@@ -2,6 +2,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
 import bartender_print
 
@@ -98,6 +99,43 @@ class BarTenderPrintTests(unittest.TestCase):
         self.assertEqual(bartender_print._read_object_value(imported_objects[1]), "69")
         self.assertEqual(bartender_print._read_object_value(imported_objects[2]), "1")
         self.assertEqual(bartender_print._read_object_value(imported_objects[3]), "1")
+
+    def test_run_sdk_print_retries_after_headless_bartender_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            csv_path = temp_root / "codes.csv"
+            sdk_path = temp_root / "Seagull.BarTender.Print.dll"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path.write_text("010000000000000021ABC\t04650118041257\tTest\n", encoding="utf-8-sig")
+            sdk_path.write_text("sdk", encoding="utf-8")
+
+            attempts = [
+                mock.Mock(
+                    returncode=10,
+                    stdout="",
+                    stderr="There are too many process instances of BarTender running. Stop a few bartend.exe instances and try again.",
+                ),
+                mock.Mock(returncode=0, stdout="", stderr=""),
+            ]
+
+            with (
+                mock.patch.object(bartender_print, "BARTENDER_SDK_DLL", sdk_path),
+                mock.patch.object(bartender_print.subprocess, "run", side_effect=attempts) as run_mock,
+                mock.patch.object(bartender_print, "_cleanup_headless_bartender_processes") as cleanup_mock,
+                mock.patch.object(bartender_print.time, "sleep") as sleep_mock,
+            ):
+                bartender_print._run_sdk_print(
+                    template_path=template_path,
+                    csv_path=csv_path,
+                    label_count=1,
+                    job_name="Order 1",
+                    printer_name="Printer",
+                )
+
+        self.assertEqual(run_mock.call_count, 2)
+        cleanup_mock.assert_called_once_with()
+        sleep_mock.assert_called_once_with(bartender_print.PRINT_SUBMIT_RETRY_DELAY_SECONDS)
 
 
 if __name__ == "__main__":

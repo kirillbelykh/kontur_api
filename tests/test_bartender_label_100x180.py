@@ -2,6 +2,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
 import pandas as pd
 
@@ -302,6 +303,43 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
             self.assertIn("без подробного сообщения", script)
             self.assertIn("exit 10", script)
             self.assertIn("NumberOfSerializedLabels = 1", script)
+
+    def test_run_sdk_database_print_retries_after_headless_bartender_cleanup(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            csv_path = temp_root / "codes.csv"
+            sdk_path = temp_root / "Seagull.BarTender.Print.dll"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path.write_text("010000000000000021ABC\t04650118041257\tTest\n", encoding="utf-8-sig")
+            sdk_path.write_text("sdk", encoding="utf-8")
+
+            attempts = [
+                mock.Mock(
+                    returncode=10,
+                    stdout="",
+                    stderr="There are too many process instances of BarTender running. Stop a few bartend.exe instances and try again.",
+                ),
+                mock.Mock(returncode=0, stdout="", stderr=""),
+            ]
+
+            with (
+                mock.patch.object(labels, "BARTENDER_SDK_DLL", sdk_path),
+                mock.patch.object(labels.subprocess, "run", side_effect=attempts) as run_mock,
+                mock.patch.object(labels, "_cleanup_headless_bartender_processes") as cleanup_mock,
+                mock.patch.object(labels.time, "sleep") as sleep_mock,
+            ):
+                labels._run_sdk_database_print(
+                    template_path=template_path,
+                    csv_path=csv_path,
+                    record_count=1,
+                    job_name="Order 1",
+                    printer_name="Printer",
+                )
+
+        self.assertEqual(run_mock.call_count, 2)
+        cleanup_mock.assert_called_once_with()
+        sleep_mock.assert_called_once_with(labels.PRINT_SUBMIT_RETRY_DELAY_SECONDS)
 
 
     def test_resolve_context_color_uses_sterile_latex_default(self):

@@ -55,6 +55,46 @@ class BarTenderLabel100x180Error(RuntimeError):
     """Raised when 100x180 BarTender label printing cannot be completed."""
 
 
+def _is_bartender_process_limit_error(message: str) -> bool:
+    normalized = str(message or "").strip().lower()
+    if not normalized:
+        return False
+    return (
+        "too many process instances of bartender" in normalized
+        or "stop a few bartend.exe instances" in normalized
+        or "shared desktop heap" in normalized
+    )
+
+
+def _cleanup_headless_bartender_processes() -> None:
+    command = (
+        "$targets = Get-Process bartend -ErrorAction SilentlyContinue | "
+        "Where-Object { $_.MainWindowHandle -eq 0 }; "
+        "if ($targets) { $targets | Stop-Process -Force -ErrorAction SilentlyContinue }"
+    )
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        subprocess.run(
+            [
+                POWERSHELL_EXE,
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=creationflags,
+            timeout=15,
+        )
+    except Exception:
+        pass
+
+
 @dataclass(frozen=True)
 class LabelTemplateInfo:
     name: str
@@ -1146,6 +1186,7 @@ def _run_sdk_database_print(
     ]
 
     last_error = ""
+    cleanup_attempted = False
     try:
         for attempt in range(1, PRINT_SUBMIT_ATTEMPTS + 1):
             try:
@@ -1174,6 +1215,15 @@ def _run_sdk_database_print(
                 return
 
             last_error = _extract_process_error(completed.stderr or completed.stdout)
+            if (
+                not cleanup_attempted
+                and attempt < PRINT_SUBMIT_ATTEMPTS
+                and _is_bartender_process_limit_error(last_error)
+            ):
+                cleanup_attempted = True
+                _cleanup_headless_bartender_processes()
+                time.sleep(PRINT_SUBMIT_RETRY_DELAY_SECONDS)
+                continue
             if completed.returncode == 10:
                 break
             if attempt < PRINT_SUBMIT_ATTEMPTS:
