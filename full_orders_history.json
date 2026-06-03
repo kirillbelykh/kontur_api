@@ -367,8 +367,8 @@
     {
       "order_name": "1053 стер лат M 260603 (800к)",
       "document_id": "3c5084e8-7211-4969-ae8e-ad5445349162",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1053 стер лат M 260603 800к\\1053 стер лат M 260603 (800к)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1053 стер лат M 260603 800к\\1053 стер лат M 260603 (800к).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
       "gtin": "4650118040083",
@@ -388,7 +388,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1053 стер лат M 260603 800к\\1053 стер лат M 260603 (800к).xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1053 стер лат M 260603 800к\\1053 стер лат M 260603 (800к)_csv.csv",
+      "pdf_path": null
     },
     {
       "order_name": "1052 стер лат S 260603 (80к)",
@@ -18824,7 +18827,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T12:17:22.734070",
+  "last_update": "2026-06-03T12:18:15.207859",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
