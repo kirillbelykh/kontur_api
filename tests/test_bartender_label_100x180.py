@@ -466,6 +466,11 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
                     return_value=exe_path,
                 ),
                 mock.patch.object(
+                    labels,
+                    "_build_bartender_cli_data_file",
+                    return_value=(csv_path, 237),
+                ),
+                mock.patch.object(
                     labels.subprocess,
                     "run",
                     return_value=mock.Mock(returncode=0, stdout="", stderr=""),
@@ -481,8 +486,28 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
 
         command = run_mock.call_args.args[0]
         self.assertIn("/FP", command)
-        self.assertIn("/DbTextHeader=0", command)
+        self.assertIn("/DbTextHeader=1", command)
         self.assertIn("/RecordRange=1-237", command)
+
+    def test_build_bartender_cli_data_file_adds_field_headers(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            csv_path = temp_root / "codes.csv"
+            csv_path.write_text(
+                "010000000000000021ABC\t04650118041257\tTest 1\n"
+                "010000000000000021DEF\t04650118040083\tTest 2\n",
+                encoding="utf-8-sig",
+            )
+
+            prepared_csv_path, record_count = labels._build_bartender_cli_data_file(csv_path)
+
+            try:
+                self.assertEqual(record_count, 2)
+                prepared_lines = prepared_csv_path.read_text(encoding="utf-8-sig").splitlines()
+                self.assertEqual(prepared_lines[0], "Field 1\tField 2\tField 3")
+                self.assertEqual(len(prepared_lines), 3)
+            finally:
+                prepared_csv_path.unlink(missing_ok=True)
 
 if __name__ == "__main__":
     unittest.main()

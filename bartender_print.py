@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import csv
 import json
 import re
 import subprocess
@@ -223,6 +224,69 @@ def count_csv_records(csv_path: Path) -> int:
                 record_count += 1
 
     return record_count
+
+
+def _read_cli_csv_rows(csv_path: Path) -> tuple[list[list[str]], str]:
+    encodings = ("utf-8-sig", "utf-8", "cp1251")
+    last_error: Exception | None = None
+
+    for encoding in encodings:
+        try:
+            sample_line = ""
+            with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                for raw_line in csv_file:
+                    if str(raw_line or "").strip():
+                        sample_line = raw_line
+                        break
+
+            delimiter = "\t"
+            if ";" in sample_line and "\t" not in sample_line:
+                delimiter = ";"
+            elif "," in sample_line and "\t" not in sample_line and ";" not in sample_line:
+                delimiter = ","
+
+            rows: list[list[str]] = []
+            with csv_path.open("r", encoding=encoding, newline="") as csv_file:
+                reader = csv.reader(csv_file, delimiter=delimiter)
+                for row in reader:
+                    prepared = [str(cell or "") for cell in row]
+                    if len(prepared) == 1:
+                        raw_line = str(prepared[0] or "")
+                        if delimiter == "\t" and "\t" in raw_line:
+                            prepared = raw_line.split("\t")
+                        elif delimiter == ";" and ";" in raw_line:
+                            prepared = raw_line.split(";")
+                        elif delimiter == "," and "," in raw_line:
+                            prepared = raw_line.split(",")
+                    if any(cell.strip() for cell in prepared):
+                        rows.append(prepared)
+
+            return rows, delimiter
+        except UnicodeDecodeError as exc:
+            last_error = exc
+
+    if last_error is not None:
+        raise BarTenderPrintError(f"Не удалось прочитать CSV для печати: {csv_path}") from last_error
+    raise BarTenderPrintError(f"Не удалось прочитать CSV для печати: {csv_path}")
+
+
+def _build_bartender_cli_data_file(csv_path: Path) -> tuple[Path, int]:
+    rows, delimiter = _read_cli_csv_rows(csv_path)
+    if not rows:
+        raise BarTenderPrintError(f"В CSV нет строк для печати: {csv_path}")
+
+    column_count = max(len(row) for row in rows)
+    header = [f"Field {index}" for index in range(1, column_count + 1)]
+    temp_csv_path = Path(tempfile.gettempdir()) / f"kontur_bt_cli_{uuid.uuid4().hex}.csv"
+
+    with temp_csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
+        writer = csv.writer(csv_file, delimiter=delimiter, lineterminator="\n")
+        writer.writerow(header)
+        for row in rows:
+            padded_row = list(row) + [""] * (column_count - len(row))
+            writer.writerow(padded_row)
+
+    return temp_csv_path, len(rows)
 
 
 def print_labels(context: PrintContext) -> None:
@@ -708,14 +772,15 @@ def _run_bartender_command_line_print(
     printer_name: str | None = None,
 ) -> None:
     bartender_exe_path = _resolve_bartender_exe_path()
+    prepared_csv_path, prepared_record_count = _build_bartender_cli_data_file(csv_path)
     command = [
         str(bartender_exe_path),
         "/RUN",
         f"/AF={template_path}",
-        f"/D={csv_path}",
+        f"/D={prepared_csv_path}",
         "/FP",
-        "/DbTextHeader=0",
-        f"/RecordRange=1-{max(1, int(record_count))}",
+        "/DbTextHeader=1",
+        f"/RecordRange=1-{max(1, int(prepared_record_count or record_count))}",
         "/X",
         "/NOSPLASH",
     ]
@@ -725,30 +790,36 @@ def _run_bartender_command_line_print(
         command.append(f"/PrintJobName={job_name}")
 
     try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS + 30,
-        )
-    except FileNotFoundError as exc:
-        raise BarTenderPrintError(
-            f"Не найден {bartender_exe_path}. Проверьте установку BarTender."
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise BarTenderPrintError(
-            "BarTender не завершил командную печать вовремя."
-        ) from exc
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS + 30,
+            )
+        except FileNotFoundError as exc:
+            raise BarTenderPrintError(
+                f"Не найден {bartender_exe_path}. Проверьте установку BarTender."
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise BarTenderPrintError(
+                "BarTender не завершил командную печать вовремя."
+            ) from exc
 
-    if completed.returncode != 0:
-        error_text = _extract_process_error(completed.stderr or completed.stdout)
-        raise BarTenderPrintError(
-            "BarTender вернул ошибку при командной печати."
-            + (f" Причина: {error_text}" if error_text else "")
-        )
+        if completed.returncode != 0:
+            error_text = _extract_process_error(completed.stderr or completed.stdout)
+            raise BarTenderPrintError(
+                "BarTender вернул ошибку при командной печати."
+                + (f" Причина: {error_text}" if error_text else "")
+            )
+    finally:
+        try:
+            prepared_csv_path.unlink()
+        except OSError:
+            pass
 
 
 def _build_powershell_script() -> str:

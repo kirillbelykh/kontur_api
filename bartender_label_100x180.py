@@ -1090,6 +1090,25 @@ def _read_csv_rows(csv_path: Path) -> tuple[list[list[str]], str]:
     raise BarTenderLabel100x180Error(f"Не удалось прочитать CSV для печати: {csv_path}")
 
 
+def _build_bartender_cli_data_file(csv_path: Path) -> tuple[Path, int]:
+    rows, delimiter = _read_csv_rows(csv_path)
+    if not rows:
+        raise BarTenderLabel100x180Error(f"В CSV нет строк для печати: {csv_path}")
+
+    column_count = max(len(row) for row in rows)
+    header = [f"Field {index}" for index in range(1, column_count + 1)]
+    temp_csv_path = Path(tempfile.gettempdir()) / f"kontur_label_cli_{uuid.uuid4().hex}.csv"
+
+    with temp_csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
+        writer = csv.writer(csv_file, delimiter=delimiter, lineterminator="\n")
+        writer.writerow(header)
+        for row in rows:
+            padded_row = list(row) + [""] * (column_count - len(row))
+            writer.writerow(padded_row)
+
+    return temp_csv_path, len(rows)
+
+
 def _ensure_unique_label_values(csv_path: Path, data_source_kind: str) -> None:
     rows, _delimiter = _read_csv_rows(csv_path)
     if len(rows) < 2:
@@ -1448,14 +1467,15 @@ def _run_bartender_command_line_print(
     printer_name: str | None = None,
 ) -> None:
     bartender_exe_path = _resolve_bartender_exe_path()
+    prepared_csv_path, prepared_record_count = _build_bartender_cli_data_file(csv_path)
     command = [
         str(bartender_exe_path),
         "/RUN",
         f"/AF={template_path}",
-        f"/D={csv_path}",
+        f"/D={prepared_csv_path}",
         "/FP",
-        "/DbTextHeader=0",
-        f"/RecordRange=1-{max(1, int(record_count))}",
+        "/DbTextHeader=1",
+        f"/RecordRange=1-{max(1, int(prepared_record_count or record_count))}",
         "/X",
         "/NOSPLASH",
     ]
@@ -1465,30 +1485,36 @@ def _run_bartender_command_line_print(
         command.append(f"/PrintJobName={job_name}")
 
     try:
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS + 30,
-        )
-    except FileNotFoundError as exc:
-        raise BarTenderLabel100x180Error(
-            f"Не найден {bartender_exe_path}. Проверьте установку BarTender."
-        ) from exc
-    except subprocess.TimeoutExpired as exc:
-        raise BarTenderLabel100x180Error(
-            "BarTender не завершил командную печать вовремя."
-        ) from exc
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS + 30,
+            )
+        except FileNotFoundError as exc:
+            raise BarTenderLabel100x180Error(
+                f"Не найден {bartender_exe_path}. Проверьте установку BarTender."
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise BarTenderLabel100x180Error(
+                "BarTender не завершил командную печать вовремя."
+            ) from exc
 
-    if completed.returncode != 0:
-        error_text = _extract_process_error(completed.stderr or completed.stdout)
-        raise BarTenderLabel100x180Error(
-            "BarTender вернул ошибку при командной печати."
-            + (f" Причина: {error_text}" if error_text else "")
-        )
+        if completed.returncode != 0:
+            error_text = _extract_process_error(completed.stderr or completed.stdout)
+            raise BarTenderLabel100x180Error(
+                "BarTender вернул ошибку при командной печати."
+                + (f" Причина: {error_text}" if error_text else "")
+            )
+    finally:
+        try:
+            prepared_csv_path.unlink()
+        except OSError:
+            pass
 
 
 def _build_powershell_script() -> str:
