@@ -234,9 +234,45 @@ class BarTenderPrintTests(unittest.TestCase):
         cli_print_mock.assert_called_once_with(
             template_path=template_path,
             csv_path=csv_path,
+            record_count=1,
             job_name="Order 1",
             printer_name="Printer",
         )
+
+    def test_run_bartender_command_line_print_uses_full_record_range(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            template_path = temp_root / "template.btw"
+            csv_path = temp_root / "codes.csv"
+            exe_path = temp_root / "bartend.exe"
+            template_path.write_text("template", encoding="utf-8")
+            csv_path.write_text("row\n", encoding="utf-8-sig")
+            exe_path.write_text("exe", encoding="utf-8")
+
+            with (
+                mock.patch.object(
+                    bartender_print,
+                    "_resolve_bartender_exe_path",
+                    return_value=exe_path,
+                ),
+                mock.patch.object(
+                    bartender_print.subprocess,
+                    "run",
+                    return_value=mock.Mock(returncode=0, stdout="", stderr=""),
+                ) as run_mock,
+            ):
+                bartender_print._run_bartender_command_line_print(
+                    template_path=template_path,
+                    csv_path=csv_path,
+                    record_count=237,
+                    job_name="Order 1",
+                    printer_name="Printer",
+                )
+
+        command = run_mock.call_args.args[0]
+        self.assertIn("/FP", command)
+        self.assertIn("/DbTextHeader=0", command)
+        self.assertIn("/RecordRange=1-237", command)
 
 if __name__ == "__main__":
     unittest.main()

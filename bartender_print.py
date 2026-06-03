@@ -536,6 +536,7 @@ def _run_sdk_print(
                 _run_bartender_command_line_print(
                     template_path=template_path,
                     csv_path=csv_path,
+                    record_count=label_count,
                     job_name=job_name,
                     printer_name=printer_name,
                 )
@@ -701,6 +702,7 @@ def _configure_com_print_setup(bt_format, *, record_count: int, job_name: str) -
 def _run_bartender_command_line_print(
     template_path: Path,
     csv_path: Path,
+    record_count: int,
     job_name: str,
     *,
     printer_name: str | None = None,
@@ -711,7 +713,9 @@ def _run_bartender_command_line_print(
         "/RUN",
         f"/AF={template_path}",
         f"/D={csv_path}",
-        "/P",
+        "/FP",
+        "/DbTextHeader=0",
+        f"/RecordRange=1-{max(1, int(record_count))}",
         "/X",
         "/NOSPLASH",
     ]
