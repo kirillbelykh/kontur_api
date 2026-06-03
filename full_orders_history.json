@@ -3,8 +3,8 @@
     {
       "order_name": "1051 хир 9,0 партия 260603 (по 50 пар)",
       "document_id": "651301c3-7396-4f7c-ba91-bf7a3d813b7e",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1051 хир 90 партия 260603 по 50 пар\\1051 хир 90 партия 260603 по 50 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1051 хир 90 партия 260603 по 50 пар\\1051 хир 9,0 партия 260603 (по 50 пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1051 хир 90 партия 260603 по 50 пар\\1051 хир 9,0 партия 260603 (по 50 пар).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,0",
       "gtin": "4640473506027",
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1051 хир 90 партия 260603 по 50 пар\\1051 хир 9,0 партия 260603 (по 50 пар).xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1051 хир 90 партия 260603 по 50 пар\\1051 хир 90 партия 260603 по 50 пар.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1051 хир 90 партия 260603 по 50 пар\\1051 хир 9,0 партия 260603 (по 50 пар)_csv.csv"
     },
     {
       "order_name": "1050 стер лат M партия 260603",
@@ -18402,7 +18405,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T10:23:39.175249",
+  "last_update": "2026-06-03T10:30:25.384484",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
