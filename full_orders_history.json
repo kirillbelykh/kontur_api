@@ -61,8 +61,8 @@
     {
       "order_name": "1066 лат диаг S 260606 (4460д)",
       "document_id": "ab245902-cad7-44f2-ac79-4cf066d39683",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\1066 лат диаг S 260606 4460д\\1066 лат диаг S 260606 4460д.pdf, C:\\Users\\User\\Desktop\\Коды км\\1066 лат диаг S 260606 4460д\\1066 лат диаг S 260606 (4460д)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1066 лат диаг S 260606 4460д\\1066 лат диаг S 260606 (4460д).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
       "gtin": "4650118041257",
@@ -82,7 +82,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1066 лат диаг S 260606 4460д\\1066 лат диаг S 260606 (4460д).xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1066 лат диаг S 260606 4460д\\1066 лат диаг S 260606 (4460д)_csv.csv",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1066 лат диаг S 260606 4460д\\1066 лат диаг S 260606 4460д.pdf"
     },
     {
       "order_name": "1065 лат диаг XL 260604 (60к)",
@@ -18866,7 +18869,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T14:28:40.147351",
+  "last_update": "2026-06-03T14:30:29.150560",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
