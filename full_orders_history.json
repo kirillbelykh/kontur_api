@@ -30,7 +30,7 @@
       "order_name": "1050 стер лат M партия 260603",
       "document_id": "62b540d3-1fb0-4168-a3b8-5caa86d16528",
       "status": "Скачан",
-      "filename": "C:\\Users\\User\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.pdf, C:\\Users\\User\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.xls",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.pdf, C:\\Users\\user\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.xls",
       "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
       "gtin": "4650118040083",
@@ -45,22 +45,22 @@
       ],
       "created_at": "2026-06-03T09:36:52.109368",
       "created_by": "user",
-      "updated_at": "2026-06-03T09:36:52.109368",
+      "updated_at": "2026-06-03T10:02:43.741988",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
-      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.pdf",
-      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603_csv.csv",
-      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.xls"
+      "tsd_created": true,
+      "tsd_created_at": "2026-06-03T10:02:43.741988",
+      "tsd_intro_number": "781b4bd6-64ee-47aa-9ea2-4be12799e4a4",
+      "tsd_created_by": "user",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1050 стер лат M партия 260603\\1050 стер лат M партия 260603.xls"
     },
     {
       "order_name": "1049 хир 8 заявка 6137",
       "document_id": "d8de5637-dd04-471e-b0e2-049e57c629dd",
-      "status": "Выполнен",
+      "status": "Скачан",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\1049 хир 8 заявка 6137\\1049 хир 8 заявка 6137.pdf, C:\\Users\\user\\Desktop\\Коды км\\1049 хир 8 заявка 6137\\1049 хир 8 заявка 6137_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1049 хир 8 заявка 6137\\1049 хир 8 заявка 6137.xls",
-      "simpl": "wheelChairs",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
       "gtin": "4640473510628",
       "positions": [
@@ -348,7 +348,7 @@
       "order_name": "1042 хир 9 260531 (50пар)",
       "document_id": "e8c01931-8fb9-45e3-8401-f584f5b65d4f",
       "status": "Скачан",
-      "filename": "C:\\Users\\User\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 50пар.pdf, C:\\Users\\User\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар).xls",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 50пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар).xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,0",
       "gtin": "4640473506027",
@@ -369,15 +369,15 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар).xls",
-      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар)_csv.csv",
-      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 50пар.pdf"
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар).xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 (50пар)_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1042 хир 9 260531 50пар\\1042 хир 9 260531 50пар.pdf"
     },
     {
       "order_name": "1041 хир 8 260531 (50пар)",
       "document_id": "8ed8e9b7-5f69-4f3a-96da-06116d828b5c",
       "status": "Скачан",
-      "filename": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf, C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
       "gtin": "4640473506003",
@@ -398,9 +398,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
-      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv",
-      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf"
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар).xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 (50пар)_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1041 хир 8 260531 50пар\\1041 хир 8 260531 50пар.pdf"
     },
     {
       "order_name": "1040 хир 7 260531 (50пар)",
@@ -5901,8 +5901,8 @@
     {
       "order_name": "782 лат диаг S 260504 2010д",
       "document_id": "f429ee61-480b-4029-89a2-82d2ab161b92",
-      "status": "Скачан",
-      "filename": "C:\\Users\\User\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д.pdf, C:\\Users\\User\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д.xls",
+      "status": "received",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д.xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
       "gtin": "4650118041257",
@@ -5923,9 +5923,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д.xls",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д.xls",
       "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д.pdf",
-      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д_csv.csv"
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\782 лат диаг S 260504 2010д\\782 лат диаг S 260504 2010д_csv.csv"
     },
     {
       "order_name": "780 лат 2-хл M 260503 140д",
@@ -18402,8 +18402,8 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T09:51:32.500183",
+  "last_update": "2026-06-03T10:02:45.609284",
   "created_by": "sklad",
-  "updated_by": "User",
-  "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
+  "updated_by": "user",
+  "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
 }
