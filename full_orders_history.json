@@ -271,12 +271,12 @@
       ],
       "created_at": "2026-06-03T11:25:25.722836",
       "created_by": "user",
-      "updated_at": "2026-06-03T11:25:25.722836",
+      "updated_at": "2026-06-03T13:58:00.368607",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created": true,
+      "tsd_created_at": "2026-06-03T13:58:00.368607",
+      "tsd_intro_number": "2fe0f4aa-c85a-442a-9eab-daece62cb9f0",
+      "tsd_created_by": "user"
     },
     {
       "order_name": "1057 стер нитрил M 260604 (80к)",
@@ -297,12 +297,12 @@
       ],
       "created_at": "2026-06-03T11:25:16.961008",
       "created_by": "user",
-      "updated_at": "2026-06-03T11:25:16.961008",
+      "updated_at": "2026-06-03T13:52:01.992244",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "tsd_created": true,
+      "tsd_created_at": "2026-06-03T13:52:01.992244",
+      "tsd_intro_number": "594e449f-7ffa-4aff-8761-37d6a440af66",
+      "tsd_created_by": "user",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1057 стер нитрил M 260604 80к\\1057 стер нитрил M 260604 (80к).xls",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1057 стер нитрил M 260604 80к\\1057 стер нитрил M 260604 (80к)_csv.csv",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1057 стер нитрил M 260604 80к\\1057 стер нитрил M 260604 80к.pdf"
@@ -18857,7 +18857,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T13:45:44.737628",
+  "last_update": "2026-06-03T13:58:03.708216",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
