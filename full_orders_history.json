@@ -107,8 +107,8 @@
     {
       "order_name": "1064 лат диаг L 260604 (90к)",
       "document_id": "cb800568-a9db-4071-8114-51d5adddf11e",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1064 лат диаг L 260604 90к\\1064 лат диаг L 260604 90к.pdf, C:\\Users\\user\\Desktop\\Коды км\\1064 лат диаг L 260604 90к\\1064 лат диаг L 260604 (90к)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1064 лат диаг L 260604 90к\\1064 лат диаг L 260604 (90к).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
       "gtin": "4650118041332",
@@ -128,7 +128,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1064 лат диаг L 260604 90к\\1064 лат диаг L 260604 (90к).xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1064 лат диаг L 260604 90к\\1064 лат диаг L 260604 (90к)_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1064 лат диаг L 260604 90к\\1064 лат диаг L 260604 90к.pdf"
     },
     {
       "order_name": "1063 HR лат XL 260604 (100к)",
@@ -18851,7 +18854,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T12:23:44.674808",
+  "last_update": "2026-06-03T12:24:26.538458",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
