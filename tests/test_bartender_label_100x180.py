@@ -234,6 +234,48 @@ class BarTenderLabel100x180Tests(unittest.TestCase):
         self.assertEqual(values[0], "Р”Р°С‚Р° РёР·РіРѕС‚РѕРІР»РµРЅРёСЏ 2026-03")
         self.assertEqual(values[1], "")
 
+    def test_replace_field_value_does_not_steal_next_field_value_when_same_substring_contains_following_marker(self):
+        values = ["Партия                        260131\rДата изготовления   ", "2025-11\r"]
+
+        updated = labels._replace_field_value(values, 0, "Партия", "260603", allow_adjacent=True)
+
+        self.assertTrue(updated)
+        self.assertEqual(values[0], "Партия                        260603\rДата изготовления   ")
+        self.assertEqual(values[1], "2025-11\r")
+
+    def test_update_details_object_keeps_batch_when_following_date_uses_adjacent_substring(self):
+        details_object = _make_object_xml(
+            "Размер                          ",
+            "9,0\r",
+            "Партия                        260131\rДата изготовления   ",
+            "2025-11\r",
+            "Срок годности          ",
+            "2030-11\r",
+            "Количество                150 ",
+            "пар",
+            object_name="Текст 20",
+        )
+
+        labels._update_details_object(
+            details_object,
+            _make_context(
+                size="9,0",
+                batch="260603",
+                manufacture_date="2026-03",
+                expiration_date="2031-03",
+                quantity_pairs=200,
+                quantity_pairs_word="пар",
+            ),
+        )
+
+        values = labels._get_substring_values(details_object)
+        self.assertEqual(values[1], "9,0\r")
+        self.assertEqual(values[2], "Партия                        260603\rДата изготовления   ")
+        self.assertEqual(values[3], "2026-03\r")
+        self.assertEqual(values[5], "2031-03\r")
+        self.assertEqual(values[6], "Количество                200 ")
+        self.assertEqual(values[7], "пар")
+
     def test_update_description_object_removes_color_line_when_value_is_empty(self):
         description_object = _make_object_xml(
             "-Диагностические перчатки\r-Цвет: nan\r-Манжета: с венчиком",

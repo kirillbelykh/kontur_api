@@ -612,7 +612,12 @@ def _replace_field_value(
     allow_adjacent: bool,
 ) -> bool:
     updated = False
-    has_adjacent_value = allow_adjacent and index + 1 < len(values) and _is_plain_value_substring(values[index + 1])
+    has_adjacent_value = (
+        allow_adjacent
+        and index + 1 < len(values)
+        and _is_plain_value_substring(values[index + 1])
+        and not _has_following_detail_marker(values[index], label)
+    )
     adjacent_original_value = values[index + 1] if has_adjacent_value else ""
 
     new_current_value, inline_updated = _replace_inline_field_value(values[index], label, replacement)
@@ -701,6 +706,23 @@ def _is_plain_value_substring(value: str) -> bool:
     if not stripped_value:
         return True
     return not _contains_detail_marker(stripped_value)
+
+
+def _has_following_detail_marker(value: str, label: str) -> bool:
+    normalized_value = str(value or "").lower()
+    normalized_label = str(label or "").lower()
+    if not normalized_value or not normalized_label:
+        return False
+
+    label_position = normalized_value.find(normalized_label)
+    if label_position < 0:
+        return False
+
+    suffix = normalized_value[label_position + len(normalized_label) :]
+    if not suffix:
+        return False
+
+    return any(marker in suffix for marker in DETAIL_FIELD_MARKERS if marker.lower() != normalized_label)
 
 
 def _contains_detail_marker(value: str) -> bool:
