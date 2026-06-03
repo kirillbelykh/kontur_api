@@ -227,7 +227,7 @@
       "order_name": "1059 стер нитрил XL 260604 (6к)",
       "document_id": "50aaece0-bff5-468a-a593-752b08694ef0",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1059 стер нитрил XL 260604 6к\\1059 стер нитрил XL 260604 6к.pdf",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1059 стер нитрил XL 260604 6к\\1059 стер нитрил XL 260604 6к.pdf, C:\\Users\\user\\Desktop\\Коды км\\1059 стер нитрил XL 260604 6к\\1059 стер нитрил XL 260604 (6к)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1059 стер нитрил XL 260604 6к\\1059 стер нитрил XL 260604 (6к).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р XL",
       "gtin": "4650118046306",
@@ -248,8 +248,8 @@
       "tsd_created_at": "2026-06-03T14:07:36.537455",
       "tsd_intro_number": "14211115-4ea3-4398-8e69-3579b9396bbb",
       "tsd_created_by": "user",
-      "xls_path": null,
-      "csv_path": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1059 стер нитрил XL 260604 6к\\1059 стер нитрил XL 260604 (6к).xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1059 стер нитрил XL 260604 6к\\1059 стер нитрил XL 260604 (6к)_csv.csv",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1059 стер нитрил XL 260604 6к\\1059 стер нитрил XL 260604 6к.pdf"
     },
     {
@@ -18860,7 +18860,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T14:07:39.120094",
+  "last_update": "2026-06-03T14:09:04.015340",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
