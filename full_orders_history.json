@@ -91,7 +91,7 @@
       "order_name": "1065 лат диаг XL 260604 (60к)",
       "document_id": "fcf65fe5-ba12-4195-b48a-1296190ea848",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к).xls",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 60к.pdf, C:\\Users\\User\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XL, цвет натуральный",
       "gtin": "4650118041370",
@@ -112,9 +112,9 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к).xls",
-      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к)_csv.csv",
-      "pdf_path": null
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к).xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 (60к)_csv.csv",
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1065 лат диаг XL 260604 60к\\1065 лат диаг XL 260604 60к.pdf"
     },
     {
       "order_name": "1064 лат диаг L 260604 (90к)",
@@ -18869,7 +18869,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-03T14:30:29.150560",
+  "last_update": "2026-06-03T14:30:51.658112",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
