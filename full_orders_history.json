@@ -3,7 +3,7 @@
     {
       "order_name": "1098 лат диаг L 260521 (20к)",
       "document_id": "2bda3bad-6ae0-4758-9ef7-decc0e60109a",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\1098 лат диаг L 260521 20к\\1098 лат диаг L 260521 20к.pdf, C:\\Users\\User\\Desktop\\Коды км\\1098 лат диаг L 260521 20к\\1098 лат диаг L 260521 (20к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1098 лат диаг L 260521 20к\\1098 лат диаг L 260521 (20к).xls",
       "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р L, цвет натуральный",
@@ -19890,7 +19890,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-08T15:05:10.354703",
+  "last_update": "2026-06-08T15:25:40.919781",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
