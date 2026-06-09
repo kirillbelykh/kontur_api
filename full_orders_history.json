@@ -55,9 +55,9 @@
     {
       "order_name": "1109. ультра 7 партия 260610",
       "document_id": "196c1b8d-f416-4a53-b554-3f8039a0e99d",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1109 ультра 7 партия 260610\\1109 ультра 7 партия 260610.pdf, C:\\Users\\user\\Desktop\\Коды км\\1109 ультра 7 партия 260610\\1109. ультра 7 партия 260610_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1109 ультра 7 партия 260610\\1109. ультра 7 партия 260610.xls",
+      "simpl": "ультра",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 7,0",
       "gtin": "4640473509899",
       "positions": [
@@ -76,7 +76,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1109 ультра 7 партия 260610\\1109. ультра 7 партия 260610_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1109 ультра 7 партия 260610\\1109. ультра 7 партия 260610.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1109 ультра 7 партия 260610\\1109 ультра 7 партия 260610.pdf"
     },
     {
       "order_name": "1113 лат диаг М партия 260609",
@@ -20439,7 +20442,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-09T12:07:07.480698",
+  "last_update": "2026-06-09T12:14:30.188340",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
