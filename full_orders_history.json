@@ -3,9 +3,9 @@
     {
       "order_name": "1115 хир 8 партия 260611",
       "document_id": "f5be044c-51fd-40ce-b278-fe38069ecc4a",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1115 хир 8 партия 260611\\1115 хир 8 партия 260611.pdf, C:\\Users\\user\\Desktop\\Коды км\\1115 хир 8 партия 260611\\1115 хир 8 партия 260611_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1115 хир 8 партия 260611\\1115 хир 8 партия 260611.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
       "gtin": "4640473510628",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1115 хир 8 партия 260611\\1115 хир 8 партия 260611_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1115 хир 8 партия 260611\\1115 хир 8 партия 260611.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1115 хир 8 партия 260611\\1115 хир 8 партия 260611.pdf"
     },
     {
       "order_name": "1114 нитрил диаг S заявка 6334",
@@ -20500,7 +20503,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-09T15:33:24.301757",
+  "last_update": "2026-06-09T15:40:27.720604",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
