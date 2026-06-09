@@ -3,9 +3,9 @@
     {
       "order_name": "1112 нитр диаг М партия 260609",
       "document_id": "6557a5f2-749c-4433-80e1-62873b15b51f",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1112 нитр диаг М партия 260609\\1112 нитр диаг М партия 260609.pdf, C:\\Users\\user\\Desktop\\Коды км\\1112 нитр диаг М партия 260609\\1112 нитр диаг М партия 260609_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1112 нитр диаг М партия 260609\\1112 нитр диаг М партия 260609.xls",
+      "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет белый",
       "gtin": "4650118044067",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1112 нитр диаг М партия 260609\\1112 нитр диаг М партия 260609.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1112 нитр диаг М партия 260609\\1112 нитр диаг М партия 260609.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1112 нитр диаг М партия 260609\\1112 нитр диаг М партия 260609_csv.csv"
     },
     {
       "order_name": "1108 хир 7,5 заявка 6321",
@@ -20222,7 +20225,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-09T10:28:59.406025",
+  "last_update": "2026-06-09T10:45:21.937135",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
