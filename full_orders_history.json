@@ -3,9 +3,9 @@
     {
       "order_name": "1117 HR лат L 260604 заявка 6259,1",
       "document_id": "e8d3b015-1018-4076-9d03-4986972c86ba",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1117 HR лат L 260604 заявка 62591\\1117 HR лат L 260604 заявка 62591.pdf, C:\\Users\\user\\Desktop\\Коды км\\1117 HR лат L 260604 заявка 62591\\1117 HR лат L 260604 заявка 6259,1_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1117 HR лат L 260604 заявка 62591\\1117 HR лат L 260604 заявка 6259,1.xls",
+      "simpl": "латекс hr",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р L, цвет синий",
       "gtin": "4650118040564",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1117 HR лат L 260604 заявка 62591\\1117 HR лат L 260604 заявка 62591.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1117 HR лат L 260604 заявка 62591\\1117 HR лат L 260604 заявка 6259,1_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1117 HR лат L 260604 заявка 62591\\1117 HR лат L 260604 заявка 6259,1.xls"
     },
     {
       "order_name": "1116 HR лат M 260604 заявка 6259,1",
@@ -20558,7 +20561,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-10T12:28:23.237692",
+  "last_update": "2026-06-10T12:30:17.850889",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
