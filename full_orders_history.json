@@ -1123,7 +1123,7 @@
     {
       "order_name": "1089 хир 6,5 партия 260608",
       "document_id": "812ef5fa-8210-4134-835e-308128858058",
-      "status": "received",
+      "status": "Скачан",
       "filename": "C:\\Users\\user\\Desktop\\Коды км\\1089 хир 65 партия 260608\\1089 хир 65 партия 260608.pdf, C:\\Users\\user\\Desktop\\Коды км\\1089 хир 65 партия 260608\\1089 хир 6,5 партия 260608_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1089 хир 65 партия 260608\\1089 хир 6,5 партия 260608.xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,5",
@@ -20729,7 +20729,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-11T09:41:21.101428",
+  "last_update": "2026-06-11T09:41:48.442912",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
