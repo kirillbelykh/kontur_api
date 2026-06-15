@@ -3,9 +3,9 @@
     {
       "order_name": "1131. лат диаг М партия 260615",
       "document_id": "cd51b256-d95a-425e-b5d0-158a2354fece",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1131 лат диаг М партия 260615\\1131 лат диаг М партия 260615.pdf, C:\\Users\\user\\Desktop\\Коды км\\1131 лат диаг М партия 260615\\1131. лат диаг М партия 260615_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1131 лат диаг М партия 260615\\1131. лат диаг М партия 260615.xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
       "gtin": "4650118041295",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1131 лат диаг М партия 260615\\1131. лат диаг М партия 260615_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1131 лат диаг М партия 260615\\1131 лат диаг М партия 260615.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1131 лат диаг М партия 260615\\1131. лат диаг М партия 260615.xls"
     },
     {
       "order_name": "1131 лат диаг М партия 260615",
@@ -21042,7 +21045,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-15T13:08:31.518175",
+  "last_update": "2026-06-15T13:14:17.881391",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
