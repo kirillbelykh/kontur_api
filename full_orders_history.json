@@ -3,7 +3,7 @@
     {
       "order_name": "1130 лат диаг M 260521 (4к)",
       "document_id": "482847bb-7fd7-4eef-a8a1-f67efd407bfd",
-      "status": "Скачан",
+      "status": "Введен в оборот",
       "filename": "C:\\Users\\User\\Desktop\\Коды км\\1130 лат диаг M 260521 4к\\1130 лат диаг M 260521 4к.pdf, C:\\Users\\User\\Desktop\\Коды км\\1130 лат диаг M 260521 4к\\1130 лат диаг M 260521 (4к)_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1130 лат диаг M 260521 4к\\1130 лат диаг M 260521 (4к).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
@@ -20987,7 +20987,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-15T11:54:25.287617",
+  "last_update": "2026-06-15T11:54:30.994820",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
