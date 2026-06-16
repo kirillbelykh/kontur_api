@@ -81,9 +81,9 @@
     {
       "order_name": "1149 ультра зел 6 260617",
       "document_id": "bd8d8cbc-734f-44ec-88ba-d7676db3c0ab",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1149 ультра зел 6 260617\\1149 ультра зел 6 260617.pdf, C:\\Users\\user\\Desktop\\Коды км\\1149 ультра зел 6 260617\\1149 ультра зел 6 260617_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1149 ультра зел 6 260617\\1149 ультра зел 6 260617.xls",
+      "simpl": "ультра",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика зеленого цвета, р-р 6,0",
       "gtin": "4640473509844",
       "positions": [
@@ -102,7 +102,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1149 ультра зел 6 260617\\1149 ультра зел 6 260617_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1149 ультра зел 6 260617\\1149 ультра зел 6 260617.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1149 ультра зел 6 260617\\1149 ультра зел 6 260617.pdf"
     },
     {
       "order_name": "1150 ультра зел 6,5 260617",
@@ -21727,7 +21730,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-16T16:23:35.366755",
+  "last_update": "2026-06-16T16:24:12.418374",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
