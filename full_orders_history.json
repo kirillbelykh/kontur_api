@@ -81,9 +81,9 @@
     {
       "order_name": "1136 хир 7 партия 260605",
       "document_id": "c4fd67e3-10a8-41b1-9bea-048cd420d48a",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1136 хир 7 партия 260605\\1136 хир 7 партия 260605.pdf, C:\\Users\\user\\Desktop\\Коды км\\1136 хир 7 партия 260605\\1136 хир 7 партия 260605_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1136 хир 7 партия 260605\\1136 хир 7 партия 260605.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473505983",
       "positions": [
@@ -102,7 +102,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1136 хир 7 партия 260605\\1136 хир 7 партия 260605_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1136 хир 7 партия 260605\\1136 хир 7 партия 260605.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1136 хир 7 партия 260605\\1136 хир 7 партия 260605.pdf"
     },
     {
       "order_name": "1135. стер лат XL заявка 6417",
@@ -21305,7 +21308,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-16T12:55:53.979314",
+  "last_update": "2026-06-16T12:58:47.993315",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
