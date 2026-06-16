@@ -77,12 +77,12 @@
       ],
       "created_at": "2026-06-16T16:19:05.138926",
       "created_by": "user",
-      "updated_at": "2026-06-16T16:19:05.138926",
+      "updated_at": "2026-06-16T16:36:42.780128",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "tsd_created": true,
+      "tsd_created_at": "2026-06-16T16:36:42.780128",
+      "tsd_intro_number": "ce29b914-327a-4c7c-b248-b7fde61749a3",
+      "tsd_created_by": "user",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1151 ультра зел 7 260617\\1151 ультра зел 7 260617_csv.csv",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1151 ультра зел 7 260617\\1151 ультра зел 7 260617.xls",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1151 ультра зел 7 260617\\1151 ультра зел 7 260617.pdf"
@@ -21739,7 +21739,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-16T16:35:26.982445",
+  "last_update": "2026-06-16T16:36:44.753509",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
