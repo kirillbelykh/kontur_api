@@ -2120,11 +2120,11 @@
       ],
       "created_at": "2026-06-05T09:51:56.712654",
       "created_by": "user",
-      "updated_at": "2026-06-15T13:21:20.665836",
+      "updated_at": "2026-06-16T16:57:39.980999",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-06-15T13:21:20.665836",
-      "tsd_intro_number": "aa908104-214d-4a59-9f5a-9665dd06052c",
+      "tsd_created_at": "2026-06-16T16:57:39.980999",
+      "tsd_intro_number": "c1cd1a5f-cfac-4937-9a40-33cd2c8a779b",
       "tsd_created_by": "user",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1090 хир 7 партия 260605\\1090 хир 7 партия 260605.xls",
       "pdf_path": null,
@@ -21739,7 +21739,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-16T16:39:18.270513",
+  "last_update": "2026-06-16T16:57:41.870986",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
