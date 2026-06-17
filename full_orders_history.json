@@ -177,8 +177,8 @@
     {
       "order_name": "1148 нитрил диаг фиолет S 260525 (2к)",
       "document_id": "3e30ef1f-b7b1-4adf-8149-f9cbe104ec8b",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1148 нитрил диаг фиолет S 260525 2к\\1148 нитрил диаг фиолет S 260525 2к.pdf, C:\\Users\\user\\Desktop\\Коды км\\1148 нитрил диаг фиолет S 260525 2к\\1148 нитрил диаг фиолет S 260525 (2к)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1148 нитрил диаг фиолет S 260525 2к\\1148 нитрил диаг фиолет S 260525 (2к).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет фиолетовый",
       "gtin": "4650118044043",
@@ -198,7 +198,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1148 нитрил диаг фиолет S 260525 2к\\1148 нитрил диаг фиолет S 260525 2к.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1148 нитрил диаг фиолет S 260525 2к\\1148 нитрил диаг фиолет S 260525 (2к)_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1148 нитрил диаг фиолет S 260525 2к\\1148 нитрил диаг фиолет S 260525 (2к).xls"
     },
     {
       "order_name": "1142. хир 7,5 заявка 6444",
@@ -21768,7 +21771,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-17T12:05:39.489127",
+  "last_update": "2026-06-17T12:51:03.652947",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
