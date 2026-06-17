@@ -3,9 +3,9 @@
     {
       "order_name": "1154 хир 9 260611",
       "document_id": "297ec0ac-e664-439e-b840-8f3402fbb1c0",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1154 хир 9 260611\\1154 хир 9 260611.pdf, C:\\Users\\user\\Desktop\\Коды км\\1154 хир 9 260611\\1154 хир 9 260611_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1154 хир 9 260611\\1154 хир 9 260611.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,0",
       "gtin": "4640473510642",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1154 хир 9 260611\\1154 хир 9 260611.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1154 хир 9 260611\\1154 хир 9 260611_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1154 хир 9 260611\\1154 хир 9 260611.xls"
     },
     {
       "order_name": "1153 ультра зел 8 260617",
@@ -21765,7 +21768,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-17T12:00:20.455111",
+  "last_update": "2026-06-17T12:05:39.489127",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
