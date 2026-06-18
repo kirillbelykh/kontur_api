@@ -45,6 +45,7 @@ CLIENT_CONFIG = {
 BLOCKED_METHODS: set[str] = set()
 
 ALLOWED_METHODS = {
+    "acknowledge_wms_chz_request",
     "add_order_item",
     "approve_aggregations",
     "approve_selected_aggregations",
@@ -57,6 +58,7 @@ ALLOWED_METHODS = {
     "download_aggregation_codes",
     "download_selected_aggregations",
     "get_aggregation_state",
+    "get_auth_state",
     "get_default_date_window",
     "get_download_state",
     "get_history",
@@ -74,6 +76,7 @@ ALLOWED_METHODS = {
     "lookup_gtin",
     "lookup_gtin_by_code",
     "manual_download_order",
+    "mark_wms_chz_request_ready",
     "preview_100x180_label",
     "print_100x180_label",
     "print_download_order",

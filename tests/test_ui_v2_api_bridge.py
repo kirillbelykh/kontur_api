@@ -250,6 +250,145 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertNotIn("error", result)
         kontur_mock.assert_called_once_with(force_refresh=True)
 
+    def test_receive_wms_chz_request_persists_runtime_record(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            fake_runtime = types.SimpleNamespace(
+                root_dir=temp_root,
+                lock=api_bridge.Lock(),
+                wms_chz_requests=[],
+                wms_chz_last_synced_at=0.0,
+            )
+
+            with (
+                mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+                mock.patch.object(self.bridge, "_log"),
+            ):
+                result = self.bridge.receive_wms_chz_request(
+                    {
+                        "request_id": 17,
+                        "order_id": 55,
+                        "order_name": "WMS-55",
+                        "customer": "Clinic",
+                        "items": [
+                            {
+                                "order_item_id": 101,
+                                "item_title": "хир с полимерным",
+                                "item_size": "7,0",
+                                "pairs_quantity": 53,
+                            }
+                        ],
+                    }
+                )
+
+            self.assertTrue(result["success"])
+            self.assertEqual(len(fake_runtime.wms_chz_requests), 1)
+            self.assertEqual(fake_runtime.wms_chz_requests[0]["request_id"], 17)
+            self.assertTrue((temp_root / "runtime" / api_bridge.WMS_CHZ_REQUESTS_FILE).exists())
+
+    def test_get_orders_view_state_includes_wms_chz_sections(self):
+        fake_runtime = types.SimpleNamespace(
+            order_queue=[],
+            session_orders=[],
+            history_db=types.SimpleNamespace(get_all_orders=lambda: []),
+            wms_chz_requests=[
+                {
+                    "request_id": 1,
+                    "order_id": 10,
+                    "order_name": "WMS-10",
+                    "status": "requested",
+                    "requested_at": "2026-06-18T10:00:00",
+                    "items": [],
+                },
+                {
+                    "request_id": 2,
+                    "order_id": 11,
+                    "order_name": "WMS-11",
+                    "status": "acknowledged",
+                    "requested_at": "2026-06-18T09:00:00",
+                    "acknowledged_at": "2026-06-18T09:10:00",
+                    "items": [],
+                },
+            ],
+            wms_chz_last_synced_at=0.0,
+        )
+
+        with (
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(self.bridge, "_get_kontur_order_items", return_value=[]),
+            mock.patch.object(self.bridge, "_get_deleted_document_ids", return_value=set()),
+            mock.patch.object(self.bridge, "_load_deleted_orders", return_value=[]),
+            mock.patch.object(self.bridge, "_sync_pending_wms_chz_requests"),
+        ):
+            result = self.bridge.get_orders_view_state()
+
+        self.assertNotIn("error", result)
+        self.assertEqual([item["request_id"] for item in result["wms_chz_active"]], [1])
+        self.assertEqual([item["request_id"] for item in result["wms_chz_archive"]], [2])
+
+    def test_acknowledge_wms_chz_request_posts_callback_and_updates_status(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_runtime = types.SimpleNamespace(
+                root_dir=Path(temp_dir),
+                lock=api_bridge.Lock(),
+                wms_chz_requests=[
+                    {
+                        "request_id": 9,
+                        "order_id": 77,
+                        "order_name": "WMS-77",
+                        "status": "requested",
+                        "requested_at": "2026-06-18T10:00:00",
+                        "items": [],
+                    }
+                ],
+                wms_chz_last_synced_at=0.0,
+            )
+
+            with (
+                mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+                mock.patch.object(self.bridge, "_send_wms_chz_callback") as callback_mock,
+                mock.patch.object(self.bridge, "get_orders_view_state", return_value={"ok": True}),
+                mock.patch.object(self.bridge, "_log"),
+            ):
+                result = self.bridge.acknowledge_wms_chz_request(9)
+
+        self.assertTrue(result["success"])
+        callback_mock.assert_called_once_with(9, "acknowledge")
+        self.assertEqual(fake_runtime.wms_chz_requests[0]["status"], "acknowledged")
+        self.assertFalse(fake_runtime.wms_chz_requests[0]["is_active"])
+
+    def test_mark_wms_chz_request_ready_posts_callback_and_updates_status(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_runtime = types.SimpleNamespace(
+                root_dir=Path(temp_dir),
+                lock=api_bridge.Lock(),
+                wms_chz_requests=[
+                    {
+                        "request_id": 10,
+                        "order_id": 88,
+                        "order_name": "WMS-88",
+                        "status": "acknowledged",
+                        "requested_at": "2026-06-18T10:00:00",
+                        "acknowledged_at": "2026-06-18T10:05:00",
+                        "items": [],
+                    }
+                ],
+                wms_chz_last_synced_at=0.0,
+            )
+
+            with (
+                mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+                mock.patch.object(self.bridge, "_send_wms_chz_callback") as callback_mock,
+                mock.patch.object(self.bridge, "get_orders_view_state", return_value={"ok": True}),
+                mock.patch.object(self.bridge, "_log"),
+            ):
+                result = self.bridge.mark_wms_chz_request_ready(10)
+
+        self.assertTrue(result["success"])
+        callback_mock.assert_called_once_with(10, "ready")
+        self.assertEqual(fake_runtime.wms_chz_requests[0]["status"], "ready")
+        self.assertFalse(fake_runtime.wms_chz_requests[0]["is_active"])
+
     def test_kontur_order_mapping_preserves_product_metadata(self):
         item = {
             "documentId": "doc-1",
@@ -432,13 +571,17 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
 
         with (
             mock.patch.object(self.bridge, "_ensure_session", return_value=object()),
-            mock.patch.object(self.bridge, "_get_thumbprint", return_value="thumb"),
+            mock.patch.object(self.bridge, "_get_certificate", return_value=object()),
             mock.patch.object(self.bridge, "_parse_iso_date", side_effect=lambda value, **_kwargs: value),
             mock.patch.object(self.bridge, "_get_order_for_document_id", return_value=item),
             mock.patch.object(self.bridge, "_download_order_internal", side_effect=fake_download) as download_mock,
             mock.patch.object(self.bridge, "_sync_history_from_download_item"),
             mock.patch.object(self.bridge, "_log"),
-            mock.patch.object(api_bridge, "put_into_circulation", return_value=(True, {"introduction_id": "intro-1"})) as intro_mock,
+            mock.patch.object(
+                self.bridge,
+                "_introduce_download_item_exact_filtered",
+                return_value={"success": True, "introduction_id": "intro-1"},
+            ) as intro_mock,
         ):
             result = self.bridge.introduce_orders(
                 ["doc-1"],
@@ -450,6 +593,80 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertTrue(result["success"])
         download_mock.assert_called_once()
         intro_mock.assert_called_once()
+
+    def test_intro_exact_filtered_sends_only_emitted_saved_codes(self):
+        emitted_code = "010465011804125721ABC1234567890\x1d91EE11\x1d92TAIL"
+        introduced_code = "010465011804125721XYZ1234567890\x1d91EE11\x1d92TAIL"
+        item = {
+            "document_id": "doc-1",
+            "order_name": "Order 1",
+            "product_group": "wheelChairs",
+            "gtin": "04650118041257",
+            "full_name": "Gloves",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = Path(temp_dir) / "codes.csv"
+            csv_path.write_text(
+                f"{emitted_code}\t04650118041257\tGloves\n"
+                f"{introduced_code}\t04650118041257\tGloves\n",
+                encoding="utf-8-sig",
+            )
+            item["csv_path"] = str(csv_path)
+
+            emitted_state = types.SimpleNamespace(
+                status="EMITTED",
+                api_error=None,
+                raw_code=emitted_code,
+                sntin=api_bridge.extract_sntin(emitted_code),
+            )
+            introduced_state = types.SimpleNamespace(
+                status="INTRODUCED",
+                api_error=None,
+                raw_code=introduced_code,
+                sntin=api_bridge.extract_sntin(introduced_code),
+            )
+            fake_service = types.SimpleNamespace(
+                _resolve_true_product_group=lambda product_group: "wheelchairs",
+                fetch_code_states=lambda **_kwargs: [emitted_state, introduced_state],
+            )
+            fake_runtime = types.SimpleNamespace(bulk_aggregation_service=fake_service)
+
+            with (
+                mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+                mock.patch.object(self.bridge, "_lookup_intro_product_metadata", return_value={
+                    "gtin": "04650118041257",
+                    "full_name": "Gloves",
+                    "simpl_name": "Gloves",
+                    "tnved_code": "EE11",
+                }),
+                mock.patch.object(self.bridge, "_create_exact_intro_file_document", return_value="intro-123"),
+                mock.patch.object(self.bridge, "_upload_intro_positions_from_file") as upload_mock,
+                mock.patch.object(self.bridge, "_wait_for_intro_codes_check", return_value={"status": "doesNotHaveErrors"}),
+                mock.patch.object(self.bridge, "_get_intro_production_state", return_value={"documentStatus": "created", "positions": []}),
+                mock.patch.object(self.bridge, "_get_intro_document_state", return_value={"documentStatus": "created"}),
+                mock.patch.object(self.bridge, "_sign_and_send_intro_document", return_value={
+                    "generated_count": 1,
+                    "send_response": {"ok": True},
+                    "final_introduction": {"documentStatus": "introduced"},
+                    "final_check": {"status": "doesNotHaveErrors"},
+                }),
+                mock.patch.object(self.bridge, "_log"),
+            ):
+                result = self.bridge._introduce_download_item_exact_filtered(
+                    object(),
+                    item=item,
+                    production_date="2026-01-01",
+                    expiration_date="2031-01-01",
+                    batch_number="260330",
+                    cert=object(),
+                )
+
+        self.assertEqual(result["already_introduced_codes"], 1)
+        self.assertEqual(result["sent_codes_count"], 1)
+        upload_payload = upload_mock.call_args.kwargs["rows_payload"]
+        self.assertEqual(len(upload_payload["rows"]), 1)
+        self.assertEqual(upload_payload["rows"][0]["code"], emitted_code)
 
     def test_download_selected_aggregations_saves_separate_files_by_comment(self):
         aggregates = [

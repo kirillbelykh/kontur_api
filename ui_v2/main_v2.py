@@ -17,6 +17,7 @@ except ImportError as exc:
     ) from exc
 
 from api_bridge import ApiBridge
+from chz_bridge_server import start_chz_bridge_server
 
 
 def _resolve_pythonw() -> str:
@@ -90,6 +91,7 @@ def main():
     _ensure_desktop_shortcut()
     api = ApiBridge()
     api.start_session_auto_refresh()
+    start_chz_bridge_server(api)
     index_path = Path(__file__).resolve().parent / "ui" / "index.html"
     window = webview.create_window(
         title="KonturTestAPI [TEST]",

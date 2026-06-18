@@ -104,6 +104,16 @@ DELETED_ORDERS_DIRNAME = "Удаленные"
 DELETED_ORDERS_FILE = "deleted_orders.json"
 MARKING_CODES_DIRNAME = "\u041a\u043e\u0434\u044b \u043a\u043c"
 AGGREGATION_CODES_DIRNAME = "\u0410\u0433\u0440\u0435\u0433 \u043a\u043e\u0434\u044b \u043a\u043c"
+WMS_CHZ_REQUESTS_FILE = "wms_chz_requests.json"
+WMS_CHZ_SYNC_INTERVAL_SECONDS = 15
+WMS_CHZ_DEFAULT_API_BASE_URL = "https://wms.grund-lage.ru/api"
+
+WMS_CHZ_STATUS_LABELS = {
+    "requested": "Новый запрос",
+    "acknowledged": "Принят оператором",
+    "ready": "Коды готовы",
+    "cancelled": "Отменен",
+}
 
 STATUS_LABELS = {
     "available": "Доступен для скачивания",
@@ -133,7 +143,7 @@ STATUS_LABELS = {
     "tsd_not_created": "Не отправлено на ТСД",
     "archived": "В архиве",
     "INTRODUCED": "Введен в оборот",
-    "APPLIED": "В обороте",
+    "APPLIED": "Нанесены",
     "EMITTED": "Эмитирован",
     "WRITTEN_OFF": "Выведен из оборота",
     "RETIRED": "Выведен из оборота",
@@ -365,6 +375,8 @@ class _BridgeRuntime:
         self.kontur_orders_cache_items: List[Dict[str, Any]] = []
         self.kontur_orders_cache_at = 0.0
         self.kontur_order_metadata_cache: Dict[str, Dict[str, Any]] = {}
+        self.wms_chz_requests: List[Dict[str, Any]] = []
+        self.wms_chz_last_synced_at = 0.0
         self.load_download_items_from_history(sync=False)
         self.history_sync_thread: Optional[Thread] = None
         self.start_history_sync_on_startup()
@@ -428,6 +440,7 @@ def _history_order_to_download_item(order_data: Dict[str, Any]) -> Dict[str, Any
         "simpl": str(order_data.get("simpl") or order_data.get("simpl_name") or "").strip(),
         "full_name": _extract_position_name(order_data),
         "gtin": _extract_gtin(order_data),
+        "product_group": order_data.get("product_group") or order_data.get("productGroup") or "",
         "from_history": True,
         "downloading": False,
         "history_data": dict(order_data),
@@ -546,6 +559,7 @@ def _extract_kontur_order_positions(order_data: Dict[str, Any]) -> List[Dict[str
 class ApiBridge:
     def __init__(self):
         _get_runtime()
+        self._load_wms_chz_requests_into_runtime()
 
     def _session_auto_refresh_worker(self) -> None:
         runtime = _get_runtime()
@@ -660,6 +674,222 @@ class ApiBridge:
 
         worker = Thread(target=_worker, name=name, daemon=True)
         worker.start()
+
+    def _ensure_wms_chz_runtime_defaults(self) -> Any:
+        runtime = _get_runtime()
+        if not hasattr(runtime, "wms_chz_requests") or runtime.wms_chz_requests is None:
+            runtime.wms_chz_requests = []
+        if not hasattr(runtime, "wms_chz_last_synced_at"):
+            runtime.wms_chz_last_synced_at = 0.0
+        return runtime
+
+    def _wms_chz_requests_path(self) -> Path:
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        path = runtime.root_dir / "runtime" / WMS_CHZ_REQUESTS_FILE
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _load_wms_chz_requests(self) -> List[Dict[str, Any]]:
+        path = self._wms_chz_requests_path()
+        if not path.exists():
+            return []
+        try:
+            with path.open("r", encoding="utf-8") as file:
+                payload = json.load(file)
+        except Exception:
+            return []
+
+        items = payload.get("requests", payload) if isinstance(payload, dict) else payload
+        if not isinstance(items, list):
+            return []
+        prepared = [self._normalize_wms_chz_request(item) for item in items if isinstance(item, dict)]
+        return self._sort_wms_chz_requests(prepared)
+
+    def _save_wms_chz_requests(self, requests_payload: Sequence[Dict[str, Any]]) -> None:
+        path = self._wms_chz_requests_path()
+        payload = {
+            "requests": self._sort_wms_chz_requests(requests_payload),
+            "updated_at": datetime.now().isoformat(),
+        }
+        with path.open("w", encoding="utf-8") as file:
+            json.dump(payload, file, ensure_ascii=False, indent=2)
+
+    def _load_wms_chz_requests_into_runtime(self) -> None:
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        with runtime.lock:
+            runtime.wms_chz_requests = self._load_wms_chz_requests()
+
+    def _sort_wms_chz_requests(self, requests_payload: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return sorted(
+            [dict(item) for item in requests_payload if isinstance(item, dict)],
+            key=lambda item: (
+                0 if item.get("status") == "requested" else 1,
+                str(item.get("ready_at") or item.get("acknowledged_at") or item.get("requested_at") or ""),
+                str(item.get("request_id") or ""),
+            ),
+            reverse=True,
+        )
+
+    def _normalize_wms_chz_items(self, raw_items: Sequence[Dict[str, Any]] | None) -> List[Dict[str, Any]]:
+        items: List[Dict[str, Any]] = []
+        for raw_item in raw_items or []:
+            if not isinstance(raw_item, dict):
+                continue
+            pairs_quantity = int(raw_item.get("pairs_quantity") or 0)
+            item_title = str(raw_item.get("item_title") or raw_item.get("item_name") or "").strip()
+            item_size = str(raw_item.get("item_size") or raw_item.get("size") or "").strip()
+            item_color = str(raw_item.get("item_color") or raw_item.get("color") or "").strip()
+            batch_number = str(raw_item.get("batch_number") or raw_item.get("batch") or "").strip()
+            items.append(
+                {
+                    "order_item_id": raw_item.get("order_item_id"),
+                    "item_id": raw_item.get("item_id"),
+                    "item_title": item_title,
+                    "item_size": item_size,
+                    "item_color": item_color,
+                    "batch_number": batch_number,
+                    "pairs_quantity": pairs_quantity,
+                }
+            )
+        return items
+
+    def _build_wms_chz_items_summary(self, items: Sequence[Dict[str, Any]]) -> str:
+        if not items:
+            return "Позиции не переданы"
+        parts: List[str] = []
+        total_pairs = 0
+        for item in items:
+            total_pairs += int(item.get("pairs_quantity") or 0)
+            title_parts = [str(item.get("item_title") or "").strip()]
+            if item.get("item_size"):
+                title_parts.append(str(item["item_size"]))
+            if item.get("batch_number"):
+                title_parts.append(f"партия {item['batch_number']}")
+            label = " ".join(part for part in title_parts if part).strip() or "Позиция"
+            parts.append(f"{label} — {int(item.get('pairs_quantity') or 0)} пар")
+        summary = "; ".join(parts[:3])
+        if len(parts) > 3:
+            summary += f"; еще {len(parts) - 3}"
+        return f"{summary} • всего {total_pairs} пар"
+
+    def _normalize_wms_chz_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        request_id = int(payload.get("request_id") or payload.get("id") or 0)
+        items = self._normalize_wms_chz_items(payload.get("items"))
+        status = str(payload.get("status") or "requested").strip().lower() or "requested"
+        is_active = bool(payload.get("is_active", status == "requested"))
+        order_name = str(payload.get("order_name") or payload.get("name") or "").strip()
+        customer = str(payload.get("customer") or payload.get("order_customer") or "").strip()
+        comment = str(payload.get("comment") or "").strip()
+        requested_at = str(payload.get("requested_at") or payload.get("created_at") or "").strip()
+        acknowledged_at = str(payload.get("acknowledged_at") or "").strip()
+        ready_at = str(payload.get("ready_at") or "").strip()
+        updated_at = ready_at or acknowledged_at or requested_at or datetime.now().isoformat()
+        return {
+            "request_id": request_id,
+            "external_request_id": str(payload.get("external_request_id") or "").strip(),
+            "order_id": int(payload.get("order_id") or 0),
+            "order_name": order_name,
+            "customer": customer,
+            "comment": comment,
+            "status": status,
+            "status_label": WMS_CHZ_STATUS_LABELS.get(status, status or "unknown"),
+            "is_active": is_active,
+            "requested_at": requested_at,
+            "acknowledged_at": acknowledged_at,
+            "ready_at": ready_at,
+            "updated_at": updated_at,
+            "items": items,
+            "items_summary": self._build_wms_chz_items_summary(items),
+        }
+
+    def _serialize_wms_chz_request(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        normalized = self._normalize_wms_chz_request(item)
+        normalized["positions_count"] = len(normalized["items"])
+        normalized["pairs_total"] = sum(int(row.get("pairs_quantity") or 0) for row in normalized["items"])
+        return normalized
+
+    def _wms_api_base_url(self) -> str:
+        return str(os.getenv("WMS_API_BASE_URL") or WMS_CHZ_DEFAULT_API_BASE_URL).strip().rstrip("/")
+
+    def _wms_chz_token(self) -> str:
+        return str(os.getenv("CHZ_BRIDGE_TOKEN") or "").strip()
+
+    def _wms_chz_headers(self) -> Dict[str, str]:
+        token = self._wms_chz_token()
+        if not token:
+            raise RuntimeError("Не задан CHZ_BRIDGE_TOKEN для интеграции с WMS.")
+        return {
+            "X-CHZ-Token": token,
+            "Accept": "application/json",
+        }
+
+    def _upsert_wms_chz_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        normalized = self._normalize_wms_chz_request(payload)
+        if normalized["request_id"] <= 0:
+            raise RuntimeError("Некорректный идентификатор CHZ-запроса.")
+        with runtime.lock:
+            current_items = list(runtime.wms_chz_requests)
+            updated = False
+            for index, item in enumerate(current_items):
+                if int(item.get("request_id") or 0) == normalized["request_id"]:
+                    merged = dict(item)
+                    merged.update(normalized)
+                    current_items[index] = self._normalize_wms_chz_request(merged)
+                    normalized = current_items[index]
+                    updated = True
+                    break
+            if not updated:
+                current_items.insert(0, normalized)
+            runtime.wms_chz_requests = self._sort_wms_chz_requests(current_items)
+            self._save_wms_chz_requests(runtime.wms_chz_requests)
+        return normalized
+
+    def _sync_pending_wms_chz_requests(self, *, force: bool = False) -> None:
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        base_url = self._wms_api_base_url()
+        token = self._wms_chz_token()
+        if not base_url or not token:
+            return
+        if not force and (time.time() - float(runtime.wms_chz_last_synced_at or 0.0)) < WMS_CHZ_SYNC_INTERVAL_SECONDS:
+            return
+        try:
+            response = requests.get(
+                f"{base_url}/integration/chz/requests/pending",
+                headers=self._wms_chz_headers(),
+                timeout=10,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, list):
+                for item in payload:
+                    if isinstance(item, dict):
+                        self._upsert_wms_chz_request(item)
+            runtime.wms_chz_last_synced_at = time.time()
+        except Exception as exc:
+            logger.warning("Не удалось синхронизировать CHZ-запросы из WMS: %s", exc)
+
+    def _send_wms_chz_callback(self, request_id: int, action: str) -> None:
+        base_url = self._wms_api_base_url()
+        if not base_url:
+            raise RuntimeError("Не задан WMS_API_BASE_URL для обратного вызова ЧЗ.")
+        response = requests.post(
+            f"{base_url}/integration/chz/requests/{int(request_id)}/{action}",
+            headers=self._wms_chz_headers(),
+            timeout=10,
+        )
+        response.raise_for_status()
+
+    def receive_wms_chz_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            request = self._upsert_wms_chz_request(payload)
+            self._log(
+                "orders",
+                f"Новый запрос ЧЗ из WMS: {request.get('order_name') or request.get('order_id') or request.get('request_id')}",
+            )
+            return {"success": True, "request": self._serialize_wms_chz_request(request)}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
 
     def _deleted_orders_path(self) -> Path:
         path = _get_runtime().root_dir / DELETED_ORDERS_DIRNAME / DELETED_ORDERS_FILE
@@ -2020,14 +2250,26 @@ class ApiBridge:
                                 prepared = raw_line.split(",")
                         if not prepared:
                             continue
+                        
                         raw_code = str(prepared[0] or "").strip()
+                        
+                        # Нормализуем (убираем ^10 и т.д.)
                         normalized_code = self._normalize_full_marking_code(raw_code)
                         if not normalized_code or not normalized_code.startswith("01"):
                             continue
+                        
+                        # Извлекаем sntin (GTIN + криптохвост, без AI91/AI92)
+                        sntin = extract_sntin(normalized_code) or ""
+                        
+                        # Для проверки статусов нужен sntin или normalized_code без подписи
+                        # Для ввода в оборот нужен ПОЛНЫЙ normalized_code с подписью
+                        
                         gtin = str(prepared[1] or "").strip() if len(prepared) > 1 else ""
                         full_name = str(prepared[2] or "").strip() if len(prepared) > 2 else ""
+                        
                         yield {
-                            "full_code": normalized_code,
+                            "full_code": normalized_code,  # полный код: GTIN+хвост+AI91+AI92
+                            "sntin": sntin,
                             "gtin": gtin or normalized_code[2:16],
                             "full_name": full_name,
                         }
@@ -2056,13 +2298,14 @@ class ApiBridge:
         for csv_path in sorted(desktop_dir.rglob("*.csv")):
             scanned_files += 1
             for row in self._iter_saved_marking_rows(csv_path):
-                sntin = extract_sntin(row["full_code"])
+                sntin = row.get("sntin", "")
                 if sntin not in targets or sntin in matched:
                     continue
                 matched[sntin] = {
                     "sntin": sntin,
                     "partial_code": targets[sntin],
-                    "full_code": row["full_code"],
+                    "full_code": row["full_code"],  # полный код с подписью
+                    "normalized_code": row["normalized_code"],  # для проверки статусов
                     "gtin": str(row.get("gtin") or "").strip(),
                     "full_name": str(row.get("full_name") or "").strip(),
                     "source_path": str(csv_path),
@@ -2599,6 +2842,7 @@ class ApiBridge:
                 session,
                 introduction_id,
                 cert=cert,
+                log_channel=log_channel,
             )
             send_result["partial_success"] = partial_details
             return {
@@ -2620,6 +2864,7 @@ class ApiBridge:
                 session,
                 introduction_id,
                 cert=cert,
+                log_channel=log_channel,
             )
         else:
             send_result = {
@@ -2643,6 +2888,7 @@ class ApiBridge:
         product_group: str,
         raw_codes: Sequence[str],
         context_label: str,
+        log_channel: str = "aggregation",
     ) -> List[Any]:
         resolved_group = (
             str(product_group or "").strip()
@@ -2657,7 +2903,7 @@ class ApiBridge:
                     service._true_api_token = None
                     service._true_api_token_expires_at = 0.0
                     self._log(
-                        "aggregation",
+                        log_channel,
                         f"Повторяем запрос статусов КМ для {context_label}: pg={resolved_group}, попытка {attempt}.",
                     )
                 states = service.fetch_code_states(
@@ -2672,6 +2918,7 @@ class ApiBridge:
                     product_group=resolved_group,
                     states=states,
                     context_label=context_label,
+                    log_channel=log_channel,
                 )
             except requests.HTTPError as exc:
                 last_error = exc
@@ -2692,13 +2939,14 @@ class ApiBridge:
         product_group: str,
         states: Sequence[Any],
         context_label: str,
+        log_channel: str = "aggregation",
     ) -> List[Any]:
         error_states = [state for state in states if getattr(state, "api_error", None)]
         if not error_states:
             return list(states)
 
         self._log(
-            "aggregation",
+            log_channel,
             f"Повторно запрашиваем статусы КМ с ошибкой для {context_label}: {len(error_states)} шт.",
         )
         recovered_by_sntin: Dict[str, Any] = {}
@@ -2716,7 +2964,7 @@ class ApiBridge:
                 )
             except Exception as exc:
                 self._log(
-                    "aggregation",
+                    log_channel,
                     f"Повторный запрос статуса КМ не удался для {sntin}: {exc}",
                 )
                 continue
@@ -2729,7 +2977,7 @@ class ApiBridge:
 
         if recovered_by_sntin:
             self._log(
-                "aggregation",
+                log_channel,
                 f"Повторный запрос статусов КМ успешно восстановил {len(recovered_by_sntin)} шт. для {context_label}.",
             )
 
@@ -2744,6 +2992,7 @@ class ApiBridge:
         states: Sequence[Any],
         *,
         action_label: str,
+        log_channel: str = "aggregation",
     ) -> Dict[str, Any]:
         status_counts = Counter(getattr(state, "status", None) or "UNKNOWN" for state in states)
         api_errors = [state for state in states if getattr(state, "api_error", None)]
@@ -2753,7 +3002,7 @@ class ApiBridge:
                 for state in api_errors[:5]
             )
             self._log(
-                "aggregation",
+                log_channel,
                 f"{action_label}: не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}. Продолжаем обработку остальных кодов.",
             )
 
@@ -2764,10 +3013,10 @@ class ApiBridge:
             if getattr(state, "api_error", None):
                 continue
             normalized_status = str(getattr(state, "status", "") or "").upper()
-            if normalized_status in {"INTRODUCED", "APPLIED"}:
+            if normalized_status in {"INTRODUCED"}:
                 already_introduced += 1
                 continue
-            if normalized_status == "EMITTED":
+            if normalized_status in {"EMITTED", "APPLIED"}:
                 raw_code = str(getattr(state, "raw_code", "") or "").strip()
                 if raw_code:
                     target_codes.append(raw_code)
@@ -2782,6 +3031,139 @@ class ApiBridge:
             "unsupported_states": unsupported_states,
         }
 
+    def _dedupe_saved_marking_rows(self, rows: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        prepared_rows: List[Dict[str, Any]] = []
+        seen_sntins: set[str] = set()
+        for row in rows:
+            full_code = self._normalize_full_marking_code(str(row.get("full_code") or ""))
+            if not full_code:
+                continue
+            sntin = extract_sntin(full_code)
+            if not sntin or sntin in seen_sntins:
+                continue
+            seen_sntins.add(sntin)
+            prepared = dict(row)
+            prepared["full_code"] = full_code
+            prepared["sntin"] = sntin
+            prepared_rows.append(prepared)
+        return prepared_rows
+
+    def _resolve_intro_product_group_for_order(self, item: Dict[str, Any]) -> str:
+        history_data = item.get("history_data") if isinstance(item.get("history_data"), dict) else {}
+        live_meta = self._live_order_meta_for(item)
+        for source in (item, history_data, live_meta):
+            if not isinstance(source, dict):
+                continue
+            product_group = str(source.get("product_group") or source.get("productGroup") or "").strip()
+            if product_group:
+                return product_group
+        return str(getattr(api_module, "PRODUCT_GROUP", "") or "wheelChairs").strip() or "wheelChairs"
+
+    def _filter_saved_intro_rows_by_current_status(
+        self,
+        *,
+        item: Dict[str, Any],
+        rows: Sequence[Dict[str, Any]],
+        cert: Any,
+        action_label: str,
+    ) -> Dict[str, Any]:
+        prepared_rows = self._dedupe_saved_marking_rows(rows)
+        if not prepared_rows:
+            raise RuntimeError("CSV-файл заказа пуст или не содержит кодов маркировки.")
+
+        service = _get_runtime().bulk_aggregation_service
+        product_group = self._resolve_intro_product_group_for_order(item)
+        true_product_group = service._resolve_true_product_group(product_group)
+
+        # Для проверки статусов отправляем sntin (GTIN+криптохвост без подписи)
+        # API Честного Знака принимает sntin и возвращает его же в raw_code
+        raw_codes = [
+            str(row.get("sntin") or extract_sntin(row.get("full_code", "")) or "").strip()
+            for row in prepared_rows
+        ]
+        # Фильтруем пустые sntin на всякий случай
+        raw_codes = [code for code in raw_codes if code]
+
+        self._log(
+            "intro",
+            f"{action_label}: проверяем статусы КМ в Честном Знаке: {len(raw_codes)} шт.",
+        )
+        states = self._fetch_code_states_resilient(
+            service=service,
+            cert=cert,
+            product_group=true_product_group,
+            raw_codes=raw_codes,
+            context_label=action_label,
+            log_channel="intro",
+        )
+        partition = self._partition_intro_code_states(
+            states,
+            action_label=action_label,
+            log_channel="intro",
+        )
+
+        status_counts = partition["status_counts"]
+        api_errors = partition["api_errors"]
+        if api_errors and len(api_errors) == len(states):
+            preview = ", ".join(
+                str(getattr(state, "sntin", "") or getattr(state, "raw_code", "") or "").strip()
+                for state in api_errors[:5]
+            )
+            raise RuntimeError(
+                f"{action_label}: не удалось получить статусы кодов в Честном Знаке: {len(api_errors)} шт. "
+                f"Примеры: {preview}"
+            )
+        if api_errors:
+            preview = ", ".join(
+                str(getattr(state, "sntin", "") or getattr(state, "raw_code", "") or "").strip()
+                for state in api_errors[:5]
+            )
+            self._log(
+                "intro",
+                f"{action_label}: не удалось получить статусы части КМ: {len(api_errors)} шт. "
+                f"Примеры: {preview}. Продолжаем обработку остальных кодов.",
+            )
+
+        unsupported_states = partition["unsupported_states"]
+        if unsupported_states:
+            preview = ", ".join(
+                f"{getattr(state, 'sntin', '') or getattr(state, 'raw_code', '')} ({getattr(state, 'status', '')})"
+                for state in unsupported_states[:5]
+            )
+            raise RuntimeError(
+                f"{action_label}: часть кодов нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. "
+                f"Примеры: {preview}"
+            )
+
+        # Собираем sntin из target_codes (коды, которые нужно вводить в оборот)
+        target_sntins = {
+            str(extract_sntin(code) or code).strip()
+            for code in partition["target_codes"]
+        }
+        # Убираем пустые значения
+        target_sntins.discard("")
+
+        # Формируем target_rows из prepared_rows, сопоставляя по sntin
+        # Это гарантирует, что для ввода в оборот будут использованы ПОЛНЫЕ коды с криптоподписью
+        target_rows = []
+        for row in prepared_rows:
+            row_sntin = str(row.get("sntin") or extract_sntin(row.get("full_code", "")) or "").strip()
+            if row_sntin and row_sntin in target_sntins:
+                target_rows.append(row)
+
+        self._log(
+            "intro",
+            f"{action_label}: статусы КМ: {_format_status_counts(status_counts)}. "
+            f"Уже введено в оборот: {partition['already_introduced']}; к отправке: {len(target_rows)}.",
+        )
+        return {
+            "rows": prepared_rows,
+            "target_rows": target_rows,
+            "already_introduced": partition["already_introduced"],
+            "api_errors": api_errors,
+            "status_counts": status_counts,
+            "product_group": product_group,
+        }
 
     def _introduce_aggregations_via_exact_codes(
         self,
@@ -2858,7 +3240,7 @@ class ApiBridge:
             if state.api_error:
                 continue
             normalized_status = str(state.status or "").upper()
-            if normalized_status in {"INTRODUCED", "APPLIED"}:
+            if normalized_status in {"INTRODUCED"}:
                 already_introduced += 1
                 continue
             if normalized_status == "EMITTED":
@@ -3062,7 +3444,7 @@ class ApiBridge:
             if state.api_error:
                 continue
             normalized_status = str(state.status or "").upper()
-            if normalized_status in {"INTRODUCED", "APPLIED"}:
+            if normalized_status in {"INTRODUCED"}:
                 already_introduced += 1
                 continue
             if normalized_status == "EMITTED":
@@ -3609,6 +3991,7 @@ class ApiBridge:
     def get_orders_view_state(self, force_sync: bool = False) -> Dict[str, Any]:
         try:
             self._start_background_status_updater()
+            self._sync_pending_wms_chz_requests(force=bool(force_sync))
             runtime = _get_runtime()
             deleted_ids = self._get_deleted_document_ids()
             history_items: List[Dict[str, Any]] = []
@@ -3637,9 +4020,91 @@ class ApiBridge:
                     }
                     for item in self._load_deleted_orders()[:250]
                 ],
+                "wms_chz_active": [
+                    self._serialize_wms_chz_request(item)
+                    for item in runtime.wms_chz_requests
+                    if str(item.get("status") or "") == "requested"
+                ],
+                "wms_chz_archive": [
+                    self._serialize_wms_chz_request(item)
+                    for item in runtime.wms_chz_requests
+                    if str(item.get("status") or "") != "requested"
+                ][:250],
             }
         except Exception as exc:
             return {"error": str(exc)}
+
+    def acknowledge_wms_chz_request(self, request_id: int) -> Dict[str, Any]:
+        try:
+            normalized_id = int(request_id or 0)
+            if normalized_id <= 0:
+                raise RuntimeError("Выберите запрос ЧЗ.")
+
+            runtime = self._ensure_wms_chz_runtime_defaults()
+            with runtime.lock:
+                request = next(
+                    (item for item in runtime.wms_chz_requests if int(item.get("request_id") or 0) == normalized_id),
+                    None,
+                )
+            if not request:
+                raise RuntimeError("Запрос ЧЗ не найден.")
+
+            self._send_wms_chz_callback(normalized_id, "acknowledge")
+            updated_request = self._upsert_wms_chz_request(
+                {
+                    **request,
+                    "status": "acknowledged",
+                    "is_active": False,
+                    "acknowledged_at": datetime.now().isoformat(),
+                }
+            )
+            self._log(
+                "orders",
+                f"Оператор ЧЗ принял запрос: {updated_request.get('order_name') or normalized_id}",
+            )
+            return {
+                "success": True,
+                "request": self._serialize_wms_chz_request(updated_request),
+                "state": self.get_orders_view_state(force_sync=False),
+            }
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def mark_wms_chz_request_ready(self, request_id: int) -> Dict[str, Any]:
+        try:
+            normalized_id = int(request_id or 0)
+            if normalized_id <= 0:
+                raise RuntimeError("Выберите запрос ЧЗ.")
+
+            runtime = self._ensure_wms_chz_runtime_defaults()
+            with runtime.lock:
+                request = next(
+                    (item for item in runtime.wms_chz_requests if int(item.get("request_id") or 0) == normalized_id),
+                    None,
+                )
+            if not request:
+                raise RuntimeError("Запрос ЧЗ не найден.")
+
+            self._send_wms_chz_callback(normalized_id, "ready")
+            updated_request = self._upsert_wms_chz_request(
+                {
+                    **request,
+                    "status": "ready",
+                    "is_active": False,
+                    "ready_at": datetime.now().isoformat(),
+                }
+            )
+            self._log(
+                "orders",
+                f"Коды ЧЗ готовы: {updated_request.get('order_name') or normalized_id}",
+            )
+            return {
+                "success": True,
+                "request": self._serialize_wms_chz_request(updated_request),
+                "state": self.get_orders_view_state(force_sync=False),
+            }
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
 
     def export_order_history(self) -> Dict[str, Any]:
         try:
@@ -4454,6 +4919,116 @@ class ApiBridge:
                         return "Скачаны"
         return "Не скачаны"
 
+    def _introduce_download_item_exact_filtered(
+        self,
+        session: requests.Session,
+        *,
+        item: Dict[str, Any],
+        production_date: str,
+        expiration_date: str,
+        batch_number: str,
+        cert: Any,
+    ) -> Dict[str, Any]:
+        csv_path = self._resolve_order_csv_path(item)
+        if not csv_path:
+            raise RuntimeError("Не найден CSV-файл заказа в папке 'Коды км'.")
+
+        rows = list(self._iter_saved_marking_rows(Path(csv_path)))
+        order_name = str(item.get("order_name") or Path(csv_path).parent.name or item.get("document_id") or "").strip()
+        action_label = f"Ввод в оборот заказа {order_name or item.get('document_id') or ''}".strip()
+        status_result = self._filter_saved_intro_rows_by_current_status(
+            item=item,
+            rows=rows,
+            cert=cert,
+            action_label=action_label,
+        )
+        target_rows = list(status_result["target_rows"])
+        api_errors = list(status_result["api_errors"])
+        if not target_rows:
+            if api_errors:
+                raise RuntimeError(
+                    f"{order_name}: не осталось КМ со статусом EMITTED для отправки, "
+                    f"при этом по {len(api_errors)} КМ статус получить не удалось."
+                )
+            self._log(
+                "intro",
+                f"{order_name}: все {status_result['already_introduced']} КМ уже введены в оборот, отправлять нечего.",
+            )
+            return {
+                "success": True,
+                "document_id": str(item.get("document_id") or ""),
+                "introduction_id": "",
+                "skipped_all_introduced": True,
+                "already_introduced_codes": status_result["already_introduced"],
+                "sent_codes_count": 0,
+                "checked_codes": len(status_result["rows"]),
+                "csv_path": csv_path,
+                "status_counts": dict(status_result["status_counts"]),
+                "result": {},
+            }
+
+        metadata = self._lookup_intro_product_metadata(
+            str(item.get("gtin") or target_rows[0].get("gtin") or "").strip(),
+            str(item.get("full_name") or target_rows[0].get("full_name") or order_name).strip(),
+        )
+        self._log(
+            "intro",
+            f"{order_name}: создаём документ ввода в оборот только для невведённых КМ: "
+            f"{len(target_rows)} из {len(status_result['rows'])}.",
+        )
+        introduction_id = self._create_exact_intro_file_document(
+            session,
+            product_group=str(status_result.get("product_group") or getattr(api_module, "PRODUCT_GROUP", "wheelChairs")),
+            order_name=order_name,
+            document_number=order_name,
+            production_date=production_date,
+            expiration_date=expiration_date,
+            batch_number=batch_number,
+        )
+        self._log("intro", f"Документ ввода в оборот создан: {introduction_id}. Загружаем невведённые коды.")
+
+        rows_payload = self._build_intro_upload_rows(
+            metadata=metadata,
+            full_codes=[row["full_code"] for row in target_rows],
+            fallback_name=order_name,
+        )
+        self._upload_intro_positions_from_file(
+            session,
+            introduction_id,
+            rows_payload=rows_payload,
+        )
+        self._log("intro", f"Позиции загружены в документ {introduction_id}. Ждём проверку кодов.")
+
+        codes_check = self._wait_for_intro_codes_check(session, introduction_id, log_channel="intro")
+        finalize_result = self._finalize_intro_document_after_check(
+            session,
+            introduction_id,
+            cert=cert,
+            codes_check=codes_check,
+            uploaded_codes_count=len(target_rows),
+            log_channel="intro",
+            source_label=order_name,
+        )
+        send_result = finalize_result["send_result"]
+        actual_sent_codes_count = int(finalize_result.get("actual_sent_codes_count") or 0)
+        self._log(
+            "intro",
+            f"Ввод в оборот отправлен: {order_name} "
+            f"({actual_sent_codes_count} из {len(target_rows)} невведённых КМ, документ {introduction_id}).",
+        )
+        return {
+            "success": True,
+            "document_id": str(item.get("document_id") or ""),
+            "introduction_id": introduction_id,
+            "already_introduced_codes": status_result["already_introduced"],
+            "skipped_api_error_codes": len(api_errors),
+            "sent_codes_count": actual_sent_codes_count,
+            "checked_codes": len(status_result["rows"]),
+            "csv_path": csv_path,
+            "status_counts": dict(status_result["status_counts"]),
+            "result": send_result,
+        }
+
     def introduce_orders(
         self,
         document_ids: Sequence[str],
@@ -4468,7 +5043,9 @@ class ApiBridge:
             if not normalized_batch:
                 raise RuntimeError("Укажите номер партии.")
             session = self._ensure_session()
-            thumbprint = self._get_thumbprint()
+            cert = self._get_certificate()
+            if not cert:
+                raise RuntimeError("Не найден сертификат для подписи.")
             prod = self._parse_iso_date(production_date, field_name="Дата производства")
             exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
             results = []
@@ -4487,29 +5064,37 @@ class ApiBridge:
                     errors.append({"document_id": document_id, "error": str(exc)})
                     continue
 
-                self._log("intro", f"Запускаем ввод в оборот: {item.get('order_name')}")
-                patch = self._build_intro_patch(item, prod, exp, normalized_batch)
-                ok, result = put_into_circulation(
-                    session=session,
-                    codes_order_id=str(item.get("document_id") or ""),
-                    production_patch=patch,
-                    organization_id=os.getenv("ORGANIZATION_ID"),
-                    thumbprint=thumbprint,
-                    check_poll_interval=10,
-                    check_poll_attempts=30,
-                )
-
-                if ok:
-                    item["status"] = "Введен в оборот"
-                    self._sync_history_from_download_item(item)
-                    self._log("intro", f"Успешно: {item.get('order_name')} ({result.get('introduction_id')})")
-                    results.append({"document_id": document_id, "result": result})
-                else:
+                self._log("intro", f"Запускаем ввод в оборот с проверкой статусов КМ: {item.get('order_name')}")
+                try:
+                    result = self._introduce_download_item_exact_filtered(
+                        session,
+                        item=item,
+                        production_date=prod,
+                        expiration_date=exp,
+                        batch_number=normalized_batch,
+                        cert=cert,
+                    )
+                except Exception as exc:
                     item["status"] = "Ошибка ввода"
                     self._sync_history_from_download_item(item)
-                    error_text = "; ".join(result.get("errors", [])) or "Неизвестная ошибка"
+                    error_text = str(exc)
                     self._log("intro", f"Ошибка: {item.get('order_name')} - {error_text}")
-                    errors.append({"document_id": document_id, "error": error_text, "result": result})
+                    errors.append({"document_id": document_id, "error": error_text})
+                    continue
+
+                item["status"] = "Введен в оборот"
+                self._sync_history_from_download_item(item)
+                if result.get("skipped_all_introduced"):
+                    self._log(
+                        "intro",
+                        f"Уже введено: {item.get('order_name')} ({result.get('already_introduced_codes', 0)} КМ)",
+                    )
+                else:
+                    self._log(
+                        "intro",
+                        f"Успешно: {item.get('order_name')} ({result.get('introduction_id')})",
+                    )
+                results.append({"document_id": document_id, "result": result})
 
             return {
                 "success": not errors,
@@ -5397,7 +5982,7 @@ class ApiBridge:
                     if state.api_error:
                         continue
                     normalized_status = str(state.status or "").upper()
-                    if normalized_status in {"INTRODUCED", "APPLIED"}:
+                    if normalized_status in {"INTRODUCED"}:
                         already_introduced += 1
                         continue
                     if normalized_status == "EMITTED":

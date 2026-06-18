@@ -10,7 +10,10 @@ class UiMobileServerTests(unittest.TestCase):
 
     def test_mobile_server_allows_label_printing_methods(self):
         for method_name in (
+            "acknowledge_wms_chz_request",
+            "get_auth_state",
             "get_labels_state",
+            "mark_wms_chz_request_ready",
             "preview_100x180_label",
             "print_100x180_label",
             "print_download_order",

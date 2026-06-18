@@ -78,10 +78,14 @@ const state = {
     queue: [],
     sessionOrders: [],
     history: [],
+    wmsChzActive: [],
+    wmsChzArchive: [],
     selectedQueueId: '',
     deletedOrders: [],
     selectedHistoryId: '',
     selectedDeletedId: '',
+    selectedWmsChzId: '',
+    selectedWmsChzArchiveId: '',
     showDeleted: false,
     historySearch: '',
     fullscreenTable: '',
@@ -670,6 +674,10 @@ function statusPill(value) {
   return `<span class="pill ${cls}">${escapeHtml(text)}</span>`;
 }
 
+function renderWmsChzStatusCell(row) {
+  return statusPill(row?.status_label || row?.status || '—');
+}
+
 function hasActiveTextSelection() {
   const selection = window.getSelection?.();
   return Boolean(selection && String(selection).trim());
@@ -683,6 +691,17 @@ function updateDownloadSelectionMeta() {
     return;
   }
   element.textContent = `Всего заказов: ${total} • Выбрано: ${selected}`;
+}
+
+function updateWmsChzSelectionMeta() {
+  const element = $('#orders-chz-selection-meta');
+  if (!element) {
+    return;
+  }
+  const activeCount = state.orders.wmsChzActive.length;
+  const archiveCount = state.orders.wmsChzArchive.length;
+  const selected = state.orders.selectedWmsChzId || state.orders.selectedWmsChzArchiveId;
+  element.textContent = `Новых запросов: ${activeCount} • Архив: ${archiveCount} • Выбрано: ${selected ? 1 : 0}`;
 }
 
 function updateDownloadProgressUi() {
@@ -2061,6 +2080,17 @@ const Views = {
         toggleDeletedBtn.textContent = state.orders.showDeleted ? 'Скрыть удаленные' : 'Удаленные';
       }
 
+      updateWmsChzSelectionMeta();
+      const chzAckButton = $('#orders-chz-ack-btn');
+      const chzReadyButton = $('#orders-chz-ready-btn');
+      if (chzAckButton) {
+        chzAckButton.disabled = !state.orders.selectedWmsChzId;
+      }
+      if (chzReadyButton) {
+        const selectedArchiveItem = state.orders.wmsChzArchive.find((item) => item.request_id === state.orders.selectedWmsChzArchiveId);
+        chzReadyButton.disabled = !selectedArchiveItem || selectedArchiveItem.status !== 'acknowledged';
+      }
+
 	      setInputValue('#orders-history-search', state.orders.historySearch);
 	      const historyRows = getFilteredRows(state.orders.history, { query: state.orders.historySearch });
 
@@ -2118,6 +2148,55 @@ const Views = {
         },
       );
       renderOrdersFullscreenTable();
+
+      const activeChzHost = $('#orders-chz-table');
+      const archiveChzHost = $('#orders-chz-archive-table');
+      if (activeChzHost) {
+        createTable(
+          activeChzHost,
+          [
+            { label: 'Заявка', key: 'order_name' },
+            { label: 'Позиции', key: 'items_summary' },
+            { label: 'Статус', render: (row) => renderWmsChzStatusCell(row) },
+            { label: 'Время', key: 'requested_at' },
+          ],
+          state.orders.wmsChzActive,
+          {
+            rowId: (row) => row.request_id,
+            single: true,
+            compact: true,
+            maxHeight: '220px',
+            selectedIds: state.orders.selectedWmsChzId,
+            onRowClick: (id) => {
+              state.orders.selectedWmsChzId = Number(id || 0);
+              Views.orders.render();
+            },
+          },
+        );
+      }
+      if (archiveChzHost) {
+        createTable(
+          archiveChzHost,
+          [
+            { label: 'Заявка', key: 'order_name' },
+            { label: 'Позиции', key: 'items_summary' },
+            { label: 'Статус', render: (row) => renderWmsChzStatusCell(row) },
+            { label: 'Обновлено', key: 'updated_at' },
+          ],
+          state.orders.wmsChzArchive,
+          {
+            rowId: (row) => row.request_id,
+            single: true,
+            compact: true,
+            maxHeight: '220px',
+            selectedIds: state.orders.selectedWmsChzArchiveId,
+            onRowClick: (id) => {
+              state.orders.selectedWmsChzArchiveId = Number(id || 0);
+              Views.orders.render();
+            },
+          },
+        );
+      }
 
       if (state.orders.showDeleted) {
         createTable(
@@ -2450,6 +2529,8 @@ async function loadOrdersState(options = {}) {
     state.orders.sessionOrders = result.session_orders || [];
     state.orders.history = result.history || [];
     state.orders.deletedOrders = result.deleted_orders || [];
+    state.orders.wmsChzActive = result.wms_chz_active || [];
+    state.orders.wmsChzArchive = result.wms_chz_archive || [];
     if (!state.orders.queue.some((item) => item.uid === state.orders.selectedQueueId)) {
       state.orders.selectedQueueId = '';
     }
@@ -2458,6 +2539,12 @@ async function loadOrdersState(options = {}) {
     }
     if (!state.orders.deletedOrders.some((item) => item.document_id === state.orders.selectedDeletedId)) {
       state.orders.selectedDeletedId = '';
+    }
+    if (!state.orders.wmsChzActive.some((item) => item.request_id === state.orders.selectedWmsChzId)) {
+      state.orders.selectedWmsChzId = '';
+    }
+    if (!state.orders.wmsChzArchive.some((item) => item.request_id === state.orders.selectedWmsChzArchiveId)) {
+      state.orders.selectedWmsChzArchiveId = '';
     }
     if (render) {
       Views.orders.render();
@@ -3646,6 +3733,28 @@ async function bindEvents() {
       markRoutesDirty(['download', 'intro', 'tsd', 'labels']);
       return result;
     }, 'Заказ восстановлен.');
+  });
+
+  $('#orders-chz-ack-btn')?.addEventListener('click', async () => {
+    await runAction('Подтверждаем получение запроса ЧЗ...', async () => {
+      if (!state.orders.selectedWmsChzId) {
+        throw new Error('Выберите запрос ЧЗ.');
+      }
+      const result = await API.call('acknowledge_wms_chz_request', state.orders.selectedWmsChzId);
+      await loadOrdersState({ force: true });
+      return result;
+    }, 'Запрос ЧЗ принят оператором.');
+  });
+
+  $('#orders-chz-ready-btn')?.addEventListener('click', async () => {
+    await runAction('Сообщаем в WMS, что коды готовы...', async () => {
+      if (!state.orders.selectedWmsChzArchiveId) {
+        throw new Error('Выберите запрос ЧЗ в архиве.');
+      }
+      const result = await API.call('mark_wms_chz_request_ready', state.orders.selectedWmsChzArchiveId);
+      await loadOrdersState({ force: true });
+      return result;
+    }, 'WMS уведомлена о готовности кодов.');
   });
 
 	  $('#download-refresh-btn').addEventListener('click', async () => {
