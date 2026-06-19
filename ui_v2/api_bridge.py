@@ -776,7 +776,7 @@ class ApiBridge:
         request_id = int(payload.get("request_id") or payload.get("id") or 0)
         items = self._normalize_wms_chz_items(payload.get("items"))
         status = str(payload.get("status") or "requested").strip().lower() or "requested"
-        is_active = bool(payload.get("is_active", status == "requested"))
+        is_active = bool(payload.get("is_active", status in {"requested", "acknowledged"}))
         order_name = str(payload.get("order_name") or payload.get("name") or "").strip()
         customer = str(payload.get("customer") or payload.get("order_customer") or "").strip()
         comment = str(payload.get("comment") or "").strip()
@@ -4023,12 +4023,16 @@ class ApiBridge:
                 "wms_chz_active": [
                     self._serialize_wms_chz_request(item)
                     for item in runtime.wms_chz_requests
-                    if str(item.get("status") or "") == "requested"
+                    if bool(item.get("is_active", str(item.get("status") or "") in {"requested", "acknowledged"}))
+                    and str(item.get("status") or "") in {"requested", "acknowledged"}
                 ],
                 "wms_chz_archive": [
                     self._serialize_wms_chz_request(item)
                     for item in runtime.wms_chz_requests
-                    if str(item.get("status") or "") != "requested"
+                    if not (
+                        bool(item.get("is_active", str(item.get("status") or "") in {"requested", "acknowledged"}))
+                        and str(item.get("status") or "") in {"requested", "acknowledged"}
+                    )
                 ][:250],
             }
         except Exception as exc:
@@ -4054,7 +4058,7 @@ class ApiBridge:
                 {
                     **request,
                     "status": "acknowledged",
-                    "is_active": False,
+                    "is_active": True,
                     "acknowledged_at": datetime.now().isoformat(),
                 }
             )

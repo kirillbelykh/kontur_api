@@ -305,8 +305,19 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                     "order_id": 11,
                     "order_name": "WMS-11",
                     "status": "acknowledged",
+                    "is_active": True,
                     "requested_at": "2026-06-18T09:00:00",
                     "acknowledged_at": "2026-06-18T09:10:00",
+                    "items": [],
+                },
+                {
+                    "request_id": 3,
+                    "order_id": 12,
+                    "order_name": "WMS-12",
+                    "status": "ready",
+                    "is_active": False,
+                    "requested_at": "2026-06-18T08:00:00",
+                    "ready_at": "2026-06-18T08:30:00",
                     "items": [],
                 },
             ],
@@ -323,8 +334,8 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             result = self.bridge.get_orders_view_state()
 
         self.assertNotIn("error", result)
-        self.assertEqual([item["request_id"] for item in result["wms_chz_active"]], [1])
-        self.assertEqual([item["request_id"] for item in result["wms_chz_archive"]], [2])
+        self.assertEqual([item["request_id"] for item in result["wms_chz_active"]], [1, 2])
+        self.assertEqual([item["request_id"] for item in result["wms_chz_archive"]], [3])
 
     def test_acknowledge_wms_chz_request_posts_callback_and_updates_status(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -355,7 +366,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertTrue(result["success"])
         callback_mock.assert_called_once_with(9, "acknowledge")
         self.assertEqual(fake_runtime.wms_chz_requests[0]["status"], "acknowledged")
-        self.assertFalse(fake_runtime.wms_chz_requests[0]["is_active"])
+        self.assertTrue(fake_runtime.wms_chz_requests[0]["is_active"])
 
     def test_mark_wms_chz_request_ready_posts_callback_and_updates_status(self):
         with tempfile.TemporaryDirectory() as temp_dir:

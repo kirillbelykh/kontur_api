@@ -2087,8 +2087,12 @@ const Views = {
         chzAckButton.disabled = !state.orders.selectedWmsChzId;
       }
       if (chzReadyButton) {
+        const selectedActiveItem = state.orders.wmsChzActive.find((item) => item.request_id === state.orders.selectedWmsChzId);
         const selectedArchiveItem = state.orders.wmsChzArchive.find((item) => item.request_id === state.orders.selectedWmsChzArchiveId);
-        chzReadyButton.disabled = !selectedArchiveItem || selectedArchiveItem.status !== 'acknowledged';
+        const selectedReadyCandidate = selectedActiveItem?.status === 'acknowledged'
+          ? selectedActiveItem
+          : selectedArchiveItem;
+        chzReadyButton.disabled = !selectedReadyCandidate || selectedReadyCandidate.status !== 'acknowledged';
       }
 
 	      setInputValue('#orders-history-search', state.orders.historySearch);
@@ -2169,6 +2173,7 @@ const Views = {
             selectedIds: state.orders.selectedWmsChzId,
             onRowClick: (id) => {
               state.orders.selectedWmsChzId = Number(id || 0);
+              state.orders.selectedWmsChzArchiveId = '';
               Views.orders.render();
             },
           },
@@ -2192,6 +2197,7 @@ const Views = {
             selectedIds: state.orders.selectedWmsChzArchiveId,
             onRowClick: (id) => {
               state.orders.selectedWmsChzArchiveId = Number(id || 0);
+              state.orders.selectedWmsChzId = '';
               Views.orders.render();
             },
           },
@@ -3748,10 +3754,17 @@ async function bindEvents() {
 
   $('#orders-chz-ready-btn')?.addEventListener('click', async () => {
     await runAction('Сообщаем в WMS, что коды готовы...', async () => {
-      if (!state.orders.selectedWmsChzArchiveId) {
-        throw new Error('Выберите запрос ЧЗ в архиве.');
+      const selectedActiveItem = state.orders.wmsChzActive.find((item) => item.request_id === state.orders.selectedWmsChzId);
+      const selectedArchiveItem = state.orders.wmsChzArchive.find((item) => item.request_id === state.orders.selectedWmsChzArchiveId);
+      const selectedRequestId = selectedActiveItem?.status === 'acknowledged'
+        ? state.orders.selectedWmsChzId
+        : selectedArchiveItem?.status === 'acknowledged'
+          ? state.orders.selectedWmsChzArchiveId
+          : '';
+      if (!selectedRequestId) {
+        throw new Error('Выберите подтвержденный запрос ЧЗ.');
       }
-      const result = await API.call('mark_wms_chz_request_ready', state.orders.selectedWmsChzArchiveId);
+      const result = await API.call('mark_wms_chz_request_ready', selectedRequestId);
       await loadOrdersState({ force: true });
       return result;
     }, 'WMS уведомлена о готовности кодов.');
