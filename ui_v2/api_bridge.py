@@ -784,6 +784,7 @@ class ApiBridge:
         acknowledged_at = str(payload.get("acknowledged_at") or "").strip()
         ready_at = str(payload.get("ready_at") or "").strip()
         updated_at = ready_at or acknowledged_at or requested_at or datetime.now().isoformat()
+        callback_path = str(payload.get("callback_path") or "/integration/chz/requests").strip() or "/integration/chz/requests"
         return {
             "request_id": request_id,
             "external_request_id": str(payload.get("external_request_id") or "").strip(),
@@ -800,6 +801,7 @@ class ApiBridge:
             "updated_at": updated_at,
             "items": items,
             "items_summary": self._build_wms_chz_items_summary(items),
+            "callback_path": callback_path,
         }
 
     def _serialize_wms_chz_request(self, item: Dict[str, Any]) -> Dict[str, Any]:
@@ -854,17 +856,27 @@ class ApiBridge:
         if not force and (time.time() - float(runtime.wms_chz_last_synced_at or 0.0)) < WMS_CHZ_SYNC_INTERVAL_SECONDS:
             return
         try:
-            response = requests.get(
-                f"{base_url}/integration/chz/requests/pending",
-                headers=self._wms_chz_headers(),
-                timeout=10,
-            )
-            response.raise_for_status()
-            payload = response.json()
-            if isinstance(payload, list):
-                for item in payload:
-                    if isinstance(item, dict):
-                        self._upsert_wms_chz_request(item)
+            endpoints = [
+                "/integration/chz/requests/pending",
+                "/integration/production-chz/requests/pending",
+            ]
+            for endpoint in endpoints:
+                try:
+                    response = requests.get(
+                        f"{base_url}{endpoint}",
+                        headers=self._wms_chz_headers(),
+                        timeout=10,
+                    )
+                    if response.status_code == 404:
+                        continue
+                    response.raise_for_status()
+                    payload = response.json()
+                    if isinstance(payload, list):
+                        for item in payload:
+                            if isinstance(item, dict):
+                                self._upsert_wms_chz_request(item)
+                except Exception as endpoint_exc:
+                    logger.warning("Не удалось синхронизировать CHZ-запросы из WMS (%s): %s", endpoint, endpoint_exc)
             runtime.wms_chz_last_synced_at = time.time()
         except Exception as exc:
             logger.warning("Не удалось синхронизировать CHZ-запросы из WMS: %s", exc)
@@ -873,8 +885,17 @@ class ApiBridge:
         base_url = self._wms_api_base_url()
         if not base_url:
             raise RuntimeError("Не задан WMS_API_BASE_URL для обратного вызова ЧЗ.")
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        callback_path = "/integration/chz/requests"
+        with runtime.lock:
+            request = next(
+                (item for item in runtime.wms_chz_requests if int(item.get("request_id") or 0) == int(request_id)),
+                None,
+            )
+        if request and str(request.get("callback_path") or "").strip():
+            callback_path = str(request.get("callback_path")).strip()
         response = requests.post(
-            f"{base_url}/integration/chz/requests/{int(request_id)}/{action}",
+            f"{base_url}{callback_path}/{int(request_id)}/{action}",
             headers=self._wms_chz_headers(),
             timeout=10,
         )
@@ -885,7 +906,9 @@ class ApiBridge:
             request = self._upsert_wms_chz_request(payload)
             self._log(
                 "orders",
-                f"Новый запрос ЧЗ из WMS: {request.get('order_name') or request.get('order_id') or request.get('request_id')}",
+                "Новый запрос ЧЗ из WMS: "
+                f"{request.get('order_name') or request.get('order_id') or request.get('request_id')}"
+                + (f" | Комментарий: {request.get('comment')}" if request.get("comment") else ""),
             )
             return {"success": True, "request": self._serialize_wms_chz_request(request)}
         except Exception as exc:

@@ -2161,6 +2161,7 @@ const Views = {
           [
             { label: 'Заявка', key: 'order_name' },
             { label: 'Позиции', key: 'items_summary' },
+            { label: 'Комментарий', key: 'comment' },
             { label: 'Статус', render: (row) => renderWmsChzStatusCell(row) },
             { label: 'Время', key: 'requested_at' },
           ],
@@ -2185,6 +2186,7 @@ const Views = {
           [
             { label: 'Заявка', key: 'order_name' },
             { label: 'Позиции', key: 'items_summary' },
+            { label: 'Комментарий', key: 'comment' },
             { label: 'Статус', render: (row) => renderWmsChzStatusCell(row) },
             { label: 'Обновлено', key: 'updated_at' },
           ],
