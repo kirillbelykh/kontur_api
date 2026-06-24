@@ -29,9 +29,9 @@
     {
       "order_name": "1186 нитрил диаг M 260625",
       "document_id": "4170c838-e063-4ba4-a4ec-5380218616da",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1186 нитрил диаг M 260625\\1186 нитрил диаг M 260625.pdf, C:\\Users\\user\\Desktop\\Коды км\\1186 нитрил диаг M 260625\\1186 нитрил диаг M 260625_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1186 нитрил диаг M 260625\\1186 нитрил диаг M 260625.xls",
+      "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет синий",
       "gtin": "4650118044074",
       "positions": [
@@ -50,7 +50,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1186 нитрил диаг M 260625\\1186 нитрил диаг M 260625.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1186 нитрил диаг M 260625\\1186 нитрил диаг M 260625_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1186 нитрил диаг M 260625\\1186 нитрил диаг M 260625.xls"
     },
     {
       "order_name": "1185 хир 6 партия 260625 (по 50 пар)",
@@ -22819,7 +22822,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-24T11:50:04.551266",
+  "last_update": "2026-06-24T13:16:42.721495",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
