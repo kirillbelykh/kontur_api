@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1211 стер нитрил XL заявка 6578 (70 пар)",
+      "document_id": "44aea3c8-7bbe-4536-b41c-1ebe7e557684",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р XL",
+      "gtin": "4640473513544",
+      "positions": [
+        {
+          "gtin": "4640473513544",
+          "name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р XL",
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-06-25T15:59:34.740929",
+      "created_by": "user",
+      "updated_at": "2026-06-25T15:59:34.740929",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1203 стер лат L заявка 6020",
       "document_id": "3f84b5ce-2639-43dd-82e0-25e781412976",
       "status": "Выполнен",
@@ -23531,7 +23557,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-25T15:07:57.201597",
+  "last_update": "2026-06-25T15:59:36.612574",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
