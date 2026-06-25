@@ -3,9 +3,9 @@
     {
       "order_name": "1209 лат диаг 2-хлор М 260625",
       "document_id": "f4a77081-9c80-40f7-a9fe-a4e15a16fe8f",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1209 лат диаг 2-хлор М 260625\\1209 лат диаг 2-хлор М 260625.pdf, C:\\Users\\user\\Desktop\\Коды км\\1209 лат диаг 2-хлор М 260625\\1209 лат диаг 2-хлор М 260625_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1209 лат диаг 2-хлор М 260625\\1209 лат диаг 2-хлор М 260625.xls",
+      "simpl": "латекс 2-хлор",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные двойного хлорирования текстурированные, р-р M, цвет натуральный",
       "gtin": "4650118041127",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1209 лат диаг 2-хлор М 260625\\1209 лат диаг 2-хлор М 260625.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1209 лат диаг 2-хлор М 260625\\1209 лат диаг 2-хлор М 260625_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1209 лат диаг 2-хлор М 260625\\1209 лат диаг 2-хлор М 260625.xls"
     },
     {
       "order_name": "1208 ультра 8 партия 260621",
@@ -23421,7 +23424,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-25T13:04:35.514657",
+  "last_update": "2026-06-25T13:16:31.512029",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
