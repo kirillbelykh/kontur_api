@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1207 ультра 7 партия 260621",
+      "document_id": "084fb3e4-69c4-4405-abc3-a352d07d6e78",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 7,0",
+      "gtin": "4640473509899",
+      "positions": [
+        {
+          "gtin": "4640473509899",
+          "name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 7,0",
+          "tnvedCode": "4015120001",
+          "quantity": 60,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-06-25T11:23:12.064032",
+      "created_by": "user",
+      "updated_at": "2026-06-25T11:23:12.064032",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1206 стер нитрил L заявка 6573",
       "document_id": "3e3bec2d-e2b6-470e-855a-be1577fea5d1",
       "status": "Выполнен",
@@ -23343,7 +23369,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-25T10:28:35.397390",
+  "last_update": "2026-06-25T11:23:13.952650",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
