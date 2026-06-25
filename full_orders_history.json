@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1209 лат диаг 2-хлор М 260625",
+      "document_id": "f4a77081-9c80-40f7-a9fe-a4e15a16fe8f",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные двойного хлорирования текстурированные, р-р M, цвет натуральный",
+      "gtin": "4650118041127",
+      "positions": [
+        {
+          "gtin": "4650118041127",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные двойного хлорирования текстурированные, р-р M, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 150,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-06-25T13:04:33.425985",
+      "created_by": "user",
+      "updated_at": "2026-06-25T13:04:33.425985",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1208 ультра 8 партия 260621",
       "document_id": "0d46b7f0-6b9c-4956-a40d-66e79fea5e66",
       "status": "Выполнен",
@@ -23395,7 +23421,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-25T12:21:30.373108",
+  "last_update": "2026-06-25T13:04:35.514657",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
