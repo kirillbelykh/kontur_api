@@ -3,9 +3,9 @@
     {
       "order_name": "1215 хир 7 590925",
       "document_id": "532adcac-140e-4e95-8e44-69ba071d4efe",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\User\\Desktop\\Коды км\\1215 хир 7 590925\\1215 хир 7 590925.pdf, C:\\Users\\User\\Desktop\\Коды км\\1215 хир 7 590925\\1215 хир 7 590925_csv.csv, C:\\Users\\User\\Desktop\\Коды км\\1215 хир 7 590925\\1215 хир 7 590925.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473510604",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1215 хир 7 590925\\1215 хир 7 590925.pdf",
+      "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1215 хир 7 590925\\1215 хир 7 590925.xls",
+      "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1215 хир 7 590925\\1215 хир 7 590925_csv.csv"
     },
     {
       "order_name": "1214 стер нитрил L заявка 6575 (5 пар)",
@@ -23765,7 +23768,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-25T16:14:17.816708",
+  "last_update": "2026-06-25T16:20:06.073252",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
