@@ -100,6 +100,25 @@ body[data-client-mode="browser-mobile"] {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+body[data-embedded="true"] {
+  overflow: auto;
+  background: transparent;
+}
+
+body[data-embedded="true"] .app-shell {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+body[data-embedded="true"] .sidebar,
+body[data-embedded="true"] .topbar {
+  display: none;
+}
+
+body[data-embedded="true"] .content-area {
+  padding: 0;
+}
+
 button, input, select, textarea {
   font: inherit;
 }

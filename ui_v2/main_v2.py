@@ -18,6 +18,25 @@ except ImportError as exc:
 
 from api_bridge import ApiBridge
 from chz_bridge_server import start_chz_bridge_server
+from ui_mobile.server_mobile import start_mobile_servers
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw_value = str(os.getenv(name) or "").strip()
+    if not raw_value:
+        return default
+    try:
+        parsed = int(raw_value)
+    except ValueError:
+        return default
+    return parsed if 1 <= parsed <= 65535 else default
 
 
 def _resolve_pythonw() -> str:
@@ -92,6 +111,17 @@ def main():
     api = ApiBridge()
     api.start_session_auto_refresh()
     start_chz_bridge_server(api)
+    if _env_flag("WMS_EMBED_SERVER_ENABLED", True):
+        try:
+            start_mobile_servers(
+                api,
+                host=str(os.getenv("WMS_EMBED_SERVER_HOST") or "127.0.0.1").strip() or "127.0.0.1",
+                port=_env_int("WMS_EMBED_SERVER_PORT", 8787),
+                https_port=_env_int("WMS_EMBED_SERVER_HTTPS_PORT", 8788),
+                enable_https=_env_flag("WMS_EMBED_SERVER_HTTPS_ENABLED", False),
+            )
+        except OSError:
+            pass
     index_path = Path(__file__).resolve().parent / "ui" / "index.html"
     window = webview.create_window(
         title="KonturTestAPI [TEST]",

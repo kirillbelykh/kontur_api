@@ -14,7 +14,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from dotenv import load_dotenv
 
@@ -41,6 +41,13 @@ CLIENT_CONFIG = {
     "brandTitle": "Kontur Mobile",
     "subtitleSuffix": "Мобильная web-версия для локальной сети.",
 }
+
+SUPPORTED_ROUTES = ("orders", "chz", "download", "intro", "tsd", "aggregation", "labels")
+DEFAULT_ALLOWED_ORIGINS = (
+    "https://wms.grund-lage.ru",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+)
 
 BLOCKED_METHODS: set[str] = set()
 
@@ -93,6 +100,41 @@ def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
 
 
+def _normalize_route(route: str | None) -> str:
+    candidate = str(route or "").strip()
+    return candidate if candidate in SUPPORTED_ROUTES else "orders"
+
+
+def _query_flag(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _bound_user() -> str:
+    return str(os.getenv("WMS_BOUND_USER") or "").strip()
+
+
+def _allowed_origins() -> set[str]:
+    configured = str(os.getenv("WMS_ALLOWED_ORIGINS") or "").strip()
+    origins = {origin for origin in DEFAULT_ALLOWED_ORIGINS if origin}
+    if configured:
+        origins.update(origin.strip() for origin in configured.split(",") if origin.strip())
+    return origins
+
+
+def _is_allowed_origin(origin: str | None) -> bool:
+    candidate = str(origin or "").strip()
+    if not candidate:
+        return False
+    return candidate in _allowed_origins()
+
+
+def _build_client_config(*, embedded: bool = False, initial_route: str | None = None) -> dict[str, Any]:
+    config = dict(CLIENT_CONFIG)
+    config["embeddedMode"] = embedded
+    config["initialRoute"] = _normalize_route(initial_route)
+    return config
+
+
 def _discover_ipv4_addresses() -> list[str]:
     addresses: set[str] = {"127.0.0.1"}
     try:
@@ -110,17 +152,17 @@ def _discover_ipv4_addresses() -> list[str]:
     return sorted(addresses)
 
 
-def _build_browser_config() -> str:
+def _build_browser_config(*, embedded: bool = False, initial_route: str | None = None) -> str:
     return (
         "<script>"
-        f"window.__KONTUR_CLIENT_CONFIG__ = {json.dumps(CLIENT_CONFIG, ensure_ascii=False)};"
+        f"window.__KONTUR_CLIENT_CONFIG__ = {json.dumps(_build_client_config(embedded=embedded, initial_route=initial_route), ensure_ascii=False)};"
         "</script>"
     )
 
 
-def _render_index_html() -> bytes:
+def _render_index_html(*, embedded: bool = False, initial_route: str | None = None) -> bytes:
     html = (UI_ROOT / "index.html").read_text(encoding="utf-8", errors="ignore")
-    injected = html.replace("</head>", f"{_build_browser_config()}\n</head>", 1)
+    injected = html.replace("</head>", f"{_build_browser_config(embedded=embedded, initial_route=initial_route)}\n</head>", 1)
     return injected.encode("utf-8")
 
 
@@ -163,11 +205,25 @@ class MobileRequestHandler(SimpleHTTPRequestHandler):
         message = format % args
         print(f"[ui_mobile] {self.address_string()} - {message}")
 
+    def _cors_origin(self) -> str | None:
+        origin = str(self.headers.get("Origin") or "").strip()
+        return origin if _is_allowed_origin(origin) else None
+
+    def _apply_common_headers(self) -> None:
+        origin = self._cors_origin()
+        if origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Access-Control-Request-Private-Network")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+
     def _write_bytes(self, payload: bytes, *, content_type: str, status: int = HTTPStatus.OK) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store")
+        self._apply_common_headers()
         self.end_headers()
         self.wfile.write(payload)
 
@@ -196,17 +252,42 @@ class MobileRequestHandler(SimpleHTTPRequestHandler):
             content_type=(mime or "application/octet-stream") + ("; charset=utf-8" if mime and (mime.startswith("text/") or mime in {"application/javascript", "application/json"}) else ""),
         )
 
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Content-Length", "0")
+        self._apply_common_headers()
+        self.end_headers()
+
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = parsed.path or "/"
+        query = parse_qs(parsed.query)
+        embedded = _query_flag((query.get("embed") or [None])[0])
+        requested_route = (query.get("route") or [None])[0]
         if path in {"/", "/index.html"}:
-            self._write_bytes(_render_index_html(), content_type="text/html; charset=utf-8")
+            self._write_bytes(
+                _render_index_html(embedded=embedded, initial_route=requested_route),
+                content_type="text/html; charset=utf-8",
+            )
             return
         if path == "/api/health":
-            self._write_json({"ok": True, "mode": "browser-mobile", "time": time.time()})
+            requested_user = str((query.get("username") or [""])[0]).strip()
+            bound_user = _bound_user()
+            self._write_json(
+                {
+                    "ok": True,
+                    "mode": "browser-mobile",
+                    "time": time.time(),
+                    "bound_user": bound_user or None,
+                    "requested_user": requested_user or None,
+                    "user_match": not bound_user or not requested_user or bound_user.casefold() == requested_user.casefold(),
+                    "embedded_mode": embedded,
+                    "allowed_origins": sorted(_allowed_origins()),
+                }
+            )
             return
         if path == "/api/config":
-            self._write_json(CLIENT_CONFIG)
+            self._write_json(_build_client_config(embedded=embedded, initial_route=requested_route))
             return
         if path == "/favicon.ico":
             icon = REPO_ROOT / "assets" / "icons" / "icon.ico"
@@ -282,6 +363,46 @@ def _server_thread(server: ThreadingHTTPServer) -> threading.Thread:
     return thread
 
 
+def start_mobile_servers(
+    bridge: ApiBridge,
+    *,
+    host: str,
+    port: int,
+    https_port: int | None,
+    enable_https: bool,
+) -> dict[str, Any]:
+    http_server = _build_http_server(host, port, bridge)
+    threads = [_server_thread(http_server)]
+    https_server: ThreadingHTTPServer | None = None
+    ca_pem: Path | None = None
+
+    if enable_https and https_port:
+        https_bundle = _build_https_server(host, https_port, bridge)
+        if https_bundle:
+            https_server, ca_pem = https_bundle
+            threads.append(_server_thread(https_server))
+
+    return {
+        "http_server": http_server,
+        "https_server": https_server,
+        "threads": threads,
+        "ca_pem": ca_pem,
+    }
+
+
+def stop_mobile_servers(bundle: dict[str, Any] | None) -> None:
+    if not bundle:
+        return
+    http_server = bundle.get("http_server")
+    https_server = bundle.get("https_server")
+    if http_server is not None:
+        http_server.shutdown()
+        http_server.server_close()
+    if https_server is not None:
+        https_server.shutdown()
+        https_server.server_close()
+
+
 def _print_urls(host: str, http_port: int, https_port: int | None, has_https: bool) -> None:
     addresses = _discover_ipv4_addresses()
     public_hosts = addresses if host == "0.0.0.0" else [host]
@@ -306,16 +427,17 @@ def main() -> None:
     args = parser.parse_args()
 
     bridge = ApiBridge()
-    http_server = _build_http_server(args.host, args.port, bridge)
-    threads = [_server_thread(http_server)]
-    https_server: ThreadingHTTPServer | None = None
-    ca_pem: Path | None = None
-
-    if not args.no_https:
-        https_bundle = _build_https_server(args.host, args.https_port, bridge)
-        if https_bundle:
-            https_server, ca_pem = https_bundle
-            threads.append(_server_thread(https_server))
+    bundle = start_mobile_servers(
+        bridge,
+        host=args.host,
+        port=args.port,
+        https_port=args.https_port,
+        enable_https=not args.no_https,
+    )
+    http_server = bundle["http_server"]
+    https_server = bundle["https_server"]
+    threads = bundle["threads"]
+    ca_pem = bundle["ca_pem"]
 
     _print_urls(args.host, args.port, args.https_port if https_server else None, https_server is not None)
     if ca_pem:
@@ -327,11 +449,7 @@ def main() -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        http_server.shutdown()
-        http_server.server_close()
-        if https_server is not None:
-            https_server.shutdown()
-            https_server.server_close()
+        stop_mobile_servers(bundle)
 
 
 if __name__ == "__main__":

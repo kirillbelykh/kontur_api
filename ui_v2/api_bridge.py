@@ -740,6 +740,7 @@ class ApiBridge:
             item_title = str(raw_item.get("item_title") or raw_item.get("item_name") or "").strip()
             item_size = str(raw_item.get("item_size") or raw_item.get("size") or "").strip()
             item_color = str(raw_item.get("item_color") or raw_item.get("color") or "").strip()
+            item_venchik = str(raw_item.get("item_venchik") or raw_item.get("venchik") or "").strip()
             batch_number = str(raw_item.get("batch_number") or raw_item.get("batch") or "").strip()
             items.append(
                 {
@@ -748,6 +749,7 @@ class ApiBridge:
                     "item_title": item_title,
                     "item_size": item_size,
                     "item_color": item_color,
+                    "item_venchik": item_venchik,
                     "batch_number": batch_number,
                     "pairs_quantity": pairs_quantity,
                 }
@@ -794,12 +796,16 @@ class ApiBridge:
         ).strip().lower()
         if explicit_type in {"production", "prod", "manufacturing", "производство"}:
             return "production"
+        if explicit_type in {"manual", "adhoc", "ручной"}:
+            return "manual"
         if explicit_type in {"shipment", "shipping", "order", "outbound", "отгрузка"}:
             return "shipment"
 
         marker = f"{callback_path} {order_name}".lower()
         if "production" in marker or "производ" in marker:
             return "production"
+        if "manual-chz" in marker or "ручн" in marker:
+            return "manual"
         return "shipment"
 
     @staticmethod
@@ -831,6 +837,9 @@ class ApiBridge:
         updated_at = ready_at or acknowledged_at or requested_at or datetime.now().isoformat()
         callback_path = str(payload.get("callback_path") or "/integration/chz/requests").strip() or "/integration/chz/requests"
         request_type = self._infer_wms_chz_request_type(payload, order_name=order_name, callback_path=callback_path)
+        order_number = str(payload.get("order_number") or order_name).strip()
+        if request_type == "production" and order_number.lower().startswith("производство "):
+            order_number = order_number.split(" ", 1)[1].strip()
         author = str(
             payload.get("requested_by_username")
             or payload.get("author")
@@ -845,10 +854,11 @@ class ApiBridge:
             "external_request_id": str(payload.get("external_request_id") or "").strip(),
             "order_id": int(payload.get("order_id") or 0),
             "order_name": order_name,
+            "order_number": order_number,
             "customer": customer,
             "comment": comment,
             "request_type": request_type,
-            "type_label": "Производство" if request_type == "production" else "Отгрузка",
+            "type_label": "Производство" if request_type == "production" else "Ручной" if request_type == "manual" else "Отгрузка",
             "author": author or "WMS",
             "status": status,
             "status_label": WMS_CHZ_STATUS_LABELS.get(status, status or "unknown"),
@@ -902,7 +912,14 @@ class ApiBridge:
             for index, item in enumerate(current_items):
                 if int(item.get("request_id") or 0) == normalized["request_id"]:
                     merged = dict(item)
-                    merged.update(normalized)
+                    for key, value in normalized.items():
+                        if key == "author" and value == "WMS" and str(merged.get("author") or "").strip():
+                            continue
+                        if key == "order_name" and not str(value or "").strip() and str(merged.get("order_name") or "").strip():
+                            continue
+                        if key == "order_number" and not str(value or "").strip() and str(merged.get("order_number") or "").strip():
+                            continue
+                        merged[key] = value
                     current_items[index] = self._normalize_wms_chz_request(merged)
                     normalized = current_items[index]
                     updated = True
@@ -925,6 +942,7 @@ class ApiBridge:
             endpoints = [
                 "/integration/chz/requests/pending",
                 "/integration/production-chz/requests/pending",
+                "/integration/manual-chz/requests/pending",
             ]
             for endpoint in endpoints:
                 try:

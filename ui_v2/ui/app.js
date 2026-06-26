@@ -38,9 +38,16 @@ const CLIENT_CONFIG = {
   appTitle: String(window.__KONTUR_CLIENT_CONFIG__?.appTitle || '').trim(),
   brandTitle: String(window.__KONTUR_CLIENT_CONFIG__?.brandTitle || '').trim(),
   subtitleSuffix: String(window.__KONTUR_CLIENT_CONFIG__?.subtitleSuffix || '').trim(),
+  embeddedMode: Boolean(window.__KONTUR_CLIENT_CONFIG__?.embeddedMode),
+  initialRoute: String(window.__KONTUR_CLIENT_CONFIG__?.initialRoute || '').trim(),
 };
 
 const ROUTE_KEYS = Object.keys(ROUTES);
+
+function normalizeInitialRoute(route) {
+  return ROUTE_KEYS.includes(route) ? route : 'orders';
+}
+
 const UI_PERF = {
   sessionPollMs: 120000,
   logPollMs: 15000,
@@ -68,7 +75,7 @@ const UI_PERF = {
 
 const state = {
   theme: localStorage.getItem('kontur-ui-v2-theme-choice') || 'light',
-  route: 'orders',
+  route: normalizeInitialRoute(CLIENT_CONFIG.initialRoute),
   session: {},
   options: {
     simplified_options: [],
@@ -446,6 +453,7 @@ function applyClientConfig() {
   if (CLIENT_CONFIG.browserMode) {
     document.body.dataset.clientMode = CLIENT_CONFIG.mobileMode ? 'browser-mobile' : 'browser';
   }
+  document.body.dataset.embedded = CLIENT_CONFIG.embeddedMode ? 'true' : 'false';
   if (CLIENT_CONFIG.appTitle) {
     document.title = CLIENT_CONFIG.appTitle;
   }
@@ -798,7 +806,7 @@ function renderChzRequestDetails(row) {
       <dl>
         <div><dt>Тип</dt><dd>${escapeHtml(row.type_label || '—')}</dd></div>
         <div><dt>Автор</dt><dd>${escapeHtml(row.author || 'WMS')}</dd></div>
-        <div><dt>Заказ</dt><dd>${escapeHtml(row.order_name || row.request_id || '—')}</dd></div>
+        <div><dt>Заказ №</dt><dd>${escapeHtml(row.order_number || row.order_name || row.request_id || '—')}</dd></div>
         <div><dt>Статус</dt><dd>${renderChzStatusCell(row)}</dd></div>
         <div><dt>Время</dt><dd>${escapeHtml(row.requested_at_label || row.requested_at || '—')}</dd></div>
       </dl>
@@ -818,6 +826,7 @@ function renderChzRequestDetails(row) {
               item.item_size ? `р. ${item.item_size}` : '',
               item.batch_number ? `партия ${item.batch_number}` : '',
               item.item_color || '',
+              item.item_venchik || '',
               `${item.pairs_quantity || 0} пар`,
             ].filter(Boolean).join(' • '))}</dd>
           </div>
@@ -840,6 +849,7 @@ function renderChzTable(container, rows, selectedIds, group) {
         render: (row) => `<div class="chz-check-col"><input type="checkbox" data-chz-group="${escapeHtml(group)}" data-chz-id="${escapeHtml(row.request_id)}" ${selectedSet.has(String(row.request_id)) ? 'checked' : ''}></div>`,
       },
       { label: 'Тип', key: 'type_label' },
+      { label: 'Заказ №', key: 'order_number' },
       { label: 'Автор', key: 'author' },
       { label: 'Номенклатура', key: 'item_title' },
       { label: 'Размер', key: 'item_size' },
