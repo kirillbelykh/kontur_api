@@ -33,6 +33,7 @@
 
       <nav class="sidebar-nav" id="sidebar-nav">
         <button class="nav-item is-active" data-route="orders">📋 <span>Заказ кодов</span></button>
+        <button class="nav-item" data-route="chz">🛡️ <span>Запросы ЧЗ</span><span class="nav-badge is-hidden" id="chz-nav-badge">0</span></button>
         <button class="nav-item" data-route="download">⏬ <span>Загрузка кодов</span></button>
         <button class="nav-item" data-route="intro">🔄 <span>Ввод в оборот</span></button>
         <button class="nav-item" data-route="tsd">📲 <span>Задание на ТСД</span></button>
@@ -172,25 +173,6 @@
                 <div class="table-host" id="orders-history-table"></div>
               </article>
 
-              <article class="panel">
-                <div class="panel-header">
-                  <h3>WMS / ЧЗ</h3>
-                  <div class="inline-actions compact">
-                    <button class="secondary-btn" id="orders-chz-ack-btn">Ок</button>
-                    <button class="secondary-btn" id="orders-chz-ready-btn">Коды готовы</button>
-                  </div>
-                </div>
-                <div class="selection-meta" id="orders-chz-selection-meta">Новых запросов: 0 • Архив: 0 • Выбрано: 0</div>
-                <div class="table-card">
-                  <h4>Новые запросы</h4>
-                  <div class="table-host" id="orders-chz-table"></div>
-                </div>
-                <div class="table-card">
-                  <h4>Архив уведомлений</h4>
-                  <div class="table-host" id="orders-chz-archive-table"></div>
-                </div>
-              </article>
-
               <article class="panel is-hidden" id="orders-deleted-panel">
                 <div class="panel-header">
                   <h3>Удаленные заказы</h3>
@@ -208,6 +190,45 @@
               <pre class="log-box" id="orders-log"></pre>
             </article>
           </div>
+        </section>
+
+        <section class="view" id="view-chz">
+          <article class="panel">
+            <div class="panel-header panel-header-table-tools">
+              <h3>Запросы ЧЗ</h3>
+              <div class="table-tools">
+                <button class="secondary-btn" id="chz-refresh-btn">Обновить</button>
+                <button class="secondary-btn" id="chz-take-work-btn">Взять в работу</button>
+                <button class="secondary-btn" id="chz-ready-btn">Коды готовы</button>
+                <button class="secondary-btn" id="chz-archive-selected-btn">В архив</button>
+                <button class="secondary-btn" id="chz-toggle-archive-btn">Архив</button>
+                <button class="secondary-btn is-hidden" id="chz-restore-btn">Вернуть</button>
+              </div>
+            </div>
+            <div class="selection-meta" id="chz-selection-meta">Новых: 0 • В работе: 0 • Архив: 0 • Выбрано: 0</div>
+            <div class="grid two-col">
+              <div class="table-card">
+                <h4>Новые запросы</h4>
+                <div class="table-host" id="chz-new-table"></div>
+              </div>
+              <div class="table-card">
+                <h4>Запросы в работе</h4>
+                <div class="table-host" id="chz-work-table"></div>
+              </div>
+            </div>
+            <div class="table-card is-hidden" id="chz-archive-panel">
+              <h4>Архив запросов</h4>
+              <div class="table-host" id="chz-archive-table"></div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Лог запросов ЧЗ</h3>
+              <button class="secondary-btn" data-clear-log="chz">Очистить лог</button>
+            </div>
+            <pre class="log-box" id="chz-log"></pre>
+          </article>
         </section>
 
         <section class="view" id="view-download">

@@ -3,6 +3,10 @@ const ROUTES = {
     title: 'Заказ кодов',
     subtitle: 'Создание, очередь и история заказов кодов маркировки.',
   },
+  chz: {
+    title: 'Запросы ЧЗ',
+    subtitle: 'Заявки из WMS на заказ кодов маркировки, работа оператора и архив.',
+  },
   download: {
     title: 'Загрузка кодов',
     subtitle: 'Синхронизация статусов, ручная загрузка и печать термоэтикеток.',
@@ -44,6 +48,7 @@ const UI_PERF = {
   aggregationSearchDebounceMs: 180,
   routeNavFreshMs: {
     orders: 12000,
+    chz: 8000,
     download: 12000,
     intro: 12000,
     tsd: 12000,
@@ -52,6 +57,7 @@ const UI_PERF = {
   },
   routeAutoRefreshMs: {
     orders: 15000,
+    chz: 10000,
     download: 15000,
     intro: 15000,
     tsd: 15000,
@@ -89,6 +95,17 @@ const state = {
     showDeleted: false,
     historySearch: '',
     fullscreenTable: '',
+  },
+  chz: {
+    newRequests: [],
+    inProgress: [],
+    archive: [],
+    selectedNewIds: new Set(),
+    selectedWorkIds: new Set(),
+    selectedArchiveIds: new Set(),
+    showArchive: false,
+    knownRequestIds: new Set(),
+    unreadCount: 0,
   },
   download: {
     items: [],
@@ -252,6 +269,7 @@ const API = {
 
 const LOG_SELECTORS = {
   orders: '#orders-log',
+  chz: '#chz-log',
   download: '#download-log',
   intro: '#intro-log',
   tsd: '#tsd-log',
@@ -261,6 +279,7 @@ const LOG_SELECTORS = {
 
 const ROUTE_LOG_CHANNEL = {
   orders: 'orders',
+  chz: 'chz',
   download: 'download',
   intro: 'intro',
   tsd: 'tsd',
@@ -702,6 +721,158 @@ function updateWmsChzSelectionMeta() {
   const archiveCount = state.orders.wmsChzArchive.length;
   const selected = state.orders.selectedWmsChzId || state.orders.selectedWmsChzArchiveId;
   element.textContent = `Новых запросов: ${activeCount} • Архив: ${archiveCount} • Выбрано: ${selected ? 1 : 0}`;
+}
+
+function getSelectedChzIds() {
+  return [
+    ...state.chz.selectedNewIds,
+    ...state.chz.selectedWorkIds,
+    ...state.chz.selectedArchiveIds,
+  ].map((id) => Number(id)).filter((id) => id > 0);
+}
+
+function updateChzSelectionMeta() {
+  const element = $('#chz-selection-meta');
+  if (!element) {
+    return;
+  }
+  element.textContent = `Новых: ${state.chz.newRequests.length} • В работе: ${state.chz.inProgress.length} • Архив: ${state.chz.archive.length} • Выбрано: ${getSelectedChzIds().length}`;
+}
+
+function updateChzNavBadge() {
+  const badge = $('#chz-nav-badge');
+  if (!badge) {
+    return;
+  }
+  const count = Number(state.chz.unreadCount || 0);
+  badge.textContent = String(count);
+  badge.classList.toggle('is-hidden', count <= 0);
+}
+
+function notifyChzRequest(message) {
+  showToast(message, 'info', 3600);
+  if (!('Notification' in window)) {
+    return;
+  }
+  const showNotification = () => {
+    try {
+      new Notification('Запрос ЧЗ', { body: message });
+    } catch (error) {
+      // Browser notifications are optional; toast is already shown.
+    }
+  };
+  if (Notification.permission === 'granted') {
+    showNotification();
+  } else if (Notification.permission === 'default') {
+    Notification.requestPermission().then((permission) => {
+      if (permission === 'granted') {
+        showNotification();
+      }
+    }).catch(() => null);
+  }
+}
+
+function findChzRequestById(requestId) {
+  const normalizedId = Number(requestId || 0);
+  return [...state.chz.newRequests, ...state.chz.inProgress, ...state.chz.archive]
+    .find((item) => Number(item.request_id || 0) === normalizedId);
+}
+
+function renderChzStatusCell(row) {
+  return statusPill(row?.status_label || row?.status || '—');
+}
+
+function renderChzRequestDetails(row) {
+  if (!row) {
+    return;
+  }
+  const modal = ensureOrderDetailsModal();
+  modal.classList.remove('is-hidden');
+  modal.querySelector('#order-details-title').textContent = `Запрос ЧЗ ${row.order_name || `#${row.request_id}`}`;
+  modal.querySelector('#order-details-subtitle').textContent = `${row.type_label || 'Запрос'} • ${row.status_label || row.status || 'Статус не указан'}`;
+  const content = modal.querySelector('#order-details-content');
+  const items = Array.isArray(row.items) ? row.items : [];
+  content.innerHTML = `
+    <section class="order-details-section">
+      <h4>Основное</h4>
+      <dl>
+        <div><dt>Тип</dt><dd>${escapeHtml(row.type_label || '—')}</dd></div>
+        <div><dt>Автор</dt><dd>${escapeHtml(row.author || 'WMS')}</dd></div>
+        <div><dt>Заказ</dt><dd>${escapeHtml(row.order_name || row.request_id || '—')}</dd></div>
+        <div><dt>Статус</dt><dd>${renderChzStatusCell(row)}</dd></div>
+        <div><dt>Время</dt><dd>${escapeHtml(row.requested_at_label || row.requested_at || '—')}</dd></div>
+      </dl>
+    </section>
+    <section class="order-details-section">
+      <h4>Комментарий заказчика</h4>
+      <div class="preview-box">${escapeHtml(row.comment || 'Комментарий не указан.')}</div>
+    </section>
+    <section class="order-details-section">
+      <h4>Позиции</h4>
+      <dl>
+        ${items.map((item, index) => `
+          <div>
+            <dt>${escapeHtml(`Позиция ${index + 1}`)}</dt>
+            <dd>${escapeHtml([
+              item.item_title || 'Номенклатура',
+              item.item_size ? `р. ${item.item_size}` : '',
+              item.batch_number ? `партия ${item.batch_number}` : '',
+              item.item_color || '',
+              `${item.pairs_quantity || 0} пар`,
+            ].filter(Boolean).join(' • '))}</dd>
+          </div>
+        `).join('')}
+      </dl>
+    </section>
+  `;
+}
+
+function renderChzTable(container, rows, selectedIds, group) {
+  if (!container) {
+    return;
+  }
+  const selectedSet = selectedIds instanceof Set ? selectedIds : new Set();
+  createTable(
+    container,
+    [
+      {
+        label: '',
+        render: (row) => `<div class="chz-check-col"><input type="checkbox" data-chz-group="${escapeHtml(group)}" data-chz-id="${escapeHtml(row.request_id)}" ${selectedSet.has(String(row.request_id)) ? 'checked' : ''}></div>`,
+      },
+      { label: 'Тип', key: 'type_label' },
+      { label: 'Автор', key: 'author' },
+      { label: 'Номенклатура', key: 'item_title' },
+      { label: 'Размер', key: 'item_size' },
+      { label: 'Партия', key: 'batch_number' },
+      { label: 'Цвет', key: 'item_color' },
+      { label: 'Кол-во пар', key: 'pairs_total' },
+      { label: 'Статус', render: (row) => renderChzStatusCell(row) },
+      { label: 'Время', key: 'requested_at_label' },
+    ],
+    rows,
+    {
+      rowId: (row) => row.request_id,
+      compact: true,
+      maxHeight: group === 'archive' ? '360px' : '300px',
+      selectedIds: selectedSet,
+      onRowClick: (id) => renderChzRequestDetails(findChzRequestById(id)),
+    },
+  );
+  container.querySelectorAll('input[data-chz-id]').forEach((checkbox) => {
+    checkbox.addEventListener('change', () => {
+      const id = String(checkbox.dataset.chzId || '');
+      if (!id) {
+        return;
+      }
+      if (checkbox.checked) {
+        selectedSet.add(id);
+      } else {
+        selectedSet.delete(id);
+      }
+      updateChzSelectionMeta();
+      Views.chz.render();
+    });
+  });
 }
 
 function updateDownloadProgressUi() {
@@ -2005,10 +2176,14 @@ const Router = {
 	    if (route !== 'labels') {
 	      state.labels.fullscreenTable = '';
 	    }
-	    if (route !== 'orders') {
-	      state.orders.fullscreenTable = '';
-	    }
+    if (route !== 'orders') {
+      state.orders.fullscreenTable = '';
+    }
     state.route = route;
+    if (route === 'chz') {
+      state.chz.unreadCount = 0;
+      updateChzNavBadge();
+    }
     document.querySelectorAll('.nav-item').forEach((item) => {
       item.classList.toggle('is-active', item.dataset.route === route);
     });
@@ -2227,6 +2402,45 @@ const Views = {
             },
           },
         );
+      }
+    },
+  },
+  chz: {
+    render() {
+      updateChzSelectionMeta();
+      updateChzNavBadge();
+
+      const archivePanel = $('#chz-archive-panel');
+      const restoreButton = $('#chz-restore-btn');
+      const toggleArchiveButton = $('#chz-toggle-archive-btn');
+      if (archivePanel) {
+        archivePanel.classList.toggle('is-hidden', !state.chz.showArchive);
+      }
+      if (restoreButton) {
+        restoreButton.classList.toggle('is-hidden', !state.chz.showArchive);
+        restoreButton.disabled = state.chz.selectedArchiveIds.size === 0;
+      }
+      if (toggleArchiveButton) {
+        toggleArchiveButton.textContent = state.chz.showArchive ? 'Скрыть архив' : 'Архив';
+      }
+
+      const takeWorkButton = $('#chz-take-work-btn');
+      const readyButton = $('#chz-ready-btn');
+      const archiveButton = $('#chz-archive-selected-btn');
+      if (takeWorkButton) {
+        takeWorkButton.disabled = state.chz.selectedNewIds.size === 0;
+      }
+      if (readyButton) {
+        readyButton.disabled = state.chz.selectedWorkIds.size === 0;
+      }
+      if (archiveButton) {
+        archiveButton.disabled = getSelectedChzIds().length === 0;
+      }
+
+      renderChzTable($('#chz-new-table'), state.chz.newRequests, state.chz.selectedNewIds, 'new');
+      renderChzTable($('#chz-work-table'), state.chz.inProgress, state.chz.selectedWorkIds, 'work');
+      if (state.chz.showArchive) {
+        renderChzTable($('#chz-archive-table'), state.chz.archive, state.chz.selectedArchiveIds, 'archive');
       }
     },
   },
@@ -2496,6 +2710,8 @@ async function loadRouteState(route, options = {}) {
   switch (route) {
     case 'orders':
       return loadOrdersState(options);
+    case 'chz':
+      return loadChzState(options);
     case 'download':
       return loadDownloadState(options);
     case 'intro':
@@ -2560,6 +2776,57 @@ async function loadOrdersState(options = {}) {
     markRouteLoaded('orders');
   } finally {
     state.ui.routeLoading.orders = false;
+  }
+}
+
+function applyChzState(result, options = {}) {
+  const newRequests = result.new_requests || [];
+  const inProgress = result.in_progress || [];
+  const archive = result.archive || [];
+  const allIds = new Set(
+    [...newRequests, ...inProgress, ...archive].map((item) => String(item.request_id || '')).filter(Boolean),
+  );
+  const previousKnownIds = state.chz.knownRequestIds instanceof Set ? state.chz.knownRequestIds : new Set();
+  const incomingNewRequests = newRequests.filter((item) => !previousKnownIds.has(String(item.request_id || '')));
+
+  state.chz.newRequests = newRequests;
+  state.chz.inProgress = inProgress;
+  state.chz.archive = archive;
+  state.chz.knownRequestIds = allIds;
+
+  const visibleIds = {
+    new: new Set(newRequests.map((item) => String(item.request_id || ''))),
+    work: new Set(inProgress.map((item) => String(item.request_id || ''))),
+    archive: new Set(archive.map((item) => String(item.request_id || ''))),
+  };
+  state.chz.selectedNewIds = new Set([...state.chz.selectedNewIds].filter((id) => visibleIds.new.has(String(id))));
+  state.chz.selectedWorkIds = new Set([...state.chz.selectedWorkIds].filter((id) => visibleIds.work.has(String(id))));
+  state.chz.selectedArchiveIds = new Set([...state.chz.selectedArchiveIds].filter((id) => visibleIds.archive.has(String(id))));
+
+  if (isRouteActive('chz')) {
+    state.chz.unreadCount = 0;
+  } else if (previousKnownIds.size === 0 && newRequests.length > 0) {
+    state.chz.unreadCount = Math.max(Number(state.chz.unreadCount || 0), newRequests.length);
+  } else if (incomingNewRequests.length > 0) {
+    state.chz.unreadCount += incomingNewRequests.length;
+    notifyChzRequest(`Поступил новый запрос ЧЗ: ${incomingNewRequests[0].order_name || incomingNewRequests[0].items_summary || 'WMS'}`);
+  }
+
+  updateChzNavBadge();
+  if (options.render) {
+    Views.chz.render();
+  }
+}
+
+async function loadChzState(options = {}) {
+  const { force = false, render = isRouteActive('chz') } = normalizeLoadOptions(options);
+  state.ui.routeLoading.chz = true;
+  try {
+    const result = await API.call('get_chz_requests_view_state', Boolean(force));
+    applyChzState(result, { render });
+    markRouteLoaded('chz');
+  } finally {
+    state.ui.routeLoading.chz = false;
   }
 }
 
@@ -3772,6 +4039,84 @@ async function bindEvents() {
     }, 'WMS уведомлена о готовности кодов.');
   });
 
+  $('#chz-refresh-btn')?.addEventListener('click', async () => {
+    await runAction('Обновляем запросы ЧЗ...', async () => {
+      await loadChzState({ force: true });
+      return { success: true };
+    }, 'Запросы ЧЗ обновлены.');
+  });
+
+  $('#chz-toggle-archive-btn')?.addEventListener('click', () => {
+    state.chz.showArchive = !state.chz.showArchive;
+    Views.chz.render();
+  });
+
+  $('#chz-take-work-btn')?.addEventListener('click', async () => {
+    await runAction('Берем запросы ЧЗ в работу...', async () => {
+      const selectedIds = [...state.chz.selectedNewIds].map((id) => Number(id)).filter((id) => id > 0);
+      if (!selectedIds.length) {
+        throw new Error('Выберите новые запросы ЧЗ.');
+      }
+      const result = await API.call('acknowledge_wms_chz_requests', selectedIds);
+      if (result?.success === false) {
+        throw new Error(result.error || 'Не удалось взять запросы ЧЗ в работу.');
+      }
+      state.chz.selectedNewIds.clear();
+      await loadChzState({ force: true });
+      return result;
+    }, 'Запросы ЧЗ взяты в работу.');
+  });
+
+  $('#chz-ready-btn')?.addEventListener('click', async () => {
+    await runAction('Отправляем в WMS готовность кодов ЧЗ...', async () => {
+      const selectedIds = [...state.chz.selectedWorkIds].map((id) => Number(id)).filter((id) => id > 0);
+      if (!selectedIds.length) {
+        throw new Error('Выберите запросы ЧЗ в работе.');
+      }
+      const result = await API.call('mark_wms_chz_requests_ready', selectedIds);
+      if (result?.success === false) {
+        throw new Error(result.error || 'Не удалось отметить коды ЧЗ готовыми.');
+      }
+      state.chz.selectedWorkIds.clear();
+      await loadChzState({ force: true });
+      return result;
+    }, 'WMS уведомлена о готовности кодов.');
+  });
+
+  $('#chz-archive-selected-btn')?.addEventListener('click', async () => {
+    await runAction('Переносим запросы ЧЗ в архив...', async () => {
+      const selectedIds = getSelectedChzIds();
+      if (!selectedIds.length) {
+        throw new Error('Выберите запросы ЧЗ.');
+      }
+      const result = await API.call('archive_wms_chz_requests', selectedIds);
+      if (result?.success === false) {
+        throw new Error(result.error || 'Не удалось перенести запросы ЧЗ в архив.');
+      }
+      state.chz.selectedNewIds.clear();
+      state.chz.selectedWorkIds.clear();
+      state.chz.selectedArchiveIds.clear();
+      await loadChzState({ force: true });
+      return result;
+    }, 'Запросы ЧЗ перенесены в архив.');
+  });
+
+  $('#chz-restore-btn')?.addEventListener('click', async () => {
+    await runAction('Возвращаем запросы ЧЗ из архива...', async () => {
+      const selectedIds = [...state.chz.selectedArchiveIds].map((id) => Number(id)).filter((id) => id > 0);
+      if (!selectedIds.length) {
+        throw new Error('Выберите архивные запросы ЧЗ.');
+      }
+      const result = await API.call('restore_wms_chz_requests', selectedIds);
+      if (result?.success === false) {
+        throw new Error(result.error || 'Не удалось вернуть запросы ЧЗ из архива.');
+      }
+      state.chz.selectedArchiveIds.clear();
+      await loadChzState({ force: true });
+      return result;
+    }, 'Запросы ЧЗ возвращены из архива.');
+  });
+
 	  $('#download-refresh-btn').addEventListener('click', async () => {
     state.download.autoDownload = $('#download-auto-checkbox').checked;
     await runAction('Синхронизируем статусы загрузки...', async () => {
@@ -4306,6 +4651,13 @@ async function runAutoRefreshTick() {
   const routeAge = currentTime - Number(state.ui.routeUpdatedAt[currentRoute] || 0);
   if (state.ui.routeDirty[currentRoute] || routeAge >= routeMaxAge) {
     refreshCurrentRouteState({ freshnessMs: 0 }).catch(() => null);
+  }
+
+  if (currentRoute !== 'chz') {
+    const chzAge = currentTime - Number(state.ui.routeUpdatedAt.chz || 0);
+    if (state.ui.routeDirty.chz || chzAge >= getRouteRefreshAge('chz', 10000)) {
+      maybeRefreshRouteState('chz', { freshnessMs: 0 }).catch(() => null);
+    }
   }
 }
 

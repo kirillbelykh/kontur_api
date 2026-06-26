@@ -88,7 +88,7 @@ from utils import get_tnved_code, make_session_with_cookies
 LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS = 300
 
 
-LOG_CHANNELS = ("orders", "download", "intro", "tsd", "aggregation", "labels")
+LOG_CHANNELS = ("orders", "chz", "download", "intro", "tsd", "aggregation", "labels")
 MAX_LOG_LINES = 500
 DOCUMENT_STATUS_CACHE_TTL_SECONDS = 60
 CODE_STATUS_CACHE_TTL_SECONDS = 180
@@ -109,10 +109,11 @@ WMS_CHZ_SYNC_INTERVAL_SECONDS = 15
 WMS_CHZ_DEFAULT_API_BASE_URL = "https://wms.grund-lage.ru/api"
 
 WMS_CHZ_STATUS_LABELS = {
-    "requested": "Новый запрос",
-    "acknowledged": "Принят оператором",
+    "requested": "Ожидает",
+    "acknowledged": "В работе",
     "ready": "Коды готовы",
     "cancelled": "Отменен",
+    "archived": "В архиве",
 }
 
 STATUS_LABELS = {
@@ -772,6 +773,50 @@ class ApiBridge:
             summary += f"; еще {len(parts) - 3}"
         return f"{summary} • всего {total_pairs} пар"
 
+    @staticmethod
+    def _format_wms_chz_time(value: Any) -> str:
+        raw_value = str(value or "").strip()
+        if not raw_value:
+            return ""
+        try:
+            parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+        except ValueError:
+            return raw_value
+        return parsed.strftime("%d.%m.%Y, %H:%M")
+
+    @staticmethod
+    def _infer_wms_chz_request_type(payload: Dict[str, Any], *, order_name: str, callback_path: str) -> str:
+        explicit_type = str(
+            payload.get("request_type")
+            or payload.get("type")
+            or payload.get("order_type")
+            or ""
+        ).strip().lower()
+        if explicit_type in {"production", "prod", "manufacturing", "производство"}:
+            return "production"
+        if explicit_type in {"shipment", "shipping", "order", "outbound", "отгрузка"}:
+            return "shipment"
+
+        marker = f"{callback_path} {order_name}".lower()
+        if "production" in marker or "производ" in marker:
+            return "production"
+        return "shipment"
+
+    @staticmethod
+    def _wms_chz_request_ids(request_ids: Sequence[Any] | Any) -> List[int]:
+        raw_items = request_ids if isinstance(request_ids, (list, tuple, set)) else [request_ids]
+        normalized: List[int] = []
+        for raw_item in raw_items:
+            try:
+                request_id = int(raw_item or 0)
+            except (TypeError, ValueError):
+                continue
+            if request_id > 0 and request_id not in normalized:
+                normalized.append(request_id)
+        if not normalized:
+            raise RuntimeError("Выберите запрос ЧЗ.")
+        return normalized
+
     def _normalize_wms_chz_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         request_id = int(payload.get("request_id") or payload.get("id") or 0)
         items = self._normalize_wms_chz_items(payload.get("items"))
@@ -785,6 +830,16 @@ class ApiBridge:
         ready_at = str(payload.get("ready_at") or "").strip()
         updated_at = ready_at or acknowledged_at or requested_at or datetime.now().isoformat()
         callback_path = str(payload.get("callback_path") or "/integration/chz/requests").strip() or "/integration/chz/requests"
+        request_type = self._infer_wms_chz_request_type(payload, order_name=order_name, callback_path=callback_path)
+        author = str(
+            payload.get("requested_by_username")
+            or payload.get("author")
+            or payload.get("created_by")
+            or payload.get("requested_by")
+            or payload.get("user")
+            or ""
+        ).strip()
+        first_item = items[0] if items else {}
         return {
             "request_id": request_id,
             "external_request_id": str(payload.get("external_request_id") or "").strip(),
@@ -792,14 +847,25 @@ class ApiBridge:
             "order_name": order_name,
             "customer": customer,
             "comment": comment,
+            "request_type": request_type,
+            "type_label": "Производство" if request_type == "production" else "Отгрузка",
+            "author": author or "WMS",
             "status": status,
             "status_label": WMS_CHZ_STATUS_LABELS.get(status, status or "unknown"),
             "is_active": is_active,
             "requested_at": requested_at,
+            "requested_at_label": self._format_wms_chz_time(requested_at),
             "acknowledged_at": acknowledged_at,
+            "acknowledged_at_label": self._format_wms_chz_time(acknowledged_at),
             "ready_at": ready_at,
+            "ready_at_label": self._format_wms_chz_time(ready_at),
             "updated_at": updated_at,
+            "updated_at_label": self._format_wms_chz_time(updated_at),
             "items": items,
+            "item_title": first_item.get("item_title") or "",
+            "item_size": first_item.get("item_size") or "",
+            "item_color": first_item.get("item_color") or "",
+            "batch_number": first_item.get("batch_number") or "",
             "items_summary": self._build_wms_chz_items_summary(items),
             "callback_path": callback_path,
         }
@@ -4061,6 +4127,41 @@ class ApiBridge:
         except Exception as exc:
             return {"error": str(exc)}
 
+    def _build_chz_requests_view_state(self) -> Dict[str, Any]:
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        with runtime.lock:
+            requests_payload = [
+                self._serialize_wms_chz_request(item)
+                for item in self._sort_wms_chz_requests(runtime.wms_chz_requests)
+            ]
+
+        new_requests = [item for item in requests_payload if item.get("status") == "requested"]
+        in_progress = [item for item in requests_payload if item.get("status") == "acknowledged"]
+        archive = [
+            item
+            for item in requests_payload
+            if item.get("status") not in {"requested", "acknowledged"}
+            or not bool(item.get("is_active", True))
+        ]
+        return {
+            "new_requests": new_requests,
+            "in_progress": in_progress,
+            "archive": archive[:500],
+            "counts": {
+                "new": len(new_requests),
+                "in_progress": len(in_progress),
+                "archive": len(archive),
+            },
+        }
+
+    def get_chz_requests_view_state(self, force_sync: bool = False) -> Dict[str, Any]:
+        try:
+            self._start_background_status_updater()
+            self._sync_pending_wms_chz_requests(force=bool(force_sync))
+            return self._build_chz_requests_view_state()
+        except Exception as exc:
+            return {"error": str(exc)}
+
     def acknowledge_wms_chz_request(self, request_id: int) -> Dict[str, Any]:
         try:
             normalized_id = int(request_id or 0)
@@ -4086,7 +4187,7 @@ class ApiBridge:
                 }
             )
             self._log(
-                "orders",
+                "chz",
                 f"Оператор ЧЗ принял запрос: {updated_request.get('order_name') or normalized_id}",
             )
             return {
@@ -4122,7 +4223,7 @@ class ApiBridge:
                 }
             )
             self._log(
-                "orders",
+                "chz",
                 f"Коды ЧЗ готовы: {updated_request.get('order_name') or normalized_id}",
             )
             return {
@@ -4130,6 +4231,84 @@ class ApiBridge:
                 "request": self._serialize_wms_chz_request(updated_request),
                 "state": self.get_orders_view_state(force_sync=False),
             }
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def acknowledge_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
+        try:
+            for request_id in self._wms_chz_request_ids(request_ids):
+                result = self.acknowledge_wms_chz_request(request_id)
+                if result.get("success") is False:
+                    raise RuntimeError(str(result.get("error") or "Не удалось взять запрос ЧЗ в работу."))
+            return {"success": True, "state": self.get_chz_requests_view_state(force_sync=False)}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def mark_wms_chz_requests_ready(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
+        try:
+            for request_id in self._wms_chz_request_ids(request_ids):
+                result = self.mark_wms_chz_request_ready(request_id)
+                if result.get("success") is False:
+                    raise RuntimeError(str(result.get("error") or "Не удалось отметить коды ЧЗ готовыми."))
+            return {"success": True, "state": self.get_chz_requests_view_state(force_sync=False)}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def archive_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
+        try:
+            ids = set(self._wms_chz_request_ids(request_ids))
+            runtime = self._ensure_wms_chz_runtime_defaults()
+            archived_at = datetime.now().isoformat()
+            changed = 0
+            with runtime.lock:
+                updated_items: List[Dict[str, Any]] = []
+                for item in runtime.wms_chz_requests:
+                    normalized = self._normalize_wms_chz_request(item)
+                    if int(normalized.get("request_id") or 0) in ids:
+                        normalized["status"] = "archived"
+                        normalized["status_label"] = WMS_CHZ_STATUS_LABELS["archived"]
+                        normalized["is_active"] = False
+                        normalized["archived_at"] = archived_at
+                        normalized["updated_at"] = archived_at
+                        normalized["updated_at_label"] = self._format_wms_chz_time(archived_at)
+                        changed += 1
+                    updated_items.append(normalized)
+                runtime.wms_chz_requests = self._sort_wms_chz_requests(updated_items)
+                self._save_wms_chz_requests(runtime.wms_chz_requests)
+
+            if not changed:
+                raise RuntimeError("Выбранные запросы ЧЗ не найдены.")
+            self._log("chz", f"Запросы ЧЗ перенесены в архив: {changed}")
+            return {"success": True, "state": self.get_chz_requests_view_state(force_sync=False)}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def restore_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
+        try:
+            ids = set(self._wms_chz_request_ids(request_ids))
+            runtime = self._ensure_wms_chz_runtime_defaults()
+            restored_at = datetime.now().isoformat()
+            changed = 0
+            with runtime.lock:
+                updated_items: List[Dict[str, Any]] = []
+                for item in runtime.wms_chz_requests:
+                    normalized = self._normalize_wms_chz_request(item)
+                    if int(normalized.get("request_id") or 0) in ids:
+                        normalized["status"] = "requested"
+                        normalized["status_label"] = WMS_CHZ_STATUS_LABELS["requested"]
+                        normalized["is_active"] = True
+                        normalized["updated_at"] = restored_at
+                        normalized["updated_at_label"] = self._format_wms_chz_time(restored_at)
+                        normalized.pop("archived_at", None)
+                        changed += 1
+                    updated_items.append(normalized)
+                runtime.wms_chz_requests = self._sort_wms_chz_requests(updated_items)
+                self._save_wms_chz_requests(runtime.wms_chz_requests)
+
+            if not changed:
+                raise RuntimeError("Выбранные архивные запросы ЧЗ не найдены.")
+            self._log("chz", f"Запросы ЧЗ возвращены из архива: {changed}")
+            return {"success": True, "state": self.get_chz_requests_view_state(force_sync=False)}
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
