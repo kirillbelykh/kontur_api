@@ -61,9 +61,9 @@
     {
       "order_name": "1229 микро 7,5 260629",
       "document_id": "9dbadce7-6cdc-49dc-ae9a-09cfe35cd794",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1229 микро 75 260629\\1229 микро 75 260629.pdf, C:\\Users\\user\\Desktop\\Коды км\\1229 микро 75 260629\\1229 микро 7,5 260629_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1229 микро 75 260629\\1229 микро 7,5 260629.xls",
+      "simpl": "микрохирургия",
       "full_name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 7,5",
       "gtin": "4640473504894",
       "positions": [
@@ -82,7 +82,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1229 микро 75 260629\\1229 микро 7,5 260629_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1229 микро 75 260629\\1229 микро 75 260629.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1229 микро 75 260629\\1229 микро 7,5 260629.xls"
     },
     {
       "order_name": "1228 микро 8 260629",
@@ -24494,7 +24497,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-29T14:28:55.199971",
+  "last_update": "2026-06-29T14:29:28.201670",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
