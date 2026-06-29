@@ -3,9 +3,9 @@
     {
       "order_name": "1227 лат диаг XS 260629",
       "document_id": "c19ad418-689e-4936-8977-1108961d0e51",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1227 лат диаг XS 260629\\1227 лат диаг XS 260629.pdf, C:\\Users\\user\\Desktop\\Коды км\\1227 лат диаг XS 260629\\1227 лат диаг XS 260629_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1227 лат диаг XS 260629\\1227 лат диаг XS 260629.xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XS, цвет натуральный",
       "gtin": "4650118041219",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1227 лат диаг XS 260629\\1227 лат диаг XS 260629.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1227 лат диаг XS 260629\\1227 лат диаг XS 260629_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1227 лат диаг XS 260629\\1227 лат диаг XS 260629.pdf"
     },
     {
       "order_name": "1226 стер лат M заявка 6586 (5 пар)",
@@ -24242,7 +24245,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-29T10:22:24.177712",
+  "last_update": "2026-06-29T10:34:28.668112",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
