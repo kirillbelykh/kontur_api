@@ -572,7 +572,8 @@ function Create-DesktopShortcut {
         [Parameter(Mandatory = $true)][string]$ProjectDir,
         [Parameter(Mandatory = $true)][string]$ShortcutName,
         [Parameter(Mandatory = $true)][string]$LauncherFile,
-        [string]$Description = ""
+        [string]$Description = "",
+        [string]$TargetFolder = [Environment]::GetFolderPath("Desktop")
     )
 
     $launcher = Join-Path $ProjectDir $LauncherFile
@@ -598,8 +599,10 @@ function Create-DesktopShortcut {
         $arguments = "/c `"$launcher`""
     }
 
-    $desktop = [Environment]::GetFolderPath("Desktop")
-    $shortcutPath = Join-Path $desktop "$ShortcutName.lnk"
+    if (-not (Test-Path $TargetFolder)) {
+        New-Item -ItemType Directory -Path $TargetFolder -Force | Out-Null
+    }
+    $shortcutPath = Join-Path $TargetFolder "$ShortcutName.lnk"
     if (Test-Path $shortcutPath) {
         Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
     }
@@ -625,6 +628,23 @@ function Create-DesktopShortcut {
 
     $shortcut.Save()
     Write-Ok "Shortcut created: $shortcutPath"
+}
+
+function Ensure-StartupShortcut {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProjectDir,
+        [Parameter(Mandatory = $true)][string]$ShortcutName,
+        [Parameter(Mandatory = $true)][string]$LauncherFile,
+        [string]$Description = ""
+    )
+
+    $startupFolder = [Environment]::GetFolderPath("Startup")
+    Create-DesktopShortcut `
+        -ProjectDir $ProjectDir `
+        -ShortcutName $ShortcutName `
+        -LauncherFile $LauncherFile `
+        -Description $Description `
+        -TargetFolder $startupFolder
 }
 
 function Remove-DesktopShortcut {
@@ -666,6 +686,8 @@ Test-BarTenderInstallation
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
+Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "CRPT server" -LauncherFile "run_crpt_server.vbs" -Description "Kontur API background bridge"
+Ensure-StartupShortcut -ProjectDir $projectDir -ShortcutName "CRPT server" -LauncherFile "run_crpt_server.vbs" -Description "Kontur API background bridge"
 Remove-DesktopShortcut -ShortcutName "KonturAccessProlongation"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LUuYmF0") -Description "Kontur API full update and rebuild"
 

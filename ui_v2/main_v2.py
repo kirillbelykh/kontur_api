@@ -110,7 +110,10 @@ def main():
     _ensure_desktop_shortcut()
     api = ApiBridge()
     api.start_session_auto_refresh()
-    start_chz_bridge_server(api)
+    try:
+        start_chz_bridge_server(api)
+    except OSError:
+        pass
     if _env_flag("WMS_EMBED_SERVER_ENABLED", True):
         try:
             start_mobile_servers(

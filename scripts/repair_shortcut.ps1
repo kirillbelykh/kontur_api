@@ -26,7 +26,8 @@ function New-KonturShortcut {
     param(
         [Parameter(Mandatory = $true)][string]$ShortcutName,
         [Parameter(Mandatory = $true)][string]$LauncherFile,
-        [string]$Description = ""
+        [string]$Description = "",
+        [string]$TargetFolder = [Environment]::GetFolderPath("Desktop")
     )
 
     $launcher = Join-Path $projectDir $LauncherFile
@@ -48,8 +49,10 @@ function New-KonturShortcut {
         $arguments = "/c `"$launcher`""
     }
 
-    $desktop = [Environment]::GetFolderPath("Desktop")
-    $shortcutPath = Join-Path $desktop "$ShortcutName.lnk"
+    if (-not (Test-Path $TargetFolder)) {
+        New-Item -ItemType Directory -Path $TargetFolder -Force | Out-Null
+    }
+    $shortcutPath = Join-Path $TargetFolder "$ShortcutName.lnk"
 
     if (Test-Path $shortcutPath) {
         Remove-Item -Path $shortcutPath -Force -ErrorAction SilentlyContinue
@@ -78,6 +81,17 @@ function New-KonturShortcut {
     Write-Ok "Shortcut repaired: $shortcutPath"
 }
 
+function New-KonturStartupShortcut {
+    param(
+        [Parameter(Mandatory = $true)][string]$ShortcutName,
+        [Parameter(Mandatory = $true)][string]$LauncherFile,
+        [string]$Description = ""
+    )
+
+    $startupFolder = [Environment]::GetFolderPath("Startup")
+    New-KonturShortcut -ShortcutName $ShortcutName -LauncherFile $LauncherFile -Description $Description -TargetFolder $startupFolder
+}
+
 function Remove-KonturShortcut {
     param(
         [Parameter(Mandatory = $true)][string]$ShortcutName
@@ -95,5 +109,7 @@ function Remove-KonturShortcut {
 New-KonturShortcut -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 New-KonturShortcut -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
 New-KonturShortcut -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
+New-KonturShortcut -ShortcutName "CRPT server" -LauncherFile "run_crpt_server.vbs" -Description "Kontur API background bridge"
+New-KonturStartupShortcut -ShortcutName "CRPT server" -LauncherFile "run_crpt_server.vbs" -Description "Kontur API background bridge"
 Remove-KonturShortcut -ShortcutName "KonturAccessProlongation"
 New-KonturShortcut -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LUuYmF0") -Description "Kontur API full update and rebuild"

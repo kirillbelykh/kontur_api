@@ -989,7 +989,7 @@ class ApiBridge:
         try:
             request = self._upsert_wms_chz_request(payload)
             self._log(
-                "orders",
+                "chz",
                 "Новый запрос ЧЗ из WMS: "
                 f"{request.get('order_name') or request.get('order_id') or request.get('request_id')}"
                 + (f" | Комментарий: {request.get('comment')}" if request.get("comment") else ""),

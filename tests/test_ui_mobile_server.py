@@ -20,13 +20,20 @@ class UiMobileServerTests(unittest.TestCase):
     def test_mobile_server_allows_label_printing_methods(self):
         for method_name in (
             "acknowledge_wms_chz_request",
+            "acknowledge_wms_chz_requests",
+            "archive_selected_aggregations",
+            "archive_wms_chz_requests",
             "get_auth_state",
+            "get_chz_requests_view_state",
             "get_labels_state",
             "mark_wms_chz_request_ready",
+            "mark_wms_chz_requests_ready",
             "preview_100x180_label",
             "print_100x180_label",
             "print_download_order",
             "prolong_kontur_access",
+            "remove_order_item",
+            "restore_wms_chz_requests",
         ):
             self.assertIn(method_name, mobile_server.ALLOWED_METHODS)
             self.assertNotIn(method_name, mobile_server.BLOCKED_METHODS)
