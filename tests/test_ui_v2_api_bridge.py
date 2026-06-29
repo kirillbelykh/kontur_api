@@ -564,6 +564,47 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         mark_mock.assert_called_once_with("doc-1", "intro-2")
         remove_mock.assert_called_once_with(fake_runtime.download_items, "doc-1")
 
+    def test_create_tsd_tasks_enriches_missing_gtin_from_kontur_metadata(self):
+        item = {
+            "document_id": "doc-1",
+            "order_name": "Order 1",
+            "status": "released",
+            "full_name": "",
+            "gtin": "",
+        }
+        fake_runtime = types.SimpleNamespace(
+            download_items=[],
+            document_status_cache={},
+        )
+
+        with (
+            mock.patch.object(self.bridge, "_parse_iso_date", side_effect=lambda value, **_kwargs: value),
+            mock.patch.object(self.bridge, "_find_download_item", return_value=item),
+            mock.patch.object(self.bridge, "_ensure_session_safely", return_value=object()),
+            mock.patch.object(self.bridge, "_fetch_kontur_order_metadata", return_value={
+                "positions": [{"gtin": "04650118041257", "name": "Gloves"}],
+                "gtin": "04650118041257",
+                "full_name": "Gloves",
+            }),
+            mock.patch.object(self.bridge, "_create_tsd_task_with_retry", return_value=(True, {"introduction_id": "intro-2"})) as create_mock,
+            mock.patch.object(self.bridge, "_mark_tsd_created_local"),
+            mock.patch.object(self.bridge, "_log"),
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(api_bridge, "remove_order_by_document_id", return_value=False),
+        ):
+            result = self.bridge.create_tsd_tasks(
+                ["doc-1"],
+                "INT-1",
+                "01-02-2026",
+                "01-02-2031",
+                "260318",
+            )
+
+        self.assertTrue(result["success"])
+        enriched_item = create_mock.call_args.kwargs["item"]
+        self.assertEqual(enriched_item["gtin"], "04650118041257")
+        self.assertEqual(enriched_item["full_name"], "Gloves")
+
     def test_introduce_orders_auto_downloads_missing_files_before_intro(self):
         item = {
             "document_id": "doc-1",
@@ -786,6 +827,26 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 action_label="Ввод в оборот выбранных АК",
             )
         self.assertIn("Не удалось найти полные коды", api_bridge._normalize_ui_text(str(error_context.exception)))
+
+    def test_match_saved_marking_codes_uses_sntin_when_normalized_code_field_is_absent(self):
+        full_code = "010465011804125721ABC1234567890\x1d91EE11\x1d92TAIL"
+        sntin = api_bridge.extract_sntin(full_code)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            order_dir = root / "Order 1"
+            order_dir.mkdir()
+            (order_dir / "codes.csv").write_text(
+                f"{full_code}\t04650118041257\tGloves\n",
+                encoding="utf-8-sig",
+            )
+
+            with mock.patch.object(api_bridge, "_desktop_data_dir", return_value=root):
+                result = self.bridge._match_saved_marking_codes([sntin])
+
+        self.assertIn(sntin, result["matched"])
+        self.assertEqual(result["matched"][sntin]["full_code"], full_code)
+        self.assertEqual(result["matched"][sntin]["normalized_code"], sntin)
 
     def test_introduce_selected_aggregations_sends_when_document_stays_created_after_codes_check(self):
         aggregate = types.SimpleNamespace(

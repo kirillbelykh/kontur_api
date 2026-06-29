@@ -2303,14 +2303,56 @@ class ApiBridge:
             "TnvedCode": get_tnved_code(simpl_name) if simpl_name else "",
         }
 
+    def _first_saved_marking_row_for_order(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        csv_path = self._resolve_order_csv_path(item)
+        if not csv_path:
+            return {}
+        try:
+            return next(self._iter_saved_marking_rows(Path(csv_path)), {})
+        except Exception:
+            return {}
+
+    def _enrich_order_metadata_for_tsd(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        enriched = self._merge_order_data(item)
+        if _extract_gtin(enriched):
+            return enriched
+
+        document_id = str(enriched.get("document_id") or "").strip()
+        if document_id:
+            session = self._ensure_session_safely("tsd")
+            if session is not None:
+                try:
+                    metadata = self._fetch_kontur_order_metadata(session, document_id)
+                except Exception as exc:
+                    metadata = {}
+                    self._log("tsd", f"Не удалось загрузить GTIN из Контура для {document_id}: {exc}")
+                if metadata:
+                    enriched = self._merge_kontur_order_metadata(enriched, metadata)
+                    if _extract_gtin(enriched):
+                        return enriched
+
+        first_row = self._first_saved_marking_row_for_order(enriched)
+        if first_row:
+            if first_row.get("gtin"):
+                enriched["gtin"] = str(first_row.get("gtin") or "").strip()
+            if first_row.get("full_name") and not str(enriched.get("full_name") or "").strip():
+                enriched["full_name"] = str(first_row.get("full_name") or "").strip()
+        return enriched
+
     def _build_tsd_payload(self, item: Dict[str, Any], intro_number: str, production_date: str, expiration_date: str, batch_number: str) -> tuple[List[Dict[str, str]], Dict[str, Any]]:
-        gtin = str(item.get("gtin") or _extract_gtin(item.get("history_data") or {}) or "").strip()
+        merged_item = self._merge_order_data(item)
+        gtin = str(merged_item.get("gtin") or _extract_gtin(merged_item) or "").strip()
         if not gtin:
-            raise RuntimeError(f"У заказа {item.get('order_name')} не найден GTIN.")
+            first_row = self._first_saved_marking_row_for_order(merged_item)
+            gtin = str(first_row.get("gtin") or "").strip()
+            if first_row.get("full_name") and not str(merged_item.get("full_name") or "").strip():
+                merged_item["full_name"] = str(first_row.get("full_name") or "").strip()
+        if not gtin:
+            raise RuntimeError(f"У заказа {merged_item.get('order_name')} не найден GTIN.")
         if not gtin.startswith("0"):
             gtin = f"0{gtin}"
         positions_data = [{
-            "name": str(item.get("full_name") or item.get("order_name") or "").strip(),
+            "name": str(merged_item.get("full_name") or merged_item.get("order_name") or "").strip(),
             "gtin": gtin,
         }]
         production_patch = {
@@ -2318,7 +2360,7 @@ class ApiBridge:
             "productionDate": production_date,
             "expirationDate": expiration_date,
             "batchNumber": batch_number,
-            "TnvedCode": get_tnved_code(str(item.get("simpl") or "").strip()),
+            "TnvedCode": get_tnved_code(str(merged_item.get("simpl") or "").strip()),
         }
         return positions_data, production_patch
 
@@ -2377,6 +2419,7 @@ class ApiBridge:
                         yield {
                             "full_code": normalized_code,  # полный код: GTIN+хвост+AI91+AI92
                             "sntin": sntin,
+                            "normalized_code": sntin,
                             "gtin": gtin or normalized_code[2:16],
                             "full_name": full_name,
                         }
@@ -2412,7 +2455,7 @@ class ApiBridge:
                     "sntin": sntin,
                     "partial_code": targets[sntin],
                     "full_code": row["full_code"],  # полный код с подписью
-                    "normalized_code": row["normalized_code"],  # для проверки статусов
+                    "normalized_code": row.get("normalized_code") or sntin,  # для проверки статусов
                     "gtin": str(row.get("gtin") or "").strip(),
                     "full_name": str(row.get("full_name") or "").strip(),
                     "source_path": str(csv_path),
@@ -5545,6 +5588,7 @@ class ApiBridge:
                         errors.append({"document_id": document_id, "error": "Заказ не найден"})
                         continue
 
+                item = self._enrich_order_metadata_for_tsd(item)
                 retry_tsd = bool(item.get("tsd_created") or (item.get("history_data") or {}).get("tsd_created"))
                 if retry_tsd:
                     item = dict(item)
