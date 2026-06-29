@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1229 микро 7,5 260629",
+      "document_id": "9dbadce7-6cdc-49dc-ae9a-09cfe35cd794",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 7,5",
+      "gtin": "4640473504894",
+      "positions": [
+        {
+          "gtin": "4640473504894",
+          "name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 7,5",
+          "tnvedCode": "4015120001",
+          "quantity": 58,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-06-29T14:17:22.156305",
+      "created_by": "user",
+      "updated_at": "2026-06-29T14:17:22.156305",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1228 микро 8 260629",
       "document_id": "9834b753-3194-4220-b6c6-b0e47225285c",
       "status": "Выполнен",
@@ -24410,7 +24436,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-29T12:57:56.216953",
+  "last_update": "2026-06-29T14:17:24.034111",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
