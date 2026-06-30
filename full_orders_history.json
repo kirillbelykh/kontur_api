@@ -3,9 +3,9 @@
     {
       "order_name": "1254 ультра 7 партия 260621",
       "document_id": "5532a8ac-13bc-49a3-86c1-0c41878ca401",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1254 ультра 7 партия 260621\\1254 ультра 7 партия 260621.pdf, C:\\Users\\user\\Desktop\\Коды км\\1254 ультра 7 партия 260621\\1254 ультра 7 партия 260621_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1254 ультра 7 партия 260621\\1254 ультра 7 партия 260621.xls",
+      "simpl": "ультра",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 7,0",
       "gtin": "4640473509899",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1254 ультра 7 партия 260621\\1254 ультра 7 партия 260621.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1254 ультра 7 партия 260621\\1254 ультра 7 партия 260621.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1254 ультра 7 партия 260621\\1254 ультра 7 партия 260621_csv.csv"
     },
     {
       "order_name": "1253 гинек 7,5 заявка 6621",
@@ -25214,7 +25217,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-30T11:35:03.253258",
+  "last_update": "2026-06-30T11:40:36.082134",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
