@@ -3,9 +3,9 @@
     {
       "order_name": "1255 лат диаг XS 260630",
       "document_id": "108f02f1-15e2-4643-99f8-51b5d3d9aaef",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1255 лат диаг XS 260630\\1255 лат диаг XS 260630.pdf, C:\\Users\\user\\Desktop\\Коды км\\1255 лат диаг XS 260630\\1255 лат диаг XS 260630_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1255 лат диаг XS 260630\\1255 лат диаг XS 260630.xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XS, цвет натуральный",
       "gtin": "4650118041219",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1255 лат диаг XS 260630\\1255 лат диаг XS 260630.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1255 лат диаг XS 260630\\1255 лат диаг XS 260630.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1255 лат диаг XS 260630\\1255 лат диаг XS 260630_csv.csv"
     },
     {
       "order_name": "1254 ультра 7 партия 260621",
@@ -25243,7 +25246,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-06-30T13:53:34.414994",
+  "last_update": "2026-06-30T14:04:42.438143",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
