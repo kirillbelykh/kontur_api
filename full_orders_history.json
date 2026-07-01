@@ -7283,8 +7283,8 @@
     {
       "order_name": "1074 хир 9 251216 заявка 6249 (10 пар)",
       "document_id": "76f962bf-5686-4338-95fc-fbcd0d338bb6",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1074 хир 9 251216 заявка 6249 10 пар\\1074 хир 9 251216 заявка 6249 10 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1074 хир 9 251216 заявка 6249 10 пар\\1074 хир 9 251216 заявка 6249 (10 пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1074 хир 9 251216 заявка 6249 10 пар\\1074 хир 9 251216 заявка 6249 (10 пар).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,0",
       "gtin": "4640473219415",
@@ -7304,7 +7304,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1074 хир 9 251216 заявка 6249 10 пар\\1074 хир 9 251216 заявка 6249 (10 пар).xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1074 хир 9 251216 заявка 6249 10 пар\\1074 хир 9 251216 заявка 6249 10 пар.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1074 хир 9 251216 заявка 6249 10 пар\\1074 хир 9 251216 заявка 6249 (10 пар)_csv.csv"
     },
     {
       "order_name": "1073 хир 9 440825 заявка 6249 (9 пар)",
@@ -26386,7 +26389,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:45:21.341818",
+  "last_update": "2026-07-01T12:45:37.606092",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
