@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "тест 222",
+      "document_id": "b4746c3a-3020-4a65-b1c7-34fcc7ff0795",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
+      "gtin": "4650118040083",
+      "positions": [
+        {
+          "gtin": "4650118040083",
+          "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-07-01T17:42:15.246710",
+      "created_by": "user",
+      "updated_at": "2026-07-01T17:42:15.246710",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "тест 1122",
       "document_id": "23bf9530-94c4-4022-81cf-ae91825d2ea4",
       "status": "Выполнен",
@@ -26487,7 +26513,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T17:41:07.122867",
+  "last_update": "2026-07-01T17:42:17.824586",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
