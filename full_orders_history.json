@@ -6964,8 +6964,8 @@
     {
       "order_name": "1083 стер лат L заявка 6278",
       "document_id": "5723f29a-4c6f-485c-960c-211c15133810",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1083 стер лат L заявка 6278\\1083 стер лат L заявка 6278.pdf, C:\\Users\\user\\Desktop\\Коды км\\1083 стер лат L заявка 6278\\1083 стер лат L заявка 6278_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1083 стер лат L заявка 6278\\1083 стер лат L заявка 6278.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4640473514060",
@@ -6985,7 +6985,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1083 стер лат L заявка 6278\\1083 стер лат L заявка 6278.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1083 стер лат L заявка 6278\\1083 стер лат L заявка 6278.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1083 стер лат L заявка 6278\\1083 стер лат L заявка 6278_csv.csv"
     },
     {
       "order_name": "1082 стер лат L заявка 6268",
@@ -26356,7 +26359,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:41:57.294066",
+  "last_update": "2026-07-01T12:42:18.481400",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
