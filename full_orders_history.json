@@ -3,9 +3,9 @@
     {
       "order_name": "1265 микро 8,0 260629",
       "document_id": "479a3305-4d84-4cea-947f-0252f6872282",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1265 микро 80 260629\\1265 микро 80 260629.pdf, C:\\Users\\user\\Desktop\\Коды км\\1265 микро 80 260629\\1265 микро 8,0 260629_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1265 микро 80 260629\\1265 микро 8,0 260629.xls",
+      "simpl": "микрохирургия",
       "full_name": "Перчатки Sover Microsurgery хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной тактильной чувствительности, р-р 8,0",
       "gtin": "4640473504900",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1265 микро 80 260629\\1265 микро 8,0 260629.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1265 микро 80 260629\\1265 микро 80 260629.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1265 микро 80 260629\\1265 микро 8,0 260629_csv.csv"
     },
     {
       "order_name": "1262 лат диаг 2-хлор S 260630",
@@ -25594,7 +25597,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T09:41:03.951375",
+  "last_update": "2026-07-01T09:41:28.305948",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
