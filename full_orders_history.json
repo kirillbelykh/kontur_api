@@ -11785,8 +11785,8 @@
     {
       "order_name": "874 хир 8,5 260322",
       "document_id": "02ed7e73-ca8f-49d8-8795-57f76e055cd7",
-      "status": "received",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\874 хир 85 260322\\874 хир 85 260322.pdf, C:\\Users\\user\\Desktop\\Коды км\\874 хир 85 260322\\874 хир 8,5 260322_csv.csv",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,5",
       "gtin": "4640473510635",
@@ -11806,7 +11806,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\874 хир 85 260322\\874 хир 85 260322.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\874 хир 85 260322\\874 хир 8,5 260322_csv.csv"
     },
     {
       "order_name": "871 стер лат M 260501 заявка 5889",
@@ -26458,7 +26461,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:53:42.741496",
+  "last_update": "2026-07-01T12:53:58.946038",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
