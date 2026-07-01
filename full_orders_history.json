@@ -1041,8 +1041,8 @@
     {
       "order_name": "1245 стер нитрил M заявка 6618 (20 пар)",
       "document_id": "8347d688-da4d-4ad8-ad1d-38bef050637d",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1245 стер нитрил M заявка 6618 20 пар\\1245 стер нитрил M заявка 6618 20 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1245 стер нитрил M заявка 6618 20 пар\\1245 стер нитрил M заявка 6618 (20 пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1245 стер нитрил M заявка 6618 20 пар\\1245 стер нитрил M заявка 6618 (20 пар).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
       "gtin": "4640473512523",
@@ -1062,7 +1062,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1245 стер нитрил M заявка 6618 20 пар\\1245 стер нитрил M заявка 6618 (20 пар).xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1245 стер нитрил M заявка 6618 20 пар\\1245 стер нитрил M заявка 6618 20 пар.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1245 стер нитрил M заявка 6618 20 пар\\1245 стер нитрил M заявка 6618 (20 пар)_csv.csv"
     },
     {
       "order_name": "1244 стер нитрил M заявка 6618 (5 пар)",
@@ -25914,7 +25917,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:03:57.095710",
+  "last_update": "2026-07-01T12:04:18.305432",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
