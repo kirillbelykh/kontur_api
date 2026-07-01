@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1273 дв пара 8 260701",
+      "document_id": "f8c1f640-e899-4c4c-906a-95a8677c59f1",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 8,0",
+      "gtin": "4640473504689",
+      "positions": [
+        {
+          "gtin": "4640473504689",
+          "name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 8,0",
+          "tnvedCode": "4015120009",
+          "quantity": 11,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-07-01T10:49:15.548802",
+      "created_by": "user",
+      "updated_at": "2026-07-01T10:49:15.548802",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1272 дв пара 7,5 260701",
       "document_id": "7b44b448-70d5-4b58-ac49-100cf79ade04",
       "status": "Выполнен",
@@ -25805,7 +25831,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T10:48:46.389250",
+  "last_update": "2026-07-01T10:49:17.471203",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
