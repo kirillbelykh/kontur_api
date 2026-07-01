@@ -4407,8 +4407,8 @@
     {
       "order_name": "1155 стер лат L заявка 6464",
       "document_id": "ff06eaac-4218-43a8-aecd-80e73ed761f8",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1155 стер лат L заявка 6464\\1155 стер лат L заявка 6464.pdf, C:\\Users\\user\\Desktop\\Коды км\\1155 стер лат L заявка 6464\\1155 стер лат L заявка 6464_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1155 стер лат L заявка 6464\\1155 стер лат L заявка 6464.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4640473513063",
@@ -4428,7 +4428,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1155 стер лат L заявка 6464\\1155 стер лат L заявка 6464.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1155 стер лат L заявка 6464\\1155 стер лат L заявка 6464.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1155 стер лат L заявка 6464\\1155 стер лат L заявка 6464_csv.csv"
     },
     {
       "order_name": "1156 стер нитрил 250904",
@@ -26230,7 +26233,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:26:30.297519",
+  "last_update": "2026-07-01T12:26:51.916838",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
