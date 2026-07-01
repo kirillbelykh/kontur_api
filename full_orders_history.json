@@ -3598,8 +3598,8 @@
     {
       "order_name": "1180 ультра 7,5 заявка 6521 (30 пар)",
       "document_id": "b6b4ebc2-7267-44d9-902f-ebc9f9f112f1",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1180 ультра 75 заявка 6521 30 пар\\1180 ультра 75 заявка 6521 30 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1180 ультра 75 заявка 6521 30 пар\\1180 ультра 7,5 заявка 6521 (30 пар)_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1180 ультра 75 заявка 6521 30 пар\\1180 ультра 7,5 заявка 6521 (30 пар).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 7,5",
       "gtin": "4640473501992",
@@ -3619,7 +3619,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1180 ультра 75 заявка 6521 30 пар\\1180 ультра 7,5 заявка 6521 (30 пар).xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1180 ультра 75 заявка 6521 30 пар\\1180 ультра 75 заявка 6521 30 пар.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1180 ультра 75 заявка 6521 30 пар\\1180 ультра 7,5 заявка 6521 (30 пар)_csv.csv"
     },
     {
       "order_name": "1179 ультра 7,5 заявка 6521 (1 пара)",
@@ -26191,7 +26194,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:21:56.314787",
+  "last_update": "2026-07-01T12:22:17.724350",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
