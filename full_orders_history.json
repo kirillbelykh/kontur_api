@@ -5216,8 +5216,8 @@
     {
       "order_name": "1132 хир 7 заявка 6416",
       "document_id": "d1b7312c-5519-4620-8b3a-f02b00b539c8",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1132 хир 7 заявка 6416\\1132 хир 7 заявка 6416.pdf, C:\\Users\\user\\Desktop\\Коды км\\1132 хир 7 заявка 6416\\1132 хир 7 заявка 6416_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1132 хир 7 заявка 6416\\1132 хир 7 заявка 6416.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473505983",
@@ -5237,7 +5237,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1132 хир 7 заявка 6416\\1132 хир 7 заявка 6416.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1132 хир 7 заявка 6416\\1132 хир 7 заявка 6416.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1132 хир 7 заявка 6416\\1132 хир 7 заявка 6416_csv.csv"
     },
     {
       "order_name": "1131. лат диаг М партия 260615",
@@ -5329,8 +5332,8 @@
     {
       "order_name": "1129 хир 7,5 к заявке 6403",
       "document_id": "5df7d522-8cfc-4252-b790-3bccee54ada0",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1129 хир 75 к заявке 6403\\1129 хир 75 к заявке 6403.pdf, C:\\Users\\user\\Desktop\\Коды км\\1129 хир 75 к заявке 6403\\1129 хир 7,5 к заявке 6403_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1129 хир 75 к заявке 6403\\1129 хир 7,5 к заявке 6403.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473505990",
@@ -5350,7 +5353,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1129 хир 75 к заявке 6403\\1129 хир 7,5 к заявке 6403.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1129 хир 75 к заявке 6403\\1129 хир 75 к заявке 6403.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1129 хир 75 к заявке 6403\\1129 хир 7,5 к заявке 6403_csv.csv"
     },
     {
       "order_name": "1128 хир 7,5 к заявке 6408",
@@ -26284,7 +26290,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:32:46.125385",
+  "last_update": "2026-07-01T12:33:46.300105",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
