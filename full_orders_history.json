@@ -58,9 +58,9 @@
     {
       "order_name": "1272 дв пара 7,5 260701",
       "document_id": "7b44b448-70d5-4b58-ac49-100cf79ade04",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1272 дв пара 75 260701\\1272 дв пара 75 260701.pdf, C:\\Users\\user\\Desktop\\Коды км\\1272 дв пара 75 260701\\1272 дв пара 7,5 260701_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1272 дв пара 75 260701\\1272 дв пара 7,5 260701.xls",
+      "simpl": "двойная пара",
       "full_name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,5",
       "gtin": "4640473504672",
       "positions": [
@@ -79,7 +79,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1272 дв пара 75 260701\\1272 дв пара 7,5 260701.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1272 дв пара 75 260701\\1272 дв пара 75 260701.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1272 дв пара 75 260701\\1272 дв пара 7,5 260701_csv.csv"
     },
     {
       "order_name": "1271 дв пара 7,0 260701",
@@ -25863,7 +25866,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T10:55:38.700788",
+  "last_update": "2026-07-01T10:56:13.527637",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
