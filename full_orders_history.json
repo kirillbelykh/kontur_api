@@ -751,8 +751,8 @@
     {
       "order_name": "1251 гинек 7,5 заявка 6621",
       "document_id": "8dc9be4a-f4c4-4305-93f3-7aa78196cc3d",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1251 гинек 75 заявка 6621\\1251 гинек 75 заявка 6621.pdf, C:\\Users\\user\\Desktop\\Коды км\\1251 гинек 75 заявка 6621\\1251 гинек 7,5 заявка 6621_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1251 гинек 75 заявка 6621\\1251 гинек 7,5 заявка 6621.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком с удлиненной крагой, р-р 7,5",
       "gtin": "4640473506218",
@@ -772,7 +772,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1251 гинек 75 заявка 6621\\1251 гинек 7,5 заявка 6621.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1251 гинек 75 заявка 6621\\1251 гинек 75 заявка 6621.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1251 гинек 75 заявка 6621\\1251 гинек 7,5 заявка 6621_csv.csv"
     },
     {
       "order_name": "1250 хир 7,0 заявка 6606 (4 пары)",
@@ -25890,7 +25893,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:01:28.227974",
+  "last_update": "2026-07-01T12:01:44.231349",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
