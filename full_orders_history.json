@@ -6306,8 +6306,8 @@
     {
       "order_name": "1102 стер лат M заявка 6330",
       "document_id": "f8a6cccf-c3e2-4b6f-aa79-47cfd238533f",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1102 стер лат M заявка 6330\\1102 стер лат M заявка 6330.pdf, C:\\Users\\user\\Desktop\\Коды км\\1102 стер лат M заявка 6330\\1102 стер лат M заявка 6330_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1102 стер лат M заявка 6330\\1102 стер лат M заявка 6330.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
       "gtin": "4640473513070",
@@ -6327,7 +6327,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1102 стер лат M заявка 6330\\1102 стер лат M заявка 6330.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1102 стер лат M заявка 6330\\1102 стер лат M заявка 6330.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1102 стер лат M заявка 6330\\1102 стер лат M заявка 6330_csv.csv"
     },
     {
       "order_name": "1101 стер лат M заявка 6329",
@@ -26317,7 +26320,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:37:20.868153",
+  "last_update": "2026-07-01T12:37:36.939327",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
