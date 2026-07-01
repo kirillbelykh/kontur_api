@@ -6132,8 +6132,8 @@
     {
       "order_name": "1107 хир 7,5 заявка 6301",
       "document_id": "aec74640-1a9b-4318-8140-ef5ab404115d",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1107 хир 75 заявка 6301\\1107 хир 75 заявка 6301.pdf, C:\\Users\\user\\Desktop\\Коды км\\1107 хир 75 заявка 6301\\1107 хир 7,5 заявка 6301_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1107 хир 75 заявка 6301\\1107 хир 7,5 заявка 6301.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473505990",
@@ -6153,13 +6153,16 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1107 хир 75 заявка 6301\\1107 хир 7,5 заявка 6301.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1107 хир 75 заявка 6301\\1107 хир 75 заявка 6301.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1107 хир 75 заявка 6301\\1107 хир 7,5 заявка 6301_csv.csv"
     },
     {
       "order_name": "1106 стер лат L заявка 6325",
       "document_id": "4d68fe1e-6ce1-4461-8d1b-269a1ce5a81d",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1106 стер лат L заявка 6325\\1106 стер лат L заявка 6325.pdf, C:\\Users\\user\\Desktop\\Коды км\\1106 стер лат L заявка 6325\\1106 стер лат L заявка 6325_csv.csv",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4640473513063",
@@ -6179,7 +6182,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1106 стер лат L заявка 6325\\1106 стер лат L заявка 6325.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1106 стер лат L заявка 6325\\1106 стер лат L заявка 6325_csv.csv"
     },
     {
       "order_name": "1105 стер лат M заявка 6325",
@@ -26299,7 +26305,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T12:34:50.784352",
+  "last_update": "2026-07-01T12:35:55.989414",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
