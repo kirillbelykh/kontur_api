@@ -603,8 +603,8 @@
     {
       "order_name": "1256 лат диаг XS 260630",
       "document_id": "8f9fbf43-f71d-4f5f-be92-9994596b425c",
-      "status": "Выполнен",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630.pdf, C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630.xls",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630.pdf, C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р XS, цвет натуральный",
       "gtin": "4650118041219",
@@ -626,7 +626,7 @@
       "tsd_intro_number": null,
       "tsd_created_by": null,
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630.xls",
-      "csv_path": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630_csv.csv",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1256 лат диаг XS 260630\\1256 лат диаг XS 260630.pdf"
     },
     {
@@ -25881,7 +25881,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-01T11:29:46.375760",
+  "last_update": "2026-07-01T11:41:58.762361",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
