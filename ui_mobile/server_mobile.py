@@ -65,6 +65,7 @@ ALLOWED_METHODS = {
     "create_order",
     "create_tsd_tasks",
     "delete_order",
+    "delete_wms_chz_requests",
     "download_aggregation_codes",
     "download_selected_aggregations",
     "get_aggregation_state",

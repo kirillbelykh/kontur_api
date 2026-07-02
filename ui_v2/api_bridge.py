@@ -114,6 +114,7 @@ WMS_CHZ_STATUS_LABELS = {
     "ready": "Коды готовы",
     "cancelled": "Отменен",
     "archived": "В архиве",
+    "deleted": "Удален",
 }
 
 STATUS_LABELS = {
@@ -992,7 +993,7 @@ class ApiBridge:
                     if (
                         (existing_status == "acknowledged" and incoming_status == "requested")
                         or (
-                            existing_status in {"ready", "archived"}
+                            existing_status in {"ready", "archived", "deleted"}
                             and incoming_status in {"requested", "acknowledged"}
                         )
                     ):
@@ -4287,13 +4288,17 @@ class ApiBridge:
                 "wms_chz_active": [
                     self._serialize_wms_chz_request(item)
                     for item in runtime.wms_chz_requests
-                    if bool(item.get("is_active", str(item.get("status") or "") in {"requested", "acknowledged"}))
-                    and str(item.get("status") or "") in {"requested", "acknowledged"}
+                    if (
+                        str(item.get("status") or "") != "deleted"
+                        and bool(item.get("is_active", str(item.get("status") or "") in {"requested", "acknowledged"}))
+                        and str(item.get("status") or "") in {"requested", "acknowledged"}
+                    )
                 ],
                 "wms_chz_archive": [
                     self._serialize_wms_chz_request(item)
                     for item in runtime.wms_chz_requests
-                    if not (
+                    if str(item.get("status") or "") != "deleted"
+                    and not (
                         bool(item.get("is_active", str(item.get("status") or "") in {"requested", "acknowledged"}))
                         and str(item.get("status") or "") in {"requested", "acknowledged"}
                     )
@@ -4308,6 +4313,7 @@ class ApiBridge:
             requests_payload = [
                 self._serialize_wms_chz_request(item)
                 for item in self._sort_wms_chz_requests(runtime.wms_chz_requests)
+                if str(item.get("status") or "").strip().lower() != "deleted"
             ]
 
         new_requests = [item for item in requests_payload if item.get("status") == "requested"]
@@ -4469,6 +4475,35 @@ class ApiBridge:
             if not changed:
                 raise RuntimeError("Выбранные архивные запросы ЧЗ не найдены.")
             self._log("chz", f"Запросы ЧЗ возвращены из архива: {changed}")
+            return {"success": True, "state": self.get_chz_requests_view_state(force_sync=False)}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def delete_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
+        try:
+            refs = set(self._wms_chz_request_refs(request_ids))
+            runtime = self._ensure_wms_chz_runtime_defaults()
+            deleted_at = datetime.now().isoformat()
+            changed = 0
+            with runtime.lock:
+                updated_items: List[Dict[str, Any]] = []
+                for item in runtime.wms_chz_requests:
+                    normalized = self._normalize_wms_chz_request(item)
+                    if any(self._wms_chz_request_matches_ref(normalized, request_ref) for request_ref in refs):
+                        normalized["status"] = "deleted"
+                        normalized["status_label"] = WMS_CHZ_STATUS_LABELS["deleted"]
+                        normalized["is_active"] = False
+                        normalized["deleted_at"] = deleted_at
+                        normalized["updated_at"] = deleted_at
+                        normalized["updated_at_label"] = self._format_wms_chz_time(deleted_at)
+                        changed += 1
+                    updated_items.append(normalized)
+                runtime.wms_chz_requests = self._sort_wms_chz_requests(updated_items)
+                self._save_wms_chz_requests(runtime.wms_chz_requests)
+
+            if not changed:
+                raise RuntimeError("Выбранные запросы ЧЗ не найдены.")
+            self._log("chz", f"Запросы ЧЗ удалены из рабочего списка: {changed}")
             return {"success": True, "state": self.get_chz_requests_view_state(force_sync=False)}
         except Exception as exc:
             return {"success": False, "error": str(exc)}

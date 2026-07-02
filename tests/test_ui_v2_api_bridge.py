@@ -360,11 +360,12 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 mock.patch.object(self.bridge, "_send_wms_chz_callback") as callback_mock,
                 mock.patch.object(self.bridge, "get_orders_view_state", return_value={"ok": True}),
                 mock.patch.object(self.bridge, "_log"),
+                mock.patch.object(self.bridge, "_sync_pending_wms_chz_requests"),
             ):
                 result = self.bridge.acknowledge_wms_chz_request(9)
 
         self.assertTrue(result["success"])
-        callback_mock.assert_called_once_with(9, "acknowledge")
+        callback_mock.assert_called_once_with("/integration/chz/requests:9", "acknowledge")
         self.assertEqual(fake_runtime.wms_chz_requests[0]["status"], "acknowledged")
         self.assertTrue(fake_runtime.wms_chz_requests[0]["is_active"])
 
@@ -392,13 +393,55 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 mock.patch.object(self.bridge, "_send_wms_chz_callback") as callback_mock,
                 mock.patch.object(self.bridge, "get_orders_view_state", return_value={"ok": True}),
                 mock.patch.object(self.bridge, "_log"),
+                mock.patch.object(self.bridge, "_sync_pending_wms_chz_requests"),
             ):
                 result = self.bridge.mark_wms_chz_request_ready(10)
 
         self.assertTrue(result["success"])
-        callback_mock.assert_called_once_with(10, "ready")
+        callback_mock.assert_called_once_with("/integration/chz/requests:10", "ready")
         self.assertEqual(fake_runtime.wms_chz_requests[0]["status"], "ready")
         self.assertFalse(fake_runtime.wms_chz_requests[0]["is_active"])
+
+    def test_delete_wms_chz_requests_hides_request_and_prevents_resync_restore(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            fake_runtime = types.SimpleNamespace(
+                root_dir=Path(temp_dir),
+                lock=api_bridge.Lock(),
+                wms_chz_requests=[
+                    {
+                        "request_id": 11,
+                        "order_id": 89,
+                        "order_name": "WMS-89",
+                        "status": "requested",
+                        "requested_at": "2026-06-18T10:00:00",
+                        "items": [],
+                    }
+                ],
+                wms_chz_last_synced_at=0.0,
+            )
+
+            with (
+                mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+                mock.patch.object(self.bridge, "_log"),
+                mock.patch.object(self.bridge, "_sync_pending_wms_chz_requests"),
+            ):
+                result = self.bridge.delete_wms_chz_requests([11])
+                self.bridge._upsert_wms_chz_request(
+                    {
+                        "request_id": 11,
+                        "order_id": 89,
+                        "order_name": "WMS-89",
+                        "status": "requested",
+                        "requested_at": "2026-06-18T10:00:00",
+                        "items": [],
+                    }
+                )
+                state = self.bridge.get_chz_requests_view_state(force_sync=False)
+
+        self.assertTrue(result["success"])
+        self.assertEqual(fake_runtime.wms_chz_requests[0]["status"], "deleted")
+        self.assertEqual(state["new_requests"], [])
+        self.assertEqual(state["archive"], [])
 
     def test_kontur_order_mapping_preserves_product_metadata(self):
         item = {

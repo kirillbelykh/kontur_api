@@ -23,6 +23,7 @@ class UiMobileServerTests(unittest.TestCase):
             "acknowledge_wms_chz_requests",
             "archive_selected_aggregations",
             "archive_wms_chz_requests",
+            "delete_wms_chz_requests",
             "get_auth_state",
             "get_chz_requests_view_state",
             "get_labels_state",
