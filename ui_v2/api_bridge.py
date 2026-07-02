@@ -911,6 +911,20 @@ class ApiBridge:
             updated = False
             for index, item in enumerate(current_items):
                 if int(item.get("request_id") or 0) == normalized["request_id"]:
+                    existing_status = str(item.get("status") or "").strip().lower()
+                    incoming_status = str(normalized.get("status") or "").strip().lower()
+                    if (
+                        (existing_status == "acknowledged" and incoming_status == "requested")
+                        or (
+                            existing_status in {"ready", "archived"}
+                            and incoming_status in {"requested", "acknowledged"}
+                        )
+                    ):
+                        normalized = self._normalize_wms_chz_request(item)
+                        current_items[index] = normalized
+                        updated = True
+                        break
+
                     merged = dict(item)
                     for key, value in normalized.items():
                         if key == "author" and value == "WMS" and str(merged.get("author") or "").strip():
@@ -4168,7 +4182,7 @@ class ApiBridge:
                         "deleted_at": item.get("deleted_at") or "",
                         "deleted_by": item.get("deleted_by") or "",
                     }
-                    for item in self._load_deleted_orders()[:250]
+                    for item in self._load_deleted_orders()
                 ],
                 "wms_chz_active": [
                     self._serialize_wms_chz_request(item)
@@ -4183,7 +4197,7 @@ class ApiBridge:
                         bool(item.get("is_active", str(item.get("status") or "") in {"requested", "acknowledged"}))
                         and str(item.get("status") or "") in {"requested", "acknowledged"}
                     )
-                ][:250],
+                ],
             }
         except Exception as exc:
             return {"error": str(exc)}
@@ -4207,7 +4221,7 @@ class ApiBridge:
         return {
             "new_requests": new_requests,
             "in_progress": in_progress,
-            "archive": archive[:500],
+            "archive": archive,
             "counts": {
                 "new": len(new_requests),
                 "in_progress": len(in_progress),
@@ -4254,7 +4268,7 @@ class ApiBridge:
             return {
                 "success": True,
                 "request": self._serialize_wms_chz_request(updated_request),
-                "state": self.get_orders_view_state(force_sync=False),
+                "state": self.get_chz_requests_view_state(force_sync=False),
             }
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -4290,7 +4304,7 @@ class ApiBridge:
             return {
                 "success": True,
                 "request": self._serialize_wms_chz_request(updated_request),
-                "state": self.get_orders_view_state(force_sync=False),
+                "state": self.get_chz_requests_view_state(force_sync=False),
             }
         except Exception as exc:
             return {"success": False, "error": str(exc)}
@@ -4547,10 +4561,13 @@ class ApiBridge:
 
         document_id = str(response.get("documentId") or response.get("id") or "")
         status = str(response.get("status") or "unknown")
+        created_at = datetime.now().isoformat()
         history_entry = {
             "order_name": item["order_name"],
             "document_id": document_id,
             "status": status,
+            "created_at": created_at,
+            "updated_at": created_at,
             "filename": None,
             "csv_path": None,
             "pdf_path": None,
@@ -4577,6 +4594,8 @@ class ApiBridge:
             "color": item["color"],
             "units_per_pack": item["units_per_pack"],
             "codes_count": item["codes_count"],
+            "created_at": created_at,
+            "updated_at": created_at,
             "download_item": self._serialize_download_item(download_item),
         }
         _get_runtime().session_orders.insert(0, result)
@@ -5517,9 +5536,6 @@ class ApiBridge:
                     continue
                 if self._is_hidden_service_order(item):
                     continue
-                download_like = _history_order_to_download_item(item)
-                if not (item.get("tsd_created") or is_order_ready_for_tsd(download_like) or self._live_intro_meta_for_order(item) or self._live_order_meta_for(item)):
-                    continue
                 if normalized_search:
                     haystack = " ".join(
                         str(value or "")
@@ -5543,7 +5559,7 @@ class ApiBridge:
                         include_marking_status=bool(live) and self._should_include_marking_status(item),
                         tab_type="tsd",
                     )
-                    for item in orders[:300]
+                    for item in orders
                 ],
                 "live": bool(live),
                 "live_updated_at": runtime.live_status_last_refresh_at,
@@ -6546,14 +6562,16 @@ class ApiBridge:
             orders = sorted(
                 [
                     item
-                    for item in _get_runtime().history_db.get_all_orders()
+                    for item in self._collect_known_orders()
                     if str(item.get("document_id") or "").strip() not in deleted_ids
+                    and not self._is_archived_order(item)
+                    and not self._is_hidden_service_order(item)
                 ],
                 key=lambda order: str(order.get("updated_at") or order.get("created_at") or ""),
                 reverse=True,
             )
             serialized_orders = []
-            for order in orders[:300]:
+            for order in orders:
                 try:
                     metadata = resolve_order_metadata(order, df)
                     serialized_orders.append(
@@ -6617,7 +6635,7 @@ class ApiBridge:
                         "record_count": item.record_count,
                         "modified_timestamp": item.modified_timestamp,
                     }
-                    for item in list_aggregation_csv_files()[:200]
+                    for item in list_aggregation_csv_files()
                 ],
                 "marking_files": [
                     {
@@ -6627,7 +6645,7 @@ class ApiBridge:
                         "record_count": item.record_count,
                         "modified_timestamp": item.modified_timestamp,
                     }
-                    for item in list_marking_csv_files()[:200]
+                    for item in list_marking_csv_files()
                 ],
                 "orders": serialized_orders,
                 "printers": printers,
