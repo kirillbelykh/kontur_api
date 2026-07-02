@@ -1083,6 +1083,33 @@ class ApiBridge:
         )
         response.raise_for_status()
 
+    def _archive_wms_chz_requests_in_wms(self, requests_payload: Sequence[Dict[str, Any]]) -> None:
+        base_url = self._wms_api_base_url()
+        if not base_url:
+            raise RuntimeError("Не задан WMS_API_BASE_URL для архивации ЧЗ.")
+
+        entries: List[Dict[str, Any]] = []
+        for item in requests_payload:
+            request_id = self._safe_wms_chz_request_id(item.get("request_id") or item.get("id"))
+            if request_id <= 0:
+                continue
+            request_type = str(item.get("request_type") or "").strip().lower()
+            source = "production" if request_type == "production" else "manual" if request_type == "manual" else "shipment"
+            entry = {"source": source, "request_id": request_id}
+            if entry not in entries:
+                entries.append(entry)
+
+        if not entries:
+            raise RuntimeError("Выбранные запросы ЧЗ не найдены.")
+
+        response = requests.post(
+            f"{base_url}/integration/chz/requests/archive",
+            headers=self._wms_chz_headers(),
+            json={"entries": entries},
+            timeout=10,
+        )
+        response.raise_for_status()
+
     def receive_wms_chz_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             request = self._upsert_wms_chz_request(payload)
@@ -4424,6 +4451,10 @@ class ApiBridge:
     def archive_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
         try:
             refs = set(self._wms_chz_request_refs(request_ids))
+            targets = [request for request in (self._find_wms_chz_request(request_ref) for request_ref in refs) if request]
+            if not targets:
+                raise RuntimeError("Выбранные запросы ЧЗ не найдены.")
+            self._archive_wms_chz_requests_in_wms(targets)
             runtime = self._ensure_wms_chz_runtime_defaults()
             archived_at = datetime.now().isoformat()
             changed = 0
@@ -4482,6 +4513,10 @@ class ApiBridge:
     def delete_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
         try:
             refs = set(self._wms_chz_request_refs(request_ids))
+            targets = [request for request in (self._find_wms_chz_request(request_ref) for request_ref in refs) if request]
+            if not targets:
+                raise RuntimeError("Выбранные запросы ЧЗ не найдены.")
+            self._archive_wms_chz_requests_in_wms(targets)
             runtime = self._ensure_wms_chz_runtime_defaults()
             deleted_at = datetime.now().isoformat()
             changed = 0

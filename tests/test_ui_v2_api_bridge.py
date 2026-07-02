@@ -423,6 +423,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             with (
                 mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
                 mock.patch.object(self.bridge, "_log"),
+                mock.patch.object(self.bridge, "_archive_wms_chz_requests_in_wms"),
                 mock.patch.object(self.bridge, "_sync_pending_wms_chz_requests"),
             ):
                 result = self.bridge.delete_wms_chz_requests([11])
