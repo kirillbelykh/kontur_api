@@ -430,6 +430,7 @@ def _history_order_to_download_item(order_data: Dict[str, Any]) -> Dict[str, Any
     filename = order_data.get("filename")
     csv_path = order_data.get("csv_path")
     status = "Скачан" if filename or csv_path else "Из истории"
+    codes_count = _extract_codes_count(order_data)
     return {
         "order_name": str(order_data.get("order_name") or "").strip(),
         "document_id": str(order_data.get("document_id") or "").strip(),
@@ -441,6 +442,9 @@ def _history_order_to_download_item(order_data: Dict[str, Any]) -> Dict[str, Any
         "simpl": str(order_data.get("simpl") or order_data.get("simpl_name") or "").strip(),
         "full_name": _extract_position_name(order_data),
         "gtin": _extract_gtin(order_data),
+        "codes_count": codes_count,
+        "requested_codes_count": codes_count,
+        "received_codes_count": _coerce_non_negative_int(order_data.get("received_codes_count") or order_data.get("receivedCodesCount")),
         "product_group": order_data.get("product_group") or order_data.get("productGroup") or "",
         "from_history": True,
         "downloading": False,
@@ -555,6 +559,45 @@ def _extract_kontur_order_positions(order_data: Dict[str, Any]) -> List[Dict[str
     if (top_level_gtin or top_level_name) and not positions:
         positions.append({"gtin": top_level_gtin, "name": top_level_name})
     return positions
+
+
+def _coerce_non_negative_int(value: Any) -> int:
+    try:
+        if value in (None, ""):
+            return 0
+        parsed = int(float(str(value).replace(",", ".").strip()))
+    except (TypeError, ValueError):
+        return 0
+    return max(parsed, 0)
+
+
+def _extract_codes_count(order_data: Dict[str, Any]) -> int:
+    direct_keys = (
+        "codes_count",
+        "codesCount",
+        "requested_codes_count",
+        "requestedCodesCount",
+        "received_codes_count",
+        "receivedCodesCount",
+        "order_quantity",
+        "quantity",
+        "totalCodesCount",
+        "total_codes_count",
+    )
+    direct_values = [_coerce_non_negative_int(order_data.get(key)) for key in direct_keys]
+    direct_count = max(direct_values, default=0)
+    if direct_count > 0:
+        return direct_count
+
+    total = 0
+    for position in _extract_kontur_order_positions(order_data):
+        total += max(
+            _coerce_non_negative_int(position.get("quantity")),
+            _coerce_non_negative_int(position.get("codesCount")),
+            _coerce_non_negative_int(position.get("requestedCodesCount")),
+            _coerce_non_negative_int(position.get("receivedCodesCount")),
+        )
+    return total
 
 
 class ApiBridge:
@@ -809,22 +852,53 @@ class ApiBridge:
         return "shipment"
 
     @staticmethod
-    def _wms_chz_request_ids(request_ids: Sequence[Any] | Any) -> List[int]:
+    def _safe_wms_chz_request_id(value: Any) -> int:
+        try:
+            return int(value or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
+    def _wms_chz_request_key_from_parts(request_id: int, callback_path: str) -> str:
+        normalized_path = str(callback_path or "/integration/chz/requests").strip() or "/integration/chz/requests"
+        return f"{normalized_path}:{int(request_id or 0)}"
+
+    def _wms_chz_request_key_from_payload(self, payload: Dict[str, Any]) -> str:
+        request_id = self._safe_wms_chz_request_id(payload.get("request_id") or payload.get("id"))
+        callback_path = str(payload.get("callback_path") or "/integration/chz/requests").strip() or "/integration/chz/requests"
+        return self._wms_chz_request_key_from_parts(request_id, callback_path)
+
+    @staticmethod
+    def _wms_chz_request_refs(request_ids: Sequence[Any] | Any) -> List[str]:
         raw_items = request_ids if isinstance(request_ids, (list, tuple, set)) else [request_ids]
-        normalized: List[int] = []
+        normalized: List[str] = []
         for raw_item in raw_items:
-            try:
-                request_id = int(raw_item or 0)
-            except (TypeError, ValueError):
+            if isinstance(raw_item, dict):
+                raw_item = raw_item.get("request_key") or raw_item.get("request_id") or raw_item.get("id")
+            request_ref = str(raw_item or "").strip()
+            if not request_ref:
                 continue
-            if request_id > 0 and request_id not in normalized:
-                normalized.append(request_id)
+            if request_ref.isdigit():
+                request_ref = str(int(request_ref))
+            if request_ref not in normalized:
+                normalized.append(request_ref)
         if not normalized:
             raise RuntimeError("Выберите запрос ЧЗ.")
         return normalized
 
+    def _wms_chz_request_matches_ref(self, item: Dict[str, Any], request_ref: Any) -> bool:
+        normalized_ref = str(request_ref or "").strip()
+        if not normalized_ref:
+            return False
+        item_key = str(item.get("request_key") or self._wms_chz_request_key_from_payload(item)).strip()
+        if item_key and normalized_ref == item_key:
+            return True
+        if normalized_ref.isdigit():
+            return self._safe_wms_chz_request_id(item.get("request_id") or item.get("id")) == int(normalized_ref)
+        return False
+
     def _normalize_wms_chz_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        request_id = int(payload.get("request_id") or payload.get("id") or 0)
+        request_id = self._safe_wms_chz_request_id(payload.get("request_id") or payload.get("id"))
         items = self._normalize_wms_chz_items(payload.get("items"))
         status = str(payload.get("status") or "requested").strip().lower() or "requested"
         is_active = bool(payload.get("is_active", status in {"requested", "acknowledged"}))
@@ -836,6 +910,7 @@ class ApiBridge:
         ready_at = str(payload.get("ready_at") or "").strip()
         updated_at = ready_at or acknowledged_at or requested_at or datetime.now().isoformat()
         callback_path = str(payload.get("callback_path") or "/integration/chz/requests").strip() or "/integration/chz/requests"
+        request_key = str(payload.get("request_key") or "").strip() or self._wms_chz_request_key_from_parts(request_id, callback_path)
         request_type = self._infer_wms_chz_request_type(payload, order_name=order_name, callback_path=callback_path)
         order_number = str(payload.get("order_number") or order_name).strip()
         if request_type == "production" and order_number.lower().startswith("производство "):
@@ -850,9 +925,10 @@ class ApiBridge:
         ).strip()
         first_item = items[0] if items else {}
         return {
+            "request_key": request_key,
             "request_id": request_id,
             "external_request_id": str(payload.get("external_request_id") or "").strip(),
-            "order_id": int(payload.get("order_id") or 0),
+            "order_id": self._safe_wms_chz_request_id(payload.get("order_id")),
             "order_name": order_name,
             "order_number": order_number,
             "customer": customer,
@@ -910,7 +986,7 @@ class ApiBridge:
             current_items = list(runtime.wms_chz_requests)
             updated = False
             for index, item in enumerate(current_items):
-                if int(item.get("request_id") or 0) == normalized["request_id"]:
+                if self._wms_chz_request_key_from_payload(item) == normalized["request_key"]:
                     existing_status = str(item.get("status") or "").strip().lower()
                     incoming_status = str(normalized.get("status") or "").strip().lower()
                     if (
@@ -979,21 +1055,28 @@ class ApiBridge:
         except Exception as exc:
             logger.warning("Не удалось синхронизировать CHZ-запросы из WMS: %s", exc)
 
-    def _send_wms_chz_callback(self, request_id: int, action: str) -> None:
+    def _find_wms_chz_request(self, request_ref: Any) -> Optional[Dict[str, Any]]:
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        with runtime.lock:
+            for item in runtime.wms_chz_requests:
+                normalized = self._normalize_wms_chz_request(item)
+                if self._wms_chz_request_matches_ref(normalized, request_ref):
+                    return normalized
+        return None
+
+    def _send_wms_chz_callback(self, request_ref: Any, action: str) -> None:
         base_url = self._wms_api_base_url()
         if not base_url:
             raise RuntimeError("Не задан WMS_API_BASE_URL для обратного вызова ЧЗ.")
-        runtime = self._ensure_wms_chz_runtime_defaults()
+        request = self._find_wms_chz_request(request_ref)
         callback_path = "/integration/chz/requests"
-        with runtime.lock:
-            request = next(
-                (item for item in runtime.wms_chz_requests if int(item.get("request_id") or 0) == int(request_id)),
-                None,
-            )
+        request_id = self._safe_wms_chz_request_id(request.get("request_id") if request else request_ref)
         if request and str(request.get("callback_path") or "").strip():
             callback_path = str(request.get("callback_path")).strip()
+        if request_id <= 0:
+            raise RuntimeError("Некорректный идентификатор CHZ-запроса.")
         response = requests.post(
-            f"{base_url}{callback_path}/{int(request_id)}/{action}",
+            f"{base_url}{callback_path}/{request_id}/{action}",
             headers=self._wms_chz_headers(),
             timeout=10,
         )
@@ -1160,12 +1243,13 @@ class ApiBridge:
         document_status = str(item.get("documentStatus") or item.get("status") or "").strip()
         created_at = str(item.get("createdDate") or item.get("created_at") or "").strip()
         updated_at = str(item.get("updatedDate") or item.get("updated_at") or "").strip()
-        requested_count = item.get("requestedCodesCount")
-        received_count = item.get("receivedCodesCount")
+        requested_count = _coerce_non_negative_int(item.get("requestedCodesCount") or item.get("requested_codes_count"))
+        received_count = _coerce_non_negative_int(item.get("receivedCodesCount") or item.get("received_codes_count"))
         positions = _extract_kontur_order_positions(item)
         metadata_source = dict(item)
         if positions:
             metadata_source["positions"] = positions
+        codes_count = max(requested_count, received_count, _extract_codes_count(metadata_source))
         local_item = {
             "order_name": document_number,
             "document_id": document_id,
@@ -1173,8 +1257,8 @@ class ApiBridge:
             "status_raw": document_status,
             "created_at": created_at,
             "updated_at": updated_at,
-            "codes_count": requested_count or received_count or 0,
-            "requested_codes_count": requested_count,
+            "codes_count": codes_count,
+            "requested_codes_count": requested_count or codes_count,
             "received_codes_count": received_count,
             "product_group": item.get("productGroup") or "",
             "cisType": item.get("cisType") or "",
@@ -1670,6 +1754,16 @@ class ApiBridge:
             intro_document_id = live_document_id
         else:
             intro_document_id = str(live_meta.get("introductionDocumentId") or "").strip()
+        codes_count = max(_extract_codes_count(merged), _extract_codes_count(live_meta))
+        requested_codes_count = max(
+            _coerce_non_negative_int(merged.get("requested_codes_count") or merged.get("requestedCodesCount")),
+            _coerce_non_negative_int(live_meta.get("requestedCodesCount") or live_meta.get("requested_codes_count")),
+            codes_count,
+        )
+        received_codes_count = max(
+            _coerce_non_negative_int(merged.get("received_codes_count") or merged.get("receivedCodesCount")),
+            _coerce_non_negative_int(live_meta.get("receivedCodesCount") or live_meta.get("received_codes_count")),
+        )
         return {
             "order_name": str(merged.get("order_name") or live_meta.get("documentNumber") or merged.get("document_number") or "").strip(),
             "document_id": str(merged.get("document_id") or "").strip(),
@@ -1690,6 +1784,9 @@ class ApiBridge:
             "xls_path": merged.get("xls_path") or "",
             "created_at": merged.get("created_at") or live_meta.get("createdDate") or "",
             "updated_at": merged.get("updated_at") or live_meta.get("updatedDate") or "",
+            "codes_count": codes_count,
+            "requested_codes_count": requested_codes_count,
+            "received_codes_count": received_codes_count,
             "tsd_created": tsd_created,
             "tsd_intro_number": merged.get("tsd_intro_number") or "",
             "tsd_status": status_payload["status"] if tab_type == "tsd" else _translate_status("tsd_created" if tsd_created else "tsd_not_created"),
@@ -1998,6 +2095,9 @@ class ApiBridge:
             "simpl": item["simpl_name"],
             "full_name": item["full_name"],
             "gtin": item["gtin"],
+            "codes_count": item["codes_count"],
+            "requested_codes_count": item["codes_count"],
+            "received_codes_count": 0,
             "from_history": False,
             "downloading": False,
             "history_data": None,
@@ -4237,22 +4337,15 @@ class ApiBridge:
         except Exception as exc:
             return {"error": str(exc)}
 
-    def acknowledge_wms_chz_request(self, request_id: int) -> Dict[str, Any]:
+    def acknowledge_wms_chz_request(self, request_id: Any) -> Dict[str, Any]:
         try:
-            normalized_id = int(request_id or 0)
-            if normalized_id <= 0:
-                raise RuntimeError("Выберите запрос ЧЗ.")
-
-            runtime = self._ensure_wms_chz_runtime_defaults()
-            with runtime.lock:
-                request = next(
-                    (item for item in runtime.wms_chz_requests if int(item.get("request_id") or 0) == normalized_id),
-                    None,
-                )
+            request = self._find_wms_chz_request(request_id)
             if not request:
                 raise RuntimeError("Запрос ЧЗ не найден.")
+            request_ref = request.get("request_key") or request_id
+            normalized_id = self._safe_wms_chz_request_id(request.get("request_id"))
 
-            self._send_wms_chz_callback(normalized_id, "acknowledge")
+            self._send_wms_chz_callback(request_ref, "acknowledge")
             updated_request = self._upsert_wms_chz_request(
                 {
                     **request,
@@ -4273,22 +4366,15 @@ class ApiBridge:
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
-    def mark_wms_chz_request_ready(self, request_id: int) -> Dict[str, Any]:
+    def mark_wms_chz_request_ready(self, request_id: Any) -> Dict[str, Any]:
         try:
-            normalized_id = int(request_id or 0)
-            if normalized_id <= 0:
-                raise RuntimeError("Выберите запрос ЧЗ.")
-
-            runtime = self._ensure_wms_chz_runtime_defaults()
-            with runtime.lock:
-                request = next(
-                    (item for item in runtime.wms_chz_requests if int(item.get("request_id") or 0) == normalized_id),
-                    None,
-                )
+            request = self._find_wms_chz_request(request_id)
             if not request:
                 raise RuntimeError("Запрос ЧЗ не найден.")
+            request_ref = request.get("request_key") or request_id
+            normalized_id = self._safe_wms_chz_request_id(request.get("request_id"))
 
-            self._send_wms_chz_callback(normalized_id, "ready")
+            self._send_wms_chz_callback(request_ref, "ready")
             updated_request = self._upsert_wms_chz_request(
                 {
                     **request,
@@ -4311,7 +4397,7 @@ class ApiBridge:
 
     def acknowledge_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
         try:
-            for request_id in self._wms_chz_request_ids(request_ids):
+            for request_id in self._wms_chz_request_refs(request_ids):
                 result = self.acknowledge_wms_chz_request(request_id)
                 if result.get("success") is False:
                     raise RuntimeError(str(result.get("error") or "Не удалось взять запрос ЧЗ в работу."))
@@ -4321,7 +4407,7 @@ class ApiBridge:
 
     def mark_wms_chz_requests_ready(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
         try:
-            for request_id in self._wms_chz_request_ids(request_ids):
+            for request_id in self._wms_chz_request_refs(request_ids):
                 result = self.mark_wms_chz_request_ready(request_id)
                 if result.get("success") is False:
                     raise RuntimeError(str(result.get("error") or "Не удалось отметить коды ЧЗ готовыми."))
@@ -4331,7 +4417,7 @@ class ApiBridge:
 
     def archive_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
         try:
-            ids = set(self._wms_chz_request_ids(request_ids))
+            refs = set(self._wms_chz_request_refs(request_ids))
             runtime = self._ensure_wms_chz_runtime_defaults()
             archived_at = datetime.now().isoformat()
             changed = 0
@@ -4339,7 +4425,7 @@ class ApiBridge:
                 updated_items: List[Dict[str, Any]] = []
                 for item in runtime.wms_chz_requests:
                     normalized = self._normalize_wms_chz_request(item)
-                    if int(normalized.get("request_id") or 0) in ids:
+                    if any(self._wms_chz_request_matches_ref(normalized, request_ref) for request_ref in refs):
                         normalized["status"] = "archived"
                         normalized["status_label"] = WMS_CHZ_STATUS_LABELS["archived"]
                         normalized["is_active"] = False
@@ -4360,7 +4446,7 @@ class ApiBridge:
 
     def restore_wms_chz_requests(self, request_ids: Sequence[Any] | Any) -> Dict[str, Any]:
         try:
-            ids = set(self._wms_chz_request_ids(request_ids))
+            refs = set(self._wms_chz_request_refs(request_ids))
             runtime = self._ensure_wms_chz_runtime_defaults()
             restored_at = datetime.now().isoformat()
             changed = 0
@@ -4368,7 +4454,7 @@ class ApiBridge:
                 updated_items: List[Dict[str, Any]] = []
                 for item in runtime.wms_chz_requests:
                     normalized = self._normalize_wms_chz_request(item)
-                    if int(normalized.get("request_id") or 0) in ids:
+                    if any(self._wms_chz_request_matches_ref(normalized, request_ref) for request_ref in refs):
                         normalized["status"] = "requested"
                         normalized["status_label"] = WMS_CHZ_STATUS_LABELS["requested"]
                         normalized["is_active"] = True
@@ -4576,6 +4662,9 @@ class ApiBridge:
             "full_name": item["full_name"],
             "gtin": item["gtin"],
             "positions": positions,
+            "codes_count": item["codes_count"],
+            "requested_codes_count": item["codes_count"],
+            "received_codes_count": 0,
         }
         existing_history_entry = _get_runtime().history_db.get_order_by_document_id(document_id)
         if existing_history_entry is None:
@@ -6572,12 +6661,15 @@ class ApiBridge:
             )
             serialized_orders = []
             for order in orders:
+                status_record = self._serialize_order_record(order, session=None, tab_type="orders")
                 try:
                     metadata = resolve_order_metadata(order, df)
                     serialized_orders.append(
                         {
                             "document_id": metadata.document_id,
                             "order_name": metadata.order_name,
+                            "status": status_record.get("status") or "",
+                            "status_raw": status_record.get("status_raw") or "",
                             "gtin": metadata.gtin,
                             "full_name": metadata.full_name,
                             "simpl_name": metadata.simpl_name,
@@ -6586,6 +6678,9 @@ class ApiBridge:
                             "color": metadata.color,
                             "units_per_pack": metadata.units_per_pack,
                             "order_quantity": metadata.order_quantity,
+                            "codes_count": status_record.get("codes_count") or metadata.order_quantity or 0,
+                            "requested_codes_count": status_record.get("requested_codes_count") or metadata.order_quantity or 0,
+                            "received_codes_count": status_record.get("received_codes_count") or 0,
                         }
                     )
                 except Exception:
@@ -6593,6 +6688,8 @@ class ApiBridge:
                         {
                             "document_id": str(order.get("document_id") or "").strip(),
                             "order_name": str(order.get("order_name") or "").strip(),
+                            "status": status_record.get("status") or "",
+                            "status_raw": status_record.get("status_raw") or "",
                             "gtin": _extract_gtin(order),
                             "full_name": _extract_position_name(order),
                             "simpl_name": str(order.get("simpl") or "").strip(),
@@ -6600,7 +6697,10 @@ class ApiBridge:
                             "batch": "",
                             "color": "",
                             "units_per_pack": 0,
-                            "order_quantity": 0,
+                            "order_quantity": status_record.get("codes_count") or 0,
+                            "codes_count": status_record.get("codes_count") or 0,
+                            "requested_codes_count": status_record.get("requested_codes_count") or status_record.get("codes_count") or 0,
+                            "received_codes_count": status_record.get("received_codes_count") or 0,
                         }
                     )
 

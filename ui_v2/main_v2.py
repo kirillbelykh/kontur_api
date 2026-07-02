@@ -118,10 +118,10 @@ def main():
         try:
             start_mobile_servers(
                 api,
-                host=str(os.getenv("WMS_EMBED_SERVER_HOST") or "127.0.0.1").strip() or "127.0.0.1",
+                host=str(os.getenv("WMS_EMBED_SERVER_HOST") or "0.0.0.0").strip() or "0.0.0.0",
                 port=_env_int("WMS_EMBED_SERVER_PORT", 8787),
                 https_port=_env_int("WMS_EMBED_SERVER_HTTPS_PORT", 8788),
-                enable_https=_env_flag("WMS_EMBED_SERVER_HTTPS_ENABLED", False),
+                enable_https=_env_flag("WMS_EMBED_SERVER_HTTPS_ENABLED", True),
             )
         except OSError:
             pass

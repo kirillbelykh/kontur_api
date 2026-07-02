@@ -1,1 +1,2 @@
 pywebview>=4.4
+trustme>=1.2
