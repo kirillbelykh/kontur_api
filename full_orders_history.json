@@ -2247,8 +2247,8 @@
     {
       "order_name": "1220 стер лат L заявка 6599",
       "document_id": "b956649b-6993-42b1-bb4d-176a7125d2f4",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1220 стер лат L заявка 6599\\1220 стер лат L заявка 6599.pdf, C:\\Users\\user\\Desktop\\Коды км\\1220 стер лат L заявка 6599\\1220 стер лат L заявка 6599_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1220 стер лат L заявка 6599\\1220 стер лат L заявка 6599.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4640473513063",
@@ -2268,7 +2268,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1220 стер лат L заявка 6599\\1220 стер лат L заявка 6599.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1220 стер лат L заявка 6599\\1220 стер лат L заявка 6599.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1220 стер лат L заявка 6599\\1220 стер лат L заявка 6599_csv.csv"
     },
     {
       "order_name": "1219 стер лат S заявка 6599",
@@ -26586,7 +26589,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-02T12:01:33.846782",
+  "last_update": "2026-07-02T12:01:51.456304",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
