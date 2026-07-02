@@ -171,8 +171,8 @@
     {
       "order_name": "1275 хир 7,5 заявка 6627 (9 пар)",
       "document_id": "c45e85b0-4079-4b98-b5f3-a38f0e07fbbb",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1275 хир 75 заявка 6627 9 пар\\1275 хир 75 заявка 6627 9 пар.pdf, C:\\Users\\user\\Desktop\\Коды км\\1275 хир 75 заявка 6627 9 пар\\1275 хир 7,5 заявка 6627 (9 пар).xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473217732",
@@ -192,7 +192,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1275 хир 75 заявка 6627 9 пар\\1275 хир 75 заявка 6627 9 пар.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1275 хир 75 заявка 6627 9 пар\\1275 хир 7,5 заявка 6627 (9 пар).xls",
+      "csv_path": null
     },
     {
       "order_name": "1275 хир 7,5 заявка 6627 (10 пар)",
@@ -26577,7 +26580,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-02T12:00:27.283681",
+  "last_update": "2026-07-02T12:00:55.379892",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
