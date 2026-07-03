@@ -58,8 +58,8 @@
     {
       "order_name": "1282 нитрил диаг L заявка 6636",
       "document_id": "36d604f3-b02e-4f59-8280-0bc45a6a1d87",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1282 нитрил диаг L заявка 6636\\1282 нитрил диаг L заявка 6636.pdf, C:\\Users\\user\\Desktop\\Коды км\\1282 нитрил диаг L заявка 6636\\1282 нитрил диаг L заявка 6636_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1282 нитрил диаг L заявка 6636\\1282 нитрил диаг L заявка 6636.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р L, цвет синий",
       "gtin": "4650118044135",
@@ -79,7 +79,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1282 нитрил диаг L заявка 6636\\1282 нитрил диаг L заявка 6636.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1282 нитрил диаг L заявка 6636\\1282 нитрил диаг L заявка 6636.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1282 нитрил диаг L заявка 6636\\1282 нитрил диаг L заявка 6636_csv.csv"
     },
     {
       "order_name": "1280 хир 6,5 заявка 6654",
@@ -26754,7 +26757,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-03T14:31:28.013047",
+  "last_update": "2026-07-03T14:31:44.500203",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
