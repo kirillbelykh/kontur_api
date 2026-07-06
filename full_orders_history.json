@@ -3,9 +3,9 @@
     {
       "order_name": "1311 нитрил диаг L 260707",
       "document_id": "8bcc7157-080b-4ef2-912d-ce1f4b814a7f",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1311 нитрил диаг L 260707\\1311 нитрил диаг L 260707.pdf, C:\\Users\\user\\Desktop\\Коды км\\1311 нитрил диаг L 260707\\1311 нитрил диаг L 260707_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1311 нитрил диаг L 260707\\1311 нитрил диаг L 260707.xls",
+      "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р L, цвет синий",
       "gtin": "4650118044135",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1311 нитрил диаг L 260707\\1311 нитрил диаг L 260707.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1311 нитрил диаг L 260707\\1311 нитрил диаг L 260707_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1311 нитрил диаг L 260707\\1311 нитрил диаг L 260707.xls"
     },
     {
       "order_name": "1310 нитрил диаг M 260706",
@@ -27694,7 +27697,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-06T15:07:03.793969",
+  "last_update": "2026-07-06T15:25:04.716969",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
