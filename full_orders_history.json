@@ -3,9 +3,9 @@
     {
       "order_name": "1296 орто 6,5 260702",
       "document_id": "c803e73e-f3b2-44a4-8da9-76cb89415261",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1296 орто 65 260702\\1296 орто 65 260702.pdf, C:\\Users\\user\\Desktop\\Коды км\\1296 орто 65 260702\\1296 орто 6,5 260702_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1296 орто 65 260702\\1296 орто 6,5 260702.xls",
+      "simpl": "ортопедия",
       "full_name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 6,5",
       "gtin": "4640473505099",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1296 орто 65 260702\\1296 орто 65 260702.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1296 орто 65 260702\\1296 орто 6,5 260702_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1296 орто 65 260702\\1296 орто 6,5 260702.xls"
     },
     {
       "order_name": "1292 ультра зел 8,0 заявка 6642",
@@ -27104,7 +27107,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-06T10:15:07.163736",
+  "last_update": "2026-07-06T10:20:44.624850",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
