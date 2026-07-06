@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1286 ультра зел 7,5 заявка 6640",
+      "document_id": "2c8bdab7-0c34-44ad-b8d8-b44d72b91a08",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика зеленого цвета, р-р 7,5",
+      "gtin": "4640473505280",
+      "positions": [
+        {
+          "gtin": "4640473505280",
+          "name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика зеленого цвета, р-р 7,5",
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-07-06T09:43:14.960827",
+      "created_by": "user",
+      "updated_at": "2026-07-06T09:43:14.960827",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1285 ультра зел 6,5 заявка 6640",
       "document_id": "22b042db-f891-4bf5-aa3a-abda233b2a5c",
       "status": "Выполнен",
@@ -26948,7 +26974,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-06T09:42:59.072581",
+  "last_update": "2026-07-06T09:43:16.889667",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
