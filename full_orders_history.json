@@ -61,9 +61,9 @@
     {
       "order_name": "1297 орто 7,5 260315",
       "document_id": "e5c0eb33-57d2-4ce6-8656-7150126393be",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1297 орто 75 260315\\1297 орто 75 260315.pdf, C:\\Users\\user\\Desktop\\Коды км\\1297 орто 75 260315\\1297 орто 7,5 260315_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1297 орто 75 260315\\1297 орто 7,5 260315.xls",
+      "simpl": "ортопедия",
       "full_name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 7,5",
       "gtin": "4640473505112",
       "positions": [
@@ -82,7 +82,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1297 орто 75 260315\\1297 орто 75 260315.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1297 орто 75 260315\\1297 орто 7,5 260315_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1297 орто 75 260315\\1297 орто 7,5 260315.xls"
     },
     {
       "order_name": "1296 орто 6,5 260702",
@@ -27191,7 +27194,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-06T11:03:32.562593",
+  "last_update": "2026-07-06T11:04:10.811709",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
