@@ -29,9 +29,9 @@
     {
       "order_name": "1309 нитрил диаг S 260706",
       "document_id": "aa633dfb-3325-4a04-b723-66735231fefd",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1309 нитрил диаг S 260706\\1309 нитрил диаг S 260706.pdf, C:\\Users\\user\\Desktop\\Коды км\\1309 нитрил диаг S 260706\\1309 нитрил диаг S 260706_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1309 нитрил диаг S 260706\\1309 нитрил диаг S 260706.xls",
+      "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
       "gtin": "4650118044012",
       "positions": [
@@ -50,7 +50,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1309 нитрил диаг S 260706\\1309 нитрил диаг S 260706.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1309 нитрил диаг S 260706\\1309 нитрил диаг S 260706_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1309 нитрил диаг S 260706\\1309 нитрил диаг S 260706.xls"
     },
     {
       "order_name": "1308 хир 8,5 заявка 6682",
@@ -27662,7 +27665,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-06T13:30:29.026079",
+  "last_update": "2026-07-06T13:42:40.843233",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
