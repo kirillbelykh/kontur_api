@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1313 орто 8,0 260701",
+      "document_id": "3988f924-2d17-4633-929f-155fb617185e",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,0",
+      "gtin": "4640473505129",
+      "positions": [
+        {
+          "gtin": "4640473505129",
+          "name": "Перчатки Sover Orthopedic хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком повышенной прочности, р-р 8,0",
+          "tnvedCode": "4015120009",
+          "quantity": 19,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-07-07T09:16:56.304304",
+      "created_by": "user",
+      "updated_at": "2026-07-07T09:16:56.304304",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1312 нитрил диаг L 260707",
       "document_id": "25ec6855-7fd9-47a3-a6ad-0ffd7a7bd37e",
       "status": "Выполнен",
@@ -27723,7 +27749,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-07T09:15:40.611173",
+  "last_update": "2026-07-07T09:16:58.215597",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
