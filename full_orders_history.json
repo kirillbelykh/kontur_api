@@ -3,9 +3,9 @@
     {
       "order_name": "1317 дв пара 7,5 260707",
       "document_id": "c6b3fce6-3b67-481f-9b8b-5639661db08d",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1317 дв пара 75 260707\\1317 дв пара 75 260707.pdf, C:\\Users\\user\\Desktop\\Коды км\\1317 дв пара 75 260707\\1317 дв пара 7,5 260707_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1317 дв пара 75 260707\\1317 дв пара 7,5 260707.xls",
+      "simpl": "двойная пара",
       "full_name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,5",
       "gtin": "4640473504672",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1317 дв пара 75 260707\\1317 дв пара 75 260707.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1317 дв пара 75 260707\\1317 дв пара 7,5 260707_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1317 дв пара 75 260707\\1317 дв пара 7,5 260707.xls"
     },
     {
       "order_name": "1314 нитрил диаг M 260706",
@@ -27807,7 +27810,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-07T11:50:21.916957",
+  "last_update": "2026-07-07T12:01:40.514392",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
