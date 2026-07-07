@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1317 дв пара 7,5 260707",
+      "document_id": "c6b3fce6-3b67-481f-9b8b-5639661db08d",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,5",
+      "gtin": "4640473504672",
+      "positions": [
+        {
+          "gtin": "4640473504672",
+          "name": "Перчатки Sover Double Pair хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика (2 пары в индивидуальной упаковке), р-р 7,5",
+          "tnvedCode": "4015120009",
+          "quantity": 37,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-07-07T11:50:19.929664",
+      "created_by": "user",
+      "updated_at": "2026-07-07T11:50:19.929664",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1314 нитрил диаг M 260706",
       "document_id": "c79104ba-268a-4fdd-b44e-3812b29729db",
       "status": "Выполнен",
@@ -27781,7 +27807,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-07T10:22:22.249853",
+  "last_update": "2026-07-07T11:50:21.916957",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
