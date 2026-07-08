@@ -3,9 +3,9 @@
     {
       "order_name": "1322 ультра 6,5 260627",
       "document_id": "3943545c-cbab-4727-be86-b3be8888fe97",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1322 ультра 65 260627\\1322 ультра 65 260627.pdf, C:\\Users\\user\\Desktop\\Коды км\\1322 ультра 65 260627\\1322 ультра 6,5 260627_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1322 ультра 65 260627\\1322 ультра 6,5 260627.xls",
+      "simpl": "ультра",
       "full_name": "Перчатки Sover ULTRA хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные без венчика натурального цвета, р-р 6,5",
       "gtin": "4640473509875",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1322 ультра 65 260627\\1322 ультра 65 260627.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1322 ультра 65 260627\\1322 ультра 6,5 260627_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1322 ультра 65 260627\\1322 ультра 6,5 260627.xls"
     },
     {
       "order_name": "1316 хир 7,0 заявка 6704",
@@ -28004,7 +28007,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-08T08:51:07.255341",
+  "last_update": "2026-07-08T09:12:37.722257",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
