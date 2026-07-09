@@ -3,9 +3,9 @@
     {
       "order_name": "1337 стер нитрил L 260709",
       "document_id": "356f6864-3c6e-4a02-9a3e-ba01cf1bf298",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1337 стер нитрил L 260709\\1337 стер нитрил L 260709.pdf, C:\\Users\\user\\Desktop\\Коды км\\1337 стер нитрил L 260709\\1337 стер нитрил L 260709_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1337 стер нитрил L 260709\\1337 стер нитрил L 260709.xls",
+      "simpl": "стер нитрил",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118046276",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1337 стер нитрил L 260709\\1337 стер нитрил L 260709.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1337 стер нитрил L 260709\\1337 стер нитрил L 260709_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1337 стер нитрил L 260709\\1337 стер нитрил L 260709.xls"
     },
     {
       "order_name": "1336 стер нитрил M 260709",
@@ -28380,7 +28383,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-09T10:17:56.674577",
+  "last_update": "2026-07-09T10:18:35.865258",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
