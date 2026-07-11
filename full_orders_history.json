@@ -252,8 +252,8 @@
     {
       "order_name": "1338 хир 7,0 (по 50 пар) заявка 6750",
       "document_id": "7269f5ac-cc18-40ad-9550-5d77428e4698",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1338 хир 70 по 50 пар заявка 6750\\1338 хир 70 по 50 пар заявка 6750.pdf, C:\\Users\\user\\Desktop\\Коды км\\1338 хир 70 по 50 пар заявка 6750\\1338 хир 7,0 (по 50 пар) заявка 6750_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1338 хир 70 по 50 пар заявка 6750\\1338 хир 7,0 (по 50 пар) заявка 6750.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473505983",
@@ -273,7 +273,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1338 хир 70 по 50 пар заявка 6750\\1338 хир 70 по 50 пар заявка 6750.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1338 хир 70 по 50 пар заявка 6750\\1338 хир 7,0 (по 50 пар) заявка 6750_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1338 хир 70 по 50 пар заявка 6750\\1338 хир 7,0 (по 50 пар) заявка 6750.xls"
     },
     {
       "order_name": "1337 стер нитрил L 260709",
@@ -28658,7 +28661,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-10T15:07:07.037762",
+  "last_update": "2026-07-11T13:48:01.076237",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
