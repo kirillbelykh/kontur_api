@@ -165,8 +165,8 @@
     {
       "order_name": "1349 лат диаг М 260711",
       "document_id": "c7241e49-68c6-4f1a-9915-d536059804a5",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1349 лат диаг М 260711\\1349 лат диаг М 260711.pdf, C:\\Users\\user\\Desktop\\Коды км\\1349 лат диаг М 260711\\1349 лат диаг М 260711_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1349 лат диаг М 260711\\1349 лат диаг М 260711.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р M, цвет натуральный",
       "gtin": "4650118041295",
@@ -186,7 +186,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1349 лат диаг М 260711\\1349 лат диаг М 260711.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1349 лат диаг М 260711\\1349 лат диаг М 260711_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1349 лат диаг М 260711\\1349 лат диаг М 260711.xls"
     },
     {
       "order_name": "1348 лат диаг S 260711",
@@ -28797,7 +28800,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-13T09:24:41.617358",
+  "last_update": "2026-07-13T09:36:27.263307",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
