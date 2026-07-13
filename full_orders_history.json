@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1355 хир 9 заявка 6757",
+      "document_id": "02bbb196-984b-4dc9-9fef-a800e961557b",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,0",
+      "gtin": "4640473506027",
+      "positions": [
+        {
+          "gtin": "4640473506027",
+          "name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,0",
+          "tnvedCode": "4015120001",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-07-13T14:05:45.922823",
+      "created_by": "user",
+      "updated_at": "2026-07-13T14:05:45.922823",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1354 лат диаг 2-хлор М партия 260713",
       "document_id": "8c691b29-0b50-4030-aa0c-bb5875e4002f",
       "status": "Скачан",
@@ -28887,7 +28913,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-13T10:41:01.181168",
+  "last_update": "2026-07-13T14:05:48.258903",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
