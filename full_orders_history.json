@@ -4,7 +4,7 @@
       "order_name": "1361 хир 7,0 260627",
       "document_id": "6340cd54-7139-4316-9e8a-601c1f71240d",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1361 хир 70 260627\\1361 хир 7,0 260627_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1361 хир 70 260627\\1361 хир 7,0 260627.xls",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1361 хир 70 260627\\1361 хир 70 260627.pdf, C:\\Users\\user\\Desktop\\Коды км\\1361 хир 70 260627\\1361 хир 7,0 260627.xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473510604",
@@ -26,7 +26,7 @@
       "tsd_intro_number": null,
       "tsd_created_by": null,
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1361 хир 70 260627\\1361 хир 7,0 260627_csv.csv",
-      "pdf_path": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1361 хир 70 260627\\1361 хир 70 260627.pdf",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1361 хир 70 260627\\1361 хир 7,0 260627.xls"
     },
     {
@@ -31011,7 +31011,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-14T16:46:30.469195",
+  "last_update": "2026-07-14T16:51:45.157790",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
