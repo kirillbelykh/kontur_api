@@ -1902,7 +1902,16 @@ class ApiBridge:
                     runtime.auth_message = "Открываем браузер и собираем cookies..."
                     runtime.auth_error = ""
                     runtime.auth_updated_at = time.time()
-                    cookies = cookies_module.get_cookies()
+                    browser_cookies = cookies_module.load_cookies_from_yandex_profile()
+                    saved_cookies = browser_cookies or cookies_module.load_cookies_from_file(allow_stale=True)
+                    if saved_cookies and cookies_module.validate_kontur_session(saved_cookies):
+                        # A refresh button should not interrupt a working
+                        # session just because the browser profile is locked.
+                        cookies_module.save_cookies_to_file(saved_cookies)
+                        cookies = saved_cookies
+                        runtime.auth_message = "Сессия Контур обновлена."
+                    else:
+                        cookies = cookies_module.get_cookies()
                 elif force_refresh:
                     runtime.auth_state = "cookies"
                     runtime.auth_message = "Проверяем сохраненные cookies..."

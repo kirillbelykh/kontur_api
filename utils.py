@@ -121,6 +121,7 @@ def find_yandex_paths() -> Dict[str, Optional[Path]]:
     paths: Dict[str, Optional[Path]] = {
         'browser': None,
         'user_data': None,
+        'profile_directory': None,
     }
 
     # Поиск браузера через реестр
@@ -146,21 +147,74 @@ def find_yandex_paths() -> Dict[str, Optional[Path]]:
                 paths['browser'] = candidate_browser_path
                 break
 
-    # Поиск папки с пользовательскими данными
+    user_data_root: Optional[Path] = None
+
+    # Поиск корневой папки с пользовательскими данными
     if paths['browser'] and paths['browser'].exists():
         user_data_paths = [
-            Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex/YandexBrowser/User Data/Default",
-            paths['browser'].parent.parent / "User Data/Default",
+            Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex/YandexBrowser/User Data",
+            paths['browser'].parent.parent / "User Data",
         ]
         for user_data_path in user_data_paths:
             if user_data_path.exists():
-                paths['user_data'] = user_data_path
+                user_data_root = user_data_path
                 break
 
     # Если папка с данными не найдена, создаём путь по умолчанию
-    if paths['browser'] and not paths['user_data']:
-        default_user_data = Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex/YandexBrowser/User Data/Default"
-        paths['user_data'] = default_user_data
+    if paths['browser'] and not user_data_root:
+        user_data_root = Path(os.environ.get('LOCALAPPDATA', '')) / "Yandex/YandexBrowser/User Data"
+
+    profile_candidates: list[str] = []
+    configured_profile = str(os.getenv("KONTUR_YANDEX_PROFILE") or "").strip()
+    if configured_profile:
+        profile_candidates.append(configured_profile)
+
+    if user_data_root and user_data_root.exists():
+        local_state_path = user_data_root / "Local State"
+        if local_state_path.exists():
+            try:
+                local_state = json.loads(local_state_path.read_text(encoding="utf-8"))
+                profile_info = local_state.get("profile") if isinstance(local_state, dict) else {}
+                if isinstance(profile_info, dict):
+                    last_used = str(profile_info.get("last_used") or "").strip()
+                    if last_used:
+                        profile_candidates.append(last_used)
+                    for profile_name in profile_info.get("last_active_profiles") or []:
+                        normalized_name = str(profile_name or "").strip()
+                        if normalized_name:
+                            profile_candidates.append(normalized_name)
+                    info_cache = profile_info.get("info_cache") or {}
+                    if isinstance(info_cache, dict):
+                        for profile_name in info_cache.keys():
+                            normalized_name = str(profile_name or "").strip()
+                            if normalized_name:
+                                profile_candidates.append(normalized_name)
+            except Exception as exc:
+                logger.debug("Не удалось прочитать Local State Yandex Browser: %s", exc)
+
+    profile_candidates.extend(["Default", "Profile 1"])
+
+    normalized_profile_candidates: list[str] = []
+    seen_profiles: set[str] = set()
+    for candidate in profile_candidates:
+        normalized_candidate = str(candidate or "").strip()
+        lowered = normalized_candidate.lower()
+        if not normalized_candidate or lowered in seen_profiles:
+            continue
+        seen_profiles.add(lowered)
+        normalized_profile_candidates.append(normalized_candidate)
+
+    selected_profile_directory: Optional[str] = None
+    if user_data_root:
+        for profile_name in normalized_profile_candidates:
+            if (user_data_root / profile_name).exists():
+                selected_profile_directory = profile_name
+                break
+    if not selected_profile_directory and normalized_profile_candidates:
+        selected_profile_directory = normalized_profile_candidates[0]
+
+    paths['user_data'] = user_data_root
+    paths['profile_directory'] = selected_profile_directory
 
     return paths
 

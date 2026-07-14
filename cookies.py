@@ -1,9 +1,15 @@
+import base64
 import json
 import os
+import shutil
+import sqlite3
 import threading
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import requests
 
 from logger import logger
 from utils import find_yandex_paths
@@ -13,7 +19,7 @@ paths = find_yandex_paths()
 YANDEX_DRIVER_PATH = Path(r"driver\yandexdriver.exe")
 YANDEX_BROWSER_PATH = paths["browser"]
 PROFILE_USER_DATA_DIR = paths["user_data"]
-PROFILE_DIRECTORY = "Vinsent O`neal"
+PROFILE_DIRECTORY = str(paths.get("profile_directory") or os.getenv("KONTUR_YANDEX_PROFILE") or "Default")
 HEADLESS = False
 
 RUNTIME_DIR = Path(os.getenv("KONTUR_RUNTIME_DIR", "runtime"))
@@ -187,6 +193,75 @@ def _click_cookie_accept_if_present(driver, by) -> None:
             time.sleep(SLEEP)
     except Exception as exc:
         logger.debug("Cookie accept button not available: %s", exc)
+
+
+def _build_browser_options(
+    *,
+    browser_path: Path,
+    profile_user_data_dir: Optional[Path],
+    profile_directory: Optional[str],
+    headless: bool,
+) -> Any:
+    from selenium.webdriver.chrome.options import Options
+
+    options = Options()
+    options.binary_location = str(browser_path)
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+
+    normalized_user_data_dir = Path(profile_user_data_dir) if profile_user_data_dir else None
+    normalized_profile_directory = str(profile_directory or "").strip()
+    if normalized_user_data_dir:
+        options.add_argument(f"--user-data-dir={normalized_user_data_dir}")
+    if normalized_profile_directory:
+        options.add_argument(f"--profile-directory={normalized_profile_directory}")
+
+    if headless:
+        options.add_argument("--headless=new")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-first-run")
+    options.add_argument("--no-default-browser-check")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--remote-debugging-port=0")
+    options.add_argument("--window-position=-32000,-32000")
+    options.add_argument("--window-size=1920,1080")
+    return options
+
+
+def _wait_for_valid_cookies(driver, *, timeout_seconds: float) -> Optional[Dict[str, str]]:
+    deadline = time.time() + max(1.0, float(timeout_seconds))
+    while time.time() < deadline:
+        try:
+            raw_cookies = driver.get_cookies()
+        except Exception as exc:
+            logger.debug("Не удалось прочитать cookies из браузера: %s", exc)
+            raw_cookies = []
+        cookies = {
+            str(item.get("name") or ""): str(item.get("value") or "")
+            for item in raw_cookies
+            if item.get("name")
+        }
+        is_valid, missing_fields = validate_cookies(cookies)
+        if is_valid:
+            return cookies
+        logger.debug("Ожидаем появления валидных cookies, пока отсутствуют: %s", missing_fields)
+        time.sleep(1.0)
+    return None
+
+
+def _remove_webdriver_marker(driver) -> None:
+    """Avoid exposing Selenium's navigator.webdriver flag to the login page."""
+    try:
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});",
+            },
+        )
+    except Exception as exc:
+        logger.debug("Could not configure browser anti-detection: %s", exc)
 
 
 def _hide_driver_windows(driver) -> None:
@@ -455,7 +530,7 @@ def validate_cookies(cookies: Dict[str, str]) -> tuple[bool, List[str]]:
     return True, []
 
 
-def load_cookies_from_file() -> Optional[Dict[str, str]]:
+def load_cookies_from_file(allow_stale: bool = False) -> Optional[Dict[str, str]]:
     with _COOKIE_LOCK:
         if _MEMOIZED_COOKIES and _cookies_are_fresh(_MEMOIZED_TIMESTAMP):
             return dict(_MEMOIZED_COOKIES)
@@ -470,7 +545,7 @@ def load_cookies_from_file() -> Optional[Dict[str, str]]:
         cookies = data.get("cookies")
         timestamp = float(data.get("timestamp", 0) or 0)
 
-        if not _cookies_are_fresh(timestamp):
+        if not _cookies_are_fresh(timestamp) and not allow_stale:
             logger.info("Cookies устарели (%.0f сек). Нужно обновить.", _cookies_age(timestamp))
             return None
 
@@ -488,6 +563,97 @@ def load_cookies_from_file() -> Optional[Dict[str, str]]:
     except Exception:
         logger.exception("Ошибка при чтении cookies из файла")
         return None
+
+
+def validate_kontur_session(cookies: Optional[Dict[str, str]]) -> bool:
+    """Check saved cookies with Kontur before opening an automated browser."""
+    is_valid, _ = validate_cookies(cookies or {})
+    if not is_valid:
+        return False
+    try:
+        response = requests.get(
+            "https://mk.kontur.ru/api/v1/user",
+            cookies=cookies,
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+            timeout=15,
+            allow_redirects=True,
+        )
+        return response.status_code == 200 and response.url.startswith("https://mk.kontur.ru/")
+    except requests.RequestException as exc:
+        logger.warning("Could not validate saved Kontur cookies: %s", exc)
+        return False
+
+
+def _load_yandex_cookie_key(user_data_dir: Path) -> Optional[bytes]:
+    try:
+        local_state = json.loads((user_data_dir / "Local State").read_text(encoding="utf-8"))
+        encrypted_key = base64.b64decode(local_state["os_crypt"]["encrypted_key"])
+        if encrypted_key.startswith(b"DPAPI"):
+            encrypted_key = encrypted_key[5:]
+        import win32crypt
+
+        return win32crypt.CryptUnprotectData(encrypted_key, None, None, None, 0)[1]
+    except Exception as exc:
+        logger.debug("Could not read the Yandex Browser encryption key: %s", exc)
+        return None
+
+
+def _decrypt_yandex_cookie(value: bytes, key: Optional[bytes]) -> Optional[str]:
+    if not value:
+        return ""
+    try:
+        if value.startswith((b"v10", b"v11")) and key:
+            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+            nonce = value[3:15]
+            return AESGCM(key).decrypt(nonce, value[15:], None).decode("utf-8")
+        import win32crypt
+
+        return win32crypt.CryptUnprotectData(value, None, None, None, 0)[1].decode("utf-8")
+    except Exception as exc:
+        logger.debug("Could not decrypt a Yandex Browser cookie: %s", exc)
+        return None
+
+
+def load_cookies_from_yandex_profile(
+    user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
+    profile_directory: str = PROFILE_DIRECTORY,
+) -> Optional[Dict[str, str]]:
+    """Read Kontur cookies from the user's normal Yandex Browser profile."""
+    if not user_data_dir:
+        return None
+    user_data_dir = Path(user_data_dir)
+    cookies_db = user_data_dir / profile_directory / "Network" / "Cookies"
+    if not cookies_db.exists():
+        return None
+
+    temporary_db = Path(tempfile.mkstemp(prefix="kontur_cookies_", suffix=".sqlite")[1])
+    try:
+        shutil.copy2(cookies_db, temporary_db)
+        key = _load_yandex_cookie_key(user_data_dir)
+        connection = sqlite3.connect(temporary_db)
+        try:
+            rows = connection.execute(
+                "SELECT name, value, encrypted_value FROM cookies WHERE host_key LIKE ?",
+                ("%kontur.ru",),
+            ).fetchall()
+        finally:
+            connection.close()
+        cookies: Dict[str, str] = {}
+        for name, plain_value, encrypted_value in rows:
+            value = str(plain_value or "") or _decrypt_yandex_cookie(encrypted_value or b"", key)
+            if name and value is not None:
+                cookies[str(name)] = value
+        is_valid, _ = validate_cookies(cookies)
+        return cookies if is_valid else None
+    except Exception as exc:
+        logger.warning("Could not read cookies from Yandex Browser: %s", exc)
+        return None
+    finally:
+        try:
+            temporary_db.unlink(missing_ok=True)
+        except PermissionError:
+            logger.debug("Temporary browser cookie copy is still locked: %s", temporary_db)
 
 
 def save_cookies_to_file(cookies: Dict[str, str]) -> bool:
@@ -552,32 +718,42 @@ def get_cookies(
         logger.error("Browser binary not found: %s", browser_path)
         return None
 
+    temporary_profile_dir: Optional[Path] = None
     for attempt in range(1, max_retries + 1):
         logger.info("Попытка получения cookies #%s", attempt)
         driver = None
         try:
-            options = Options()
-            options.binary_location = str(browser_path)
-            options.add_argument(f"--user-data-dir={profile_user_data_dir}")
-            options.add_argument(f"--profile-directory={profile_directory}")
-            if headless:
-                options.add_argument("--headless=new")
-                options.add_argument("--no-sandbox")
-                options.add_argument("--disable-dev-shm-usage")
-                options.add_argument("--disable-gpu")
-            options.add_argument("--window-position=-32000,-32000")
-            options.add_argument("--window-size=1920,1080")
+            options = _build_browser_options(
+                browser_path=Path(browser_path),
+                profile_user_data_dir=profile_user_data_dir,
+                profile_directory=profile_directory,
+                headless=headless,
+            )
 
             service = Service(str(driver_path))
             driver = webdriver.Chrome(service=service, options=options)
+            _remove_webdriver_marker(driver)
             wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
-            if win32gui and win32con and win32process:
+            if temporary_profile_dir is None and win32gui and win32con and win32process:
                 _hide_driver_windows(driver)
 
             driver.get(target_url)
             time.sleep(2.0)
             _click_cookie_accept_if_present(driver, By)
+
+            cookies = _wait_for_valid_cookies(driver, timeout_seconds=WAIT_TIMEOUT)
+            if cookies and save_cookies_to_file(cookies):
+                logger.info("Successfully refreshed Kontur cookies")
+                if temporary_profile_dir:
+                    shutil.rmtree(temporary_profile_dir, ignore_errors=True)
+                return dict(cookies)
+            if temporary_profile_dir is None and profile_user_data_dir:
+                temporary_profile_dir = Path(tempfile.mkdtemp(prefix="kontur_yandex_"))
+                profile_user_data_dir = temporary_profile_dir
+                profile_directory = "Default"
+                headless = False
+                continue
 
             try:
                 profile_xpath = (
@@ -599,6 +775,16 @@ def get_cookies(
                 logger.debug("Warehouse select error: %s", exc)
 
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            cookies = _wait_for_valid_cookies(
+                driver,
+                timeout_seconds=180.0 if temporary_profile_dir else WAIT_TIMEOUT,
+            )
+            if cookies and save_cookies_to_file(cookies):
+                logger.info("Successfully refreshed Kontur cookies")
+                if temporary_profile_dir:
+                    shutil.rmtree(temporary_profile_dir, ignore_errors=True)
+                return dict(cookies)
+
             raw_cookies = driver.get_cookies()
             if not raw_cookies:
                 logger.warning("После загрузки страницы cookies не найдены")
@@ -617,6 +803,13 @@ def get_cookies(
                 return dict(cookies)
         except Exception:
             logger.exception("get_cookies failed on attempt %s", attempt)
+            if temporary_profile_dir is None and profile_user_data_dir:
+                # A running Yandex Browser can lock its normal profile. Retry
+                # in a visible clean profile so the operator can sign in.
+                temporary_profile_dir = Path(tempfile.mkdtemp(prefix="kontur_yandex_"))
+                profile_user_data_dir = temporary_profile_dir
+                profile_directory = "Default"
+                headless = False
         finally:
             if driver is not None:
                 try:
@@ -625,6 +818,8 @@ def get_cookies(
                     pass
 
     logger.error("Не удалось получить валидные cookies после %s попыток", max_retries)
+    if temporary_profile_dir:
+        shutil.rmtree(temporary_profile_dir, ignore_errors=True)
     return None
 
 
