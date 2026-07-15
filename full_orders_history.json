@@ -81,9 +81,9 @@
     {
       "order_name": "1373 хир 8,0 партия 260718",
       "document_id": "ecdabf03-3cd5-4bab-89fc-a7cb3d026b47",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1373 хир 80 партия 260718\\1373 хир 80 партия 260718.pdf, C:\\Users\\user\\Desktop\\Коды км\\1373 хир 80 партия 260718\\1373 хир 8,0 партия 260718_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1373 хир 80 партия 260718\\1373 хир 8,0 партия 260718.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
       "gtin": "4640473510628",
       "positions": [
@@ -102,7 +102,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1373 хир 80 партия 260718\\1373 хир 8,0 партия 260718_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1373 хир 80 партия 260718\\1373 хир 80 партия 260718.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1373 хир 80 партия 260718\\1373 хир 8,0 партия 260718.xls"
     },
     {
       "order_name": "1372 хир 7,0 партия 260718",
@@ -123,11 +126,11 @@
       ],
       "created_at": "2026-07-15T11:58:21.996817",
       "created_by": "user",
-      "updated_at": "2026-07-15T15:39:25.753415",
+      "updated_at": "2026-07-15T15:39:55.815446",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-07-15T15:39:25.753415",
-      "tsd_intro_number": "49c4ab73-65ef-487f-8561-6e3b935128c3",
+      "tsd_created_at": "2026-07-15T15:39:55.815446",
+      "tsd_intro_number": "ce55b2e9-00c6-4c35-b8ac-4bcd3bb65632",
       "tsd_created_by": "user",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1372 хир 70 партия 260718\\1372 хир 7,0 партия 260718_csv.csv",
       "pdf_path": null,
@@ -31425,7 +31428,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-15T15:39:27.839166",
+  "last_update": "2026-07-15T16:12:54.124193",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
