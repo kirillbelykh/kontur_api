@@ -212,7 +212,7 @@
       "order_name": "1368 хир 7,5 партия 260716",
       "document_id": "36f15644-9e1c-455e-ac83-9665e8737232",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1368 хир 75 партия 260716\\1368 хир 7,5 партия 260716.xls",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1368 хир 75 партия 260716\\1368 хир 75 партия 260716.pdf, C:\\Users\\user\\Desktop\\Коды км\\1368 хир 75 партия 260716\\1368 хир 7,5 партия 260716_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1368 хир 75 партия 260716\\1368 хир 7,5 партия 260716.xls",
       "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,5",
       "gtin": "4640473510611",
@@ -233,8 +233,8 @@
       "tsd_created_at": null,
       "tsd_intro_number": null,
       "tsd_created_by": null,
-      "csv_path": null,
-      "pdf_path": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1368 хир 75 партия 260716\\1368 хир 7,5 партия 260716_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1368 хир 75 партия 260716\\1368 хир 75 партия 260716.pdf",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1368 хир 75 партия 260716\\1368 хир 7,5 партия 260716.xls"
     },
     {
@@ -31413,7 +31413,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-15T13:01:10.426909",
+  "last_update": "2026-07-15T13:07:08.586909",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
