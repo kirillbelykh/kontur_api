@@ -19,12 +19,12 @@
       ],
       "created_at": "2026-07-17T12:04:57.631435",
       "created_by": "User",
-      "updated_at": "2026-07-17T12:04:57.631435",
+      "updated_at": "2026-07-17T12:26:12.329965",
       "updated_by": "User",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "tsd_created": true,
+      "tsd_created_at": "2026-07-17T12:26:12.329965",
+      "tsd_intro_number": "0911153c-ef83-4e5c-86d6-4503208c4869",
+      "tsd_created_by": "User",
       "csv_path": "C:\\Users\\User\\Desktop\\Коды км\\1389 стер лат L 260721\\1389 стер лат L 260721_csv.csv",
       "xls_path": "C:\\Users\\User\\Desktop\\Коды км\\1389 стер лат L 260721\\1389 стер лат L 260721.xls",
       "pdf_path": "C:\\Users\\User\\Desktop\\Коды км\\1389 стер лат L 260721\\1389 стер лат L 260721.pdf"
@@ -32307,7 +32307,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-17T12:25:58.600275",
+  "last_update": "2026-07-17T12:26:14.048526",
   "created_by": "sklad",
   "updated_by": "User",
   "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
