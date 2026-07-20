@@ -3,9 +3,9 @@
     {
       "order_name": "1413 стер лат L партия 260716",
       "document_id": "44bdc622-fdbc-4115-bc5f-8d47746b6bd1",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1413 стер лат L партия 260716\\1413 стер лат L партия 260716.pdf, C:\\Users\\user\\Desktop\\Коды км\\1413 стер лат L партия 260716\\1413 стер лат L партия 260716_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1413 стер лат L партия 260716\\1413 стер лат L партия 260716.xls",
+      "simpl": "стер латекс",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р L",
       "gtin": "4650118040069",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1413 стер лат L партия 260716\\1413 стер лат L партия 260716.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1413 стер лат L партия 260716\\1413 стер лат L партия 260716_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1413 стер лат L партия 260716\\1413 стер лат L партия 260716.xls"
     },
     {
       "order_name": "1412 хир 8,0 заявка 6804",
@@ -32385,7 +32388,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-20T11:21:46.118452",
+  "last_update": "2026-07-20T11:28:38.997480",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
