@@ -81,9 +81,9 @@
     {
       "order_name": "1422. лат диаг анат S(6,5) партия 260722",
       "document_id": "5024e715-c9c6-4df0-be60-03ed5678ab11",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1422 лат диаг анат S65 партия 260722\\1422 лат диаг анат S65 партия 260722.pdf, C:\\Users\\user\\Desktop\\Коды км\\1422 лат диаг анат S65 партия 260722\\1422. лат диаг анат S(6,5) партия 260722_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1422 лат диаг анат S65 партия 260722\\1422. лат диаг анат S(6,5) партия 260722.xls",
+      "simpl": "латекс анатомической",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные анатомической формы с удлиненной крагой текстурированные, р-р S, цвет натуральный",
       "gtin": "4650118040632",
       "positions": [
@@ -102,7 +102,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1422 лат диаг анат S65 партия 260722\\1422 лат диаг анат S65 партия 260722.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1422 лат диаг анат S65 партия 260722\\1422. лат диаг анат S(6,5) партия 260722_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1422 лат диаг анат S65 партия 260722\\1422. лат диаг анат S(6,5) партия 260722.xls"
     },
     {
       "order_name": "1422 лат диаг анат S(6,5) партия 260722",
@@ -33001,7 +33004,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-21T12:43:46.781147",
+  "last_update": "2026-07-21T13:17:44.434217",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
