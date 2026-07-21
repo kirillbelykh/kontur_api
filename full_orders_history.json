@@ -145,9 +145,9 @@
     {
       "order_name": "1388 HR лат XL партия 260720",
       "document_id": "e1b446ba-c11f-4ab4-91e1-c9c27e98e2c1",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1388 HR лат XL партия 260720\\1388 HR лат XL партия 260720.pdf, C:\\Users\\user\\Desktop\\Коды км\\1388 HR лат XL партия 260720\\1388 HR лат XL партия 260720_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1388 HR лат XL партия 260720\\1388 HR лат XL партия 260720.xls",
+      "simpl": "латекс hr",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные высокой прочности текстурированные, р-р XL, цвет синий",
       "gtin": "4650118040595",
       "positions": [
@@ -166,7 +166,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1388 HR лат XL партия 260720\\1388 HR лат XL партия 260720.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1388 HR лат XL партия 260720\\1388 HR лат XL партия 260720_csv.csv",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1388 HR лат XL партия 260720\\1388 HR лат XL партия 260720.xls"
     },
     {
       "order_name": "1387 HR лат L партия 260720",
@@ -33016,7 +33019,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-21T14:29:47.220451",
+  "last_update": "2026-07-21T14:30:13.200216",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
