@@ -3,9 +3,9 @@
     {
       "order_name": "1431 хир 8,0 партия 260714",
       "document_id": "a9293d9b-5b11-426f-ab88-f4885bc96c6c",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1431 хир 80 партия 260714\\1431 хир 80 партия 260714.pdf, C:\\Users\\user\\Desktop\\Коды км\\1431 хир 80 партия 260714\\1431 хир 8,0 партия 260714_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1431 хир 80 партия 260714\\1431 хир 8,0 партия 260714.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 8,0",
       "gtin": "4640473506003",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1431 хир 80 партия 260714\\1431 хир 8,0 партия 260714_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1431 хир 80 партия 260714\\1431 хир 80 партия 260714.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1431 хир 80 партия 260714\\1431 хир 8,0 партия 260714.xls"
     },
     {
       "order_name": "1421 хир 8,0 партия 260713",
@@ -33242,7 +33245,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-23T12:06:28.308169",
+  "last_update": "2026-07-23T12:08:28.881278",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
