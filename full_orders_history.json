@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1437 нитрил диаг S партия 260722",
+      "document_id": "61435901-5a48-4d28-912f-f139e432e905",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
+      "gtin": "4650118044012",
+      "positions": [
+        {
+          "gtin": "4650118044012",
+          "name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р S, цвет синий",
+          "tnvedCode": "4015120009",
+          "quantity": 47,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-07-24T12:24:05.788025",
+      "created_by": "user",
+      "updated_at": "2026-07-24T12:24:05.788025",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1436 нитрил диаг S партия 260721",
       "document_id": "3f6d0769-1f6d-44aa-ad30-7039af3d0831",
       "status": "Выполнен",
@@ -33381,7 +33407,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-24T12:23:10.023265",
+  "last_update": "2026-07-24T12:24:07.811884",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
