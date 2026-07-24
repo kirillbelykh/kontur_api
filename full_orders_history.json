@@ -119,9 +119,9 @@
     {
       "order_name": "1438 нитрил диаг M партия 260721",
       "document_id": "cc8f2e99-ef78-4b5d-b6e0-e3e43c46f396",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1438 нитрил диаг M партия 260721\\1438 нитрил диаг M партия 260721.pdf, C:\\Users\\user\\Desktop\\Коды км\\1438 нитрил диаг M партия 260721\\1438 нитрил диаг M партия 260721_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1438 нитрил диаг M партия 260721\\1438 нитрил диаг M партия 260721.xls",
+      "simpl": "нитрил диаг",
       "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет синий",
       "gtin": "4650118044074",
       "positions": [
@@ -140,7 +140,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1438 нитрил диаг M партия 260721\\1438 нитрил диаг M партия 260721.xls",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1438 нитрил диаг M партия 260721\\1438 нитрил диаг M партия 260721.pdf",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1438 нитрил диаг M партия 260721\\1438 нитрил диаг M партия 260721_csv.csv"
     },
     {
       "order_name": "1437 нитрил диаг S партия 260722",
@@ -33549,7 +33552,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-24T13:34:56.181803",
+  "last_update": "2026-07-24T13:35:25.377309",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
