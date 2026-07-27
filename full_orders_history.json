@@ -4,8 +4,8 @@
       "order_name": "1448 нитрил диаг M партия 260727",
       "document_id": "15287e47-6668-4739-8a79-a3a57e025ad0",
       "status": "Скачан",
-      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.pdf, C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.xls",
-      "csv_path": null,
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.pdf, C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727_csv.csv",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.pdf",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.xls",
       "simpl": null,
@@ -33581,7 +33581,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-27T10:15:31.070871",
+  "last_update": "2026-07-27T10:16:07.640938",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
