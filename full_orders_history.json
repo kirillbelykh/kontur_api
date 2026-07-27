@@ -1,6 +1,26 @@
 {
   "orders": [
     {
+      "order_name": "1448 нитрил диаг M партия 260727",
+      "document_id": "15287e47-6668-4739-8a79-a3a57e025ad0",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.pdf, C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.xls",
+      "csv_path": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1448 нитрил диаг M партия 260727\\1448 нитрил диаг M партия 260727.xls",
+      "simpl": null,
+      "full_name": "Перчатки медицинские диагностические нитрильные нестерильные одноразовые неопудренные текстурированные, р-р M, цвет синий",
+      "gtin": "04650118044074",
+      "created_at": "2026-07-27T10:15:28.891064",
+      "created_by": "user",
+      "updated_at": "2026-07-27T10:15:28.891064",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1442 нитрил диаг XL партия 260721",
       "document_id": "d62e2522-b7c4-4da4-8cf4-65487121b435",
       "status": "Скачан",
@@ -33561,7 +33581,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-27T09:08:08.247936",
+  "last_update": "2026-07-27T10:15:31.070871",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
