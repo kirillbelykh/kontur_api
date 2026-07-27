@@ -363,12 +363,12 @@
       ],
       "created_at": "2026-07-24T12:25:36.689217",
       "created_by": "user",
-      "updated_at": "2026-07-24T12:25:36.689217",
+      "updated_at": "2026-07-27T15:25:42.395026",
       "updated_by": "user",
-      "tsd_created": false,
-      "tsd_created_at": null,
-      "tsd_intro_number": null,
-      "tsd_created_by": null,
+      "tsd_created": true,
+      "tsd_created_at": "2026-07-27T15:25:42.395026",
+      "tsd_intro_number": "e2305f17-25aa-4a42-805a-091e48abccf2",
+      "tsd_created_by": "user",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1439 нитрил диаг M партия 260722\\1439 нитрил диаг M партия 260722.xls",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1439 нитрил диаг M партия 260722\\1439 нитрил диаг M партия 260722.pdf",
       "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1439 нитрил диаг M партия 260722\\1439 нитрил диаг M партия 260722_csv.csv"
@@ -33818,7 +33818,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-27T15:25:07.562599",
+  "last_update": "2026-07-27T15:25:44.679992",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
