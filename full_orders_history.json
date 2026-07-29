@@ -55,9 +55,9 @@
     {
       "order_name": "1460. стер нитрил S партия 260730",
       "document_id": "b22a47c6-db2b-4293-bc3b-54b5a6b495d6",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1460 стер нитрил S партия 260730\\1460 стер нитрил S партия 260730.pdf, C:\\Users\\user\\Desktop\\Коды км\\1460 стер нитрил S партия 260730\\1460. стер нитрил S партия 260730_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1460 стер нитрил S партия 260730\\1460. стер нитрил S партия 260730.xls",
+      "simpl": "стер нитрил",
       "full_name": "Перчатки Sterä диагностические стерильные одноразовые нитрильные (нитриловые) неопудренные текстурированные неанатомической формы, с венчиком, р-р S",
       "gtin": "4650118046290",
       "positions": [
@@ -76,7 +76,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1460 стер нитрил S партия 260730\\1460 стер нитрил S партия 260730.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1460 стер нитрил S партия 260730\\1460. стер нитрил S партия 260730.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1460 стер нитрил S партия 260730\\1460. стер нитрил S партия 260730_csv.csv"
     },
     {
       "order_name": "1464 лат диаг S партия 260711",
@@ -34235,7 +34238,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-29T11:28:37.829364",
+  "last_update": "2026-07-29T11:34:32.134739",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
