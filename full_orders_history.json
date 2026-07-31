@@ -3,9 +3,9 @@
     {
       "order_name": "1466 хир 6,0 заявка 6977",
       "document_id": "076be56f-2948-4782-9b0c-36783470ecd7",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1466 хир 60 заявка 6977\\1466 хир 60 заявка 6977.pdf, C:\\Users\\user\\Desktop\\Коды км\\1466 хир 60 заявка 6977\\1466 хир 6,0 заявка 6977_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1466 хир 60 заявка 6977\\1466 хир 6,0 заявка 6977.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 6,0",
       "gtin": "4640473501015",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1466 хир 60 заявка 6977\\1466 хир 60 заявка 6977.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1466 хир 60 заявка 6977\\1466 хир 6,0 заявка 6977.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1466 хир 60 заявка 6977\\1466 хир 6,0 заявка 6977_csv.csv"
     },
     {
       "order_name": "1465 хир 6,0 партия 260717",
@@ -34299,7 +34302,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-07-31T12:48:10.408975",
+  "last_update": "2026-07-31T12:48:54.468367",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
