@@ -58,9 +58,9 @@
     {
       "order_name": "1487 лат диаг S партия 260805",
       "document_id": "9eb5d1cf-f079-4b18-ac5f-e1dd984f0474",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1487 лат диаг S партия 260805\\1487 лат диаг S партия 260805.pdf, C:\\Users\\user\\Desktop\\Коды км\\1487 лат диаг S партия 260805\\1487 лат диаг S партия 260805_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1487 лат диаг S партия 260805\\1487 лат диаг S партия 260805.xls",
+      "simpl": "латекс диаг",
       "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
       "gtin": "4650118041257",
       "positions": [
@@ -79,7 +79,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1487 лат диаг S партия 260805\\1487 лат диаг S партия 260805.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1487 лат диаг S партия 260805\\1487 лат диаг S партия 260805.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1487 лат диаг S партия 260805\\1487 лат диаг S партия 260805_csv.csv"
     },
     {
       "order_name": "1486 хир 7,5 заявка 6992",
@@ -34941,7 +34944,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-04T09:56:40.463110",
+  "last_update": "2026-08-04T10:35:40.834893",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
