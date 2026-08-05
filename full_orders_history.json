@@ -1,6 +1,32 @@
 {
   "orders": [
     {
+      "order_name": "1492 лат диаг S партия 260805",
+      "document_id": "e72c5207-2615-4fc9-82a5-cc6e33795744",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+      "gtin": "4650118041257",
+      "positions": [
+        {
+          "gtin": "4650118041257",
+          "name": "Перчатки Sterä диагностические из натурального латекса нестерильные одноразовые неопудренные текстурированные, р-р S, цвет натуральный",
+          "tnvedCode": "4015120009",
+          "quantity": 5,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-08-05T13:49:59.188854",
+      "created_by": "user",
+      "updated_at": "2026-08-05T13:49:59.188854",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "1490 хир 7,5 заявка 7015",
       "document_id": "85013d7e-3d1f-4b2c-acbf-4a17607fe5eb",
       "status": "Выполнен",
@@ -35031,7 +35057,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-05T10:24:17.189019",
+  "last_update": "2026-08-05T13:50:02.232038",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
