@@ -3,9 +3,9 @@
     {
       "order_name": "1493 хир 7,0 партия 260720",
       "document_id": "8e79b2b5-c73a-46e6-a3ac-160ec7f6b791",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1493 хир 70 партия 260720\\1493 хир 70 партия 260720.pdf, C:\\Users\\user\\Desktop\\Коды км\\1493 хир 70 партия 260720\\1493 хир 7,0 партия 260720_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1493 хир 70 партия 260720\\1493 хир 7,0 партия 260720.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 7,0",
       "gtin": "4640473510604",
       "positions": [
@@ -24,7 +24,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1493 хир 70 партия 260720\\1493 хир 70 партия 260720.pdf",
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1493 хир 70 партия 260720\\1493 хир 7,0 партия 260720.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1493 хир 70 партия 260720\\1493 хир 7,0 партия 260720_csv.csv"
     },
     {
       "order_name": "1517 лат диаг М партия 260810",
@@ -35797,7 +35800,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-07T17:49:00.732286",
+  "last_update": "2026-08-07T17:51:36.565971",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
