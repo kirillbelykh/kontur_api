@@ -158,11 +158,11 @@
       ],
       "created_at": "2026-08-07T16:03:45.581496",
       "created_by": "user",
-      "updated_at": "2026-08-10T09:45:30.354904",
+      "updated_at": "2026-08-10T09:46:03.069527",
       "updated_by": "user",
       "tsd_created": true,
-      "tsd_created_at": "2026-08-10T09:45:30.354904",
-      "tsd_intro_number": "80d9522a-4974-4d23-8d81-3e58e5ace949",
+      "tsd_created_at": "2026-08-10T09:46:03.069527",
+      "tsd_intro_number": "2117ee30-c253-4db8-b96c-45fcb0a04009",
       "tsd_created_by": "user",
       "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1515 стер лат L партия 260806\\1515 стер лат L партия 260806.pdf",
       "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1515 стер лат L партия 260806\\1515 стер лат L партия 260806.xls",
@@ -35861,7 +35861,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-10T09:45:33.059860",
+  "last_update": "2026-08-10T09:46:06.490097",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
