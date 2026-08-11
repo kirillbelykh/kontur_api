@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePickerField } from '@/components/ui/date-picker'
+import { dissolveToDust, restoreDissolved } from '@/components/ui/dust-effect'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { Shimmer } from '@/components/ui/shimmer'
@@ -69,6 +70,7 @@ export function AggregationPage() {
   const prevIdsRef = useRef<Set<string> | null>(null)
   // TableRow отдаёт onAction без исходного события — модификатор снимаем в capture-фазе до действия строки
   const shiftPressedRef = useRef(false)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
   const load = useCallback(async (force = false) => {
     setLoading(true)
     try {
@@ -263,8 +265,32 @@ export function AggregationPage() {
     runBusy(
       'archive-selected',
       async () => {
-        await apiCall('archive_selected_aggregations', selectedIdList())
+        const ids = selectedIdList()
+        const selected = new Set(ids)
+        // Строки текущей страницы идут в DOM в том же порядке, что и pageRows
+        // (плюс плейсхолдеры создающихся АК сверху).
+        const domRows = Array.from(tableScrollRef.current?.querySelectorAll('tbody tr') ?? [])
+        const offset = page === 0 && pendingCreate > 0 ? Math.min(pendingCreate, 20) : 0
+        const targets = pageRows
+          .map((row, index) =>
+            selected.has(String(row.document_id || ''))
+              ? (domRows[offset + index] as HTMLElement | undefined)
+              : undefined,
+          )
+          .filter((el): el is HTMLElement => Boolean(el))
+
+        const dust = dissolveToDust(targets)
+        try {
+          await apiCall('archive_selected_aggregations', ids)
+        } catch (error) {
+          targets.forEach(restoreDissolved)
+          throw error
+        }
+        await dust
+        setSelectedIds(new Set())
         await load(true)
+        // Если какая-то строка не ушла в архив и осталась в данных — вернуть ей вид
+        targets.forEach(restoreDissolved)
       },
       'Выбранные АК отправлены в архив.',
     )
@@ -518,6 +544,7 @@ export function AggregationPage() {
           ) : (
             <>
               <div
+                ref={tableScrollRef}
                 className="max-h-[520px] overflow-auto"
                 onMouseDownCapture={(event) => {
                   shiftPressedRef.current = event.shiftKey
