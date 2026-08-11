@@ -12,11 +12,14 @@ _paths = find_yandex_paths()
 YANDEX_DRIVER_PATH = Path(os.getenv("KONTUR_YANDEX_DRIVER", r"driver\yandexdriver.exe"))
 YANDEX_BROWSER_PATH = _paths.get("browser")
 PROFILE_USER_DATA_DIR = _paths.get("user_data")
+# Known-good profile that held the Kontur session (d647455). Env overrides.
+_DEFAULT_YANDEX_PROFILE = "Vinsent O`neal"
 PROFILE_DIRECTORY = str(
-    _paths.get("profile_directory")
-    or os.getenv("KONTUR_YANDEX_PROFILE")
-    or "Default"
+    os.getenv("KONTUR_YANDEX_PROFILE")
+    or _paths.get("profile_directory")
+    or _DEFAULT_YANDEX_PROFILE
 )
+# True Chrome --headless=new is unsupported for this auth stack by default.
 HEADLESS = False
 
 RUNTIME_DIR = Path(os.getenv("KONTUR_RUNTIME_DIR", "runtime"))

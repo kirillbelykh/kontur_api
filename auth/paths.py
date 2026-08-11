@@ -64,6 +64,8 @@ def find_yandex_paths() -> Dict[str, Optional[Path | str]]:
     configured_profile = str(os.getenv("KONTUR_YANDEX_PROFILE") or "").strip()
     if configured_profile:
         profile_candidates.append(configured_profile)
+    # Historical working Kontur profile (d647455). Prefer when present on disk.
+    profile_candidates.append("Vinsent O`neal")
 
     if user_data_root and user_data_root.exists():
         local_state_path = user_data_root / "Local State"

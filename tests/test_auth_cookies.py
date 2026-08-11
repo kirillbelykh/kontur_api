@@ -168,7 +168,8 @@ class BrowserOptionsTests(unittest.TestCase):
             )
 
         self.assertTrue(any(arg == "--headless=new" for arg in fake_options.arguments))
-        self.assertFalse(any("-32000" in arg for arg in fake_options.arguments))
+        # Off-screen flags stay even in opt-in true headless (d647455).
+        self.assertTrue(any("-32000" in arg for arg in fake_options.arguments))
 
 
 class EnsureSessionBridgeTests(unittest.TestCase):

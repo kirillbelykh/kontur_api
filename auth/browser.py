@@ -1,8 +1,9 @@
 """Selenium / YandexDriver cookie collection.
 
-Default mode matches the historical background auth flow:
-off-screen window + Win32 hide, using the real Yandex profile.
-True Chrome ``--headless=new`` is available via ``HEADLESS`` / env.
+Working background mode (restored from d647455 / 60bd74f):
+real Yandex profile, ``HEADLESS=False``, always park the window
+off-screen and hide it via Win32. True ``--headless=new`` is opt-in
+only and still keeps the off-screen size/position flags.
 """
 
 from __future__ import annotations
@@ -78,17 +79,15 @@ def build_browser_options(
         options.add_argument(f"--profile-directory={normalized_profile_directory}")
 
     if headless:
+        # Opt-in only. Historical working path used HEADLESS=False + hide.
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-    else:
-        # Historical "works in background" mode: keep a real profile session,
-        # but keep the window off-screen and hidden via Win32.
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-position=-32000,-32000")
-        options.add_argument("--window-size=1920,1080")
 
+    # Always park off-screen (d647455). Do not gate on headless.
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-position=-32000,-32000")
+    options.add_argument("--window-size=1920,1080")
     options.add_argument("--no-first-run")
     options.add_argument("--no-default-browser-check")
     options.add_argument("--disable-blink-features=AutomationControlled")
@@ -244,7 +243,8 @@ def get_cookies(
             remove_webdriver_marker(driver)
             wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
-            if not use_headless and win32_available:
+            # Always hide when possible (d647455) — not gated on headless.
+            if win32_available:
                 hide_driver_windows(driver)
 
             driver.get(target_url)
