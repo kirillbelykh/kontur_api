@@ -5,40 +5,48 @@
 ```powershell
 uv python install 3.12
 uv sync --python 3.12 --group dev
+cd frontend
+npm install
 ```
 
-Основной запуск:
+## Запуск
 
 ```powershell
-.\.venv\Scripts\python.exe ui_v2\main_v2.py
+.\.venv\Scripts\python.exe main.py     # окно pywebview, грузит frontend/dist
 ```
 
-## Проверки
+Дев-режим фронта: `npm run dev` во втором терминале, в `.env` раскомментировать
+`VITE_DEV_URL=http://127.0.0.1:5173`, перезапустить `main.py`.
 
-Перед пушем запускайте минимум:
+## Проверки (те же, что в CI)
 
 ```powershell
-uv sync --python 3.12 --group dev
-python -m py_compile auth\__init__.py cookies.py session_manager.py ui_v2\api_bridge.py ui_v2\main_v2.py
-node --check ui_v2\ui\app.js
-python -m unittest tests.test_auth_cookies tests.test_cookies_prolongation tests.test_ui_v2_api_bridge tests.test_history_db_unit
+python -m unittest discover -s tests -v      # backend (нужен Windows)
+cd frontend
+npx tsc --noEmit
+npm run build
 ```
 
-Если менялись утилиты верхнего уровня, добавьте их в `py_compile` или точечные
-unit-тесты.
+CI: `.github/workflows/ci.yml` — backend на `windows-latest`
+(Python 3.12, `requirements.txt`), frontend на `ubuntu-latest` (Node 22).
+Гоняется на push в `main` / `engineering-pass` и на PR.
+Линтеры настроены в `.flake8` и `mypy.ini`.
 
-## Git-Гигиена
+## Git-гигиена
 
-- Не коммитьте `.env`, cookies, логи, драйверы и временные файлы.
-- Не коммитьте `full_orders_history.json`, если это не осознанное обновление
-  общей истории заказов.
-- Изменения шаблонов BarTender коммитьте только после ручной проверки печати.
-- Не удаляйте пользовательские рабочие файлы командой очистки без проверки.
+- Не коммитьте `.env`, `runtime/`, `driver/`, cookies и логи.
+- `full_orders_history.json` синхронизируется автоматически через ветку
+  `orders-history` — не коммитьте его в `main` без осознанной причины.
+- `frontend/dist` коммитится сознательно (обновления уезжают на рабочие ПК
+  через git pull): после изменений фронта выполните `npm run build` и
+  закоммитьте `dist` вместе с исходниками.
+- Методы `ApiBridge` — контракт для UI: не меняйте сигнатуры без
+  одновременного обновления фронта.
+- `git push` — только по явной просьбе владельца.
 
 ## Код
 
-- Новые функции пишите с type hints.
-- Для неочевидной бизнес-логики добавляйте короткие docstring или комментарий.
+- Новые функции — с type hints.
 - Сетевые запросы к Контуру не должны блокировать интерфейс без видимого
   прогресса.
-- Тексты интерфейса храните в UTF-8 и проверяйте, что в коде нет mojibake.
+- Тексты интерфейса — UTF-8, следите за mojibake.

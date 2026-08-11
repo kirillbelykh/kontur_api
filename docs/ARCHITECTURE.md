@@ -1,53 +1,76 @@
 # Архитектура
 
-## Основные Компоненты
+Один процесс Python (`main.py` → `backend/app/desktop.py`) открывает окно
+pywebview с React-интерфейсом из `frontend/dist`. Все действия UI идут через
+`ApiBridge` (`backend/app/api_bridge.py`) — его методы являются контрактом
+между фронтом и бэком.
 
-- `ui_v2/main_v2.py` запускает актуальный desktop-интерфейс.
-- `ui_v2/api_bridge.py` связывает frontend PyWebView с Python-логикой.
-- `ui_v2/ui/app.js` и `ui_v2/ui/styles.css` отвечают за новый интерфейс.
-- `main.pyw` и `main.py` оставлены для старого интерфейса и резервных операций.
-- `ui_mobile/server_mobile.py` обслуживает мобильную версию через этот ПК.
+```mermaid
+flowchart LR
+    React["React 19<br/>frontend/dist"] -- "window.pywebview.api" --> Bridge["ApiBridge<br/>backend/app/api_bridge.py"]
+    WMS["WMS «Честный знак»"] -- "HTTP :8791<br/>X-CHZ-Token" --> Chz["chz_bridge_server.py"]
+    Chz --> Bridge
+    Bridge --> Auth["backend/auth<br/>файл → профиль → Selenium"]
+    Bridge --> Kontur["backend/kontur<br/>api.py + cryptopro.py"]
+    Bridge --> Services["backend/services<br/>history_db, bartender, update"]
+    Auth -.->|cookies| Kontur
+    Kontur --> MK[("mk.kontur.ru")]
+    Services --> Hist["full_orders_history.json"]
+    Hist <-->|"git-ветка orders-history"| Origin[("origin")]
+    Services --> BT["BarTender"]
+```
 
-## Интеграционный Слой
+## Потоки данных
 
-- `api.py` содержит основные запросы к Контур.Маркировке.
-- `auth/` — production-пакет авторизации (cookies, Selenium/Yandex Driver,
-  проверка сессии через Kontur API, автопродление доступа).
-- `cookies.py` — тонкий совместимый фасад над `auth` для старых импортов.
-- `session_manager.py` — общий менеджер HTTP-сессии для legacy UI.
-- `cryptopro.py` и `winhttp.py` отвечают за подпись и Windows HTTP-интеграции.
-- `history_db.py` синхронизирует историю заказов между рабочими ПК.
-- `aggregation_bulk.py` содержит массовые сценарии по агрегационным кодам.
+**Заказ кодов.** Экран Orders → `ApiBridge` → `backend/kontur/api.py`
+(REST к mk.kontur.ru; подпись документов — `cryptopro.py`, CAdES) → запись в
+`backend/services/history_db.py` → `full_orders_history.json`. «Настоящие»
+статусы дотягивает отдельный процесс `backend/app/true_status_worker.py`,
+который ApiBridge запускает сабпроцессом.
 
-## Авторизация И Cookies
+**Cookies (авторизация).** `backend/auth/service.py`, по убыванию дешевизны:
+(1) файл `runtime/auth/kontur_cookies.json`; (2) cookies из профиля Яндекс
+Браузера (`yandex_cookies.py`); (3) Selenium + YandexDriver (`browser.py`).
+Каждый источник подтверждается живым `GET /api/v1/user` — TTL файла сам по
+себе ничего не доказывает. Selenium открывает реальный профиль с окном за
+экраном (`--window-position=-32000,-32000`) плюс Win32 `SW_HIDE`; параллельный
+«сторож» прячет окна новых процессов `browser.exe`, а после неудачной попытки
+осиротевшие процессы принудительно завершаются. Фоновая пролонгация доступа —
+раз в ~9 ч (`prolongation.py`).
 
-Порядок получения рабочей сессии:
+**Обновления.** UI раз в 5 минут зовёт `check_for_updates` (git fetch +
+сравнение HEAD с `origin/main`); кнопка «Обновить» → `apply_update` →
+`git merge --ff-only origin/main`, перезапуск вручную. `frontend/dist`
+закоммичен сознательно: UI приезжает тем же pull, Node.js на рабочих ПК не
+нужен. Жёсткий путь — `Обновление.bat` → `scripts/update_windows.ps1`
+(stash → pull/reset → пересборка окружения).
 
-1. Прочитать локальный файл cookies (если не старше TTL).
-2. Проверить их живым запросом к `GET /api/v1/user`.
-3. Если невалидны — попробовать cookies из профиля Yandex Browser.
-4. Если снова невалидны — открыть Selenium/YandexDriver в фоновом режиме
-   (окно за экраном + скрытие через Win32; опционально true headless через
-   `KONTUR_BROWSER_HEADLESS=1`).
+**История между ПК.** `history_db.py` синхронизирует
+`full_orders_history.json` через служебную git-ветку `orders-history`
+(pull примерно раз в 20 с при обращениях, push с ретраями; кэш —
+`runtime/state/history_sync_cache`). Управляется `HISTORY_SYNC_ENABLED` /
+`HISTORY_SYNC_BRANCH`.
 
-Локальный TTL сам по себе больше не считается доказательством живой сессии.
+**WMS («Честный знак»).** `backend/app/chz_bridge_server.py` слушает
+`0.0.0.0:8791` (env `CHZ_BRIDGE_ENABLED/HOST/PORT/TOKEN`).
+`POST /api/chz/requests` (обязательный заголовок `X-CHZ-Token`) →
+`ApiBridge.receive_wms_chz_request` → заявка попадает в очередь заказов;
+`GET /api/chz/health` — доступность и число активных заявок. Без окна мост
+поднимает `backend/app/server_only.py` (ярлык «CRPT server» в автозагрузке).
+Отдельного экрана CHZ в UI нет.
 
-## Печать
+## Известные ограничения
 
-- `bartender_print.py` отправляет задания в BarTender.
-- `bartender_label_100x180.py`, `label_print_30x20.py` и смежные модули готовят
-  поля этикеток.
-- Шаблоны BarTender лежат в `BarTender/` и `Шаблоны BarTender/`.
-
-## Статусы
-
-Статусы заказов и документов должны подтягиваться из API Контура в фоне, а в
-интерфейсе отображаться на русском языке. Локальный статус используется только
-там, где он действительно локальный: например, скачан ли файл кодов на текущем
-ПК.
-
-## Runtime Файлы
-
-Логи, cookies, драйверы, временные файлы, локальные установщики и кэш не должны
-коммититься. Если новый сценарий создает runtime-файл, добавьте его в
-`.gitignore`.
+- Профиль Яндекс Браузера блокируется запущенным браузером: при
+  «profile is in use» приложение завершает процессы `browser.exe` и повторяет
+  попытку — открытый у пользователя браузер при этом закроется.
+- `api_bridge.py` — монолит ~6.9 тыс. строк. Методы — контракт для UI;
+  распиливать только с сохранением сигнатур.
+- Selenium кликает по абсолютным XPath живой вёрстки Контура
+  (`browser.py`) — редизайн mk.kontur.ru их ломает.
+- `HEADLESS = False` принципиально: через `--headless=new` авторизация
+  не проходит.
+- Порт 8791 слушает `0.0.0.0`; POST защищён только токеном —
+  `CHZ_BRIDGE_TOKEN` обязателен.
+- Копия из exe-установщика не содержит `.git`: внутриприложенческие
+  обновления и синхронизация истории там не работают.

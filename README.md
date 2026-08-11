@@ -1,84 +1,74 @@
-# Kontur API
+# Контур Маркировка
 
-Windows desktop app for Kontur.Markirovka: order codes, download, introduction
-into circulation, TSD tasks, aggregation, BarTender labels, WMS CHZ requests.
+Windows-приложение для работы с Контур.Маркировкой: заказ кодов маркировки,
+скачивание кодов, ввод в оборот, задания на ТСД, агрегация, печать этикеток
+BarTender. Заявки «Честного знака» из WMS принимает локальный HTTP-мост
+(порт 8791) — отдельного экрана для них в приложении нет.
 
-## Установка на новый ПК (Windows)
+## Что нужно на ПК
 
-1. Склонировать репозиторий (или скопировать `KonturMarkirovka-Setup.exe`).
-2. Запустить `KonturMarkirovka-Setup.exe` — установщик распакует приложение в
-   `%LOCALAPPDATA%\Programs\KonturMarkirovka`, поставит uv/Python/зависимости,
-   скачает YandexDriver и создаст ярлык «Контур Маркировка» на рабочем столе.
-3. Запустить ярлык — можно пользоваться.
+- Windows 10/11 и интернет.
+- Яндекс Браузер с профилем, в котором выполнен вход в Контур
+  (через него работает фоновая авторизация).
+- КриптоПро CSP и сертификат организации (подпись документов).
+- BarTender (печать этикеток).
 
-Пересборка установщика после изменений: `Build-Installer.bat`
-(готовый `KonturMarkirovka-Setup.exe` появляется в корне проекта).
+Лицензионные программы (браузер ставится автоматически, остальное — нет)
+в установку не входят.
 
-## Quick start
+## Установка на новый ПК
 
-```powershell
-# already installed
-.\.venv\Scripts\python.exe main.py
-# or
-KonturMarkirovka.bat
-# or
-wscript run_kontur.vbs
-```
+Способ 1 — из репозитория (основной: работают обновления и общая история):
 
-Frontend (optional hot reload):
+1. Склонировать репозиторий в `%USERPROFILE%\kontur_api`.
+2. Запустить `setup.bat`. Он поставит Git, uv и Python 3.12, зависимости,
+   создаст `.env`, скачает YandexDriver под вашу версию браузера, проверит
+   BarTender и создаст ярлык «Контур Маркировка» на рабочем столе
+   (плюс фоновый «CRPT server» в автозагрузку — мост для WMS без окна).
 
-```powershell
-cd frontend
-npm install
-npm run dev
-# set VITE_DEV_URL=http://127.0.0.1:5173 in .env, then restart main.py
-```
+Способ 2 — установщик `KonturMarkirovka-Setup.exe` (лежит в корне репозитория):
+ставит копию приложения в `%LOCALAPPDATA%\Programs\KonturMarkirovka` и
+настраивает окружение. В этой копии нет git-репозитория, поэтому кнопка
+«Обновить» и синхронизация истории заказов в ней не работают — подходит для
+быстрого старта, основной способ — первый.
 
-Production UI build:
+## Запуск
 
-```powershell
-cd frontend
-npm run build
-```
-
-## Layout
-
-See [AGENTS.md](AGENTS.md). Short map:
-
-| Path | Role |
-|------|------|
-| `backend/` | Python auth, Kontur API, services, ApiBridge, desktop shell |
-| `frontend/` | React + Vite + TypeScript + Tailwind (WMS-aligned design) |
-| `archive/legacy_ui/` | Old CustomTkinter UI (reserve only) |
-| `archive/ui_v2_static/` | Previous HTML/JS UI (reserve) |
-| `assets/labels/` | BarTender `.btw` templates |
-| `runtime/` | Local cookies, logs, backups, temp (not committed) |
-| `scripts/launchers/` | Extra VBS launchers (CRPT bridge) |
-| `tests/` | Unit tests |
-
-## Rules
-
-- Design: `.cursor/rules/design.mdc`
-- Backend: `.cursor/rules/backend.mdc`
-- Project: `.cursor/rules/project.mdc`
-
-## Tests
+Ярлык «Контур Маркировка» на рабочем столе. Либо из папки приложения:
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest tests.test_auth_cookies tests.test_cookies_prolongation tests.test_ui_v2_api_bridge tests.test_history_db_unit
+KonturMarkirovka.bat                  # обычный запуск
+wscript run_kontur.vbs                # полностью тихий запуск
+.\.venv\Scripts\python.exe main.py    # с консолью, для диагностики
 ```
 
+## Обновление
 
-## Windows installer
+- Приложение само проверяет новые версии каждые 5 минут. Когда версия есть,
+  в шапке появляется жёлтая кнопка «Обновить»: нажать, дождаться
+  «Обновление установлено», перезапустить приложение.
+- Если кнопки нет или обновление падает — запустить `Обновление.bat`:
+  полное обновление с пересборкой окружения (git, зависимости, драйвер,
+  ярлыки). Лог: `runtime\logs\kontur_update.log`.
+- Интерфейс собран заранее и лежит в репозитории (`frontend/dist`),
+  Node.js на рабочих ПК не нужен.
 
-Run `Build-Installer.bat` from the project root. Intermediates stay under `dist\installer\` / `installer\payload\`; the deliverable `KonturMarkirovka-Setup.exe` is published to the **project root** (large binaries are gitignored).
+## Где лежат данные
 
-## Update
+| Что | Где |
+|-----|-----|
+| Cookies, логи, бэкапы, временные файлы | `runtime/` (в git не попадает) |
+| История заказов | `full_orders_history.json` — общая для всех ПК, синхронизируется автоматически через служебную git-ветку `orders-history` |
+| Локальные настройки | `.env` (создаётся из `.env.example`) |
+| Драйвер браузера | `driver\yandexdriver.exe` (скачивается и обновляется автоматически) |
 
-```powershell
-git pull origin main
-uv sync --python 3.12 --frozen
-cd frontend && npm install && npm run build
-```
+## Сборка установщика
 
-BarTender and CryptoPro/CAdES are external licensed software and are not bundled.
+`Build-Installer.bat` — в корне проекта появятся `KonturMarkirovka-Setup.exe`
+и `KonturMarkirovka-<версия>-payload.zip` (кэш сборки: `dist\installer\`,
+staging: `installer\payload\`). Inno Setup 6 скрипт скачает сам, если его нет.
+
+---
+
+Инженерам: карта проекта — [AGENTS.md](AGENTS.md),
+архитектура — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

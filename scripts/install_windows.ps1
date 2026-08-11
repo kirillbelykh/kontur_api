@@ -186,7 +186,8 @@ function Resolve-ProjectDir {
     param([string]$ScriptRoot)
 
     $localProjectDir = (Resolve-Path (Join-Path $ScriptRoot "..")).Path
-    if (Test-Path (Join-Path $localProjectDir "main.pyw")) {
+    # main.py — актуальный маркер репозитория (main.pyw остался от старой структуры)
+    if (Test-Path (Join-Path $localProjectDir "main.py")) {
         return $localProjectDir
     }
 
