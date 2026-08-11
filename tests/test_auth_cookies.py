@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -222,6 +223,35 @@ class BrowserSessionErrorTests(unittest.TestCase):
         term_mock.assert_called_once()
         mkdtemp_mock.assert_not_called()
         self.assertGreaterEqual(chrome_mock.call_count, 2)
+
+    def test_failed_launch_sweeps_orphan_browser_windows(self):
+        """Упавший запуск не должен оставлять пустые окна browser.exe."""
+        from backend.auth import browser as browser_mod
+
+        generic_error = RuntimeError("some random selenium failure")
+
+        with (
+            mock.patch.object(browser_mod, "_start_new_window_hider", return_value=threading.Event()),
+            mock.patch.object(
+                browser_mod,
+                "_iter_yandex_browser_pids",
+                side_effect=[{100}, {100, 999}, {100}, {100, 999}],
+            ),
+            mock.patch.object(browser_mod, "_terminate_pids", return_value=1) as term_mock,
+            mock.patch("selenium.webdriver.Chrome", side_effect=generic_error),
+            mock.patch.object(Path, "exists", return_value=True),
+        ):
+            result = browser_mod.get_cookies(
+                driver_path=Path("driver/yandexdriver.exe"),
+                browser_path=Path("browser.exe"),
+                profile_user_data_dir=Path("User Data"),
+                profile_directory="Vinsent O`neal",
+                max_retries=2,
+            )
+
+        self.assertIsNone(result)
+        self.assertEqual(term_mock.call_count, 2)
+        term_mock.assert_called_with({999})
 
     def test_get_cookies_version_mismatch_repairs_once_then_retries(self):
         from backend.auth import browser as browser_mod

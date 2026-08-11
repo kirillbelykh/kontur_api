@@ -11,9 +11,10 @@ from __future__ import annotations
 import ctypes
 import os
 import subprocess
+import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Set
+from typing import Any, Dict, Iterator, Optional, Set, Tuple
 
 from backend.services.logger import logger
 
@@ -209,7 +210,8 @@ def is_profile_in_use(exc: BaseException) -> bool:
     )
 
 
-def _iter_yandex_browser_pids(browser_path: Optional[Path] = None) -> Set[int]:
+def _iter_process_entries() -> Iterator[Tuple[int, int, str]]:
+    """Yield (pid, parent_pid, exe_name_lower) for every running process."""
     from ctypes import wintypes
 
     class TAGPROCESSENTRY32(ctypes.Structure):
@@ -227,41 +229,64 @@ def _iter_yandex_browser_pids(browser_path: Optional[Path] = None) -> Set[int]:
         ]
 
     kernel32 = ctypes.windll.kernel32
-    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
     snap = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
     if snap in (-1, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF):
-        return set()
+        return
 
     pe = TAGPROCESSENTRY32()
     pe.dwSize = ctypes.sizeof(TAGPROCESSENTRY32)
-    found: Set[int] = set()
     try:
         if not kernel32.Process32FirstW(snap, ctypes.byref(pe)):
-            return set()
+            return
         while True:
-            if pe.szExeFile.lower() == "browser.exe":
-                pid = int(pe.th32ProcessID)
-                handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-                image = ""
-                if handle:
-                    try:
-                        buf = ctypes.create_unicode_buffer(1024)
-                        size = wintypes.DWORD(1024)
-                        if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
-                            image = buf.value.lower()
-                    finally:
-                        kernel32.CloseHandle(handle)
-                if image and "yandex" in image and "browser" in image:
-                    found.add(pid)
+            yield int(pe.th32ProcessID), int(pe.th32ParentProcessID), pe.szExeFile.lower()
             if not kernel32.Process32NextW(snap, ctypes.byref(pe)):
                 break
     finally:
         kernel32.CloseHandle(snap)
+
+
+def _iter_yandex_browser_pids(browser_path: Optional[Path] = None) -> Set[int]:
+    from ctypes import wintypes
+
+    kernel32 = ctypes.windll.kernel32
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    found: Set[int] = set()
+    for pid, _parent, exe in _iter_process_entries():
+        if exe != "browser.exe":
+            continue
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        image = ""
+        if handle:
+            try:
+                buf = ctypes.create_unicode_buffer(1024)
+                size = wintypes.DWORD(1024)
+                if kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                    image = buf.value.lower()
+            finally:
+                kernel32.CloseHandle(handle)
+        if image and "yandex" in image and "browser" in image:
+            found.add(pid)
     return found
 
 
-def terminate_yandex_browser_processes(browser_path: Optional[Path] = None) -> int:
-    pids = _iter_yandex_browser_pids(browser_path or YANDEX_BROWSER_PATH)
+def _iter_descendant_pids(root_pid: int) -> Set[int]:
+    children: Dict[int, Set[int]] = {}
+    for pid, parent, _exe in _iter_process_entries():
+        children.setdefault(parent, set()).add(pid)
+
+    result: Set[int] = set()
+    queue = [int(root_pid)]
+    while queue:
+        current = queue.pop()
+        for child in children.get(current, ()):  # PIDs могут переиспользоваться — глубина тут мала
+            if child not in result:
+                result.add(child)
+                queue.append(child)
+    return result
+
+
+def _terminate_pids(pids: Set[int]) -> int:
     if not pids:
         return 0
     PROCESS_TERMINATE = 0x0001
@@ -276,37 +301,83 @@ def terminate_yandex_browser_processes(browser_path: Optional[Path] = None) -> i
                 killed += 1
         finally:
             kernel32.CloseHandle(handle)
+    return killed
+
+
+def terminate_yandex_browser_processes(browser_path: Optional[Path] = None) -> int:
+    killed = _terminate_pids(_iter_yandex_browser_pids(browser_path or YANDEX_BROWSER_PATH))
     if killed:
         logger.info("Закрыто процессов Яндекс.Браузера: %s", killed)
         time.sleep(2.0)
     return killed
 
 
-def hide_driver_windows(driver) -> None:
-    """Park window off-screen (Desktop cookies.py used SW_HIDE on driver PID)."""
+def _hide_windows_for_pids(pids: Set[int]) -> int:
     try:
         import win32con
         import win32gui
         import win32process
-    except ImportError as exc:
-        logger.debug("pywin32 недоступен: %s", exc)
+    except ImportError:
+        return 0
+
+    handles: list[int] = []
+
+    def enum_window_callback(hwnd, results):
+        _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
+        if window_pid in pids and win32gui.IsWindowVisible(hwnd):
+            results.append(hwnd)
+
+    win32gui.EnumWindows(enum_window_callback, handles)
+    for hwnd in handles:
+        win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+    return len(handles)
+
+
+def _start_new_window_hider(before_pids: Set[int]) -> threading.Event:
+    """Hide windows of browser processes that appear after ``before_pids``.
+
+    The browser window pops up while ``webdriver.Chrome()`` is still blocking,
+    so hiding must run in parallel with the launch, not after it.
+    """
+    stop = threading.Event()
+
+    def loop() -> None:
+        hidden_total = 0
+        while not stop.is_set():
+            try:
+                fresh = _iter_yandex_browser_pids() - before_pids
+                if fresh:
+                    hidden = _hide_windows_for_pids(fresh)
+                    if hidden:
+                        hidden_total += hidden
+                        logger.info("Скрыто %s новых окон браузера (всего %s)", hidden, hidden_total)
+            except Exception as exc:
+                logger.debug("Сторож окон браузера: %s", exc)
+            stop.wait(0.25)
+
+    threading.Thread(target=loop, daemon=True, name="browser-window-hider").start()
+    return stop
+
+
+def hide_driver_windows(driver) -> None:
+    """SW_HIDE окон браузера, запущенного драйвером.
+
+    Старая версия сравнивала PID окна с PID самого драйвера, но окно
+    принадлежит дочернему browser.exe — ни одно окно не совпадало и всё
+    оставалось видимым. Ищем окна по потомкам процесса драйвера.
+    """
+    try:
+        pid = int(driver.service.process.pid)
+    except Exception as exc:
+        logger.debug("Не удалось получить PID драйвера: %s", exc)
         return
 
     try:
-        pid = driver.service.process.pid
         time.sleep(0.4)
-
-        def enum_window_callback(hwnd, results):
-            _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
-            if window_pid == pid:
-                results.append(hwnd)
-
-        handles: list[int] = []
-        win32gui.EnumWindows(enum_window_callback, handles)
-        for hwnd in handles:
-            win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
-        if handles:
-            logger.info("Скрыто %s окон браузера по PID %s", len(handles), pid)
+        pids = _iter_descendant_pids(pid) | {pid}
+        hidden = _hide_windows_for_pids(pids)
+        if hidden:
+            logger.info("Скрыто %s окон браузера по дереву PID %s", hidden, pid)
     except Exception as exc:
         logger.debug("Не удалось скрыть окно браузера: %s", exc)
 
@@ -384,6 +455,18 @@ def get_cookies(
             profile_directory,
         )
         driver = None
+        attempt_failed = False
+        before_pids: Set[int] = set()
+        hider_stop: Optional[threading.Event] = None
+        if win32_available:
+            try:
+                before_pids = _iter_yandex_browser_pids()
+            except Exception:
+                before_pids = set()
+            if not use_headless:
+                # Окно появляется, пока webdriver.Chrome() ещё блокирует,
+                # поэтому прятать надо параллельно с запуском.
+                hider_stop = _start_new_window_hider(before_pids)
         try:
             options = build_browser_options(
                 browser_path=Path(browser_path),
@@ -449,6 +532,7 @@ def get_cookies(
                 return dict(cookies)
         except Exception as exc:
             logger.exception("get_cookies failed on attempt %s", attempt)
+            attempt_failed = True
             if is_driver_version_mismatch(exc) and not driver_repaired:
                 driver_repaired = True
                 if ensure_yandex_driver_updated(force=True):
@@ -459,12 +543,24 @@ def get_cookies(
                 profile_unlocked = True
                 continue
         finally:
+            if hider_stop is not None:
+                hider_stop.set()
             if driver is not None:
                 try:
                     driver.quit()
                     logger.info("Вкладка/браузер Selenium закрыты")
                 except Exception:
                     pass
+            if attempt_failed and win32_available:
+                # Упавший запуск оставляет пустое окно browser.exe без driver'а —
+                # убираем только процессы, появившиеся за время этой попытки.
+                try:
+                    leftover = _iter_yandex_browser_pids() - before_pids
+                    killed = _terminate_pids(leftover)
+                    if killed:
+                        logger.info("Закрыто %s осиротевших окон браузера после неудачной попытки", killed)
+                except Exception as exc:
+                    logger.debug("Не удалось прибрать осиротевшие окна: %s", exc)
 
     logger.error("Не удалось получить валидные cookies после %s попыток", max_retries)
     return None
