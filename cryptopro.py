@@ -1,12 +1,19 @@
-import win32com.client
-from win32com.client import Dispatch
-import pythoncom
-from typing import Optional
+"""CryptoPro / CAdES helpers.
+
+Windows-only COM dependencies are imported lazily so the rest of the project
+(and unit tests) can import this module outside Windows.
+"""
+
+from __future__ import annotations
+
 import datetime
-from winhttp import post_with_winhttp
-import requests
-from logger import logger
 import json
+from typing import Any, Optional
+
+import requests
+
+from logger import logger
+from winhttp import post_with_winhttp
 
 BASE = "https://mk.kontur.ru"
 
@@ -20,7 +27,19 @@ CAPICOM_MY_STORE = "My"
 CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
 
 
-# ---------- certificate utilities (pywin32 / CAdES) ----------
+def _require_windows_com() -> tuple[Any, Any]:
+    try:
+        import pythoncom
+        import win32com.client
+        from win32com.client import Dispatch
+    except ImportError as exc:
+        raise RuntimeError(
+            "CryptoPro/CAdES требуют Windows и pywin32. "
+            "Установите pywin32 на рабочей станции."
+        ) from exc
+    return pythoncom, Dispatch
+
+
 def _is_cert_usable(cert) -> bool:
     """Проверка, что сертификат пригоден для подписи."""
     try:
@@ -40,10 +59,11 @@ def _is_cert_usable(cert) -> bool:
 
 
 def find_certificate_by_thumbprint(thumbprint: Optional[str] = None):
+    pythoncom, Dispatch = _require_windows_com()
     logger.debug(f"Вход в find_certificate_by_thumbprint с thumbprint: {thumbprint}")
     pythoncom.CoInitialize()
     logger.debug("Вызван CoInitialize")
-    store = win32com.client.Dispatch("CAdESCOM.Store")
+    store = Dispatch("CAdESCOM.Store")
     logger.debug("Создан объект CAdESCOM.Store")
     store.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
     logger.debug("Хранилище открыто")
@@ -80,6 +100,7 @@ def find_certificate_by_thumbprint(thumbprint: Optional[str] = None):
         logger.warning("Сертификат не найден")
     return found
 
+
 def sign_data(cert, base64_content: str, b_detached: bool = False) -> str:
     """
     Подписывает данные из base64-строки CAdES-BES подписью.
@@ -87,8 +108,12 @@ def sign_data(cert, base64_content: str, b_detached: bool = False) -> str:
     b_detached - True для отсоединенной (detached), False для присоединенной (attached).
     Возвращает подпись в base64 (ASCII).
     """
+    pythoncom, Dispatch = _require_windows_com()
     cert_thumb = getattr(cert, "Thumbprint", "Неизвестно")
-    logger.debug(f"Вход в sign_data с thumbprint сертификата: {cert_thumb}, длина base64_content: {len(base64_content)}, b_detached: {b_detached}")
+    logger.debug(
+        f"Вход в sign_data с thumbprint сертификата: {cert_thumb}, "
+        f"длина base64_content: {len(base64_content)}, b_detached: {b_detached}"
+    )
     pythoncom.CoInitialize()
     logger.debug("Вызван CoInitialize")
     signer = Dispatch("CAdESCOM.CPSigner")
@@ -133,6 +158,7 @@ def sign_text_data(cert, content: str, b_detached: bool = False) -> str:
     Подписывает обычный текст CAdES-BES подписью.
     Используется для challenge True API и документов, где подпись строится по JSON-строке.
     """
+    pythoncom, Dispatch = _require_windows_com()
     cert_thumb = getattr(cert, "Thumbprint", "Неизвестно")
     logger.debug(
         "Вход в sign_text_data с thumbprint сертификата: %s, длина content: %s, b_detached: %s",
@@ -166,8 +192,9 @@ def sign_text_data(cert, content: str, b_detached: bool = False) -> str:
     logger.info("Текстовые данные успешно подписаны сертификатом с thumbprint: %s", cert_thumb)
     return signature
 
-# ---------------- Refresh OMS token ----------------
+
 def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> bool:
+    pythoncom, _Dispatch = _require_windows_com()
     cert_thumb = getattr(cert, "Thumbprint", "Неизвестно")
     logger.info(f"Обновление токена OMS для organization_id: {organization_id} с thumbprint сертификата: {cert_thumb}")
     url_auth = f"{BASE}/api/v1/crpt/auth?organizationId={organization_id}"
@@ -188,23 +215,22 @@ def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> 
 
     payload = []
     for ch in challenges:
-        if ch['productGroup'] in ['oms', 'trueApi']:
+        if ch["productGroup"] in ["oms", "trueApi"]:
             logger.debug(f"Обработка вызова для productGroup: {ch['productGroup']}, uuid: {ch['uuid']}")
             logger.debug(f"Длина base64Data вызова: {len(ch['base64Data'])}")
             try:
                 pythoncom.CoUninitialize()
                 logger.debug("Вызван CoUninitialize перед подписью")
-                sig = sign_data(cert, ch["base64Data"], b_detached=False)  # attached для auth
+                sig = sign_data(cert, ch["base64Data"], b_detached=False)
                 logger.debug(f"Длина подписанных данных: {len(sig)}")
                 payload.append({
                     "uuid": ch["uuid"],
                     "productGroup": ch["productGroup"],
-                    "base64Data": sig  # trueApi/oms используют одно поле
+                    "base64Data": sig,
                 })
             except Exception as e:
                 logger.error(f"Подпись challenge для {ch['productGroup']} (uuid={ch['uuid']}): {e}")
                 return False
-
 
     if not payload:
         logger.error("Нет challenge для OMS в ответе")
@@ -222,12 +248,15 @@ def refresh_oms_token(session: requests.Session, cert, organization_id: str) -> 
         logger.debug(f"Статус ответа post_with_winhttp: {status}")
         logger.debug(f"Текст ответа post_with_winhttp: {resp_text}")
         logger.debug(f"Все заголовки post_with_winhttp: {all_headers}")
-        # Обновление cookies в session из Set-Cookie
-        set_cookie_lines = [line.strip()[len("Set-Cookie:"):].strip() for line in all_headers.splitlines() if line.strip().startswith("Set-Cookie:")]
+        set_cookie_lines = [
+            line.strip()[len("Set-Cookie:"):].strip()
+            for line in all_headers.splitlines()
+            if line.strip().startswith("Set-Cookie:")
+        ]
         logger.debug(f"Строки Set-Cookie: {set_cookie_lines}")
         if set_cookie_lines:
             temp_resp = requests.Response()
-            temp_resp.headers['Set-Cookie'] = ", ".join(set_cookie_lines)
+            temp_resp.headers["Set-Cookie"] = ", ".join(set_cookie_lines)
             temp_resp.status_code = status
             temp_resp.url = url_auth
             session.cookies.update(temp_resp.cookies)

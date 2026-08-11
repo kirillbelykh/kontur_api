@@ -51,7 +51,7 @@ uv sync --python 3.12 --frozen
 - `data/` - справочники и исходные таблицы.
 - `BarTender/`, `Шаблоны BarTender/` - шаблоны печати этикеток.
 - `docs/` - документация по архитектуре, разработке и эксплуатации.
-- `api.py`, `cookies.py`, `cryptopro.py`, `history_db.py` - интеграционный слой.
+- `api.py`, `auth/`, `cookies.py`, `cryptopro.py`, `history_db.py` - интеграционный слой.
 - `bartender_*.py` - подготовка данных и отправка печати в BarTender.
 
 ## Рабочие Данные
@@ -66,8 +66,8 @@ uv sync --python 3.12 --frozen
 
 ```powershell
 uv sync --python 3.12 --group dev
-python -m py_compile ui_v2\api_bridge.py ui_v2\main_v2.py
-python -m unittest tests.test_ui_v2_api_bridge tests.test_history_db_unit
+python -m py_compile auth\__init__.py cookies.py session_manager.py ui_v2\api_bridge.py ui_v2\main_v2.py
+python -m unittest tests.test_auth_cookies tests.test_cookies_prolongation tests.test_ui_v2_api_bridge tests.test_history_db_unit
 node --check ui_v2\ui\app.js
 ```
 
