@@ -15,8 +15,8 @@ type BadgeTone =
 
 /** Цвет кружка статуса — у каждого тона свой (marzban-style: точка + текст). */
 const dotClass: Record<BadgeTone, string> = {
-  neutral: 'bg-slate-400',
-  secondary: 'bg-slate-400',
+  neutral: 'bg-zinc-400',
+  secondary: 'bg-zinc-400',
   success: 'bg-emerald-500',
   warning: 'bg-amber-500',
   danger: 'bg-rose-500',

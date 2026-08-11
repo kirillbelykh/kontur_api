@@ -141,7 +141,7 @@ function Navigation({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
               className={({ isActive }) =>
                 cn(
                   'focus-ring flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground',
-                  isActive && 'bg-slate-200/80 text-foreground dark:bg-slate-800',
+                  isActive && 'bg-zinc-200/70 text-foreground dark:bg-zinc-800',
                 )
               }
             >
