@@ -7,6 +7,7 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { SelectNative } from '@/components/ui/select'
 
 type OrderMode = 'params' | 'gtin'
 
@@ -115,7 +116,7 @@ function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
 }
 
 function TextSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
+  return <SelectNative {...props} className={cn('w-full', props.className)} />
 }
 
 export function OrdersPage() {
