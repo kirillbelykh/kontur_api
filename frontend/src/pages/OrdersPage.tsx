@@ -18,6 +18,7 @@ import { Shimmer } from '@/components/ui/shimmer'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { CoolMode } from '@/components/ui/cool-mode'
 
 type OrderMode = 'params' | 'gtin'
 
@@ -682,9 +683,11 @@ export function OrdersPage() {
               <CardDescription>Позиции к массовой отправке в Контур.</CardDescription>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <Button size="sm" onClick={() => void submitQueue()} disabled={isBusy || queue.length === 0}>
-                Отправить очередь
-              </Button>
+              <CoolMode>
+                <Button size="sm" onClick={() => void submitQueue()} disabled={isBusy || queue.length === 0}>
+                  Отправить очередь
+                </Button>
+              </CoolMode>
               <Button size="sm" variant="outline" onClick={() => void removeQueueItem()} disabled={isBusy || !selectedQueueId}>
                 Удалить
               </Button>
