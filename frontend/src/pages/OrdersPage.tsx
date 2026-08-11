@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { RefreshCw, Search, Trash2, Undo2, X } from 'lucide-react'
+import { RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { cn, getErrorMessage } from '@/lib/utils'
@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SelectNative } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 type OrderMode = 'params' | 'gtin'
 
@@ -577,36 +579,34 @@ export function OrdersPage() {
               <EmptyState>Очередь пуста</EmptyState>
             ) : (
               <div className="max-h-[360px] overflow-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <tr className="border-b border-border">
-                      <th className="px-2 py-2 font-medium">Заявка</th>
-                      <th className="px-2 py-2 font-medium">Товар</th>
-                      <th className="px-2 py-2 font-medium">GTIN</th>
-                      <th className="px-2 py-2 font-medium">Кодов</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {queue.map((item) => {
-                      const selected = item.uid === selectedQueueId
+                <Table aria-label="Очередь заявок">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Заявка</TableHead>
+                      <TableHead>Товар</TableHead>
+                      <TableHead>GTIN</TableHead>
+                      <TableHead>Кодов</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {queue.map((item, index) => {
+                      const rowId = item.uid || `${item.order_name}-${index}`
                       return (
-                        <tr
-                          key={item.uid || item.order_name}
-                          className={cn(
-                            'cursor-pointer border-b border-border/70 hover:bg-muted/40',
-                            selected && 'bg-muted/60',
-                          )}
+                        <TableRow
+                          key={rowId}
+                          id={rowId}
+                          className={cn(item.uid === selectedQueueId && 'bg-muted/60')}
                           onClick={() => setSelectedQueueId(item.uid || '')}
                         >
-                          <td className="px-2 py-2 font-medium">{item.order_name || '—'}</td>
-                          <td className="px-2 py-2 text-muted-foreground">{item.simpl_name || '—'}</td>
-                          <td className="px-2 py-2 font-mono text-xs text-muted-foreground">{item.gtin || '—'}</td>
-                          <td className="px-2 py-2 tabular-nums">{item.codes_count ?? '—'}</td>
-                        </tr>
+                          <TableCell className="font-medium">{item.order_name || '—'}</TableCell>
+                          <TableCell className="text-muted-foreground">{item.simpl_name || '—'}</TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+                          <TableCell className="tabular-nums">{item.codes_count ?? '—'}</TableCell>
+                        </TableRow>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
@@ -624,29 +624,36 @@ export function OrdersPage() {
               <EmptyState>В этой сессии заказов ещё нет</EmptyState>
             ) : (
               <div className="max-h-[280px] overflow-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <tr className="border-b border-border">
-                      <th className="px-2 py-2 font-medium">Заявка</th>
-                      <th className="px-2 py-2 font-medium">Статус</th>
-                      <th className="px-2 py-2 font-medium">GTIN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sessionOrders.map((item, index) => (
-                      <tr key={item.document_id || `${rowTitle(item)}-${index}`} className="border-b border-border/70">
-                        <td className="px-2 py-2">
-                          <div className="font-medium">{rowTitle(item)}</div>
-                          <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>
-                        </td>
-                        <td className="px-2 py-2">
-                          <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
-                        </td>
-                        <td className="px-2 py-2 font-mono text-xs text-muted-foreground">{item.gtin || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <Table aria-label="Заказы текущей сессии">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Заявка</TableHead>
+                      <TableHead>Статус</TableHead>
+                      <TableHead>GTIN</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sessionOrders.map((item, index) => {
+                      const rowId = item.document_id || `${rowTitle(item)}-${index}`
+                      return (
+                        <TableRow
+                          key={rowId}
+                          id={rowId}
+                          onClick={() => item.document_id && void openDetails(item.document_id)}
+                        >
+                          <TableCell>
+                            <div className="font-medium">{rowTitle(item)}</div>
+                            <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
@@ -684,40 +691,37 @@ export function OrdersPage() {
               <EmptyState>История пуста</EmptyState>
             ) : (
               <div className="max-h-[320px] overflow-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <tr className="border-b border-border">
-                      <th className="px-2 py-2 font-medium">Заявка</th>
-                      <th className="px-2 py-2 font-medium">Статус</th>
-                      <th className="px-2 py-2 font-medium">GTIN</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table aria-label="История заказов">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Заявка</TableHead>
+                      <TableHead>Статус</TableHead>
+                      <TableHead>GTIN</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {filteredHistory.slice(0, 100).map((item, index) => {
-                      const selected = item.document_id === selectedHistoryId
+                      const rowId = item.document_id || `${rowTitle(item)}-${index}`
                       return (
-                        <tr
-                          key={item.document_id || `${rowTitle(item)}-${index}`}
-                          className={cn(
-                            'cursor-pointer border-b border-border/70 hover:bg-muted/40',
-                            selected && 'bg-muted/60',
-                          )}
+                        <TableRow
+                          key={rowId}
+                          id={rowId}
+                          className={cn(item.document_id === selectedHistoryId && 'bg-muted/60')}
                           onClick={() => setSelectedHistoryId(item.document_id || '')}
-                          onDoubleClick={() => void openDetails(item.document_id)}
                         >
-                          <td className="px-2 py-2">
+                          <TableCell>
                             <div className="font-medium">{rowTitle(item)}</div>
                             <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
-                          </td>
-                          <td className="px-2 py-2">
+                          </TableCell>
+                          <TableCell>
                             <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
-                          </td>
-                          <td className="px-2 py-2 font-mono text-xs text-muted-foreground">{item.gtin || '—'}</td>
-                        </tr>
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+                        </TableRow>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
@@ -741,84 +745,67 @@ export function OrdersPage() {
               <EmptyState>Удалённых заказов нет</EmptyState>
             ) : (
               <div className="max-h-[260px] overflow-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <tr className="border-b border-border">
-                      <th className="px-2 py-2 font-medium">Заявка</th>
-                      <th className="px-2 py-2 font-medium">Удалён</th>
-                      <th className="px-2 py-2 font-medium">Кем</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table aria-label="Удалённые заказы">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Заявка</TableHead>
+                      <TableHead>Удалён</TableHead>
+                      <TableHead>Кем</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {deletedOrders.map((item, index) => {
-                      const selected = item.document_id === selectedDeletedId
+                      const rowId = item.document_id || `${rowTitle(item)}-${index}`
                       return (
-                        <tr
-                          key={item.document_id || `${rowTitle(item)}-${index}`}
-                          className={cn(
-                            'cursor-pointer border-b border-border/70 hover:bg-muted/40',
-                            selected && 'bg-muted/60',
-                          )}
+                        <TableRow
+                          key={rowId}
+                          id={rowId}
+                          className={cn(item.document_id === selectedDeletedId && 'bg-muted/60')}
                           onClick={() => setSelectedDeletedId(item.document_id || '')}
                         >
-                          <td className="px-2 py-2">
+                          <TableCell>
                             <div className="font-medium">{rowTitle(item)}</div>
                             <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>
-                          </td>
-                          <td className="px-2 py-2 text-xs text-muted-foreground">{item.deleted_at || '—'}</td>
-                          <td className="px-2 py-2 text-xs text-muted-foreground">{item.deleted_by || '—'}</td>
-                        </tr>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{item.deleted_at || '—'}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{item.deleted_by || '—'}</TableCell>
+                        </TableRow>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
         </Card>
       ) : null}
 
-      {detailsOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"
-          onClick={() => setDetailsOpen(false)}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-card shadow-panel"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-              <div>
-                <h2 className="text-base font-semibold">Подробнее о заказе</h2>
-                <p className="text-xs text-muted-foreground">
-                  {details?.document_id ? `Документ ${details.document_id}` : 'Метаданные из Контура и локальной истории'}
-                </p>
-              </div>
-              <Button size="icon" variant="ghost" onClick={() => setDetailsOpen(false)} aria-label="Закрыть">
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="max-h-[70vh] overflow-auto px-4 py-3">
-              {!details ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">Загружаем метаданные…</div>
-              ) : (details.fields || []).length === 0 ? (
-                <EmptyState>Нет данных по заказу</EmptyState>
-              ) : (
-                <dl className="grid gap-2 sm:grid-cols-2">
-                  {(details.fields || []).map((field, index) => (
-                    <div key={`${field.label}-${index}`} className="rounded-md border border-border/80 px-3 py-2">
-                      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{field.label || '—'}</dt>
-                      <dd className="mt-0.5 break-words text-sm">{field.value || '—'}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </div>
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Подробнее о заказе</DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              {details?.document_id ? `Документ ${details.document_id}` : 'Метаданные из Контура и локальной истории'}
+            </p>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-auto">
+            {!details ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">Загружаем метаданные…</div>
+            ) : (details.fields || []).length === 0 ? (
+              <EmptyState>Нет данных по заказу</EmptyState>
+            ) : (
+              <dl className="grid gap-2 sm:grid-cols-2">
+                {(details.fields || []).map((field, index) => (
+                  <div key={`${field.label}-${index}`} className="rounded-md border border-border/80 px-3 py-2">
+                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{field.label || '—'}</dt>
+                    <dd className="mt-0.5 break-words text-sm">{field.value || '—'}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
-        </div>
-      ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
