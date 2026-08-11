@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Calendar, DateField, DatePicker as HeroDatePicker, Label } from '@heroui/react'
 import { CalendarDate, type DateValue } from '@internationalized/date'
 import { cn } from '@/lib/utils'
@@ -23,7 +24,10 @@ export function formatDateValue(value: DateValue | null): string {
   if (!value) return ''
   const day = String(value.day).padStart(2, '0')
   const month = String(value.month).padStart(2, '0')
-  return `${day}-${month}-${value.year}`
+  // Year is padded so partially typed years ("2" while entering "2026") still
+  // round-trip through parseDateValue instead of wiping the field.
+  const year = String(value.year).padStart(4, '0')
+  return `${day}-${month}-${year}`
 }
 
 export function DatePickerField({
@@ -39,13 +43,30 @@ export function DatePickerField({
   isDisabled?: boolean
   className?: string
 }) {
+  // While the user types, React Aria's own state is authoritative: feeding every
+  // intermediate onChange back through the string prop resets the typed segments.
+  const [inner, setInner] = useState<DateValue | null>(() => parseDateValue(value))
+  const lastEmitted = useRef(value ?? '')
+
+  useEffect(() => {
+    if ((value ?? '') !== lastEmitted.current) {
+      lastEmitted.current = value ?? ''
+      setInner(parseDateValue(value))
+    }
+  }, [value])
+
   return (
     <HeroDatePicker
       aria-label={label}
       className={cn('w-full', className)}
       isDisabled={isDisabled}
-      value={parseDateValue(value)}
-      onChange={(next) => onChange(formatDateValue(next))}
+      value={inner}
+      onChange={(next) => {
+        setInner(next)
+        const formatted = formatDateValue(next)
+        lastEmitted.current = formatted
+        onChange(formatted)
+      }}
     >
       {label ? <Label>{label}</Label> : null}
       <DateField.Group>
@@ -72,6 +93,16 @@ export function DatePickerField({
             </Calendar.GridHeader>
             <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
           </Calendar.Grid>
+          {/* Без этой сетки YearPickerTrigger открывает пустоту — год выбрать нельзя */}
+          <Calendar.YearPickerGrid>
+            <Calendar.YearPickerGridBody>
+              {({ year, formattedYear }) => (
+                <Calendar.YearPickerCell key={year} year={year}>
+                  {formattedYear}
+                </Calendar.YearPickerCell>
+              )}
+            </Calendar.YearPickerGridBody>
+          </Calendar.YearPickerGrid>
         </Calendar>
       </HeroDatePicker.Popover>
     </HeroDatePicker>

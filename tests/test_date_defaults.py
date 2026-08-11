@@ -1,20 +1,20 @@
 import unittest
-from datetime import date, datetime
+from datetime import date
 
 from backend.services.date_defaults import get_default_production_window
 
 
 class DefaultProductionWindowTests(unittest.TestCase):
-    def test_uses_first_day_of_inclusive_three_month_window(self):
+    def test_returns_owner_fixed_defaults(self):
         self.assertEqual(
-            get_default_production_window(date(2026, 3, 13)),
-            ("01-01-2026", "01-01-2031"),
+            get_default_production_window(),
+            ("03-03-2026", "03-03-2031"),
         )
 
-    def test_handles_year_boundary(self):
+    def test_reference_date_is_ignored(self):
         self.assertEqual(
-            get_default_production_window(datetime(2026, 1, 5, 10, 30)),
-            ("01-11-2025", "01-11-2030"),
+            get_default_production_window(date(2027, 12, 31)),
+            ("03-03-2026", "03-03-2031"),
         )
 
 

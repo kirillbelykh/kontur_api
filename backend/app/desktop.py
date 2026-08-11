@@ -71,7 +71,49 @@ def _ensure_desktop_shortcut() -> None:
         pass
 
 
+def _apply_window_icon() -> None:
+    """The window is owned by pythonw.exe, so Windows shows the Python icon.
+    Load kontur.ico and set it via WM_SETICON once the window exists."""
+    import ctypes
+    import threading
+    import time
+
+    icon_path = REPO_ROOT / "assets" / "icons" / "kontur.ico"
+    if not icon_path.exists():
+        return
+
+    def worker() -> None:
+        try:
+            user32 = ctypes.windll.user32
+            hwnd = 0
+            for _ in range(100):
+                hwnd = user32.FindWindowW(None, "Контур Маркировка")
+                if hwnd:
+                    break
+                time.sleep(0.1)
+            if not hwnd:
+                return
+            IMAGE_ICON, LR_LOADFROMFILE, WM_SETICON = 1, 0x10, 0x80
+            big = user32.LoadImageW(None, str(icon_path), IMAGE_ICON, 0, 0, LR_LOADFROMFILE)
+            small = user32.LoadImageW(None, str(icon_path), IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+            if big:
+                user32.SendMessageW(hwnd, WM_SETICON, 1, big)
+            if small:
+                user32.SendMessageW(hwnd, WM_SETICON, 0, small)
+        except Exception:
+            pass
+
+    threading.Thread(target=worker, daemon=True).start()
+
+
 def main() -> None:
+    try:
+        import ctypes
+
+        # Own taskbar identity: without this the app groups under pythonw with its icon
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Grundlage.KonturMarkirovka")
+    except Exception:
+        pass
     _ensure_desktop_shortcut()
     api = ApiBridge()
     api.start_session_auto_refresh()
@@ -88,8 +130,10 @@ def main() -> None:
         height=900,
         min_size=(1100, 700),
     )
-    # pywebview calls loaded handlers with no args on some backends, with the window on others
-    window.events.loaded += lambda *_: api.start_session_auto_refresh()
+    # Ensure the worker thread exists after the window loads, but do not
+    # fire a second forced Selenium pass (startup already triggered one).
+    window.events.loaded += lambda *_: api.start_session_auto_refresh(trigger_now=False)
+    _apply_window_icon()
     debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
     webview.start(debug=debug_mode)
 
