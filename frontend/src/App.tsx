@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AggregationPage } from '@/pages/AggregationPage'
@@ -11,7 +11,7 @@ import { TsdPage } from '@/pages/TsdPage'
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route element={<AppLayout />}>
           <Route path="/" element={<Navigate to="/orders" replace />} />
@@ -33,6 +33,6 @@ export default function App() {
           className: 'text-sm',
         }}
       />
-    </BrowserRouter>
+    </HashRouter>
   )
 }
