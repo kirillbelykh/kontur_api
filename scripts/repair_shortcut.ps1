@@ -106,11 +106,15 @@ function Remove-KonturShortcut {
     }
 }
 
-# Single primary app shortcut + optional CRPT bridge + update helper
-Remove-KonturShortcut -ShortcutName "KonturTestAPI"
-Remove-KonturShortcut -ShortcutName "KonturMobile"
-Remove-KonturShortcut -ShortcutName "KonturAccessProlongation"
-New-KonturShortcut -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur Markirovka"
-New-KonturShortcut -ShortcutName "CRPT server" -LauncherFile "scripts\launchers\run_crpt_server.vbs" -Description "Kontur API background bridge"
-New-KonturStartupShortcut -ShortcutName "CRPT server" -LauncherFile "scripts\launchers\run_crpt_server.vbs" -Description "Kontur API background bridge"
-New-KonturShortcut -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile "update.bat" -Description "Kontur API full update and rebuild"
+# One desktop shortcut: «Контур Маркировка». Drop legacy names.
+foreach ($legacy in @(
+        "KonturAPI",
+        "KonturTestAPI",
+        "KonturMobile",
+        "CRPT server",
+        "KonturAccessProlongation"
+    )) {
+    Remove-KonturShortcut -ShortcutName $legacy
+}
+$appName = ConvertFrom-Utf8Base64 "0JrQvtC90YLRg9GAINCc0LDRgNC60LjRgNC+0LLQutCw"
+New-KonturShortcut -ShortcutName $appName -LauncherFile "run_kontur.vbs" -Description $appName
