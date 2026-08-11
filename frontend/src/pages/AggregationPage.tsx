@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
@@ -494,7 +495,9 @@ export function AggregationPage() {
             </div>
           </div>
 
-          {filteredItems.length === 0 ? (
+          {loading && items.length === 0 ? (
+            <TableSkeleton rows={8} />
+          ) : filteredItems.length === 0 ? (
             <EmptyState>Агрегационные коды по текущему фильтру не найдены.</EmptyState>
           ) : (
             <>

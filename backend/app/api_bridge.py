@@ -622,7 +622,12 @@ class ApiBridge:
                     "Сессия UI v2: запускаем %s обновление cookies",
                     "принудительное" if update_triggered else "плановое",
                 )
-                self._ensure_session(force_refresh=True, force_browser_refresh=True)
+                # Scheduled TTL refresh: re-validate file first.
+                # Event-triggered (startup / manual): may open the browser.
+                self._ensure_session(
+                    force_refresh=True,
+                    force_browser_refresh=bool(update_triggered),
+                )
                 runtime.auth_state = "ready"
                 runtime.auth_message = "Авторизация завершена. Сессия активна."
                 runtime.auth_error = ""
@@ -638,7 +643,7 @@ class ApiBridge:
             finally:
                 runtime.session_refresh_event.clear()
 
-    def start_session_auto_refresh(self) -> Dict[str, Any]:
+    def start_session_auto_refresh(self, *, trigger_now: bool = True) -> Dict[str, Any]:
         runtime = _get_runtime()
         with runtime.lock:
             if not hasattr(runtime, "auth_cycle_id"):
@@ -652,12 +657,13 @@ class ApiBridge:
                     daemon=True,
                 )
                 runtime.session_refresh_thread.start()
-            runtime.auth_state = "queued"
-            runtime.auth_message = "Ожидаем запуск авторизации..."
-            runtime.auth_error = ""
-            runtime.auth_cycle_id += 1
-            runtime.auth_updated_at = time.time()
-            runtime.session_refresh_event.set()
+            if trigger_now:
+                runtime.auth_state = "queued"
+                runtime.auth_message = "Ожидаем запуск авторизации..."
+                runtime.auth_error = ""
+                runtime.auth_cycle_id += 1
+                runtime.auth_updated_at = time.time()
+                runtime.session_refresh_event.set()
         self._start_background_status_updater()
         return {"success": True}
 
@@ -1884,7 +1890,8 @@ class ApiBridge:
     def _load_nomenclature_df(self) -> pd.DataFrame:
         runtime = _get_runtime()
         if runtime.nomenclature_df is None:
-            path = runtime.root_dir / "data" / "nomenclature.xlsx"
+            # root_dir указывает на backend/, а data/ лежит в корне проекта
+            path = runtime.root_dir.parent / "data" / "nomenclature.xlsx"
             runtime.nomenclature_df = pd.read_excel(path)
         return runtime.nomenclature_df
 
@@ -1895,57 +1902,72 @@ class ApiBridge:
         force_browser_refresh: bool = False,
     ) -> requests.Session:
         runtime = _get_runtime()
+        need_refresh = False
         with runtime.lock:
             age = time.time() - runtime.session_created_at if runtime.session_created_at else 0.0
-            if force_refresh or runtime.session is None or age >= runtime.session_ttl_seconds:
-                # One orchestration path: auth.get_valid_cookies always proves
-                # cookies against Kontur API and opens Selenium only when the
-                # cheaper sources are dead. force_browser_refresh keeps the
-                # historical UI wording but no longer skips API validation or
-                # hides a broken "already have cookies" short-circuit.
-                if force_browser_refresh:
-                    runtime.auth_state = "browser"
-                    runtime.auth_message = (
-                        "Обновляем cookies в фоновом браузере..."
-                    )
-                else:
-                    runtime.auth_state = "cookies"
-                    runtime.auth_message = (
-                        "Проверяем сохраненные cookies..."
-                        if force_refresh
-                        else "Проверяем действующую сессию..."
-                    )
-                runtime.auth_error = ""
-                runtime.auth_updated_at = time.time()
+            need_refresh = (
+                force_refresh
+                or force_browser_refresh
+                or runtime.session is None
+                or age >= runtime.session_ttl_seconds
+            )
+            if not need_refresh:
+                return runtime.session
 
-                cookies = get_valid_cookies(force_refresh=bool(force_refresh or force_browser_refresh))
-                if not cookies:
-                    runtime.auth_state = "error"
-                    runtime.auth_message = "Cookies не получены."
-                    runtime.auth_error = "Не удалось получить валидные cookies для Контур.Маркировки."
-                    runtime.auth_updated_at = time.time()
-                    raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
+            if force_browser_refresh:
+                runtime.auth_state = "browser"
+                runtime.auth_message = "Обновляем cookies в фоновом браузере..."
+            else:
+                runtime.auth_state = "cookies"
+                runtime.auth_message = (
+                    "Проверяем сохраненные cookies..."
+                    if force_refresh
+                    else "Проверяем действующую сессию..."
+                )
+            runtime.auth_error = ""
+            runtime.auth_updated_at = time.time()
 
-                runtime.auth_state = "validating"
-                runtime.auth_message = "Проверяем доступ к Контур.Маркировке..."
-                runtime.auth_error = ""
-                runtime.auth_updated_at = time.time()
-                if not cookies_module.validate_kontur_session(cookies):
-                    runtime.auth_state = "error"
-                    runtime.auth_message = "Контур не подтвердил сессию."
-                    runtime.auth_error = (
-                        "Контур.Маркировка отклонила cookies. "
-                        "Выполните вход в Контур и повторите обновление сессии."
-                    )
-                    runtime.auth_updated_at = time.time()
-                    raise RuntimeError(runtime.auth_error)
+        # Do not hold runtime.lock while Selenium / network runs.
+        cookies = get_valid_cookies(
+            force_refresh=bool(force_refresh or force_browser_refresh),
+            force_browser=bool(force_browser_refresh),
+        )
 
-                runtime.session = make_session_with_cookies(cookies)
-                runtime.session_created_at = time.time()
-                runtime.auth_state = "ready"
-                runtime.auth_message = "Сессия активна."
-                runtime.auth_error = ""
+        with runtime.lock:
+            if not cookies:
+                runtime.auth_state = "error"
+                runtime.auth_message = "Cookies не получены."
+                runtime.auth_error = "Не удалось получить валидные cookies для Контур.Маркировки."
                 runtime.auth_updated_at = time.time()
+                raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
+
+            runtime.auth_state = "validating"
+            runtime.auth_message = "Проверяем доступ к Контур.Маркировке..."
+            runtime.auth_error = ""
+            runtime.auth_updated_at = time.time()
+
+        if not cookies_module.validate_kontur_session(cookies):
+            with runtime.lock:
+                runtime.auth_state = "error"
+                runtime.auth_message = "Контур не подтвердил сессию."
+                runtime.auth_error = (
+                    "Контур.Маркировка отклонила cookies. "
+                    "Выполните вход в Контур и повторите обновление сессии."
+                )
+                runtime.auth_updated_at = time.time()
+                raise RuntimeError(runtime.auth_error)
+
+        with runtime.lock:
+            runtime.session = make_session_with_cookies(cookies)
+            runtime.session_created_at = time.time()
+            runtime.auth_state = "ready"
+            runtime.auth_message = "Сессия активна."
+            runtime.auth_error = ""
+            runtime.auth_updated_at = time.time()
+            logger.info(
+                "Сессия UI v2: runtime.session установлена (%s cookie keys)",
+                len(cookies),
+            )
             return runtime.session
 
     def _ensure_session_safely(self, log_channel: str | None = None) -> Optional[requests.Session]:

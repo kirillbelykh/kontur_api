@@ -7,8 +7,10 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { SelectNative } from '@/components/ui/select'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 type TsdItem = {
@@ -93,7 +95,7 @@ export function TsdPage() {
   const [form, setForm] = useState<TsdForm>(EMPTY_FORM)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   const setField = <K extends keyof TsdForm>(key: K, value: TsdForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -101,7 +103,14 @@ export function TsdPage() {
 
   const applyItems = (next: TsdItem[]) => {
     setItems(next)
-    setSelectedId((prev) => (next.some((item) => item.document_id === prev) ? prev : ''))
+    setSelectedIds((prev) => prev.filter((id) => next.some((item) => item.document_id === id)))
+  }
+
+  const toggleId = (documentId: string) => {
+    if (!documentId) return
+    setSelectedIds((prev) =>
+      prev.includes(documentId) ? prev.filter((id) => id !== documentId) : [...prev, documentId],
+    )
   }
 
   const load = useCallback(async (useLive = false) => {
@@ -155,10 +164,9 @@ export function TsdPage() {
     runBusy(
       'create',
       async () => {
-        if (!selectedId) throw new Error('Выберите хотя бы один заказ для задания на ТСД.')
+        if (!selectedIds.length) throw new Error('Выберите хотя бы один заказ для задания на ТСД.')
         if (!form.intro_number.trim()) throw new Error('Укажите номер ввода в оборот.')
 
-        const selectedIds = [selectedId]
         const result = await apiCall<TsdRunResult>(
           'create_tsd_tasks',
           selectedIds,
@@ -169,7 +177,7 @@ export function TsdPage() {
         )
 
         const failedIds = new Set((result.errors || []).map((entry) => entry.document_id))
-        setSelectedId(failedIds.has(selectedId) ? selectedId : '')
+        setSelectedIds((prev) => prev.filter((id) => failedIds.has(id)))
         await load(false)
 
         if (result.errors?.length) {
@@ -183,15 +191,15 @@ export function TsdPage() {
     )
 
   const signIntroduction = () => {
-    if (!selectedId) {
-      toast.error('Выберите заказ для подписи.')
+    if (selectedIds.length !== 1) {
+      toast.error('Выберите один заказ для подписи.')
       return
     }
     if (!window.confirm('Подписать и ввести в оборот?')) return
     return runBusy(
       'sign',
       async () => {
-        const result = await apiCall<SignResult>('sign_tsd_introduction', selectedId)
+        const result = await apiCall<SignResult>('sign_tsd_introduction', selectedIds[0])
         if (result?.state?.items) {
           setItems(result.state.items)
           setLive(true)
@@ -224,7 +232,7 @@ export function TsdPage() {
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatPill label="Документов" value={items.length} />
         <StatPill label="Готовы к ТСД" value={readyCount} />
-        <StatPill label="Выбрано" value={selectedId ? 1 : 0} />
+        <StatPill label="Выбрано" value={selectedIds.length} />
         <StatPill label="Режим" value={live ? 'Live' : 'Кэш'} />
       </div>
 
@@ -232,19 +240,18 @@ export function TsdPage() {
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>Параметры задания</CardTitle>
-            <CardDescription>Номер ввода в оборот обязателен. Даты: YYYY-MM, YYYY-MM-DD или DD-MM-YYYY.</CardDescription>
           </div>
           <div className="flex flex-wrap gap-1.5">
             <Button
               size="sm"
               variant="success"
               onClick={() => void createTasks()}
-              disabled={isBusy || !selectedId || !form.intro_number.trim()}
+              disabled={isBusy || selectedIds.length === 0 || !form.intro_number.trim()}
             >
               <PlayCircle className="h-3.5 w-3.5" />
-              Создать задания
+              Создать задания{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => void signIntroduction()} disabled={isBusy || !selectedId}>
+            <Button size="sm" variant="outline" onClick={() => void signIntroduction()} disabled={isBusy || selectedIds.length !== 1}>
               <PenLine className="h-3.5 w-3.5" />
               Подписать и ввести в оборот
             </Button>
@@ -290,7 +297,7 @@ export function TsdPage() {
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>Заказы</CardTitle>
-            <CardDescription>Выберите заказ кликом по строке — задание создаётся для выбранной заявки.</CardDescription>
+            <CardDescription>Отметьте заказы чекбоксами — задания создаются для всех выбранных.</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="w-44">
@@ -313,14 +320,17 @@ export function TsdPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {rows.length === 0 ? (
+          {loading && items.length === 0 ? (
+            <TableSkeleton rows={8} />
+          ) : rows.length === 0 ? (
             <EmptyState>Данных пока нет.</EmptyState>
           ) : (
             <div className="max-h-[520px] overflow-auto">
               <Table aria-label="Заказы для задания на ТСД">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Заявка</TableHead>
+                    <TableHead isRowHeader={false}>Выбор</TableHead>
+                    <TableHead isRowHeader>Заявка</TableHead>
                     <TableHead>Полное наименование</TableHead>
                     <TableHead>Статус ЧЗ</TableHead>
                     <TableHead>На ТСД</TableHead>
@@ -331,14 +341,21 @@ export function TsdPage() {
                   {rows.map((item, index) => {
                     const documentId = item.document_id || ''
                     const rowId = documentId || `${item.order_name}-${index}`
-                    const selected = documentId === selectedId
+                    const selected = Boolean(documentId) && selectedIds.includes(documentId)
                     return (
                       <TableRow
                         key={rowId}
                         id={rowId}
                         className={cn(selected && 'bg-muted/60')}
-                        onClick={() => setSelectedId(documentId)}
+                        onClick={() => toggleId(documentId)}
                       >
+                        <TableCell>
+                          <Checkbox
+                            isSelected={selected}
+                            aria-label={`Выбрать заказ ${item.order_name || documentId}`}
+                            onChange={() => toggleId(documentId)}
+                          />
+                        </TableCell>
                         <TableCell textValue={item.order_name || documentId}>
                           <div className="font-medium">{item.order_name || documentId || 'Без названия'}</div>
                           <div className="font-mono text-[11px] text-muted-foreground">{documentId || '—'}</div>

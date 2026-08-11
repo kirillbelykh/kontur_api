@@ -7,8 +7,10 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { SelectNative } from '@/components/ui/select'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 type IntroItem = {
@@ -58,7 +60,7 @@ export function IntroPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [items, setItems] = useState<IntroItem[]>([])
-  const [selectedId, setSelectedId] = useState('')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [productionDate, setProductionDate] = useState('')
@@ -67,7 +69,7 @@ export function IntroPage() {
 
   const applyItems = useCallback((next: IntroItem[]) => {
     setItems(next)
-    setSelectedId((prev) => (next.some((item) => item.document_id === prev) ? prev : ''))
+    setSelectedIds((prev) => prev.filter((id) => next.some((item) => item.document_id === id)))
   }, [])
 
   const load = useCallback(async () => {
@@ -104,6 +106,13 @@ export function IntroPage() {
     })
   }, [items, search, statusFilter])
 
+  const toggleId = (documentId: string) => {
+    if (!documentId) return
+    setSelectedIds((prev) =>
+      prev.includes(documentId) ? prev.filter((id) => id !== documentId) : [...prev, documentId],
+    )
+  }
+
   const runBusy = async (key: string, action: () => Promise<void>, successMessage: string) => {
     setBusy(key)
     try {
@@ -125,11 +134,11 @@ export function IntroPage() {
     runBusy(
       'run',
       async () => {
-        if (!selectedId) throw new Error('Выберите хотя бы один заказ для ввода в оборот.')
+        if (!selectedIds.length) throw new Error('Выберите хотя бы один заказ для ввода в оборот.')
         if (!batchNumber.trim()) throw new Error('Укажите номер партии.')
         const result = await apiCall<IntroResult>(
           'introduce_orders',
-          [selectedId],
+          selectedIds,
           productionDate,
           expirationDate,
           batchNumber,
@@ -162,11 +171,11 @@ export function IntroPage() {
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatPill label="Документов" value={items.length} />
         <StatPill label="Показано" value={filteredItems.length} />
-        <StatPill label="Выбрано" value={selectedId ? 1 : 0} />
+        <StatPill label="Выбрано" value={selectedIds.length} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
-        <Card>
+      <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(260px,0.55fr)_minmax(0,1.45fr)]">
+        <Card className="min-h-[560px]">
           <CardHeader>
             <CardTitle>Параметры ввода в оборот</CardTitle>
             <CardDescription>Даты принимаются в форматах YYYY-MM, YYYY-MM-DD или DD-MM-YYYY.</CardDescription>
@@ -188,17 +197,17 @@ export function IntroPage() {
                 placeholder="Номер партии"
               />
             </div>
-            <Button size="sm" onClick={() => void runIntroduction()} disabled={isBusy || !selectedId}>
+            <Button size="sm" onClick={() => void runIntroduction()} disabled={isBusy || selectedIds.length === 0}>
               <PlayCircle className="h-3.5 w-3.5" />
-              Выполнить ввод в оборот
+              Выполнить ввод в оборот{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
             </Button>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-h-[560px]">
           <CardHeader>
             <CardTitle>Готовые заявки</CardTitle>
-            <CardDescription>Выберите заказ в таблице — клик по строке выбирает документ.</CardDescription>
+            <CardDescription>Отметьте заказы чекбоксами — ввод выполняется для всех выбранных.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -217,14 +226,17 @@ export function IntroPage() {
               />
             </div>
 
-            {filteredItems.length === 0 ? (
+            {loading && items.length === 0 ? (
+              <TableSkeleton rows={8} />
+            ) : filteredItems.length === 0 ? (
               <EmptyState>Нет документов для ввода в оборот</EmptyState>
             ) : (
-              <div className="max-h-[420px] overflow-auto">
+              <div className="max-h-[560px] overflow-auto">
                 <Table aria-label="Заказы для ввода в оборот">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Заявка</TableHead>
+                      <TableHead isRowHeader={false}>Выбор</TableHead>
+                      <TableHead isRowHeader>Заявка</TableHead>
                       <TableHead>Полное наименование</TableHead>
                       <TableHead>Статус</TableHead>
                       <TableHead>GTIN</TableHead>
@@ -232,15 +244,23 @@ export function IntroPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredItems.map((item, index) => {
-                      const rowId = item.document_id || `${item.order_name}-${index}`
-                      const selected = Boolean(item.document_id) && item.document_id === selectedId
+                      const documentId = item.document_id || ''
+                      const rowId = documentId || `${item.order_name}-${index}`
+                      const checked = Boolean(documentId) && selectedIds.includes(documentId)
                       return (
                         <TableRow
                           key={rowId}
                           id={rowId}
-                          className={cn(selected && 'bg-muted/60')}
-                          onClick={() => setSelectedId(item.document_id || '')}
+                          className={cn(checked && 'bg-muted/60')}
+                          onClick={() => toggleId(documentId)}
                         >
+                          <TableCell>
+                            <Checkbox
+                              isSelected={checked}
+                              aria-label={`Выбрать заказ ${item.order_name || documentId}`}
+                              onChange={() => toggleId(documentId)}
+                            />
+                          </TableCell>
                           <TableCell>
                             <div className="font-medium">{item.order_name || item.document_id || 'Без названия'}</div>
                             <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>

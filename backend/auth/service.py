@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Dict, Optional
 
 from backend.services.logger import logger
@@ -18,6 +19,10 @@ from backend.auth.store import (
 )
 from backend.auth.yandex_cookies import load_cookies_from_yandex_profile
 
+# Skip a second Selenium launch when cookies were just collected successfully.
+_SELENIUM_DEBOUNCE_SECONDS = 90.0
+_LAST_SELENIUM_OK_AT = 0.0
+
 
 def _accept_live_cookies(cookies: Optional[Dict[str, str]], *, source: str) -> Optional[Dict[str, str]]:
     if not cookies:
@@ -32,16 +37,29 @@ def _accept_live_cookies(cookies: Optional[Dict[str, str]], *, source: str) -> O
     return dict(cookies)
 
 
-def get_valid_cookies(force_refresh: bool = False) -> Optional[Dict[str, str]]:
+def get_valid_cookies(
+    force_refresh: bool = False,
+    *,
+    force_browser: bool = False,
+) -> Optional[Dict[str, str]]:
     """Return Kontur cookies that are structurally valid and live on the API.
 
-    Local file freshness alone is not enough: cookies are always checked via
-    Kontur `/api/v1/user` before being reused. Selenium is opened only when
-    cheaper sources fail that live check.
+    Selenium opens only when cheaper sources fail the live check, unless
+    ``force_browser`` is set. Even then a short debounce avoids opening the
+    browser twice when two refresh triggers fire back-to-back.
     """
-    if not force_refresh:
+    global _LAST_SELENIUM_OK_AT
+
+    if not force_refresh and not force_browser:
         cached = load_cookies_from_file()
         accepted = _accept_live_cookies(cached, source="file")
+        if accepted:
+            return accepted
+
+    # Force-refresh without forcing the browser: re-validate file first.
+    if force_refresh and not force_browser:
+        cached = load_cookies_from_file(allow_stale=True)
+        accepted = _accept_live_cookies(cached, source="file-revalidate")
         if accepted:
             return accepted
 
@@ -56,7 +74,7 @@ def get_valid_cookies(force_refresh: bool = False) -> Optional[Dict[str, str]]:
 
     if not became_refresher:
         cookie_refresh_event().wait(timeout=120)
-        cached = load_cookies_from_file()
+        cached = load_cookies_from_file(allow_stale=True)
         accepted = _accept_live_cookies(cached, source="file-after-wait")
         if accepted:
             return accepted
@@ -73,16 +91,28 @@ def get_valid_cookies(force_refresh: bool = False) -> Optional[Dict[str, str]]:
     try:
         logger.info("Получаем новые cookies")
 
-        profile_cookies = load_cookies_from_yandex_profile()
-        accepted = _accept_live_cookies(profile_cookies, source="yandex-profile")
-        if accepted:
-            return accepted
+        if not force_browser:
+            profile_cookies = load_cookies_from_yandex_profile()
+            accepted = _accept_live_cookies(profile_cookies, source="yandex-profile")
+            if accepted:
+                return accepted
+
+        age = time.time() - _LAST_SELENIUM_OK_AT
+        if age < _SELENIUM_DEBOUNCE_SECONDS:
+            cached = load_cookies_from_file(allow_stale=True)
+            accepted = _accept_live_cookies(cached, source="selenium-debounce")
+            if accepted:
+                logger.info(
+                    "Пропускаем повторный Selenium — cookies свежие (%.0f сек назад)",
+                    age,
+                )
+                return accepted
 
         selenium_cookies = get_cookies()
         if selenium_cookies:
-            # get_cookies already persists structurally valid cookies; re-check live.
             accepted = _accept_live_cookies(selenium_cookies, source="selenium")
             if accepted:
+                _LAST_SELENIUM_OK_AT = time.time()
                 return accepted
 
         stale = load_cookies_from_file(allow_stale=True)

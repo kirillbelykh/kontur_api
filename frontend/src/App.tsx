@@ -4,7 +4,6 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { AppUpdateProvider } from '@/hooks/useAppUpdate'
 import { PageZoomProvider } from '@/hooks/usePageZoom'
 import { AggregationPage } from '@/pages/AggregationPage'
-import { ChzPage } from '@/pages/ChzPage'
 import { DownloadPage } from '@/pages/DownloadPage'
 import { IntroPage } from '@/pages/IntroPage'
 import { LabelsPage } from '@/pages/LabelsPage'
@@ -22,7 +21,6 @@ export default function App() {
             <Route path="/" element={<Navigate to="/welcome" replace />} />
             <Route path="/welcome" element={<WelcomePage />} />
             <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/chz" element={<ChzPage />} />
             <Route path="/download" element={<DownloadPage />} />
             <Route path="/intro" element={<IntroPage />} />
             <Route path="/tsd" element={<TsdPage />} />

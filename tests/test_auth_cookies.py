@@ -84,11 +84,14 @@ class AuthServiceTests(unittest.TestCase):
         profile_cookies["token"] = "from-profile"
 
         with (
+            mock.patch.object(store, "COOKIES_FILE", self.cookies_file),
+            mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
             mock.patch("backend.auth.service.validate_kontur_session", return_value=True),
             mock.patch("backend.auth.service.load_cookies_from_yandex_profile", return_value=profile_cookies),
             mock.patch("backend.auth.service.get_cookies") as selenium_mock,
             mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
         ):
+            # No file cookies → fall through to yandex-profile.
             result = service.get_valid_cookies(force_refresh=True)
 
         self.assertEqual(result, profile_cookies)
@@ -145,7 +148,11 @@ class BrowserOptionsTests(unittest.TestCase):
             )
 
         self.assertTrue(any("-32000" in arg for arg in fake_options.arguments))
+        self.assertTrue(any("AutomationControlled" in arg for arg in fake_options.arguments))
         self.assertFalse(any(arg.startswith("--headless") for arg in fake_options.arguments))
+        fake_options.add_experimental_option.assert_any_call(
+            "excludeSwitches", ["enable-automation"]
+        )
 
     def test_true_headless_mode_uses_chrome_headless(self):
         from backend.auth.browser import build_browser_options
@@ -168,7 +175,6 @@ class BrowserOptionsTests(unittest.TestCase):
             )
 
         self.assertTrue(any(arg == "--headless=new" for arg in fake_options.arguments))
-        # Off-screen flags stay even in opt-in true headless (d647455).
         self.assertTrue(any("-32000" in arg for arg in fake_options.arguments))
 
 
@@ -189,25 +195,35 @@ class BrowserSessionErrorTests(unittest.TestCase):
         )
         self.assertFalse(is_driver_version_mismatch(exc))
 
-    def test_get_cookies_launches_browser_even_when_yandex_is_running(self):
-        """Regression: a running Yandex Browser must not block cookie refresh."""
+    def test_get_cookies_frees_locked_profile_without_temp_profile(self):
+        """Locked real profile → close Yandex and retry; never open temp/incognito."""
         from backend.auth import browser as browser_mod
 
+        lock_error = RuntimeError(
+            "session not created: Chrome failed to start: crashed. "
+            "(session not created: DevToolsActivePort file doesn't exist)"
+        )
+
         with (
-            mock.patch("selenium.webdriver.Chrome", side_effect=RuntimeError("boom")) as chrome_mock,
+            mock.patch.object(browser_mod, "terminate_yandex_browser_processes", return_value=2) as term_mock,
+            mock.patch("selenium.webdriver.Chrome", side_effect=lock_error) as chrome_mock,
             mock.patch.object(Path, "exists", return_value=True),
+            mock.patch("tempfile.mkdtemp") as mkdtemp_mock,
         ):
             result = browser_mod.get_cookies(
                 driver_path=Path("driver/yandexdriver.exe"),
                 browser_path=Path("browser.exe"),
                 profile_user_data_dir=Path("User Data"),
                 profile_directory="Vinsent O`neal",
+                max_retries=2,
             )
 
         self.assertIsNone(result)
-        chrome_mock.assert_called_once()
+        term_mock.assert_called_once()
+        mkdtemp_mock.assert_not_called()
+        self.assertGreaterEqual(chrome_mock.call_count, 2)
 
-    def test_get_cookies_version_mismatch_repairs_once_then_stops(self):
+    def test_get_cookies_version_mismatch_repairs_once_then_retries(self):
         from backend.auth import browser as browser_mod
 
         version_error = RuntimeError(
@@ -224,12 +240,69 @@ class BrowserSessionErrorTests(unittest.TestCase):
                 browser_path=Path("browser.exe"),
                 profile_user_data_dir=Path("User Data"),
                 profile_directory="Default",
+                max_retries=2,
             )
 
         self.assertIsNone(result)
         ensure_mock.assert_called_once()
-        # First failure + one post-repair retry, not three pointless launches.
-        self.assertEqual(chrome_mock.call_count, 2)
+        self.assertGreaterEqual(chrome_mock.call_count, 2)
+
+    def test_profile_xpath_is_first_step(self):
+        from backend.auth import browser as browser_mod
+
+        self.assertEqual(
+            browser_mod.STEP1_NAME_XPATH,
+            "/html/body/div[3]/div/div/div[1]/div[2]/div/div/div/div/div[2]"
+            "/div/div/div/div/div/div/div[1]/div/div[1]/div/div[1]/div/div/span/span",
+        )
+
+    def test_warehouse_xpaths_prefer_lakhta_card(self):
+        from backend.auth import browser as browser_mod
+
+        self.assertEqual(
+            browser_mod.STEP2_WAREHOUSE_XPATH,
+            '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[3]',
+        )
+
+    def test_click_warehouse_card_uses_warehouse_xpaths(self):
+        from backend.auth import browser as browser_mod
+
+        driver = mock.Mock()
+        with mock.patch.object(browser_mod, "click_first_available", return_value=True) as click_mock:
+            ok = browser_mod._click_warehouse_card(driver)
+
+        self.assertTrue(ok)
+        click_mock.assert_called_once()
+        self.assertEqual(click_mock.call_args.args[1], [browser_mod.STEP2_WAREHOUSE_XPATH])
+
+    def test_complete_kontur_certificate_login_clicks_cert_then_confirm(self):
+        from backend.auth import browser as browser_mod
+
+        driver = mock.Mock()
+        with mock.patch.object(browser_mod, "_click_profile_card", return_value=True) as click_mock:
+            ok = browser_mod.complete_kontur_certificate_login(driver)
+
+        self.assertTrue(ok)
+        click_mock.assert_called_once()
+
+    def test_background_options_keep_real_profile_flags(self):
+        from backend.auth.browser import build_browser_options
+
+        with mock.patch("selenium.webdriver.chrome.options.Options") as options_cls:
+            options = options_cls.return_value
+            build_browser_options(
+                browser_path=Path("browser.exe"),
+                profile_user_data_dir=Path("User Data"),
+                profile_directory="Vinsent O`neal",
+                headless=False,
+            )
+
+        args = [call.args[0] for call in options.add_argument.call_args_list]
+        self.assertTrue(any(a.startswith("--user-data-dir=") for a in args))
+        self.assertIn("--profile-directory=Vinsent O`neal", args)
+        self.assertIn("--window-position=-32000,-32000", args)
+        self.assertFalse(any("headless" in a for a in args))
+        self.assertFalse(any("incognito" in a.lower() for a in args))
 
 
 class EnsureSessionBridgeTests(unittest.TestCase):
@@ -251,7 +324,7 @@ class EnsureSessionBridgeTests(unittest.TestCase):
             session = bridge._ensure_session(force_refresh=True, force_browser_refresh=True)
 
         self.assertIs(session, fake_session)
-        get_valid_mock.assert_called_once_with(force_refresh=True)
+        get_valid_mock.assert_called_once_with(force_refresh=True, force_browser=True)
 
 
 if __name__ == "__main__":

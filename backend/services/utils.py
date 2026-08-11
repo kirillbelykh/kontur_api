@@ -39,8 +39,11 @@ def make_session_with_cookies(cookies: Optional[Dict[str, str]]) -> requests.Ses
         "Content-Type": "application/json; charset=utf-8",
     })
     if cookies:
-        for k, v in cookies.items():
-            session.cookies.set(k, v, domain="mk.kontur.ru", path="/")
+        for name, value in cookies.items():
+            # Set for API host and parent domain — Kontur auth cookies are often
+            # issued for .kontur.ru and must still attach to mk.kontur.ru calls.
+            session.cookies.set(str(name), str(value), domain="mk.kontur.ru", path="/")
+            session.cookies.set(str(name), str(value), domain=".kontur.ru", path="/")
     return session
 
 

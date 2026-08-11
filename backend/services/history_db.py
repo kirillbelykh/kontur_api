@@ -29,6 +29,8 @@ class OrderHistoryDB:
     _io_lock = threading.RLock()
     _startup_sync_lock = threading.Lock()
     _startup_sync_started = False
+    # Single-flight guard: only one background pull across all instances.
+    _background_pull_lock = threading.Lock()
 
     def __init__(
         self,
@@ -45,6 +47,8 @@ class OrderHistoryDB:
         self.sync_enabled = self._resolve_sync_enabled(sync_enabled)
         self.sync_cache_dir = self.repo_root / SYNC_CACHE_DIR
         self._last_sync_pull_at = 0.0
+        # (cache_key, data) — parsed history JSON keyed by file mtime+size
+        self._data_cache: Optional[Tuple[Tuple[int, int], Dict[str, Any]]] = None
         self._legacy_warning_keys: set[Tuple[str, str, str]] = set()
         self._last_logged_total_orders: Optional[int] = None
         self._last_logged_without_tsd: Optional[int] = None
@@ -168,13 +172,32 @@ class OrderHistoryDB:
             json.dump(payload, file, ensure_ascii=False, indent=2)
         temp_file.replace(path)
 
+    def _data_cache_key(self) -> Optional[Tuple[int, int]]:
+        try:
+            stat = self.db_file.stat()
+            return (stat.st_mtime_ns, stat.st_size)
+        except OSError:
+            return None
+
     def _load_data(self) -> Dict[str, Any]:
+        """Читает историю с кэшем по mtime — файл на 2+ МБ парсится не на каждый вызов."""
+        cache_key = self._data_cache_key()
+        cached = self._data_cache
+        if cache_key is not None and cached is not None and cached[0] == cache_key:
+            data = cached[1]
+            # ponytail: shallow per-order copies — записи истории плоские; если появятся
+            # вложенные изменяемые поля, перейти на copy.deepcopy
+            return {**data, "orders": [dict(order) for order in data.get("orders", [])]}
+
         data = self._read_data(self.db_file)
         data.setdefault("orders", [])
+        if cache_key is not None:
+            self._data_cache = (cache_key, {**data, "orders": [dict(order) for order in data["orders"]]})
         return data
 
     def _save_data(self, data: Dict[str, Any]):
         self._write_data(self.db_file, data)
+        self._data_cache = None
 
     def _parse_timestamp(self, value: Any) -> Optional[datetime]:
         if not value or not isinstance(value, str):
@@ -606,10 +629,32 @@ class OrderHistoryDB:
         if not force and not push and (now - self._last_sync_pull_at) < SYNC_PULL_INTERVAL_SECONDS:
             return False
 
+        if not force and not push:
+            # Read path: git fetch занимает секунды и раньше блокировал загрузку таблиц.
+            # Пуллим в фоне, читатель работает с локальным файлом.
+            self._schedule_background_pull(reason)
+            return False
+
         with self._io_lock:
             changed = self._sync_with_github_locked(push=push, reason=reason)
             self._last_sync_pull_at = time.time()
             return changed
+
+    def _schedule_background_pull(self, reason: str):
+        if not OrderHistoryDB._background_pull_lock.acquire(blocking=False):
+            return
+
+        def _pull():
+            try:
+                with self._io_lock:
+                    self._sync_with_github_locked(push=False, reason=reason)
+                    self._last_sync_pull_at = time.time()
+            except Exception as exc:
+                logger.warning("Фоновая синхронизация истории не удалась: %s", exc)
+            finally:
+                OrderHistoryDB._background_pull_lock.release()
+
+        threading.Thread(target=_pull, daemon=True, name="OrderHistoryPull").start()
 
     def _migrate_legacy_history(self):
         data = self._load_data()

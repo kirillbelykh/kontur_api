@@ -7,9 +7,11 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SelectNative } from '@/components/ui/select'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 type SheetFormat = { key?: string; label?: string }
@@ -149,8 +151,9 @@ function SelectableTable({
       <Table aria-label={ariaLabel}>
         <TableHeader>
           <TableRow>
-            {columns.map((column) => (
-              <TableHead key={column.key}>{column.label}</TableHead>
+            <TableHead isRowHeader={false}>Выбор</TableHead>
+            {columns.map((column, index) => (
+              <TableHead key={column.key} isRowHeader={index === 0}>{column.label}</TableHead>
             ))}
           </TableRow>
         </TableHeader>
@@ -163,8 +166,15 @@ function SelectableTable({
                 key={id || index}
                 id={id || `row-${index}`}
                 className={cn(selected && 'bg-muted/60')}
-                onClick={() => onSelect(id)}
+                onClick={() => onSelect(selected ? '' : id)}
               >
+                <TableCell>
+                  <Checkbox
+                    isSelected={selected}
+                    aria-label={`Выбрать строку ${index + 1}`}
+                    onChange={(next) => onSelect(next ? id : '')}
+                  />
+                </TableCell>
                 {columns.map((column) => (
                   <TableCell key={column.key}>{String(row[column.key] ?? '') || '—'}</TableCell>
                 ))}
@@ -464,15 +474,19 @@ export function LabelsPage() {
             onChange={(e) => setSearch((prev) => ({ ...prev, [key]: e.target.value }))}
             placeholder="Поиск по таблице"
           />
-          <SelectableTable
-            ariaLabel={config.title}
-            rows={filterRows(config.rows, search[key])}
-            columns={config.columns}
-            rowId={config.rowId}
-            selectedId={config.selectedId}
-            onSelect={config.onSelect}
-            emptyText={config.emptyText}
-          />
+          {loading && config.rows.length === 0 ? (
+            <TableSkeleton rows={4} />
+          ) : (
+            <SelectableTable
+              ariaLabel={config.title}
+              rows={filterRows(config.rows, search[key])}
+              columns={config.columns}
+              rowId={config.rowId}
+              selectedId={config.selectedId}
+              onSelect={config.onSelect}
+              emptyText={config.emptyText}
+            />
+          )}
         </CardContent>
       </Card>
     )

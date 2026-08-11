@@ -12,7 +12,6 @@ import {
   PanelLeftOpen,
   Printer,
   RefreshCw,
-  Shield,
   Smartphone,
   ZoomIn,
   ZoomOut,
@@ -57,7 +56,6 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { to: '/orders', label: 'Заказ кодов', icon: ClipboardList },
-  { to: '/chz', label: 'Запросы ЧЗ', icon: Shield },
   { to: '/download', label: 'Загрузка кодов', icon: Download },
   { to: '/intro', label: 'Ввод в оборот', icon: RefreshCw },
   { to: '/tsd', label: 'Задание на ТСД', icon: Smartphone },
@@ -69,7 +67,6 @@ const titles: Record<string, string> = {
   '/': '',
   '/welcome': '',
   '/orders': 'Заказ кодов',
-  '/chz': 'Запросы ЧЗ',
   '/download': 'Загрузка кодов',
   '/intro': 'Ввод в оборот',
   '/tsd': 'Задание на ТСД',

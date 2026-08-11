@@ -305,6 +305,7 @@ name = "kontur-api"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "cryptography" },
     { name = "customtkinter" },
     { name = "openpyxl" },
     { name = "pandas" },
@@ -325,6 +326,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "cryptography", specifier = ">=42" },
     { name = "customtkinter", specifier = "==5.2.2" },
     { name = "openpyxl", specifier = "==3.1.5" },
     { name = "pandas", specifier = "==2.3.2" },

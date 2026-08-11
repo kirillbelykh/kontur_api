@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -8,7 +8,9 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { SelectNative, type SelectNativeProps } from '@/components/ui/select'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
@@ -44,7 +46,6 @@ type OrderRow = {
 
 type OrdersViewState = {
   queue?: QueueItem[]
-  session_orders?: OrderRow[]
   history?: OrderRow[]
   deleted_orders?: OrderRow[]
 }
@@ -163,13 +164,17 @@ export function OrdersPage() {
   const [form, setForm] = useState<OrderForm>(EMPTY_FORM)
   const [lookup, setLookup] = useState<LookupResult | null>(null)
   const [selectedQueueId, setSelectedQueueId] = useState('')
-  const [selectedHistoryId, setSelectedHistoryId] = useState('')
+  const [selectedHistoryIds, setSelectedHistoryIds] = useState<string[]>([])
   const [selectedDeletedId, setSelectedDeletedId] = useState('')
   const [historySearch, setHistorySearch] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [details, setDetails] = useState<OrderDetailsPayload | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [historyFullscreen, setHistoryFullscreen] = useState(false)
+  // Анимация «Очередь → История»: строки очереди улетают, новые строки истории прилетают
+  const [queueLeaving, setQueueLeaving] = useState(false)
+  const [arrivedIds, setArrivedIds] = useState<Set<string>>(new Set())
+  const prevHistoryIdsRef = useRef<Set<string> | null>(null)
 
   const setField = <K extends keyof OrderForm>(key: K, value: OrderForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -185,7 +190,7 @@ export function OrdersPage() {
       const result = await apiCall<OrdersViewState>('get_orders_view_state', force)
       setState(result)
       setSelectedQueueId((prev) => ((result.queue || []).some((item) => item.uid === prev) ? prev : ''))
-      setSelectedHistoryId((prev) => ((result.history || []).some((item) => item.document_id === prev) ? prev : ''))
+      setSelectedHistoryIds((prev) => prev.filter((id) => (result.history || []).some((item) => item.document_id === id)))
       setSelectedDeletedId((prev) => ((result.deleted_orders || []).some((item) => item.document_id === prev) ? prev : ''))
     } catch (error) {
       toast.error(getErrorMessage(error, 'Не удалось загрузить заказы'))
@@ -209,9 +214,21 @@ export function OrdersPage() {
   }, [load, loadOptions])
 
   const queue = state.queue ?? []
-  const sessionOrders = state.session_orders ?? []
   const history = state.history ?? []
   const deletedOrders = state.deleted_orders ?? []
+
+  // Помечаем свежепоявившиеся документы Истории для анимации «прилёта»
+  useEffect(() => {
+    const currentIds = new Set(history.map((item) => item.document_id || '').filter(Boolean))
+    const previous = prevHistoryIdsRef.current
+    prevHistoryIdsRef.current = currentIds
+    if (!previous) return
+    const fresh = new Set([...currentIds].filter((id) => !previous.has(id)))
+    if (fresh.size === 0) return
+    setArrivedIds(fresh)
+    const timer = window.setTimeout(() => setArrivedIds(new Set()), 900)
+    return () => window.clearTimeout(timer)
+  }, [history])
 
   const filteredHistory = useMemo(() => {
     const query = historySearch.trim().toLowerCase()
@@ -300,14 +317,21 @@ export function OrdersPage() {
     runBusy(
       'submit',
       async () => {
-        const result = await apiCall<{ state?: OrdersViewState; errors?: Array<{ order_name?: string; error?: string }> }>(
-          'submit_order_queue',
-        )
-        if (result.state) setState(result.state)
-        else await load(true)
-        setSelectedQueueId('')
-        if (result.errors?.length) {
-          toast.error(`Часть заказов с ошибками: ${result.errors.length}`)
+        setQueueLeaving(true)
+        try {
+          // Даём строкам очереди «улететь» перед отправкой
+          await new Promise((resolve) => window.setTimeout(resolve, 340))
+          const result = await apiCall<{ state?: OrdersViewState; errors?: Array<{ order_name?: string; error?: string }> }>(
+            'submit_order_queue',
+          )
+          if (result.state) setState(result.state)
+          else await load(true)
+          setSelectedQueueId('')
+          if (result.errors?.length) {
+            toast.error(`Часть заказов с ошибками: ${result.errors.length}`)
+          }
+        } finally {
+          setQueueLeaving(false)
         }
       },
       'Очередь заказов выполнена',
@@ -340,8 +364,8 @@ export function OrdersPage() {
     runBusy(
       'delete',
       async () => {
-        if (!selectedHistoryId) throw new Error('Выберите заказ в истории')
-        await apiCall('delete_order', selectedHistoryId)
+        if (selectedHistoryIds.length !== 1) throw new Error('Выберите один заказ в истории')
+        await apiCall('delete_order', selectedHistoryIds[0])
         await load(true)
       },
       'Заказ перемещён в удалённые',
@@ -373,15 +397,15 @@ export function OrdersPage() {
     runBusy(
       'to-active',
       async () => {
-        if (!selectedHistoryId) throw new Error('Выберите заказ в истории')
-        await apiCall('add_history_orders_to_active', [selectedHistoryId])
+        if (!selectedHistoryIds.length) throw new Error('Выберите заказы в истории')
+        await apiCall('add_history_orders_to_active', selectedHistoryIds)
       },
-      'Заказ добавлен в загрузку',
+      'Заказы добавлены в загрузку',
     )
 
   const openDetails = (documentId?: string) =>
     runBusy('details', async () => {
-      const id = String(documentId || selectedHistoryId || '').trim()
+      const id = String(documentId || (selectedHistoryIds.length === 1 ? selectedHistoryIds[0] : '') || '').trim()
       if (!id) throw new Error('Выберите заказ')
       setDetailsOpen(true)
       setDetails(null)
@@ -391,25 +415,42 @@ export function OrdersPage() {
 
   const isBusy = Boolean(busy)
 
+  const toggleHistoryId = (documentId: string) => {
+    if (!documentId) return
+    setSelectedHistoryIds((prev) =>
+      prev.includes(documentId) ? prev.filter((id) => id !== documentId) : [...prev, documentId],
+    )
+  }
+
   const renderHistoryTable = (limit: number) => (
     <Table aria-label="История заказов">
       <TableHeader>
         <TableRow>
-          <TableHead>Заявка</TableHead>
+          <TableHead isRowHeader={false}>Выбор</TableHead>
+          <TableHead isRowHeader>Заявка</TableHead>
           <TableHead>Статус</TableHead>
           <TableHead>GTIN</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {filteredHistory.slice(0, limit).map((item, index) => {
-          const rowId = item.document_id || `${rowTitle(item)}-${index}`
+          const documentId = item.document_id || ''
+          const rowId = documentId || `${rowTitle(item)}-${index}`
+          const checked = Boolean(documentId) && selectedHistoryIds.includes(documentId)
           return (
             <TableRow
               key={rowId}
               id={rowId}
-              className={cn(item.document_id === selectedHistoryId && 'bg-muted/60')}
-              onClick={() => setSelectedHistoryId(item.document_id || '')}
+              className={cn(checked && 'bg-muted/60', arrivedIds.has(documentId) && 'order-arrive')}
+              onClick={() => toggleHistoryId(documentId)}
             >
+              <TableCell>
+                <Checkbox
+                  isSelected={checked}
+                  aria-label={`Выбрать заказ ${rowTitle(item)}`}
+                  onChange={() => toggleHistoryId(documentId)}
+                />
+              </TableCell>
               <TableCell>
                 <div className="font-medium">{rowTitle(item)}</div>
                 <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
@@ -443,9 +484,8 @@ export function OrdersPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-3 gap-2">
         <StatPill label="Очередь" value={queue.length} />
-        <StatPill label="Сессия" value={sessionOrders.length} />
         <StatPill label="История" value={history.length} />
         <StatPill label="Удалённые" value={deletedOrders.length} />
       </div>
@@ -631,7 +671,8 @@ export function OrdersPage() {
                 <Table aria-label="Очередь заявок">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Заявка</TableHead>
+                      <TableHead isRowHeader={false}>Выбор</TableHead>
+                      <TableHead isRowHeader>Заявка</TableHead>
                       <TableHead>Товар</TableHead>
                       <TableHead>GTIN</TableHead>
                       <TableHead>Кодов</TableHead>
@@ -640,13 +681,21 @@ export function OrdersPage() {
                   <TableBody>
                     {queue.map((item, index) => {
                       const rowId = item.uid || `${item.order_name}-${index}`
+                      const checked = Boolean(item.uid) && item.uid === selectedQueueId
                       return (
                         <TableRow
                           key={rowId}
                           id={rowId}
-                          className={cn(item.uid === selectedQueueId && 'bg-muted/60')}
-                          onClick={() => setSelectedQueueId(item.uid || '')}
+                          className={cn(checked && 'bg-muted/60', queueLeaving && 'order-leave')}
+                          onClick={() => setSelectedQueueId(item.uid === selectedQueueId ? '' : item.uid || '')}
                         >
+                          <TableCell>
+                            <Checkbox
+                              isSelected={checked}
+                              aria-label={`Выбрать позицию ${item.order_name || rowId}`}
+                              onChange={(next) => setSelectedQueueId(next ? item.uid || '' : '')}
+                            />
+                          </TableCell>
                           <TableCell className="font-medium">{item.order_name || '—'}</TableCell>
                           <TableCell className="text-muted-foreground">{item.simpl_name || '—'}</TableCell>
                           <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
@@ -662,52 +711,7 @@ export function OrdersPage() {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Сессия</CardTitle>
-            <CardDescription>Заказы, созданные в текущем запуске приложения.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {sessionOrders.length === 0 ? (
-              <EmptyState>В этой сессии заказов ещё нет</EmptyState>
-            ) : (
-              <div className="max-h-[280px] overflow-auto">
-                <Table aria-label="Заказы текущей сессии">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Заявка</TableHead>
-                      <TableHead>Статус</TableHead>
-                      <TableHead>GTIN</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {sessionOrders.map((item, index) => {
-                      const rowId = item.document_id || `${rowTitle(item)}-${index}`
-                      return (
-                        <TableRow
-                          key={rowId}
-                          id={rowId}
-                          onClick={() => item.document_id && void openDetails(item.document_id)}
-                        >
-                          <TableCell>
-                            <div className="font-medium">{rowTitle(item)}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+      <div className="mt-4">
         <Card>
           <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
             <div>
@@ -715,13 +719,13 @@ export function OrdersPage() {
               <CardDescription>Документы Контура / локальная история.</CardDescription>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              <Button size="sm" variant="outline" onClick={() => void openDetails()} disabled={isBusy || !selectedHistoryId}>
+              <Button size="sm" variant="outline" onClick={() => void openDetails()} disabled={isBusy || selectedHistoryIds.length !== 1}>
                 Подробнее
               </Button>
-              <Button size="sm" variant="outline" onClick={() => void addHistoryToActive()} disabled={isBusy || !selectedHistoryId}>
-                В загрузку
+              <Button size="sm" variant="outline" onClick={() => void addHistoryToActive()} disabled={isBusy || selectedHistoryIds.length === 0}>
+                В загрузку{selectedHistoryIds.length > 1 ? ` (${selectedHistoryIds.length})` : ''}
               </Button>
-              <Button size="sm" variant="danger" onClick={() => void deleteHistoryOrder()} disabled={isBusy || !selectedHistoryId}>
+              <Button size="sm" variant="danger" onClick={() => void deleteHistoryOrder()} disabled={isBusy || selectedHistoryIds.length !== 1}>
                 <Trash2 className="h-3.5 w-3.5" />
                 Удалить
               </Button>
@@ -745,10 +749,12 @@ export function OrdersPage() {
               onChange={(e) => setHistorySearch(e.target.value)}
               placeholder="Поиск по заявке, GTIN, ID…"
             />
-            {filteredHistory.length === 0 ? (
+            {loading && history.length === 0 ? (
+              <TableSkeleton rows={6} />
+            ) : filteredHistory.length === 0 ? (
               <EmptyState>История пуста</EmptyState>
             ) : (
-              <div className="max-h-[320px] overflow-auto">{renderHistoryTable(100)}</div>
+              <div className="max-h-[360px] overflow-auto">{renderHistoryTable(100)}</div>
             )}
           </CardContent>
         </Card>
@@ -774,21 +780,31 @@ export function OrdersPage() {
                 <Table aria-label="Удалённые заказы">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Заявка</TableHead>
+                      <TableHead isRowHeader={false}>Выбор</TableHead>
+                      <TableHead isRowHeader>Заявка</TableHead>
                       <TableHead>Удалён</TableHead>
                       <TableHead>Кем</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {deletedOrders.map((item, index) => {
-                      const rowId = item.document_id || `${rowTitle(item)}-${index}`
+                      const documentId = item.document_id || ''
+                      const rowId = documentId || `${rowTitle(item)}-${index}`
+                      const checked = Boolean(documentId) && documentId === selectedDeletedId
                       return (
                         <TableRow
                           key={rowId}
                           id={rowId}
-                          className={cn(item.document_id === selectedDeletedId && 'bg-muted/60')}
-                          onClick={() => setSelectedDeletedId(item.document_id || '')}
+                          className={cn(checked && 'bg-muted/60')}
+                          onClick={() => setSelectedDeletedId(documentId === selectedDeletedId ? '' : documentId)}
                         >
+                          <TableCell>
+                            <Checkbox
+                              isSelected={checked}
+                              aria-label={`Выбрать удалённый заказ ${rowTitle(item)}`}
+                              onChange={(next) => setSelectedDeletedId(next ? documentId : '')}
+                            />
+                          </TableCell>
                           <TableCell>
                             <div className="font-medium">{rowTitle(item)}</div>
                             <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>

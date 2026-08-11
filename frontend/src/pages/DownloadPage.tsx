@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SelectNative } from '@/components/ui/select'
+import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 type DownloadItem = {
@@ -407,7 +408,9 @@ export function DownloadPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {rows.length === 0 ? (
+          {loading && items.length === 0 ? (
+            <TableSkeleton rows={8} />
+          ) : rows.length === 0 ? (
             <EmptyState>Данных пока нет.</EmptyState>
           ) : (
             <div
