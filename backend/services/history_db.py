@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from backend.services.logger import logger
+from backend.services.win_subprocess import hidden_console_kwargs
 
 DEFAULT_HISTORY_FILE = "full_orders_history.json"
 LEGACY_HISTORY_FILE = "orders_history.json"
@@ -365,21 +366,7 @@ class OrderHistoryDB:
         return merged
 
     def _subprocess_kwargs(self) -> Dict[str, Any]:
-        kwargs: Dict[str, Any] = {"text": True}
-        if os.name == "nt":
-            startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
-            startf_use_showwindow = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
-            create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", None)
-
-            if startupinfo_cls is not None:
-                startupinfo = startupinfo_cls()
-                startupinfo.dwFlags |= startf_use_showwindow
-                startupinfo.wShowWindow = 0
-                kwargs["startupinfo"] = startupinfo
-
-            if create_no_window is not None:
-                kwargs["creationflags"] = int(create_no_window)
-        return kwargs
+        return {"text": True, **hidden_console_kwargs()}
 
     def _run_git(
         self,
@@ -688,8 +675,12 @@ class OrderHistoryDB:
         if changed:
             self._save_data(data)
 
-    def add_order(self, order_data: Dict[str, Any]):
-        """Добавляет новый заказ в историю или обновляет существующий."""
+    def add_order(self, order_data: Dict[str, Any]) -> bool:
+        """Добавляет новый заказ в историю или обновляет существующий.
+
+        Возвращает False, если запись не удалось сохранить (ошибку не пробрасываем,
+        чтобы не ломать конвейер заказов — вызывающий код должен показать предупреждение).
+        """
         try:
             with self._io_lock:
                 data = self._load_data()
@@ -703,11 +694,17 @@ class OrderHistoryDB:
                 # Пытаемся выгрузить историю после каждого заказа кодов,
                 # даже если запись не изменилась (например, при повторе после сетевого сбоя).
                 self._sync_with_github_locked(push=True, reason="add_order")
-        except Exception as e:
-            logger.error(f"Ошибка добавления заказа {order_data.get('document_id')}: {e}")
+            return True
+        except Exception:
+            logger.exception("Ошибка добавления заказа %s", order_data.get("document_id"))
+            return False
 
-    def mark_tsd_created(self, document_id: str, intro_number: str):
-        """Помечает заказ как отправленный на ТСД."""
+    def mark_tsd_created(self, document_id: str, intro_number: str) -> bool:
+        """Помечает заказ как отправленный на ТСД.
+
+        Возвращает False, если пометка не сохранилась (заказ не найден или ошибка записи);
+        ошибку не пробрасываем, чтобы не ломать конвейер — вызывающий код показывает предупреждение.
+        """
         try:
             with self._io_lock:
                 data = self._load_data()
@@ -731,9 +728,10 @@ class OrderHistoryDB:
                     logger.info("Заказ %s помечен как отправленный на ТСД", document_id)
                 else:
                     logger.warning("Заказ %s не найден в истории", document_id)
-
-        except Exception as e:
-            logger.error(f"Ошибка обновления статуса ТСД для заказа {document_id}: {e}")
+            return updated
+        except Exception:
+            logger.exception("Ошибка обновления статуса ТСД для заказа %s", document_id)
+            return False
 
     def get_orders_without_tsd(self) -> List[Dict[str, Any]]:
         """Возвращает заказы без ТСД (новые сверху)."""

@@ -27,13 +27,18 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import backend.kontur.api as api_module
 import backend.auth as cookies_module
-from backend.services.aggregation_bulk import AggregateInfo, BulkAggregationService, BulkAggregationSummary, extract_sntin
+from backend.services.aggregation_bulk import (
+    AggregateInfo,
+    BulkAggregationService,
+    BulkAggregationSummary,
+    CodeState,
+    extract_sntin,
+)
 from backend.kontur.api import (
     check_order_status,
     codes_order,
     download_codes,
     make_task_on_tsd,
-    put_into_circulation,
 )
 try:
     from backend.app.bartender_label_formats import (
@@ -85,7 +90,8 @@ from backend.services.options import (
 from backend.services.queue_utils import is_order_ready_for_intro, is_order_ready_for_tsd, remove_order_by_document_id
 from backend.services.update import apply_update as apply_git_update
 from backend.services.update import probe_updates
-from backend.services.utils import get_tnved_code, make_session_with_cookies
+from backend.services.utils import get_tnved_code, make_session_with_cookies, pluralize_ru
+from backend.services.win_subprocess import hidden_console_kwargs
 
 LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS = 300
 
@@ -361,6 +367,11 @@ class _BridgeRuntime:
         self.aggregation_cache_ttl_seconds = 90.0
         self.session_refresh_event = Event()
         self.session_refresh_thread: Optional[Thread] = None
+        # Single-flight для _ensure_session: пока один поток обновляет сессию,
+        # остальные ждут session_refresh_done вместо параллельного Selenium.
+        self.session_refresh_in_progress = False
+        self.session_refresh_done = Event()
+        self.session_refresh_generation = 0
         self.auth_state = "idle"
         self.auth_message = "Готовим авторизацию..."
         self.auth_error = ""
@@ -420,12 +431,15 @@ class _BridgeRuntime:
 
 
 _RUNTIME: Optional[_BridgeRuntime] = None
+_RUNTIME_LOCK = Lock()
 
 
 def _get_runtime() -> _BridgeRuntime:
     global _RUNTIME
     if _RUNTIME is None:
-        _RUNTIME = _BridgeRuntime()
+        with _RUNTIME_LOCK:
+            if _RUNTIME is None:
+                _RUNTIME = _BridgeRuntime()
     return _RUNTIME
 
 
@@ -750,6 +764,7 @@ class ApiBridge:
             with path.open("r", encoding="utf-8") as file:
                 payload = json.load(file)
         except Exception:
+            logger.exception("Файл WMS-заявок повреждён или нечитаем: %s", path)
             return []
 
         items = payload.get("requests", payload) if isinstance(payload, dict) else payload
@@ -1149,6 +1164,7 @@ class ApiBridge:
                     return [item for item in orders if isinstance(item, dict)]
             return []
         except Exception:
+            logger.exception("Файл удалённых заказов повреждён или нечитаем: %s", path)
             return []
 
     def _save_deleted_orders(self, orders: Sequence[Dict[str, Any]]) -> None:
@@ -1180,8 +1196,8 @@ class ApiBridge:
             if callable(sync_locked):
                 try:
                     sync_locked(push=True, reason=reason)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning("Не удалось выгрузить историю в GitHub (%s): %s", reason, exc)
 
     def _build_file_label(self, item: Dict[str, Any]) -> str:
         parts: List[str] = []
@@ -1627,6 +1643,12 @@ class ApiBridge:
             runtime.document_status_cache[cache_key] = {"timestamp": now, "payload": payload}
             return payload
         except Exception:
+            logger.exception(
+                "Не удалось получить статус документа %s (%s), используем сохранённый статус %r",
+                normalized_id,
+                tab_type,
+                translated_fallback,
+            )
             return {
                 "raw": str(fallback_status or "").strip(),
                 "label": translated_fallback,
@@ -1902,73 +1924,98 @@ class ApiBridge:
         force_browser_refresh: bool = False,
     ) -> requests.Session:
         runtime = _get_runtime()
-        need_refresh = False
-        with runtime.lock:
-            age = time.time() - runtime.session_created_at if runtime.session_created_at else 0.0
-            need_refresh = (
-                force_refresh
-                or force_browser_refresh
-                or runtime.session is None
-                or age >= runtime.session_ttl_seconds
-            )
-            if not need_refresh:
-                return runtime.session
-
-            if force_browser_refresh:
-                runtime.auth_state = "browser"
-                runtime.auth_message = "Обновляем cookies в фоновом браузере..."
-            else:
-                runtime.auth_state = "cookies"
-                runtime.auth_message = (
-                    "Проверяем сохраненные cookies..."
-                    if force_refresh
-                    else "Проверяем действующую сессию..."
-                )
-            runtime.auth_error = ""
-            runtime.auth_updated_at = time.time()
-
-        # Do not hold runtime.lock while Selenium / network runs.
-        cookies = get_valid_cookies(
-            force_refresh=bool(force_refresh or force_browser_refresh),
-            force_browser=bool(force_browser_refresh),
-        )
-
-        with runtime.lock:
-            if not cookies:
-                runtime.auth_state = "error"
-                runtime.auth_message = "Cookies не получены."
-                runtime.auth_error = "Не удалось получить валидные cookies для Контур.Маркировки."
-                runtime.auth_updated_at = time.time()
-                raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
-
-            runtime.auth_state = "validating"
-            runtime.auth_message = "Проверяем доступ к Контур.Маркировке..."
-            runtime.auth_error = ""
-            runtime.auth_updated_at = time.time()
-
-        if not cookies_module.validate_kontur_session(cookies):
+        entry_generation: Optional[int] = None
+        while True:
             with runtime.lock:
-                runtime.auth_state = "error"
-                runtime.auth_message = "Контур не подтвердил сессию."
-                runtime.auth_error = (
-                    "Контур.Маркировка отклонила cookies. "
-                    "Выполните вход в Контур и повторите обновление сессии."
+                if entry_generation is None:
+                    entry_generation = runtime.session_refresh_generation
+                age = time.time() - runtime.session_created_at if runtime.session_created_at else 0.0
+                session_is_fresh = (
+                    runtime.session is not None and age < runtime.session_ttl_seconds
                 )
-                runtime.auth_updated_at = time.time()
-                raise RuntimeError(runtime.auth_error)
+                # Если параллельный поток уже обновил сессию после нашего входа,
+                # принимаем её даже при force_refresh: одновременные запросы
+                # схлопываются в один реальный рефреш (single-flight).
+                refreshed_since_entry = (
+                    runtime.session is not None
+                    and runtime.session_refresh_generation != entry_generation
+                )
+                need_refresh = (
+                    force_refresh or force_browser_refresh or not session_is_fresh
+                ) and not refreshed_since_entry
+                if not need_refresh:
+                    assert runtime.session is not None  # гарантировано логикой need_refresh
+                    return runtime.session
 
-        with runtime.lock:
-            runtime.session = make_session_with_cookies(cookies)
-            runtime.session_created_at = time.time()
-            runtime.auth_state = "ready"
-            runtime.auth_message = "Сессия активна."
-            runtime.auth_error = ""
-            runtime.auth_updated_at = time.time()
-            logger.info(
-                "Сессия UI v2: runtime.session установлена (%s cookie keys)",
-                len(cookies),
+                if not runtime.session_refresh_in_progress:
+                    runtime.session_refresh_in_progress = True
+                    runtime.session_refresh_done.clear()
+                    if force_browser_refresh:
+                        runtime.auth_state = "browser"
+                        runtime.auth_message = "Обновляем cookies в фоновом браузере..."
+                    else:
+                        runtime.auth_state = "cookies"
+                        runtime.auth_message = (
+                            "Проверяем сохраненные cookies..."
+                            if force_refresh
+                            else "Проверяем действующую сессию..."
+                        )
+                    runtime.auth_error = ""
+                    runtime.auth_updated_at = time.time()
+                    break
+
+            # Рефреш уже идёт в другом потоке: ждём его завершения и перепроверяем
+            # (тот же паттерн флаг+событие, что и в backend/auth/store.py).
+            runtime.session_refresh_done.wait(timeout=300.0)
+
+        try:
+            # Do not hold runtime.lock while Selenium / network runs.
+            cookies = get_valid_cookies(
+                force_refresh=bool(force_refresh or force_browser_refresh),
+                force_browser=bool(force_browser_refresh),
             )
-            return runtime.session
+
+            with runtime.lock:
+                if not cookies:
+                    runtime.auth_state = "error"
+                    runtime.auth_message = "Cookies не получены."
+                    runtime.auth_error = "Не удалось получить валидные cookies для Контур.Маркировки."
+                    runtime.auth_updated_at = time.time()
+                    raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
+
+                runtime.auth_state = "validating"
+                runtime.auth_message = "Проверяем доступ к Контур.Маркировке..."
+                runtime.auth_error = ""
+                runtime.auth_updated_at = time.time()
+
+            if not cookies_module.validate_kontur_session(cookies):
+                with runtime.lock:
+                    runtime.auth_state = "error"
+                    runtime.auth_message = "Контур не подтвердил сессию."
+                    runtime.auth_error = (
+                        "Контур.Маркировка отклонила cookies. "
+                        "Выполните вход в Контур и повторите обновление сессии."
+                    )
+                    runtime.auth_updated_at = time.time()
+                    raise RuntimeError(runtime.auth_error)
+
+            with runtime.lock:
+                runtime.session = make_session_with_cookies(cookies)
+                runtime.session_created_at = time.time()
+                runtime.session_refresh_generation += 1
+                runtime.auth_state = "ready"
+                runtime.auth_message = "Сессия активна."
+                runtime.auth_error = ""
+                runtime.auth_updated_at = time.time()
+                logger.info(
+                    "Сессия UI v2: runtime.session установлена (%s cookie keys)",
+                    len(cookies),
+                )
+                return runtime.session
+        finally:
+            with runtime.lock:
+                runtime.session_refresh_in_progress = False
+                runtime.session_refresh_done.set()
 
     def _ensure_session_safely(self, log_channel: str | None = None) -> Optional[requests.Session]:
         try:
@@ -2201,7 +2248,11 @@ class ApiBridge:
                 "gtin": item.get("gtin"),
             }
         )
-        _get_runtime().history_db.add_order(base_record)
+        if not _get_runtime().history_db.add_order(base_record):
+            self._log(
+                "download",
+                f"Внимание: история заказа {item.get('order_name') or item.get('document_id')} не сохранена на диск",
+            )
         item["history_data"] = base_record
 
     def _mark_tsd_created_local(self, document_id: str, intro_number: str = "") -> None:
@@ -2209,7 +2260,11 @@ class ApiBridge:
         normalized_id = str(document_id or "").strip()
         if not normalized_id:
             return
-        runtime.history_db.mark_tsd_created(normalized_id, intro_number)
+        if not runtime.history_db.mark_tsd_created(normalized_id, intro_number):
+            self._log(
+                "tsd",
+                f"Внимание: отметка ТСД для заказа {normalized_id} не сохранена в истории",
+            )
         for collection in (runtime.download_items, runtime.session_orders):
             for item in collection:
                 if str(item.get("document_id") or "").strip() != normalized_id:
@@ -2780,7 +2835,6 @@ class ApiBridge:
     ) -> Dict[str, Any]:
         deadline = time.time() + timeout_seconds
         expected = {str(status) for status in expected_statuses if str(status)}
-        last_payload: Dict[str, Any] = {}
         last_status = ""
         while time.time() < deadline:
             payload = self._get_intro_production_state(session, introduction_id)
@@ -2788,7 +2842,6 @@ class ApiBridge:
             if status != last_status:
                 self._log("aggregation", f"Статус ввода в оборот {introduction_id}: {status or 'неизвестно'}")
                 last_status = status
-            last_payload = payload
             if status in expected:
                 return payload
             time.sleep(2)
@@ -2840,7 +2893,6 @@ class ApiBridge:
         timeout_seconds: float = 300.0,
     ) -> Dict[str, Any]:
         deadline = time.time() + timeout_seconds
-        last_payload: Dict[str, Any] = {}
         last_status = ""
         failed_statuses = {"introductionFailed", "crptSendingError", "relatedDocumentFailed"}
         while time.time() < deadline:
@@ -2849,7 +2901,6 @@ class ApiBridge:
             if status != last_status:
                 self._log("aggregation", f"Финальный статус ввода в оборот {introduction_id}: {status or 'неизвестно'}")
                 last_status = status
-            last_payload = payload
             if status == "introduced":
                 return payload
             if status in failed_statuses:
@@ -3494,211 +3545,6 @@ class ApiBridge:
             "product_group": product_group,
         }
 
-    def _introduce_aggregations_via_exact_codes(
-        self,
-        session: requests.Session,
-        *,
-        comment_filter: str,
-        tsd_token: str,
-        production_date: str,
-        expiration_date: str,
-        batch_number: str,
-        cert: Any,
-    ) -> Dict[str, Any]:
-        service = _get_runtime().bulk_aggregation_service
-        normalized_filter = str(comment_filter or "").strip() or None
-        ready_aggregates = service.list_ready_aggregates(
-            session,
-            comment_filter=normalized_filter,
-            status_filters=("readyForSend",),
-        )
-        if not ready_aggregates:
-            if normalized_filter:
-                raise RuntimeError(f"Не найдены АК readyForSend по фильтру '{normalized_filter}'.")
-            raise RuntimeError("Не найдены АК readyForSend для ввода в оборот.")
-
-        aggregate_codes: List[str] = []
-        skipped_nested: List[str] = []
-        product_group = ready_aggregates[0].product_group or "wheelChairs"
-        for aggregate in ready_aggregates:
-            raw_codes, reaggregation_codes = service.fetch_aggregate_codes(session, aggregate.document_id)
-            if reaggregation_codes:
-                skipped_nested.append(aggregate.aggregate_code or aggregate.document_id)
-                self._log(
-                    "aggregation",
-                    f"Пропускаем АК {aggregate.aggregate_code or aggregate.document_id}: обнаружены вложенные АК ({len(reaggregation_codes)}).",
-                )
-                continue
-            aggregate_codes.extend(raw_codes)
-
-        unique_codes = list(dict.fromkeys(code for code in aggregate_codes if str(code or "").strip()))
-        if not unique_codes:
-            raise RuntimeError("В найденных АК нет кодов маркировки для ввода в оборот.")
-
-        self._log(
-            "aggregation",
-            f"Найдены КМ в readyForSend АК: {len(unique_codes)} шт., начинаем проверку статусов в Честном Знаке.",
-        )
-        true_product_group = service._resolve_true_product_group(product_group)
-        states = self._fetch_code_states_resilient(
-            service=service,
-            cert=cert,
-            product_group=true_product_group,
-            raw_codes=unique_codes,
-            context_label="ввода в оборот АК",
-        )
-        status_counts = Counter(state.status or "UNKNOWN" for state in states)
-        api_errors = [state for state in states if state.api_error]
-        if api_errors and len(api_errors) == len(states):
-            preview = ", ".join(state.sntin for state in api_errors[:5])
-            raise RuntimeError(
-                f"Не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. "
-                f"Примеры: {preview}"
-            )
-
-        target_codes: List[str] = []
-        if api_errors:
-            preview = ", ".join(state.sntin for state in api_errors[:5])
-            self._log(
-                "aggregation",
-                f"Ввод в оборот АК: не удалось получить статусы части кодов в Честном Знаке: {len(api_errors)} шт. Примеры: {preview}. Продолжаем обработку остальных кодов.",
-            )
-        already_introduced = 0
-        unsupported_states: List[CodeState] = []
-        for state in states:
-            if state.api_error:
-                continue
-            normalized_status = str(state.status or "").upper()
-            if normalized_status in {"INTRODUCED"}:
-                already_introduced += 1
-                continue
-            if normalized_status == "EMITTED":
-                target_codes.append(state.raw_code)
-                continue
-            unsupported_states.append(state)
-        self._log(
-            "aggregation",
-            f"Статусы КМ из АК: {_format_status_counts(status_counts)}. Уже введено в оборот: {already_introduced}.",
-        )
-        if unsupported_states:
-            preview = ", ".join(
-                f"{state.sntin} ({state.status})"
-                for state in unsupported_states[:5]
-            )
-            raise RuntimeError(
-                f"Часть кодов из АК нельзя ввести в оборот автоматически: {len(unsupported_states)} шт. "
-                f"Примеры: {preview}"
-            )
-        if not target_codes:
-            raise RuntimeError("Все коды из найденных АК уже введены в оборот.")
-
-        match_result = self._match_saved_marking_codes(target_codes)
-        prepared_match = self._prepare_marking_match_result(
-            match_result,
-            action_label="Ввод в оборот АК",
-        )
-        groups = prepared_match["groups"]
-        introduced_results: List[Dict[str, Any]] = []
-        total_sent_codes = 0
-        self._log(
-            "aggregation",
-            f"Полные коды найдены в папке 'Коды км': {prepared_match['matched_count']} шт., "
-            f"не найдено: {prepared_match['unmatched_count']} шт., файлов просмотрено: {prepared_match['scanned_files']}.",
-        )
-        for index, group in enumerate(groups, start=1):
-            source_order_name = str(group.get("order_name") or "").strip() or f"Группа {index}"
-            codes = [row["full_code"] for row in group.get("codes", [])]
-            if not codes:
-                continue
-            metadata = self._lookup_intro_product_metadata(
-                str(group.get("gtin") or "").strip(),
-                str(group.get("full_name") or "").strip(),
-            )
-            document_number = self._build_aggregate_intro_document_number(source_order_name, index)
-            positions_data = [
-                {
-                    "name": metadata["full_name"] or source_order_name,
-                    "gtin": metadata["gtin"] if str(metadata["gtin"]).startswith("0") else f"0{metadata['gtin']}",
-                }
-            ]
-            production_patch = {
-                "documentNumber": document_number,
-                "productionDate": production_date,
-                "expirationDate": expiration_date,
-                "batchNumber": batch_number,
-                "TnvedCode": metadata["tnved_code"],
-            }
-            self._log(
-                "aggregation",
-                f"Создаём ввод в оборот по АК: заказ '{source_order_name}', кодов {len(codes)}, GTIN {metadata['gtin']}.",
-            )
-            ok, create_result = make_task_on_tsd(
-                session=session,
-                codes_order_id=source_order_name,
-                positions_data=positions_data,
-                production_patch=production_patch,
-            )
-            if not ok:
-                error_text = "; ".join(create_result.get("errors", [])) or "Не удалось создать документ ввода в оборот"
-                raise RuntimeError(f"{source_order_name}: {error_text}")
-
-            introduction_id = str(create_result.get("introduction_id") or "").strip()
-            if not introduction_id:
-                raise RuntimeError(f"{source_order_name}: API не вернул id документа ввода в оборот.")
-            self._log("aggregation", f"Документ ввода в оборот создан: {introduction_id}. Отправляем точные коды через ТСД.")
-            self._fill_intro_document_from_tsd(
-                session,
-                introduction_id,
-                tsd_token=tsd_token,
-                full_codes=codes,
-            )
-            codes_check = self._wait_for_intro_codes_check(session, introduction_id)
-            finalize_result = self._finalize_intro_document_after_check(
-                session,
-                introduction_id,
-                cert=cert,
-                codes_check=codes_check,
-                uploaded_codes_count=len(codes),
-                log_channel="aggregation",
-                source_label=source_order_name,
-            )
-            send_result = finalize_result["send_result"]
-            actual_sent_codes_count = int(finalize_result.get("actual_sent_codes_count") or 0)
-
-            introduced_results.append(
-                {
-                    "introduction_id": introduction_id,
-                    "order_name": source_order_name,
-                    "source_path": str(group.get("source_path") or ""),
-                    "gtin": metadata["gtin"],
-                    "codes_count": len(codes),
-                    "actual_sent_codes_count": actual_sent_codes_count,
-                    "result": send_result,
-                }
-            )
-            total_sent_codes += actual_sent_codes_count
-            self._log(
-                "aggregation",
-                f"Ввод в оборот отправлен: {source_order_name} "
-                f"({actual_sent_codes_count} из {len(codes)} кодов, документ {introduction_id}).",
-            )
-
-        return {
-            "ready_aggregates": len(ready_aggregates),
-            "skipped_nested": skipped_nested,
-            "checked_codes": len(unique_codes),
-            "matched_codes": prepared_match["matched_count"],
-            "missing_full_codes": prepared_match["unmatched_count"],
-            "missing_full_codes_preview": prepared_match["unmatched_preview"],
-            "already_introduced_codes": already_introduced,
-            "skipped_api_error_codes": len(api_errors),
-            "skipped_api_error_preview": [state.sntin for state in api_errors[:5]],
-            "introduced_codes": total_sent_codes,
-            "groups": introduced_results,
-            "status_counts": dict(status_counts),
-            "scanned_saved_files": prepared_match["scanned_files"],
-        }
-
     def _introduce_aggregations_via_exact_codes_file(
         self,
         session: requests.Session,
@@ -4267,7 +4113,7 @@ class ApiBridge:
                 encoding="utf-8",
                 errors="replace",
                 timeout=5,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                **hidden_console_kwargs(),
             )
             if result.returncode != 0:
                 raise RuntimeError((result.stderr or result.stdout or "Не удалось прочитать буфер обмена.").strip())
@@ -4298,7 +4144,7 @@ class ApiBridge:
                 encoding="utf-8",
                 errors="replace",
                 timeout=5,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                **hidden_console_kwargs(),
             )
             if result.returncode != 0:
                 raise RuntimeError((result.stderr or result.stdout or "Не удалось записать в буфер обмена.").strip())
@@ -4681,8 +4527,8 @@ class ApiBridge:
                 if callable(sync_locked):
                     try:
                         sync_locked(push=True, reason="delete_order_ui_v2")
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning("Не удалось выгрузить историю в GitHub (delete_order_ui_v2): %s", exc)
 
             runtime.download_items = [
                 item for item in runtime.download_items
@@ -4724,7 +4570,8 @@ class ApiBridge:
 
             restored_order.pop("deleted_at", None)
             restored_order.pop("deleted_by", None)
-            _get_runtime().history_db.add_order(restored_order)
+            if not _get_runtime().history_db.add_order(restored_order):
+                self._log("orders", f"Внимание: восстановленный заказ {normalized_id} не сохранён в историю")
             self._save_deleted_orders(remaining_orders)
             self._log("orders", f"Заказ восстановлен из архива: {restored_order.get('order_name') or normalized_id}")
             return {"success": True}
@@ -4789,7 +4636,11 @@ class ApiBridge:
         }
         existing_history_entry = _get_runtime().history_db.get_order_by_document_id(document_id)
         if existing_history_entry is None:
-            _get_runtime().history_db.add_order(history_entry)
+            if not _get_runtime().history_db.add_order(history_entry):
+                self._log(
+                    "orders",
+                    f"Внимание: заказ {item['order_name']} создан в Контуре, но не сохранён в историю",
+                )
         download_item = self._add_download_item(item, document_id)
 
         result = {
@@ -4842,7 +4693,6 @@ class ApiBridge:
     def get_download_state(self) -> Dict[str, Any]:
         try:
             self._start_background_status_updater()
-            runtime = _get_runtime()
             printers, default_printer = list_installed_printers()
             deleted_ids = self._get_deleted_document_ids()
             items = []
@@ -5334,9 +5184,10 @@ class ApiBridge:
 
     def _refresh_live_status_cache_once(self) -> None:
         runtime = _get_runtime()
-        if runtime.live_status_refreshing:
-            return
-        runtime.live_status_refreshing = True
+        with runtime.lock:
+            if runtime.live_status_refreshing:
+                return
+            runtime.live_status_refreshing = True
         try:
             session = self._ensure_session_safely()
             if not session:
@@ -5362,7 +5213,8 @@ class ApiBridge:
                 runtime.live_intro_by_number = dict(intro_payload.get("by_number") or {})
                 runtime.live_status_last_refresh_at = time.time()
         finally:
-            runtime.live_status_refreshing = False
+            with runtime.lock:
+                runtime.live_status_refreshing = False
 
     def _background_status_updater(self) -> None:
         runtime = _get_runtime()
@@ -7088,16 +6940,6 @@ class ApiBridge:
         normalized = self._parse_iso_date(str(value or "").strip(), field_name=field_name)
         return normalized[:7]
 
-    @staticmethod
-    def _pluralize_ru(value: int, singular: str, few: str, many: str) -> str:
-        remainder10 = value % 10
-        remainder100 = value % 100
-        if remainder10 == 1 and remainder100 != 11:
-            return singular
-        if remainder10 in (2, 3, 4) and remainder100 not in (12, 13, 14):
-            return few
-        return many
-
     def _should_offer_manual_label_input(self, error_text: str) -> bool:
         normalized_error = str(error_text or "").lower()
         triggers = (
@@ -7200,8 +7042,8 @@ class ApiBridge:
                 )
             dispenser_count = quantity_pairs // units_per_pack
             package_text = (
-                f"({dispenser_count} {self._pluralize_ru(dispenser_count, 'диспенсер', 'диспенсера', 'диспенсеров')} "
-                f"по {units_per_pack} {self._pluralize_ru(units_per_pack, 'пара', 'пары', 'пар')})"
+                f"({dispenser_count} {pluralize_ru(dispenser_count, 'диспенсер', 'диспенсера', 'диспенсеров')} "
+                f"по {units_per_pack} {pluralize_ru(units_per_pack, 'пара', 'пары', 'пар')})"
             )
         else:
             dispenser_count = 0
@@ -7230,7 +7072,7 @@ class ApiBridge:
             manufacture_date=manufacture_date_text,
             expiration_date=expiration_date_text,
             quantity_pairs=quantity_pairs,
-            quantity_pairs_word=self._pluralize_ru(quantity_pairs, "пара", "пары", "пар"),
+            quantity_pairs_word=pluralize_ru(quantity_pairs, "пара", "пары", "пар"),
             units_per_pack=units_per_pack,
             dispenser_count=dispenser_count,
             package_text=package_text,

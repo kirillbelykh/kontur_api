@@ -16,6 +16,9 @@ from typing import Any
 
 import pandas as pd
 
+from backend.services.utils import pluralize_ru
+from backend.services.win_subprocess import hidden_console_kwargs
+
 
 BT_DO_NOT_SAVE_CHANGES = 1
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -98,7 +101,6 @@ def _cleanup_headless_bartender_processes() -> None:
         "Where-Object { $_.MainWindowHandle -eq 0 }; "
         "if ($targets) { $targets | Stop-Process -Force -ErrorAction SilentlyContinue }"
     )
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
         subprocess.run(
             [
@@ -114,8 +116,8 @@ def _cleanup_headless_bartender_processes() -> None:
             text=True,
             encoding="utf-8",
             errors="replace",
-            creationflags=creationflags,
             timeout=15,
+            **hidden_console_kwargs(),
         )
     except Exception:
         pass
@@ -311,8 +313,8 @@ def build_label_print_context(
 
         dispenser_count = quantity_pairs // metadata.units_per_pack
         package_text: str | None = (
-            f"({dispenser_count} {_pluralize_ru(dispenser_count, 'диспенсер', 'диспенсера', 'диспенсеров')} "
-            f"по {metadata.units_per_pack} {_pluralize_ru(metadata.units_per_pack, 'пара', 'пары', 'пар')})"
+            f"({dispenser_count} {pluralize_ru(dispenser_count, 'диспенсер', 'диспенсера', 'диспенсеров')} "
+            f"по {metadata.units_per_pack} {pluralize_ru(metadata.units_per_pack, 'пара', 'пары', 'пар')})"
         )
     else:
         dispenser_count = 0
@@ -336,7 +338,7 @@ def build_label_print_context(
         manufacture_date=manufacture_date_text,
         expiration_date=expiration_date_text,
         quantity_pairs=quantity_pairs,
-        quantity_pairs_word=_pluralize_ru(quantity_pairs, "пара", "пары", "пар"),
+        quantity_pairs_word=pluralize_ru(quantity_pairs, "пара", "пары", "пар"),
         units_per_pack=metadata.units_per_pack,
         dispenser_count=dispenser_count,
         package_text=package_text,
@@ -1210,17 +1212,6 @@ def _build_serial_seed(value: str, start_number: int | None = None) -> str:
     return seed_text
 
 
-def _pluralize_ru(value: int, singular: str, few: str, many: str) -> str:
-    remainder10 = value % 10
-    remainder100 = value % 100
-
-    if remainder10 == 1 and remainder100 != 11:
-        return singular
-    if remainder10 in (2, 3, 4) and remainder100 not in (12, 13, 14):
-        return few
-    return many
-
-
 def _run_sdk_database_print(
     template_path: Path,
     csv_path: Path,
@@ -1235,7 +1226,6 @@ def _run_sdk_database_print(
     script_path = Path(tempfile.gettempdir()) / f"kontur_100x180_sdk_{uuid.uuid4().hex}.ps1"
     script_path.write_text(_build_powershell_script(), encoding="utf-8-sig")
 
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     command = [
         POWERSHELL_EXE,
         "-NoProfile",
@@ -1265,14 +1255,14 @@ def _run_sdk_database_print(
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    creationflags=creationflags,
                     timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS,
+                    **hidden_console_kwargs(),
                 )
             except FileNotFoundError as exc:
                 raise BarTenderLabel100x180Error(
                     "Не найден powershell.exe. Без него нельзя запустить печать этикеток 100x180."
                 ) from exc
-            except subprocess.TimeoutExpired as exc:
+            except subprocess.TimeoutExpired:
                 last_error = (
                     f"BarTender SDK не ответил за {PRINT_SUBPROCESS_TIMEOUT_SECONDS} сек. "
                     "Повтор автоматически не выполнялся, чтобы не напечатать дубли."

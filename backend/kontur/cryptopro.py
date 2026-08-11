@@ -30,7 +30,6 @@ CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
 def _require_windows_com() -> tuple[Any, Any]:
     try:
         import pythoncom
-        import win32com.client
         from win32com.client import Dispatch
     except ImportError as exc:
         raise RuntimeError(

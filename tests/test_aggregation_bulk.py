@@ -14,6 +14,7 @@ from backend.services.aggregation_bulk import BulkAggregationService
 class FakeResponse:
     def __init__(self, status_code=200, json_data=None, text="", headers=None):
         self.status_code = status_code
+        self.ok = status_code < 400
         self._json_data = json_data
         self.text = text or (json.dumps(json_data) if json_data is not None else "")
         self.headers = headers or {}
@@ -796,7 +797,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertIn("04650118042603180000000099", confirm_calls[0][1])
 
     def test_approve_failed_aggregate_uses_tsd_recovery_before_send(self):
-        raw_code = "01046501180412952156bej,nSIQ*?="
+        raw_code = "01046501180412952156bej,nSIQ*?=\x1d93dGVz"
         sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", [raw_code])
         detail_payloads = iter([
             {
@@ -840,10 +841,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         def kontur_get(url, params=None, timeout=None):
             path = url.split("https://mk.kontur.ru", 1)[1]
             if path == "/api/v1/aggregates":
-                status_filter = params["statuses"]
-                if status_filter == "readyForSend":
-                    return FakeResponse(json_data={"items": [], "total": 0})
-                if status_filter == "approveFailed":
+                if params["statuses"] == "approveFailed":
                     return FakeResponse(json_data={
                         "items": [{
                             "documentId": "doc-1",
@@ -853,6 +851,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
                         }],
                         "total": 1,
                     })
+                return FakeResponse(json_data={"items": [], "total": 0})
             if path == "/api/v1/aggregates/doc-1":
                 return FakeResponse(json_data=next(detail_payloads))
             if path == "/api/v1/aggregates/doc-1/codes":
@@ -932,8 +931,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         def kontur_get(url, params=None, timeout=None):
             path = url.split("https://mk.kontur.ru", 1)[1]
             if path == "/api/v1/aggregates":
-                status_filter = params["statuses"]
-                if status_filter == "readyForSend":
+                if params["statuses"] == "readyForSend":
                     return FakeResponse(json_data={
                         "items": [{
                             "documentId": "doc-1",
@@ -943,8 +941,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
                         }],
                         "total": 1,
                     })
-                if status_filter == "approveFailed":
-                    return FakeResponse(json_data={"items": [], "total": 0})
+                return FakeResponse(json_data={"items": [], "total": 0})
             if path == "/api/v1/aggregates/doc-1":
                 return FakeResponse(json_data=next(detail_payloads))
             if path == "/api/v1/aggregates/doc-1/codes":
@@ -1014,10 +1011,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         def kontur_get(url, params=None, timeout=None):
             path = url.split("https://mk.kontur.ru", 1)[1]
             if path == "/api/v1/aggregates":
-                status_filter = params["statuses"]
-                if status_filter == "readyForSend":
-                    return FakeResponse(json_data={"items": [], "total": 0})
-                if status_filter == "approveFailed":
+                if params["statuses"] == "approveFailed":
                     return FakeResponse(json_data={
                         "items": [{
                             "documentId": "doc-1",
@@ -1027,6 +1021,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
                         }],
                         "total": 1,
                     })
+                return FakeResponse(json_data={"items": [], "total": 0})
             if path == "/api/v1/aggregates/doc-1":
                 return FakeResponse(json_data=next(detail_payloads))
             if path == "/api/v1/aggregates/doc-1/codes":
@@ -1078,10 +1073,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         def kontur_get(url, params=None, timeout=None):
             path = url.split("https://mk.kontur.ru", 1)[1]
             if path == "/api/v1/aggregates":
-                status_filter = params["statuses"]
-                if status_filter == "readyForSend":
-                    return FakeResponse(json_data={"items": [], "total": 0})
-                if status_filter == "approveFailed":
+                if params["statuses"] == "approveFailed":
                     return FakeResponse(json_data={
                         "items": [{
                             "documentId": "doc-1",
@@ -1091,6 +1083,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
                         }],
                         "total": 1,
                     })
+                return FakeResponse(json_data={"items": [], "total": 0})
             if path == "/api/v1/aggregates/doc-1":
                 return FakeResponse(json_data={
                     "documentId": "doc-1",
@@ -1140,17 +1133,14 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertEqual(post_calls, [])
 
     def test_approve_failed_tsd_recovery_times_out_before_ready_for_send(self):
-        raw_code = "01046501180412952156bej,nSIQ*?="
+        raw_code = "01046501180412952156bej,nSIQ*?=\x1d93dGVz"
         detail_calls = {"count": 0}
         post_calls = []
 
         def kontur_get(url, params=None, timeout=None):
             path = url.split("https://mk.kontur.ru", 1)[1]
             if path == "/api/v1/aggregates":
-                status_filter = params["statuses"]
-                if status_filter == "readyForSend":
-                    return FakeResponse(json_data={"items": [], "total": 0})
-                if status_filter == "approveFailed":
+                if params["statuses"] == "approveFailed":
                     return FakeResponse(json_data={
                         "items": [{
                             "documentId": "doc-1",
@@ -1160,6 +1150,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
                         }],
                         "total": 1,
                     })
+                return FakeResponse(json_data={"items": [], "total": 0})
             if path == "/api/v1/aggregates/doc-1":
                 detail_calls["count"] += 1
                 status = "approveFailed" if detail_calls["count"] == 1 else "returnedToTsd"
@@ -1213,7 +1204,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertTrue(post_calls[1][0].endswith("/tsd/api/v1/documents/aggregates/doc-1"))
 
     def test_approve_failed_recovery_starts_after_foreign_parent_disaggregation(self):
-        raw_code = "01046501180412952156bej,nSIQ*?="
+        raw_code = "01046501180412952156bej,nSIQ*?=\x1d93dGVz"
         sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", [raw_code])
         detail_payloads = iter([
             {
@@ -1259,10 +1250,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         def kontur_get(url, params=None, timeout=None):
             path = url.split("https://mk.kontur.ru", 1)[1]
             if path == "/api/v1/aggregates":
-                status_filter = params["statuses"]
-                if status_filter == "readyForSend":
-                    return FakeResponse(json_data={"items": [], "total": 0})
-                if status_filter == "approveFailed":
+                if params["statuses"] == "approveFailed":
                     return FakeResponse(json_data={
                         "items": [{
                             "documentId": "doc-1",
@@ -1272,6 +1260,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
                         }],
                         "total": 1,
                     })
+                return FakeResponse(json_data={"items": [], "total": 0})
             if path == "/api/v1/aggregates/doc-1":
                 return FakeResponse(json_data=next(detail_payloads))
             if path == "/api/v1/aggregates/doc-1/codes":
@@ -1403,8 +1392,7 @@ class BulkAggregationServiceTests(unittest.TestCase):
         self.assertEqual(document_id, "doc-disagg-header-1")
 
     def test_run_tsd_refill_by_name_replays_returned_to_tsd_aggregate(self):
-        raw_code = "01046501180412952156bej,nSIQ*?="
-        sign_content = make_content_for_sign("7843316794", "04650118042603180000000007", [raw_code])
+        raw_code = "01046501180412952156bej,nSIQ*?=\x1d93dGVz"
         detail_payloads = iter([
             {
                 "documentId": "doc-1",
@@ -1418,22 +1406,6 @@ class BulkAggregationServiceTests(unittest.TestCase):
                 "documentId": "doc-1",
                 "aggregateCode": "04650118042603180000000007",
                 "status": "readyForSend",
-                "productGroup": "wheelChairs",
-                "comment": "כאע הטאד S 260316 (249ך)",
-                "actions": {"allowReturnToTsd": False, "allowSave": True},
-            },
-            {
-                "documentId": "doc-1",
-                "aggregateCode": "04650118042603180000000007",
-                "status": "readyForSend",
-                "productGroup": "wheelChairs",
-                "comment": "כאע הטאד S 260316 (249ך)",
-                "actions": {"allowReturnToTsd": False, "allowSave": True},
-            },
-            {
-                "documentId": "doc-1",
-                "aggregateCode": "04650118042603180000000007",
-                "status": "sentForApprove",
                 "productGroup": "wheelChairs",
                 "comment": "כאע הטאד S 260316 (249ך)",
                 "actions": {"allowReturnToTsd": False, "allowSave": True},
@@ -1461,8 +1433,6 @@ class BulkAggregationServiceTests(unittest.TestCase):
                 return FakeResponse(json_data=next(detail_payloads))
             if path == "/api/v1/aggregates/doc-1/codes":
                 return FakeResponse(json_data={"aggregateCodes": [{"ttisCode": raw_code}], "reaggregationCodes": []})
-            if path == "/api/v1/aggregates/doc-1/content-for-sign":
-                return FakeResponse(json_data=sign_content)
             raise AssertionError(f"Unexpected GET {url} {params}")
 
         def kontur_post(url, json=None, headers=None, timeout=None):
@@ -1480,13 +1450,15 @@ class BulkAggregationServiceTests(unittest.TestCase):
             comment_filter="лат диаг S 260316 (249к)",
         )
 
+        # Повторное наполнение завершается на readyForSend: отправка на подпись —
+        # отдельное действие (approve_aggregations), рефил её больше не запускает.
         self.assertEqual(service.get_cookie_value(kontur_session, "tsdToken"), "tsd-123")
         self.assertEqual(summary.ready_found, 1)
-        self.assertEqual(summary.sent_for_approve, 1)
+        self.assertEqual(summary.sent_for_approve, 0)
         self.assertEqual(summary.errors, 0)
-        self.assertEqual(len(post_calls), 2)
+        self.assertEqual(len(post_calls), 1)
         self.assertTrue(post_calls[0][0].endswith("/tsd/api/v1/documents/aggregates/doc-1"))
-        self.assertTrue(post_calls[1][0].endswith("/api/v1/aggregates/doc-1/send"))
+        self.assertEqual(post_calls[0][1], {"codes": [raw_code]})
 
 
 if __name__ == "__main__":

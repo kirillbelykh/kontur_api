@@ -1161,28 +1161,6 @@ class BulkAggregationService:
             detail.status,
         )
         log(f"✅ {aggregate.aggregate_code}: повторное наполнение завершено, статус {detail.status}")
-        return
-
-        logger.info("АК %s: после повторного наполнения отправляем в Контур на подпись", aggregate.aggregate_code)
-        final_detail = self.send_aggregate_for_approve(
-            kontur_session=kontur_session,
-            aggregate=AggregateInfo(
-                document_id=aggregate.document_id,
-                aggregate_code=aggregate.aggregate_code,
-                comment=detail.comment,
-                status=detail.status,
-                product_group=detail.product_group,
-                includes_units_count=detail.includes_units_count,
-                codes_check_errors_count=detail.codes_check_errors_count,
-            ),
-            cert=cert,
-            sign_base64_func=sign_base64_func,
-        )
-        summary.sent_for_approve += 1
-        log(
-            f"✅ {aggregate.aggregate_code}: повторно наполнен и отправлен в Контур, "
-            f"текущий статус {final_detail.status}"
-        )
 
     def fetch_aggregate_detail(
         self,

@@ -785,7 +785,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                 logger.warning("PDF export для %s завершился без fileUrl", document_id)
         else:
             logger.warning("Шаблон '30x20' для PDF не найден — пропускаем PDF экспорт")
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка в PDF-части для %s", document_id)
         pdf_path = None
 
@@ -842,7 +842,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                 csv_path = None
         else:
             logger.warning("CSV export для %s не вернул fileInfos в пределах таймаута", document_id)
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка в CSV-части для %s", document_id)
         csv_path = None
 
@@ -893,7 +893,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                 xls_path = None
         else:
             logger.warning("XLS export для %s не вернул fileInfos в пределах таймаута", document_id)
-    except Exception as e:
+    except Exception:
         logger.exception("Ошибка в XLS-части для %s", document_id)
         xls_path = None
 

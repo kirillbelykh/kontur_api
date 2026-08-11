@@ -22,6 +22,7 @@ except ImportError as exc:
 
 from backend.app.api_bridge import ApiBridge
 from backend.app.chz_bridge_server import start_chz_bridge_server
+from backend.services.logger import logger
 
 
 def _resolve_frontend_url() -> str:
@@ -120,7 +121,7 @@ def main() -> None:
     try:
         start_chz_bridge_server(api)
     except OSError:
-        pass
+        logger.exception("CHZ bridge не смог занять порт — колбэки WMS приниматься не будут")
 
     window = webview.create_window(
         title="Контур Маркировка",

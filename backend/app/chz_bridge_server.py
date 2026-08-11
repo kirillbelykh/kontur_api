@@ -12,6 +12,10 @@ from backend.services.logger import logger
 from backend.app.api_bridge import ApiBridge
 
 
+# WMS в проде шлёт колбэки на этот порт с ДРУГОГО хоста, поэтому дефолт —
+# слушать все интерфейсы: существующие установки обновляются без ручной
+# правки .env. Для ужесточения задайте KONTUR_CHZ_BRIDGE_HOST=127.0.0.1
+# на машинах, которым приём заявок из WMS не нужен.
 BRIDGE_HOST = "0.0.0.0"
 BRIDGE_PORT = 8791
 
@@ -26,7 +30,12 @@ def _is_bridge_enabled() -> bool:
 
 
 def _bridge_host() -> str:
-    return str(os.getenv("CHZ_BRIDGE_HOST") or BRIDGE_HOST).strip() or BRIDGE_HOST
+    # KONTUR_CHZ_BRIDGE_HOST — основной переключатель; CHZ_BRIDGE_HOST — легаси-имя.
+    for env_name in ("KONTUR_CHZ_BRIDGE_HOST", "CHZ_BRIDGE_HOST"):
+        value = str(os.getenv(env_name) or "").strip()
+        if value:
+            return value
+    return BRIDGE_HOST
 
 
 def _bridge_port() -> int:
@@ -127,5 +136,12 @@ def start_chz_bridge_server(bridge: ApiBridge) -> ThreadingHTTPServer | None:
     server = _build_server(bridge)
     worker = Thread(target=server.serve_forever, name="ChzBridgeServer", daemon=True)
     worker.start()
-    logger.info("CHZ bridge server started on http://%s:%s/api/chz/requests", _bridge_host(), _bridge_port())
+    host = _bridge_host()
+    logger.info("CHZ bridge server started on http://%s:%s/api/chz/requests", host, _bridge_port())
+    if host not in {"127.0.0.1", "localhost", "::1"}:
+        logger.warning(
+            "CHZ bridge слушает %s — порт доступен из сети. Если приём заявок из WMS "
+            "на этой машине не нужен, задайте KONTUR_CHZ_BRIDGE_HOST=127.0.0.1 в .env",
+            host,
+        )
     return server

@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from backend.services.options import size_options
+from backend.services.win_subprocess import hidden_console_kwargs
 
 
 BT_DO_NOT_SAVE_CHANGES = 1
@@ -78,7 +79,6 @@ def _cleanup_headless_bartender_processes() -> None:
         "Where-Object { $_.MainWindowHandle -eq 0 }; "
         "if ($targets) { $targets | Stop-Process -Force -ErrorAction SilentlyContinue }"
     )
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
         subprocess.run(
             [
@@ -94,8 +94,8 @@ def _cleanup_headless_bartender_processes() -> None:
             text=True,
             encoding="utf-8",
             errors="replace",
-            creationflags=creationflags,
             timeout=15,
+            **hidden_console_kwargs(),
         )
     except Exception:
         pass
@@ -519,7 +519,6 @@ def _run_sdk_print(
     script_path = Path(tempfile.gettempdir()) / f"kontur_bt_sdk_{uuid.uuid4().hex}.ps1"
     script_path.write_text(_build_powershell_script(), encoding="utf-8-sig")
 
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     command = [
         POWERSHELL_EXE,
         "-NoProfile",
@@ -549,8 +548,8 @@ def _run_sdk_print(
                     text=True,
                     encoding="utf-8",
                     errors="replace",
-                    creationflags=creationflags,
                     timeout=PRINT_SUBPROCESS_TIMEOUT_SECONDS,
+                    **hidden_console_kwargs(),
                 )
             except FileNotFoundError as exc:
                 raise BarTenderPrintError("Не найден powershell.exe. Без него нельзя запустить печать через BarTender SDK.") from exc
@@ -982,7 +981,6 @@ def _normalize_printer_listing(
 
 
 def _list_installed_printers_via_powershell() -> tuple[list[str], str | None]:
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     script = """
 $printers = @(Get-CimInstance Win32_Printer | Sort-Object Name | Select-Object -ExpandProperty Name)
 $defaultPrinter = Get-CimInstance Win32_Printer | Where-Object { $_.Default } | Select-Object -First 1 -ExpandProperty Name
@@ -1007,7 +1005,7 @@ $defaultPrinter = Get-CimInstance Win32_Printer | Where-Object { $_.Default } | 
             text=True,
             encoding="utf-8",
             errors="replace",
-            creationflags=creationflags,
+            **hidden_console_kwargs(),
         )
     except FileNotFoundError:
         return [], None

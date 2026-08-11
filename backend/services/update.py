@@ -13,24 +13,12 @@ try:
 except Exception:  # pragma: no cover - headless / no tk
     mbox = None  # type: ignore[assignment]
 
+from backend.services.win_subprocess import hidden_console_kwargs
+
 
 def _git_kwargs():
     """kwargs для subprocess: скрыть консоль на Windows и вернуть текст."""
-    kwargs: dict[str, object] = {"text": True}
-    if os.name == "nt":
-        startupinfo_cls = getattr(subprocess, "STARTUPINFO", None)
-        startf_use_showwindow = getattr(subprocess, "STARTF_USESHOWWINDOW", 0)
-        create_no_window = getattr(subprocess, "CREATE_NO_WINDOW", None)
-
-        if startupinfo_cls is not None:
-            si = startupinfo_cls()
-            si.dwFlags |= startf_use_showwindow
-            si.wShowWindow = 0
-            kwargs["startupinfo"] = si
-
-        if create_no_window is not None:
-            kwargs["creationflags"] = int(create_no_window)
-    return kwargs
+    return {"text": True, **hidden_console_kwargs()}
 
 
 def _run_git(args, repo_dir, check=True):
