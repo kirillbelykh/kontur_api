@@ -36,3 +36,7 @@ orders_history.json
 
 /dist/
 
+
+/installer/payload/
+/dist/
+
