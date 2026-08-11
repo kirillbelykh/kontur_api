@@ -44,10 +44,6 @@
   --wms-border-thin: 240 6% 80%;
   --wms-ring: 240 4% 42%;
 
-  /* transitions.dev: акцент — почти чёрный, а не синий; hover/soft выводятся сами */
-  --accent: var(--eclipse);
-  --accent-foreground: var(--snow);
-
   --border-width-default: 1px;
   --border-width-hover: 1px;
   --border-width-focus: 1px;
@@ -425,9 +421,6 @@
   --wms-border: 240 4% 32%;
   --wms-border-thin: 240 4% 28%;
   --wms-ring: 240 5% 68%;
-  /* Тёмная тема: акцент инвертируется — светлые кнопки на тёмном, как у transitions.dev */
-  --accent: var(--snow);
-  --accent-foreground: var(--eclipse);
   --field-border: hsl(240 4% 30%);
   --field-border-hover: hsl(240 4% 42%);
   --field-border-focus: hsl(240 4% 55%);

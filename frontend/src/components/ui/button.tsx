@@ -35,7 +35,14 @@ const VARIANT_MAP: Record<ButtonVariant, HeroVariant> = {
   warning: 'secondary',
 }
 
+/* Основные кнопки — «мягкий» синий, как Get Pro на transitions.dev:
+   светло-синяя пилюля с синим текстом вместо залитой акцентом. */
+const SOFT_ACCENT_CLASS =
+  '[--button-bg:var(--accent-soft)] [--button-bg-hover:var(--accent-soft-hover)] [--button-bg-pressed:var(--accent-soft-hover)] [--button-fg:var(--accent-soft-foreground)]'
+
 const VARIANT_CLASS: Partial<Record<ButtonVariant, string>> = {
+  default: SOFT_ACCENT_CLASS,
+  primary: SOFT_ACCENT_CLASS,
   success:
     '[--button-bg:var(--success)] [--button-bg-hover:var(--success-hover)] [--button-bg-pressed:var(--success-hover)] [--button-fg:var(--success-foreground)]',
   warning:
