@@ -11,12 +11,13 @@ from typing import Any
 
 
 def _repo_root() -> Path:
-    return Path(__file__).resolve().parent.parent
+    # backend/app/true_status_worker.py -> корень репозитория (иначе import backend.* не работает)
+    return Path(__file__).resolve().parents[2]
 
 
 sys.path.insert(0, str(_repo_root()))
 os.environ.setdefault("HISTORY_SYNC_ENABLED", "0")
-os.environ.setdefault("LOG_FILE", str((_repo_root() / "ui_v2_true_status.log").resolve()))
+os.environ.setdefault("LOG_FILE", str(_repo_root() / "runtime" / "logs" / "ui_v2_true_status.log"))
 
 from backend.services.aggregation_bulk import BulkAggregationService
 from backend.kontur.cryptopro import find_certificate_by_thumbprint, sign_text_data

@@ -13,6 +13,7 @@ try:
 except Exception:  # pragma: no cover - headless / no tk
     mbox = None  # type: ignore[assignment]
 
+from backend.services.logger import logger
 from backend.services.win_subprocess import hidden_console_kwargs
 
 
@@ -44,7 +45,7 @@ def _kill_git_processes():
                 stderr=subprocess.DEVNULL,
             )
     except Exception:
-        pass
+        logger.debug("Не удалось завершить зависшие git-процессы", exc_info=True)
 
 
 def _ensure_index_lock_removed(repo_dir, attempts=6, delay=0.3):
@@ -76,6 +77,8 @@ def default_repo_dir() -> str:
 
 def _default_pre_cleanup():
     """Закрыть рут-логгеры и собрать мусор, чтобы файлы могли быть заменены."""
+    # Молча: смысл функции — освободить файловые хэндлы логов перед git-обновлением;
+    # логирование здесь снова открыло бы файл, а сбой flush/close ни на что не влияет.
     try:
         import gc
         import logging
@@ -178,7 +181,7 @@ def apply_update(
         try:
             pre_update_cleanup()
         except Exception:
-            pass
+            logger.debug("pre_update_cleanup завершился с ошибкой — продолжаем обновление", exc_info=True)
         _ensure_index_lock_removed(repo)
 
         try:
@@ -206,7 +209,7 @@ def apply_update(
                     try:
                         _run_git(["stash", "pop"], repo)
                     except Exception:
-                        pass
+                        logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
                 return {
                     "success": False,
                     "error": "Не удалось выполнить fast-forward. Ветка расходится с origin/main.",
@@ -218,14 +221,14 @@ def apply_update(
                     try:
                         _run_git(["stash", "pop"], repo)
                     except Exception:
-                        pass
+                        logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
                 return {"success": False, "error": "Не удалось выполнить принудительное обновление"}
 
         if stash_created:
             try:
                 _run_git(["stash", "pop"], repo)
             except subprocess.CalledProcessError:
-                pass
+                logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
 
         new_head = _capture_git(["rev-parse", "HEAD"], repo).strip()
         result: Dict[str, Any] = {

@@ -20,7 +20,7 @@ LOG_BACKUP_COUNT = 3
 LOG_FORMAT = "%(asctime)s | %(levelname)-7s | %(message)s"
 
 
-logger = logging.getLogger("GTIN_Lookup")
+logger = logging.getLogger("kontur")
 logger.setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 logger.propagate = False
 
@@ -35,6 +35,7 @@ def _configure_standard_streams() -> None:
         try:
             reconfigure(encoding="utf-8", errors="replace")
         except Exception:
+            # Молча: логгер ещё не настроен, а во frozen/GUI-сборках потоки бывают закрыты.
             pass
 
 

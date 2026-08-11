@@ -16,6 +16,7 @@ from typing import Any
 
 import pandas as pd
 
+from backend.services.logger import logger
 from backend.services.utils import pluralize_ru
 from backend.services.win_subprocess import hidden_console_kwargs
 
@@ -120,7 +121,7 @@ def _cleanup_headless_bartender_processes() -> None:
             **hidden_console_kwargs(),
         )
     except Exception:
-        pass
+        logger.debug("Не удалось прибрать фоновые процессы BarTender", exc_info=True)
 
 
 @dataclass(frozen=True)
@@ -388,8 +389,7 @@ def _schedule_delayed_print_artifact_cleanup(
             time.sleep(max(1, int(delay_seconds)))
             target_path.unlink()
         except OSError:
-            pass
-        except Exception:
+            # Временный файл уже удалён или ещё занят печатью — некритично.
             pass
 
     threading.Thread(
@@ -480,12 +480,12 @@ def _prepare_template_copy(context: LabelPrint100x180Context) -> Path:
             try:
                 bt_format.Close(BT_DO_NOT_SAVE_CHANGES)
             except Exception:
-                pass
+                logger.debug("BarTender: Close временного шаблона не удался", exc_info=True)
         if app is not None:
             try:
                 app.Quit(BT_DO_NOT_SAVE_CHANGES)
             except Exception:
-                pass
+                logger.debug("BarTender: Quit COM-приложения не удался", exc_info=True)
         pythoncom.CoUninitialize()
 
 
@@ -497,7 +497,7 @@ def _bind_format_to_selected_printer(bt_format, printer_name: str) -> bool:
     try:
         bt_format.PrintSetup.EnablePrompting = False
     except Exception:
-        pass
+        logger.debug("BarTender: не удалось отключить EnablePrompting", exc_info=True)
 
     try:
         bt_format.PrintSetup.PrinterName = normalized_printer_name
@@ -1366,12 +1366,12 @@ def _run_com_database_print(
             try:
                 bt_format.Close(BT_DO_NOT_SAVE_CHANGES)
             except Exception:
-                pass
+                logger.debug("BarTender: Close формата после печати не удался", exc_info=True)
         if app is not None:
             try:
                 app.Quit(BT_DO_NOT_SAVE_CHANGES)
             except Exception:
-                pass
+                logger.debug("BarTender: Quit COM-приложения не удался", exc_info=True)
         pythoncom.CoUninitialize()
 
 
@@ -1432,7 +1432,7 @@ def _configure_com_print_setup(bt_format, *, record_count: int, job_name: str) -
     try:
         bt_format.UseDatabase = True
     except Exception:
-        pass
+        logger.debug("BarTender: формат не принял UseDatabase", exc_info=True)
 
     for attribute_name, attribute_value in (
         ("UseDatabase", True),
@@ -1443,25 +1443,25 @@ def _configure_com_print_setup(bt_format, *, record_count: int, job_name: str) -
         try:
             setattr(print_setup, attribute_name, attribute_value)
         except Exception:
-            pass
+            logger.debug("BarTender: PrintSetup не принял %s=%s", attribute_name, attribute_value, exc_info=True)
 
     if job_name:
         try:
             print_setup.JobName = job_name
         except Exception:
-            pass
+            logger.debug("BarTender: не удалось задать имя задания печати", exc_info=True)
 
     try:
         if getattr(print_setup, "SupportsIdenticalCopies", False):
             print_setup.IdenticalCopiesOfLabel = 1
     except Exception:
-        pass
+        logger.debug("BarTender: не удалось задать IdenticalCopiesOfLabel", exc_info=True)
 
     try:
         if getattr(print_setup, "SupportsSerializedLabels", False):
             print_setup.NumberOfSerializedLabels = 1
     except Exception:
-        pass
+        logger.debug("BarTender: не удалось задать NumberOfSerializedLabels", exc_info=True)
 
     try:
         print_setup.RecordRange = "1" if record_count == 1 else f"1-{record_count}"

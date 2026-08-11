@@ -37,10 +37,14 @@ def _resolve_frontend_url() -> str:
     legacy = REPO_ROOT / "archive" / "ui_v2_static" / "ui" / "index.html"
     if legacy.exists():
         return legacy.resolve().as_uri()
-    raise SystemExit(
-        "Frontend not found. Run `cd frontend && npm install && npm run build`, "
-        "or set VITE_DEV_URL=http://127.0.0.1:5173"
+    message = (
+        f"Frontend not found: {index_path} is missing. "
+        "Run `cd frontend && npm install && npm run build` (or `git pull` to fetch the committed dist), "
+        "or set VITE_DEV_URL=http://127.0.0.1:5173 in .env while developing."
     )
+    # Под pythonw консоли нет — продублируем причину в lookup.log, иначе оператор не увидит её.
+    logger.error(message)
+    raise SystemExit(message)
 
 
 def _resolve_pythonw() -> str:
@@ -68,8 +72,9 @@ def _ensure_desktop_shortcut() -> None:
         if icon_path.exists():
             shortcut.IconLocation = str(icon_path)
         shortcut.Save()
+        logger.debug("Ярлык на рабочем столе обновлён: %s", shortcut_path)
     except Exception:
-        pass
+        logger.debug("Не удалось обновить ярлык %s", shortcut_path, exc_info=True)
 
 
 def _apply_window_icon() -> None:
@@ -93,6 +98,7 @@ def _apply_window_icon() -> None:
                     break
                 time.sleep(0.1)
             if not hwnd:
+                logger.debug("Окно приложения не найдено за 10с — иконка окна не установлена")
                 return
             IMAGE_ICON, LR_LOADFROMFILE, WM_SETICON = 1, 0x10, 0x80
             big = user32.LoadImageW(None, str(icon_path), IMAGE_ICON, 0, 0, LR_LOADFROMFILE)
@@ -101,8 +107,9 @@ def _apply_window_icon() -> None:
                 user32.SendMessageW(hwnd, WM_SETICON, 1, big)
             if small:
                 user32.SendMessageW(hwnd, WM_SETICON, 0, small)
+            logger.debug("Иконка окна установлена (big=%s, small=%s)", bool(big), bool(small))
         except Exception:
-            pass
+            logger.debug("Не удалось установить иконку окна", exc_info=True)
 
     threading.Thread(target=worker, daemon=True).start()
 
@@ -113,13 +120,15 @@ def main() -> None:
 
         # Own taskbar identity: without this the app groups under pythonw with its icon
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Grundlage.KonturMarkirovka")
+        logger.debug("AppUserModelID установлен")
     except Exception:
-        pass
+        logger.debug("Не удалось установить AppUserModelID", exc_info=True)
     _ensure_desktop_shortcut()
     api = ApiBridge()
     api.start_session_auto_refresh()
     try:
         start_chz_bridge_server(api)
+        logger.debug("CHZ bridge для WMS запущен")
     except OSError:
         logger.exception("CHZ bridge не смог занять порт — колбэки WMS приниматься не будут")
 

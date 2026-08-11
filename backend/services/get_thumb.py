@@ -84,6 +84,7 @@ def find_certificate_thumbprint() -> Optional[str]:
         try:
             pythoncom.CoUninitialize()
         except Exception:
+            # Молча: CoUninitialize падает только при лишнем вызове (COM уже освобождён).
             pass
 
 
@@ -156,6 +157,7 @@ def find_certificate_thumbprint_detailed() -> Optional[str]:
         try:
             pythoncom.CoUninitialize()
         except Exception:
+            # Молча: CoUninitialize падает только при лишнем вызове (COM уже освобождён).
             pass
 
 
@@ -186,6 +188,7 @@ def get_thumbprint() -> Optional[str]:
         try:
             pythoncom.CoUninitialize()
         except Exception:
+            # Молча: CoUninitialize падает только при лишнем вызове (COM уже освобождён).
             pass
 
 

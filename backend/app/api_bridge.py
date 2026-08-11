@@ -22,8 +22,10 @@ import pandas as pd
 import requests
 from dotenv import load_dotenv
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+load_dotenv(_REPO_ROOT / ".env")
 
 import backend.kontur.api as api_module
 import backend.auth as cookies_module
@@ -345,9 +347,38 @@ def _order_freshness_sort_key(item: Dict[str, Any]) -> tuple[str, str, str]:
     return (updated_at or created_at, created_at, document_id)
 
 
+def _migrate_legacy_state_files() -> None:
+    """Одноразовый перенос состояния из легаси-мест под repo-root runtime/.
+
+    Исторически WMS-заявки писались в backend/runtime/ (а до этого — плоско в
+    runtime/), удалённые заказы — в backend/Удаленные/. Переносим файлы на новые
+    пути один раз при старте; если новый файл уже есть, старые не трогаем.
+    """
+    backend_dir = _REPO_ROOT / "backend"
+    moves = (
+        # Порядок кандидатов важен: backend/runtime/ писался позже, чем плоский runtime/.
+        (backend_dir / "runtime" / WMS_CHZ_REQUESTS_FILE, _REPO_ROOT / "runtime" / "wms" / WMS_CHZ_REQUESTS_FILE),
+        (_REPO_ROOT / "runtime" / WMS_CHZ_REQUESTS_FILE, _REPO_ROOT / "runtime" / "wms" / WMS_CHZ_REQUESTS_FILE),
+        (backend_dir / DELETED_ORDERS_DIRNAME / DELETED_ORDERS_FILE, _REPO_ROOT / "runtime" / "deleted" / DELETED_ORDERS_FILE),
+    )
+    for old_path, new_path in moves:
+        try:
+            if new_path.exists() or not old_path.exists():
+                continue
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            old_path.replace(new_path)
+            logger.info("Перенесли состояние приложения: %s -> %s", old_path, new_path)
+            old_dir = old_path.parent
+            if old_dir not in (_REPO_ROOT / "runtime", backend_dir) and not any(old_dir.iterdir()):
+                old_dir.rmdir()
+        except OSError:
+            logger.warning("Не удалось перенести %s -> %s", old_path, new_path, exc_info=True)
+
+
 class _BridgeRuntime:
     def __init__(self):
-        self.root_dir = Path(__file__).resolve().parent.parent
+        self.root_dir = _REPO_ROOT
+        _migrate_legacy_state_files()
         self.history_db = OrderHistoryDB(startup_sync="none")
         self.lock = Lock()
         self.session: Optional[requests.Session] = None
@@ -401,7 +432,7 @@ class _BridgeRuntime:
             self.history_db.sync_with_github(force=True, push=False, reason="runtime-init")
             self.load_download_items_from_history(sync=False)
         except Exception:
-            pass
+            logger.warning("Стартовая синхронизация истории заказов не удалась — работаем с локальной копией", exc_info=True)
 
     def start_history_sync_on_startup(self) -> None:
         if self.history_sync_thread is not None and self.history_sync_thread.is_alive():
@@ -441,6 +472,47 @@ def _get_runtime() -> _BridgeRuntime:
             if _RUNTIME is None:
                 _RUNTIME = _BridgeRuntime()
     return _RUNTIME
+
+
+_APP_VERSION_INFO: Optional[Dict[str, str]] = None
+
+
+def _detect_app_version() -> str:
+    try:
+        import importlib.metadata
+
+        return importlib.metadata.version("kontur-api")
+    except Exception:
+        # Проект не устанавливается как пакет ([tool.uv] package = false),
+        # поэтому обычный путь — чтение pyproject.toml.
+        pass
+    try:
+        text = (_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        match = re.search(r'^version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        if match:
+            return match.group(1)
+        logger.warning("В pyproject.toml не нашли поле version")
+    except Exception:
+        logger.warning("Не удалось определить версию приложения", exc_info=True)
+    return "unknown"
+
+
+def _detect_git_commit() -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=str(_REPO_ROOT),
+            **hidden_console_kwargs(),
+        )
+        if completed.returncode == 0:
+            return str(completed.stdout or "").strip()
+        logger.debug("git rev-parse завершился с кодом %s: %s", completed.returncode, str(completed.stderr or "").strip())
+    except Exception:
+        logger.debug("git rev-parse недоступен", exc_info=True)
+    return ""
 
 
 def _history_order_to_download_item(order_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -737,7 +809,7 @@ class ApiBridge:
                     try:
                         cleanup()
                     except Exception:
-                        pass
+                        logger.debug("Очистка после фоновой задачи %s не удалась", name, exc_info=True)
 
         worker = Thread(target=_worker, name=name, daemon=True)
         worker.start()
@@ -752,7 +824,7 @@ class ApiBridge:
 
     def _wms_chz_requests_path(self) -> Path:
         runtime = self._ensure_wms_chz_runtime_defaults()
-        path = runtime.root_dir / "runtime" / WMS_CHZ_REQUESTS_FILE
+        path = runtime.root_dir / "runtime" / "wms" / WMS_CHZ_REQUESTS_FILE
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -1147,7 +1219,7 @@ class ApiBridge:
             return {"success": False, "error": str(exc)}
 
     def _deleted_orders_path(self) -> Path:
-        path = _get_runtime().root_dir / DELETED_ORDERS_DIRNAME / DELETED_ORDERS_FILE
+        path = _get_runtime().root_dir / "runtime" / "deleted" / DELETED_ORDERS_FILE
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -1663,7 +1735,7 @@ class ApiBridge:
         env = os.environ.copy()
         env.setdefault("PYTHONIOENCODING", "utf-8")
         env.setdefault("HISTORY_SYNC_ENABLED", "0")
-        env["LOG_FILE"] = str((Path(__file__).resolve().parent / "ui_v2_true_status.log").resolve())
+        env["LOG_FILE"] = str(_REPO_ROOT / "runtime" / "logs" / "ui_v2_true_status.log")
 
         command = [
             sys.executable,
@@ -1912,8 +1984,7 @@ class ApiBridge:
     def _load_nomenclature_df(self) -> pd.DataFrame:
         runtime = _get_runtime()
         if runtime.nomenclature_df is None:
-            # root_dir указывает на backend/, а data/ лежит в корне проекта
-            path = runtime.root_dir.parent / "data" / "nomenclature.xlsx"
+            path = runtime.root_dir / "data" / "nomenclature.xlsx"
             runtime.nomenclature_df = pd.read_excel(path)
         return runtime.nomenclature_df
 
@@ -2779,7 +2850,7 @@ class ApiBridge:
                 if looked_up_simpl:
                     simpl_name = looked_up_simpl
             except Exception:
-                pass
+                logger.debug("GTIN %s не нашёлся в номенклатуре — используем имя из заказа", normalized_gtin, exc_info=True)
         tnved_code = get_tnved_code(simpl_name or full_name)
         return {
             "gtin": normalized_gtin,
@@ -3162,14 +3233,8 @@ class ApiBridge:
         broken_count = 0
 
         for position in positions:
-            try:
-                total_codes += max(int(position.get("codesCount") or 0), 0)
-            except Exception:
-                pass
-            try:
-                broken_count += max(int(position.get("brokenCodesCount") or 0), 0)
-            except Exception:
-                pass
+            total_codes += _coerce_non_negative_int(position.get("codesCount"))
+            broken_count += _coerce_non_negative_int(position.get("brokenCodesCount"))
             for broken_group in position.get("brokenCodes") or []:
                 broken_codes.extend(
                     str(code or "").strip()
@@ -4025,6 +4090,16 @@ class ApiBridge:
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
+    def get_app_version(self) -> Dict[str, str]:
+        """Версия приложения и короткий коммит; кэшируется при первом вызове, не бросает."""
+        global _APP_VERSION_INFO
+        if _APP_VERSION_INFO is None:
+            _APP_VERSION_INFO = {
+                "version": _detect_app_version(),
+                "commit": _detect_git_commit(),
+            }
+        return dict(_APP_VERSION_INFO)
+
     def check_for_updates(self) -> Dict[str, Any]:
         """Fetch origin and report whether origin/main is ahead of HEAD."""
         try:
@@ -4737,7 +4812,7 @@ class ApiBridge:
                     if response.status_code == 200:
                         kontur_data = response.json()
             except Exception:
-                pass
+                logger.debug("codes-order/%s недоступен — пробуем codes-introduction", normalized_id, exc_info=True)
 
             # Если не нашли как заказ кодов, пробуем как ввод в оборот
             if not kontur_data:
@@ -4753,7 +4828,7 @@ class ApiBridge:
                             kontur_data = response.json()
                             source_type = "codes-introduction"
                 except Exception:
-                    pass
+                    logger.debug("codes-introduction/%s недоступен — показываем только локальные данные", normalized_id, exc_info=True)
 
             # Собираем локальные данные из истории
             local_data = self._find_order_data(normalized_id)
@@ -6902,8 +6977,7 @@ class ApiBridge:
                     time.sleep(max(1, int(delay_seconds)))
                 cleanup_target.unlink()
             except OSError:
-                pass
-            except Exception:
+                # Временный CSV уже удалён или ещё занят печатью — некритично.
                 pass
 
         if delay_seconds > 0:

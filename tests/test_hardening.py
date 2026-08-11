@@ -58,7 +58,7 @@ class HistoryDbAddOrderResultTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             db = self._build_db(temp_dir)
             with patch.object(db, "_save_data", side_effect=OSError("disk full")), \
-                    self.assertLogs("GTIN_Lookup", level="ERROR") as captured:
+                    self.assertLogs("kontur", level="ERROR") as captured:
                 result = db.add_order({
                     "document_id": "DOC-FAIL-1",
                     "order_name": "broken write",

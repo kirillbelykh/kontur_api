@@ -1,7 +1,8 @@
-from pathlib import Path
+import json
 import tempfile
 import types
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import backend.app.api_bridge as api_bridge
@@ -284,7 +285,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             self.assertTrue(result["success"])
             self.assertEqual(len(fake_runtime.wms_chz_requests), 1)
             self.assertEqual(fake_runtime.wms_chz_requests[0]["request_id"], 17)
-            self.assertTrue((temp_root / "runtime" / api_bridge.WMS_CHZ_REQUESTS_FILE).exists())
+            self.assertTrue((temp_root / "runtime" / "wms" / api_bridge.WMS_CHZ_REQUESTS_FILE).exists())
 
     def test_get_orders_view_state_includes_wms_chz_sections(self):
         fake_runtime = types.SimpleNamespace(
@@ -1392,6 +1393,127 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             )
             logged_messages = [str(call.args[1]) for call in log_mock.call_args_list]
             self.assertTrue(any("100" in message and "200" in message for message in logged_messages))
+
+class AppVersionTests(unittest.TestCase):
+    def setUp(self):
+        self.bridge = api_bridge.ApiBridge()
+        api_bridge._APP_VERSION_INFO = None
+        self.addCleanup(setattr, api_bridge, "_APP_VERSION_INFO", None)
+
+    def test_get_app_version_returns_pyproject_version_and_git_commit(self):
+        completed = types.SimpleNamespace(returncode=0, stdout="abc1234\n", stderr="")
+
+        with mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock:
+            result = self.bridge.get_app_version()
+
+        self.assertEqual(result, {"version": "2.0.0", "commit": "abc1234"})
+        run_mock.assert_called_once()
+        self.assertEqual(run_mock.call_args.args[0], ["git", "rev-parse", "--short", "HEAD"])
+
+    def test_get_app_version_is_cached_after_first_call(self):
+        completed = types.SimpleNamespace(returncode=0, stdout="abc1234\n", stderr="")
+
+        with mock.patch.object(api_bridge.subprocess, "run", return_value=completed) as run_mock:
+            first = self.bridge.get_app_version()
+            second = self.bridge.get_app_version()
+
+        self.assertEqual(first, second)
+        run_mock.assert_called_once()
+
+    def test_get_app_version_never_raises_when_git_is_unavailable(self):
+        with mock.patch.object(api_bridge.subprocess, "run", side_effect=FileNotFoundError("no git")):
+            result = self.bridge.get_app_version()
+
+        self.assertEqual(result["commit"], "")
+        self.assertEqual(result["version"], "2.0.0")
+
+
+class LegacyStateMigrationTests(unittest.TestCase):
+    def test_moves_old_state_files_to_repo_root_runtime(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            old_wms = temp_root / "backend" / "runtime" / api_bridge.WMS_CHZ_REQUESTS_FILE
+            old_wms.parent.mkdir(parents=True)
+            old_wms.write_text('{"requests": []}', encoding="utf-8")
+            old_deleted = temp_root / "backend" / api_bridge.DELETED_ORDERS_DIRNAME / api_bridge.DELETED_ORDERS_FILE
+            old_deleted.parent.mkdir(parents=True)
+            old_deleted.write_text('{"orders": []}', encoding="utf-8")
+
+            with mock.patch.object(api_bridge, "_REPO_ROOT", temp_root):
+                api_bridge._migrate_legacy_state_files()
+
+            self.assertTrue((temp_root / "runtime" / "wms" / api_bridge.WMS_CHZ_REQUESTS_FILE).exists())
+            self.assertTrue((temp_root / "runtime" / "deleted" / api_bridge.DELETED_ORDERS_FILE).exists())
+            self.assertFalse(old_wms.exists())
+            self.assertFalse(old_deleted.exists())
+            # Пустые легаси-каталоги убраны.
+            self.assertFalse(old_wms.parent.exists())
+            self.assertFalse(old_deleted.parent.exists())
+
+    def test_never_overwrites_existing_new_state(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            old_wms = temp_root / "backend" / "runtime" / api_bridge.WMS_CHZ_REQUESTS_FILE
+            old_wms.parent.mkdir(parents=True)
+            old_wms.write_text("old", encoding="utf-8")
+            new_wms = temp_root / "runtime" / "wms" / api_bridge.WMS_CHZ_REQUESTS_FILE
+            new_wms.parent.mkdir(parents=True)
+            new_wms.write_text("new", encoding="utf-8")
+
+            with mock.patch.object(api_bridge, "_REPO_ROOT", temp_root):
+                api_bridge._migrate_legacy_state_files()
+
+            self.assertEqual(new_wms.read_text(encoding="utf-8"), "new")
+            self.assertTrue(old_wms.exists())
+
+
+class ApiBridgeSurfaceSmokeTests(unittest.TestCase):
+    """Смоук: дешёвые read-only методы моста возвращают JSON-сериализуемые данные без исключений."""
+
+    def setUp(self):
+        self.bridge = api_bridge.ApiBridge()
+
+    def test_cheap_read_only_methods_return_json_serializable_payloads(self):
+        with (
+            mock.patch.object(self.bridge, "_start_background_status_updater"),
+            mock.patch.object(self.bridge, "_sync_pending_wms_chz_requests"),
+            mock.patch.object(self.bridge, "_get_kontur_order_items", return_value=[]),
+            mock.patch.object(self.bridge, "_collect_known_orders", return_value=[]),
+            mock.patch.object(self.bridge, "_ensure_session_safely", return_value=None),
+            mock.patch.object(self.bridge, "_get_aggregation_items_cached", return_value=[]),
+            mock.patch.object(self.bridge, "_load_nomenclature_df", return_value=object()),
+            mock.patch.object(api_bridge, "list_installed_printers", return_value=([], "")),
+            mock.patch.object(api_bridge, "list_label_sheet_formats", return_value=[]),
+            mock.patch.object(api_bridge, "list_aggregation_csv_files", return_value=[]),
+            mock.patch.object(api_bridge, "list_marking_csv_files", return_value=[]),
+            mock.patch.object(
+                api_bridge.cookies_module,
+                "get_kontur_access_prolongation_state",
+                return_value={"enabled": False},
+            ),
+        ):
+            payloads = {
+                "get_bootstrap": self.bridge.get_bootstrap(),
+                "get_options": self.bridge.get_options(),
+                "get_default_date_window": self.bridge.get_default_date_window(),
+                "get_app_version": self.bridge.get_app_version(),
+                "get_logs": self.bridge.get_logs("orders"),
+            }
+
+        for method_name, payload in payloads.items():
+            try:
+                json.dumps(payload)
+            except (TypeError, ValueError) as exc:
+                self.fail(f"{method_name} вернул не-JSON-сериализуемый ответ: {exc}")
+
+        self.assertIsInstance(payloads["get_logs"], list)
+        for method_name in ("get_bootstrap", "get_options", "get_default_date_window", "get_app_version"):
+            self.assertIsInstance(payloads[method_name], dict)
+            self.assertNotIn("error", payloads[method_name], method_name)
+        for section_name, section in payloads["get_bootstrap"].items():
+            if isinstance(section, dict):
+                self.assertNotIn("error", section, f"bootstrap.{section_name}")
+
 
 if __name__ == "__main__":
     unittest.main()
