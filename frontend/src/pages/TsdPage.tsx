@@ -7,6 +7,7 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DatePickerField } from '@/components/ui/date-picker'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
@@ -261,18 +262,16 @@ export function TsdPage() {
             </div>
             <div>
               <FieldLabel>Дата производства</FieldLabel>
-              <TextInput
+              <DatePickerField
                 value={form.production_date}
-                onChange={(event) => setField('production_date', event.target.value)}
-                placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
+                onChange={(value) => setField('production_date', value)}
               />
             </div>
             <div>
               <FieldLabel>Срок годности</FieldLabel>
-              <TextInput
+              <DatePickerField
                 value={form.expiration_date}
-                onChange={(event) => setField('expiration_date', event.target.value)}
-                placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
+                onChange={(value) => setField('expiration_date', value)}
               />
             </div>
             <div>

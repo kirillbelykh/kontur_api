@@ -7,6 +7,7 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DatePickerField } from '@/components/ui/date-picker'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -546,19 +547,11 @@ export function LabelsPage() {
               </div>
               <div>
                 <FieldLabel>Дата изготовления</FieldLabel>
-                <TextInput
-                  value={manufactureDate}
-                  onChange={(e) => setManufactureDate(e.target.value)}
-                  placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
-                />
+                <DatePickerField value={manufactureDate} onChange={setManufactureDate} />
               </div>
               <div>
                 <FieldLabel>Срок годности</FieldLabel>
-                <TextInput
-                  value={expirationDate}
-                  onChange={(e) => setExpirationDate(e.target.value)}
-                  placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
-                />
+                <DatePickerField value={expirationDate} onChange={setExpirationDate} />
               </div>
               <div>
                 <FieldLabel>Количество</FieldLabel>

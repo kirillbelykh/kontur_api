@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
@@ -7,7 +8,7 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { SelectNative } from '@/components/ui/select'
+import { SelectNative, type SelectNativeProps } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
@@ -117,8 +118,40 @@ function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
 }
 
-function TextSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
+function TextSelect(props: SelectNativeProps) {
   return <SelectNative {...props} className={cn('w-full', props.className)} />
+}
+
+function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: OrderMode) => void }) {
+  return (
+    <div className="inline-flex rounded-[var(--field-radius)] border border-border bg-muted/40 p-0.5">
+      {(
+        [
+          { id: 'params', label: 'По параметрам' },
+          { id: 'gtin', label: 'По GTIN' },
+        ] as const
+      ).map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          onClick={() => onChange(item.id)}
+          className={cn(
+            'relative rounded-[var(--field-radius)] border-0 bg-transparent px-3 py-1.5 text-xs font-medium transition-colors',
+            mode === item.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {mode === item.id ? (
+            <motion.span
+              layoutId="orders-mode-toggle"
+              transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
+              className="absolute inset-0 rounded-[var(--field-radius)] bg-card shadow-sm"
+            />
+          ) : null}
+          <span className="relative z-10">{item.label}</span>
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export function OrdersPage() {
@@ -424,28 +457,7 @@ export function OrdersPage() {
             <CardDescription>Параметры номенклатуры или прямой GTIN → очередь / сразу в Контур.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5">
-              <button
-                type="button"
-                className={cn(
-                  'rounded px-3 py-1.5 text-xs font-medium transition',
-                  mode === 'params' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground',
-                )}
-                onClick={() => setMode('params')}
-              >
-                По параметрам
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'rounded px-3 py-1.5 text-xs font-medium transition',
-                  mode === 'gtin' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground',
-                )}
-                onClick={() => setMode('gtin')}
-              >
-                По GTIN
-              </button>
-            </div>
+            <ModeToggle mode={mode} onChange={setMode} />
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="sm:col-span-2">
@@ -455,18 +467,20 @@ export function OrdersPage() {
 
               <div className="sm:col-span-2">
                 <FieldLabel>Наименование</FieldLabel>
-                <TextInput
-                  list="orders-product-options"
+                <TextSelect
+                  searchable
+                  placeholder="Упрощённое имя"
                   value={form.name}
                   disabled={!paramsMode}
                   onChange={(e) => setField('name', e.target.value)}
-                  placeholder="Упрощённое имя"
-                />
-                <datalist id="orders-product-options">
+                >
+                  <option value="">Выберите</option>
                   {(options.simplified_options || []).map((value) => (
-                    <option key={value} value={value} />
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
                   ))}
-                </datalist>
+                </TextSelect>
               </div>
 
               <div>

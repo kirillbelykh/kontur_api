@@ -7,6 +7,7 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DatePickerField } from '@/components/ui/date-picker'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
@@ -173,19 +174,11 @@ export function IntroPage() {
           <CardContent className="space-y-3">
             <div>
               <FieldLabel>Дата производства</FieldLabel>
-              <TextInput
-                value={productionDate}
-                onChange={(event) => setProductionDate(event.target.value)}
-                placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
-              />
+              <DatePickerField value={productionDate} onChange={setProductionDate} />
             </div>
             <div>
               <FieldLabel>Срок годности</FieldLabel>
-              <TextInput
-                value={expirationDate}
-                onChange={(event) => setExpirationDate(event.target.value)}
-                placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
-              />
+              <DatePickerField value={expirationDate} onChange={setExpirationDate} />
             </div>
             <div>
               <FieldLabel>Номер партии</FieldLabel>

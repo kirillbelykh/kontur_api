@@ -38,22 +38,21 @@
   --wms-card-foreground: 222 47% 11%;
   --wms-muted: 210 40% 94%;
   --wms-muted-foreground: 215 16% 47%;
-  --wms-border: 214 32% 91%;
-  --wms-border-thin: 214 32% 88%;
+  --wms-border: 214 20% 82%;
+  --wms-border-thin: 214 20% 78%;
   --wms-ring: 210 5% 45%;  /* ← ИЗМЕНЕНО: #6f7379 в HSL */
   
-  /* Остальное без изменений */
-  --border-width-default: 0.1px;
-  --border-width-hover: 0.5px;
-  --border-width-focus: 0.5px;
-  --border-width-active: 0.5px;
-  --wms-ring-width-default: 0.5px;
-  --wms-ring-offset-width: 0.5px;
+  --border-width-default: 1px;
+  --border-width-hover: 1px;
+  --border-width-focus: 1px;
+  --border-width-active: 1px;
+  --wms-ring-width-default: 2px;
+  --wms-ring-offset-width: 1px;
 
-  /* HeroUI fields: idle = soft shadow / no border; focus = thin black border */
+  /* HeroUI fields share the border tokens so inputs and selects look identical */
   --field-border-width: 1px;
-  --field-border: transparent;
-  --field-border-hover: transparent;
+  --field-border: hsl(214 20% 82%);
+  --field-border-hover: hsl(214 20% 68%);
   --field-border-focus: #000000;
 
   /* Modal morph (transitions.dev Plus→menu motion language) */
@@ -184,9 +183,11 @@
   --wms-card-foreground: 219 14% 71%;
   --wms-muted: 220 13% 22%;
   --wms-muted-foreground: 220 10% 65%;
-  --wms-border: 220 13% 28%;
-  --wms-border-thin: 220 13% 24%;
+  --wms-border: 220 13% 38%;
+  --wms-border-thin: 220 13% 34%;
   --wms-ring: 207 82% 66%;
+  --field-border: hsl(220 13% 38%);
+  --field-border-hover: hsl(220 13% 50%);
   --field-border-focus: #ffffff;
   --magic-spotlight: #262626;
   --magic-gradient-from: #64748b;

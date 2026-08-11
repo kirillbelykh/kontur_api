@@ -190,13 +190,19 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
       const onPointerDown = (event: PointerEvent) => {
         const target = event.target
         if (!(target instanceof Element)) return
-        if (rootRef.current?.contains(target)) return
         if (target.closest('[data-slot="select-popover"]')) return
+        if (rootRef.current?.contains(target)) {
+          // Trigger press while open: swallow it, otherwise the popover closes and reopens
+          event.preventDefault()
+          event.stopPropagation()
+          setIsOpen(false)
+          return
+        }
         setIsOpen(false)
       }
 
-      document.addEventListener('pointerdown', onPointerDown)
-      return () => document.removeEventListener('pointerdown', onPointerDown)
+      document.addEventListener('pointerdown', onPointerDown, true)
+      return () => document.removeEventListener('pointerdown', onPointerDown, true)
     }, [isOpen])
 
     React.useEffect(() => {

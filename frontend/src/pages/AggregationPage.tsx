@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronDown, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { cn, getErrorMessage } from '@/lib/utils'
@@ -7,6 +8,7 @@ import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DatePickerField } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -32,8 +34,6 @@ type AggregationState = {
   cache_age_seconds?: number
   total_items?: number
 }
-
-type DownloadMode = 'comment' | 'count'
 
 const PAGE_SIZE = 200
 
@@ -62,10 +62,6 @@ export function AggregationPage() {
   const [createComment, setCreateComment] = useState('')
   const [createCount, setCreateCount] = useState('1')
 
-  const [downloadMode, setDownloadMode] = useState<DownloadMode>('comment')
-  const [downloadTarget, setDownloadTarget] = useState('')
-  const [downloadStatus, setDownloadStatus] = useState('tsdProcessStart')
-
   const [commentFilter, setCommentFilter] = useState('')
   const [refillToken, setRefillToken] = useState('')
   const [productionDate, setProductionDate] = useState('')
@@ -73,6 +69,7 @@ export function AggregationPage() {
   const [batchNumber, setBatchNumber] = useState('')
   const [documentTitle, setDocumentTitle] = useState('')
   const [allowDisaggregate, setAllowDisaggregate] = useState(false)
+  const [refillOpen, setRefillOpen] = useState(false)
 
   const [statusFilter, setStatusFilter] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -210,21 +207,6 @@ export function AggregationPage() {
       'Агрегационные коды созданы.',
     )
 
-  const downloadCodes = () =>
-    runBusy(
-      'download',
-      async () => {
-        await apiCall(
-          'download_aggregation_codes',
-          downloadMode,
-          downloadTarget,
-          downloadStatus || 'tsdProcessStart',
-        )
-        await load(true)
-      },
-      'Агрегационные коды скачаны.',
-    )
-
   const refreshList = () =>
     runBusy(
       'refresh',
@@ -320,7 +302,7 @@ export function AggregationPage() {
         <StatPill label="Возраст кэша" value={cacheAge > 0 ? `${cacheAge} с` : '—'} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <Card>
           <CardHeader>
             <CardTitle>Создание АК</CardTitle>
@@ -353,88 +335,18 @@ export function AggregationPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Скачивание АК</CardTitle>
-            <CardDescription>Выгрузка кодов агрегации в CSV по названию или количеству.</CardDescription>
+            <CardTitle>Проведение и ввод в оборот</CardTitle>
+            <CardDescription>Действия над выбранными АК.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="inline-flex rounded-md border border-border bg-muted/40 p-0.5">
-              <button
-                type="button"
-                className={cn(
-                  'rounded px-3 py-1.5 text-xs font-medium transition',
-                  downloadMode === 'comment' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground',
-                )}
-                onClick={() => setDownloadMode('comment')}
-              >
-                По названию
-              </button>
-              <button
-                type="button"
-                className={cn(
-                  'rounded px-3 py-1.5 text-xs font-medium transition',
-                  downloadMode === 'count' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground',
-                )}
-                onClick={() => setDownloadMode('count')}
-              >
-                По количеству
-              </button>
-            </div>
-            <div>
-              <FieldLabel>Значение</FieldLabel>
-              <TextInput
-                value={downloadTarget}
-                onChange={(e) => setDownloadTarget(e.target.value)}
-                placeholder={downloadMode === 'comment' ? 'Название для поиска' : 'Количество кодов'}
-              />
-            </div>
-            <div>
-              <FieldLabel>Статус</FieldLabel>
-              <TextInput value={downloadStatus} onChange={(e) => setDownloadStatus(e.target.value)} />
-            </div>
-            <Button size="sm" onClick={() => void downloadCodes()} disabled={isBusy}>
-              Скачать коды агрегации
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Проведение и повторное наполнение</CardTitle>
-            <CardDescription>Действия над выбранными АК и повторное наполнение по названию.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <FieldLabel>Название для повторного наполнения</FieldLabel>
-              <TextInput
-                value={commentFilter}
-                onChange={(e) => setCommentFilter(e.target.value)}
-                placeholder="Нужно только для повторного наполнения"
-              />
-            </div>
-            <div>
-              <FieldLabel>TSD токен (только для повторного наполнения)</FieldLabel>
-              <TextInput
-                value={refillToken}
-                onChange={(e) => setRefillToken(e.target.value)}
-                placeholder="Нужен только для повторного наполнения"
-              />
-            </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <FieldLabel>Дата производства</FieldLabel>
-                <TextInput
-                  value={productionDate}
-                  onChange={(e) => setProductionDate(e.target.value)}
-                  placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
-                />
+                <DatePickerField value={productionDate} onChange={setProductionDate} />
               </div>
               <div>
                 <FieldLabel>Срок годности</FieldLabel>
-                <TextInput
-                  value={expirationDate}
-                  onChange={(e) => setExpirationDate(e.target.value)}
-                  placeholder="YYYY-MM, YYYY-MM-DD или DD-MM-YYYY"
-                />
+                <DatePickerField value={expirationDate} onChange={setExpirationDate} />
               </div>
               <div>
                 <FieldLabel>Номер партии</FieldLabel>
@@ -454,11 +366,6 @@ export function AggregationPage() {
               </div>
             </div>
 
-            <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Повторное наполнение используйте только для АК, которые ещё не были зарегистрированы в ГИС МТ. Для уже
-              зарегистрированных АК нужна переагрегация только по изменяемым кодам, а не повторная отправка всего состава.
-            </p>
-
             <Checkbox isSelected={allowDisaggregate} onChange={setAllowDisaggregate}>
               <span className="text-sm">Разрешить расформирование чужих АК при проведении</span>
             </Checkbox>
@@ -476,10 +383,54 @@ export function AggregationPage() {
               <Button size="sm" variant="outline" onClick={() => void introduceSelected()} disabled={isBusy || !hasSelection}>
                 Ввести в оборот выбранные АК
               </Button>
-              <Button size="sm" onClick={() => void refill()} disabled={isBusy}>
+              <Button
+                size="sm"
+                variant={refillOpen ? 'secondary' : 'ghost'}
+                onClick={() => setRefillOpen((open) => !open)}
+              >
+                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', refillOpen && 'rotate-180')} />
                 Повторное наполнение
               </Button>
             </div>
+
+            <AnimatePresence initial={false}>
+              {refillOpen ? (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden"
+                >
+                  <div className="space-y-3 border-t border-border pt-3">
+                    <div>
+                      <FieldLabel>Название для повторного наполнения</FieldLabel>
+                      <TextInput
+                        value={commentFilter}
+                        onChange={(e) => setCommentFilter(e.target.value)}
+                        placeholder="Название АК для поиска"
+                      />
+                    </div>
+                    <div>
+                      <FieldLabel>TSD токен</FieldLabel>
+                      <TextInput
+                        value={refillToken}
+                        onChange={(e) => setRefillToken(e.target.value)}
+                        placeholder="Токен ТСД"
+                      />
+                    </div>
+                    <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      Повторное наполнение используйте только для АК, которые ещё не были зарегистрированы в ГИС МТ. Для
+                      уже зарегистрированных АК нужна переагрегация только по изменяемым кодам, а не повторная отправка
+                      всего состава.
+                    </p>
+                    <Button size="sm" onClick={() => void refill()} disabled={isBusy}>
+                      Выполнить повторное наполнение
+                    </Button>
+                  </div>
+                </motion.div>
+              ) : null}
+            </AnimatePresence>
           </CardContent>
         </Card>
       </div>
@@ -561,7 +512,6 @@ export function AggregationPage() {
                     <TableRow>
                       <TableHead>✓</TableHead>
                       <TableHead>АК</TableHead>
-                      <TableHead>Название</TableHead>
                       <TableHead>Статус</TableHead>
                       <TableHead>Создан</TableHead>
                       <TableHead>КМ</TableHead>
@@ -589,9 +539,8 @@ export function AggregationPage() {
                           </TableCell>
                           <TableCell>
                             <div className="font-medium">{row.aggregate_code || '—'}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">{row.document_id || '—'}</div>
+                            <div className="text-[11px] text-muted-foreground">{row.comment || '—'}</div>
                           </TableCell>
-                          <TableCell>{row.comment || '—'}</TableCell>
                           <TableCell>
                             <Badge tone={toneForStatus(row.status_label || row.status)}>
                               {row.status_label || row.status || '—'}
