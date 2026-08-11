@@ -7,6 +7,7 @@ import json
 import shutil
 import sqlite3
 import tempfile
+import time
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -61,10 +62,38 @@ def load_cookies_from_yandex_profile(
 
     temporary_db = Path(tempfile.mkstemp(prefix="kontur_cookies_", suffix=".sqlite")[1])
     try:
-        shutil.copy2(cookies_db, temporary_db)
-        key = _load_yandex_cookie_key(user_data_dir)
-        connection = sqlite3.connect(temporary_db)
+        last_error: Optional[Exception] = None
+        copied = False
+        # Browser often locks Cookies exclusively; retry briefly in case the
+        # lock is transient (startup / flush). Shared-read open is preferred.
+        for attempt in range(1, 4):
+            try:
+                try:
+                    raw = cookies_db.read_bytes()
+                    temporary_db.write_bytes(raw)
+                except OSError:
+                    shutil.copy2(cookies_db, temporary_db)
+                copied = True
+                break
+            except OSError as exc:
+                last_error = exc
+                logger.debug(
+                    "Yandex Cookies DB locked (attempt %s/3): %s",
+                    attempt,
+                    exc,
+                )
+                time.sleep(0.35 * attempt)
+        if not copied:
+            # Last resort: open sqlite in immutable URI mode (may still fail).
+            try:
+                uri = cookies_db.resolve().as_uri() + "?mode=ro&immutable=1"
+                connection = sqlite3.connect(uri, uri=True)
+            except Exception as exc:
+                raise last_error or exc
+        else:
+            connection = sqlite3.connect(temporary_db)
         try:
+            key = _load_yandex_cookie_key(user_data_dir)
             rows = connection.execute(
                 "SELECT name, value, encrypted_value FROM cookies WHERE host_key LIKE ?",
                 ("%kontur.ru",),
@@ -79,7 +108,15 @@ def load_cookies_from_yandex_profile(
         is_valid, _ = validate_cookies(cookies)
         return cookies if is_valid else None
     except Exception as exc:
-        logger.warning("Could not read cookies from Yandex Browser: %s", exc)
+        winerr = getattr(exc, "winerror", None)
+        if winerr == 32 or isinstance(exc, PermissionError):
+            logger.warning(
+                "Could not read cookies from Yandex Browser: profile DB is locked "
+                "(close the browser or rely on saved file cookies). %s",
+                exc,
+            )
+        else:
+            logger.warning("Could not read cookies from Yandex Browser: %s", exc)
         return None
     finally:
         try:

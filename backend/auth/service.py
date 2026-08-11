@@ -6,7 +6,8 @@ from typing import Dict, Optional
 
 from backend.services.logger import logger
 
-from backend.auth.browser import get_cookies
+from backend.auth.browser import get_cookies, is_yandex_profile_busy
+from backend.auth.constants import PROFILE_USER_DATA_DIR
 from backend.auth.kontur_check import validate_kontur_session
 from backend.auth.store import (
     cookie_lock,
@@ -77,6 +78,17 @@ def get_valid_cookies(force_refresh: bool = False) -> Optional[Dict[str, str]]:
         accepted = _accept_live_cookies(profile_cookies, source="yandex-profile")
         if accepted:
             return accepted
+
+        # Real profile cannot be opened twice. Prefer live file cookies over
+        # launching Selenium that only creates empty crashing windows.
+        if is_yandex_profile_busy(PROFILE_USER_DATA_DIR):
+            logger.warning(
+                "Профиль Yandex Browser занят — Selenium пропущен, пробуем file cookies"
+            )
+            busy_file = load_cookies_from_file(allow_stale=True)
+            accepted = _accept_live_cookies(busy_file, source="file-profile-busy")
+            if accepted:
+                return accepted
 
         selenium_cookies = get_cookies()
         if selenium_cookies:

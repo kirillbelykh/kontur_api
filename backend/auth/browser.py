@@ -9,9 +9,10 @@ only and still keeps the off-screen size/position flags.
 from __future__ import annotations
 
 import os
+import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 
 from backend.services.logger import logger
 
@@ -129,7 +130,84 @@ def remove_webdriver_marker(driver) -> None:
         logger.debug("Could not configure browser anti-detection: %s", exc)
 
 
+def classify_session_error(exc: BaseException) -> str:
+    """Classify Selenium startup failures for retry / fail-fast policy.
+
+    Returns one of: ``version``, ``profile_lock``, ``other``.
+    """
+    message = str(exc).lower()
+    if "supports chrome version" in message or "this version of chromedriver only supports" in message:
+        return "version"
+    lock_markers = (
+        "devtoolsactiveport",
+        "chrome instance exited",
+        "chrome failed to start",
+        "user data directory is already in use",
+        "profile is already in use",
+        "no longer running",
+    )
+    if any(marker in message for marker in lock_markers):
+        return "profile_lock"
+    if "session not created" in message and (
+        "crashed" in message or "exited" in message or "chrome" in message
+    ):
+        # Ambiguous SessionNotCreated — do not open three empty windows.
+        return "profile_lock"
+    return "other"
+
+
+def _process_descendant_pids(root_pid: int) -> Set[int]:
+    """Return ``root_pid`` plus all descendants via Toolhelp snapshot."""
+    pids: Set[int] = {int(root_pid)}
+    parent_map: Dict[int, int] = {}
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class TAGPROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_wchar * 260),
+            ]
+
+        kernel32 = ctypes.windll.kernel32
+        snap = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+        if snap in (-1, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF):
+            return pids
+        pe = TAGPROCESSENTRY32()
+        pe.dwSize = ctypes.sizeof(TAGPROCESSENTRY32)
+        try:
+            if not kernel32.Process32FirstW(snap, ctypes.byref(pe)):
+                return pids
+            while True:
+                parent_map[int(pe.th32ProcessID)] = int(pe.th32ParentProcessID)
+                if not kernel32.Process32NextW(snap, ctypes.byref(pe)):
+                    break
+        finally:
+            kernel32.CloseHandle(snap)
+    except Exception:
+        return pids
+
+    changed = True
+    while changed:
+        changed = False
+        for pid, parent in parent_map.items():
+            if parent in pids and pid not in pids:
+                pids.add(pid)
+                changed = True
+    return pids
+
+
 def hide_driver_windows(driver) -> None:
+    """Hide chromedriver *and* browser windows spawned for the session."""
     try:
         import win32con
         import win32gui
@@ -139,20 +217,185 @@ def hide_driver_windows(driver) -> None:
         return
 
     try:
-        pid = driver.service.process.pid
-        time.sleep(1.0)
+        service_pid = int(driver.service.process.pid)
+    except Exception as exc:
+        logger.debug("Не удалось получить PID YandexDriver: %s", exc)
+        return
 
-        def enum_window_callback(hwnd, results):
-            _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
-            if window_pid == pid:
-                results.append(hwnd)
-
+    try:
+        time.sleep(0.5)
+        target_pids = _process_descendant_pids(service_pid)
+        # Browser may briefly outlive parent linkage; also match by exe path later.
         handles: list[int] = []
-        win32gui.EnumWindows(enum_window_callback, handles)
+
+        def enum_window_callback(hwnd, _results):
+            if not win32gui.IsWindowVisible(hwnd) and not win32gui.IsWindow(hwnd):
+                return
+            try:
+                _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
+            except Exception:
+                return
+            if window_pid in target_pids:
+                handles.append(hwnd)
+
+        win32gui.EnumWindows(enum_window_callback, None)
+
+        if not handles:
+            # Fallback: hide recent Yandex Browser windows (same binary) when
+            # process-tree linkage is not visible yet.
+            browser_name = "browser.exe"
+            try:
+                import ctypes
+                from ctypes import wintypes
+
+                class TAGPROCESSENTRY32(ctypes.Structure):
+                    _fields_ = [
+                        ("dwSize", wintypes.DWORD),
+                        ("cntUsage", wintypes.DWORD),
+                        ("th32ProcessID", wintypes.DWORD),
+                        ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+                        ("th32ModuleID", wintypes.DWORD),
+                        ("cntThreads", wintypes.DWORD),
+                        ("th32ParentProcessID", wintypes.DWORD),
+                        ("pcPriClassBase", ctypes.c_long),
+                        ("dwFlags", wintypes.DWORD),
+                        ("szExeFile", ctypes.c_wchar * 260),
+                    ]
+
+                kernel32 = ctypes.windll.kernel32
+                snap = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+                pe = TAGPROCESSENTRY32()
+                pe.dwSize = ctypes.sizeof(TAGPROCESSENTRY32)
+                browser_pids: Set[int] = set()
+                if kernel32.Process32FirstW(snap, ctypes.byref(pe)):
+                    while True:
+                        if pe.szExeFile.lower() == browser_name and int(pe.th32ParentProcessID) == service_pid:
+                            browser_pids.add(int(pe.th32ProcessID))
+                        if not kernel32.Process32NextW(snap, ctypes.byref(pe)):
+                            break
+                kernel32.CloseHandle(snap)
+                target_pids |= browser_pids
+
+                def enum_again(hwnd, _results):
+                    try:
+                        _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
+                    except Exception:
+                        return
+                    if window_pid in target_pids:
+                        handles.append(hwnd)
+
+                win32gui.EnumWindows(enum_again, None)
+            except Exception as exc:
+                logger.debug("Fallback browser window enum failed: %s", exc)
+
         for hwnd in handles:
-            win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+            try:
+                win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+            except Exception:
+                pass
     except Exception as exc:
         logger.debug("Не удалось скрыть окно браузера Selenium: %s", exc)
+
+
+def is_yandex_profile_busy(user_data_dir: Optional[Path] = None) -> bool:
+    """True when Yandex Browser already holds the profile (Selenium would crash)."""
+    root = Path(user_data_dir) if user_data_dir else None
+    if root is not None:
+        for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+            if (root / name).exists():
+                return True
+
+    browser_path = YANDEX_BROWSER_PATH
+    needle = "yandexbrowser"
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        class TAGPROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ("dwSize", wintypes.DWORD),
+                ("cntUsage", wintypes.DWORD),
+                ("th32ProcessID", wintypes.DWORD),
+                ("th32DefaultHeapID", ctypes.POINTER(ctypes.c_ulong)),
+                ("th32ModuleID", wintypes.DWORD),
+                ("cntThreads", wintypes.DWORD),
+                ("th32ParentProcessID", wintypes.DWORD),
+                ("pcPriClassBase", ctypes.c_long),
+                ("dwFlags", wintypes.DWORD),
+                ("szExeFile", ctypes.c_wchar * 260),
+            ]
+
+        kernel32 = ctypes.windll.kernel32
+        snap = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+        if snap in (-1, 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF):
+            return False
+        pe = TAGPROCESSENTRY32()
+        pe.dwSize = ctypes.sizeof(TAGPROCESSENTRY32)
+        found = False
+        try:
+            if kernel32.Process32FirstW(snap, ctypes.byref(pe)):
+                while True:
+                    if pe.szExeFile.lower() == "browser.exe":
+                        # Confirm it is Yandex, not an unrelated browser.exe.
+                        try:
+                            import win32api
+                            import win32con
+                            import win32process
+
+                            handle = win32api.OpenProcess(
+                                win32con.PROCESS_QUERY_LIMITED_INFORMATION,
+                                False,
+                                int(pe.th32ProcessID),
+                            )
+                            try:
+                                path = win32process.GetModuleFileNameEx(handle, 0)
+                            finally:
+                                win32api.CloseHandle(handle)
+                            if needle in str(path).lower():
+                                found = True
+                                break
+                        except Exception:
+                            # If path cannot be resolved, treat browser.exe as busy
+                            # only when our known binary path exists under Program Files.
+                            if browser_path and "yandex" in str(browser_path).lower():
+                                found = True
+                                break
+                    if not kernel32.Process32NextW(snap, ctypes.byref(pe)):
+                        break
+        finally:
+            kernel32.CloseHandle(snap)
+        return found
+    except Exception as exc:
+        logger.debug("Could not detect running Yandex Browser: %s", exc)
+        return False
+
+
+def ensure_yandex_driver_updated(*, force: bool = True) -> bool:
+    """Run scripts/ensure_yandex_driver.ps1. Returns True when the script exits 0."""
+    ensure_script = Path(__file__).resolve().parents[2] / "scripts" / "ensure_yandex_driver.ps1"
+    if not ensure_script.exists():
+        logger.error("Не найден scripts/ensure_yandex_driver.ps1")
+        return False
+    cmd = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(ensure_script),
+    ]
+    if force:
+        cmd.append("-Force")
+    try:
+        logger.info("Обновляем YandexDriver через ensure_yandex_driver.ps1...")
+        completed = subprocess.run(cmd, check=False, timeout=180)
+        ok = completed.returncode == 0
+        if not ok:
+            logger.error("ensure_yandex_driver.ps1 завершился с кодом %s", completed.returncode)
+        return ok
+    except Exception as exc:
+        logger.warning("Автообновление YandexDriver не удалось: %s", exc)
+        return False
 
 
 def _try_select_profile_and_warehouse(driver, wait, by, expected_conditions) -> None:
@@ -221,6 +464,15 @@ def get_cookies(
         logger.error("Browser binary not found: %s", browser_path)
         return None
 
+    if profile_user_data_dir and is_yandex_profile_busy(Path(profile_user_data_dir)):
+        logger.error(
+            "Профиль Yandex Browser уже занят (браузер запущен). "
+            "Selenium с профилем '%s' не запускаем — иначе открываются пустые окна. "
+            "Закройте Яндекс.Браузер или используйте сохранённые/профильные cookies.",
+            profile_directory,
+        )
+        return None
+
     use_headless = _effective_headless(headless)
     logger.info(
         "Сбор cookies через Selenium (headless=%s, profile=%s)",
@@ -228,8 +480,10 @@ def get_cookies(
         profile_directory,
     )
 
-    version_mismatch_hint_logged = False
-    for attempt in range(1, max_retries + 1):
+    driver_repaired = False
+    attempt = 0
+    while attempt < max_retries:
+        attempt += 1
         logger.info("Попытка получения cookies #%s", attempt)
         driver = None
         try:
@@ -268,6 +522,8 @@ def get_cookies(
             raw_cookies = driver.get_cookies()
             if not raw_cookies:
                 logger.warning("После загрузки страницы cookies не найдены")
+                if attempt < max_retries:
+                    time.sleep(2.0)
                 continue
 
             cookies = {item["name"]: item["value"] for item in raw_cookies}
@@ -283,41 +539,48 @@ def get_cookies(
                 return dict(cookies)
         except Exception as exc:
             logger.exception("get_cookies failed on attempt %s", attempt)
-            message = str(exc).lower()
-            if (not version_mismatch_hint_logged) and (
-                "supports chrome version" in message
-                or "devtoolsactiveport" in message
-                or "session not created" in message
-            ):
-                version_mismatch_hint_logged = True
-                logger.error(
-                    "YandexDriver не совместим с текущим Яндекс.Браузером или профиль занят. "
-                    "Закройте браузер и выполните: "
-                    "powershell -ExecutionPolicy Bypass -File scripts\\ensure_yandex_driver.ps1"
-                )
-                # One automatic repair attempt on first failure.
-                if attempt == 1:
-                    try:
-                        import subprocess
+            kind = classify_session_error(exc)
 
-                        ensure_script = Path(__file__).resolve().parents[2] / "scripts" / "ensure_yandex_driver.ps1"
-                        if ensure_script.exists():
-                            logger.info("Пробуем автоматически обновить YandexDriver...")
-                            subprocess.run(
-                                [
-                                    "powershell",
-                                    "-NoProfile",
-                                    "-ExecutionPolicy",
-                                    "Bypass",
-                                    "-File",
-                                    str(ensure_script),
-                                    "-Force",
-                                ],
-                                check=False,
-                                timeout=180,
-                            )
-                    except Exception as repair_exc:
-                        logger.warning("Автообновление YandexDriver не удалось: %s", repair_exc)
+            if kind == "version":
+                logger.error(
+                    "Несовместимость YandexDriver и Яндекс.Браузера: %s. "
+                    "Обновляем драйвер перед повтором.",
+                    exc,
+                )
+                if driver_repaired:
+                    logger.error(
+                        "YandexDriver всё ещё не совпадает с браузером после обновления. "
+                        "Выполните вручную: powershell -ExecutionPolicy Bypass "
+                        "-File scripts\\ensure_yandex_driver.ps1 -Force"
+                    )
+                    return None
+                driver_repaired = True
+                if ensure_yandex_driver_updated(force=True):
+                    # One repair + one retry only — never burn max_retries=3 on mismatch.
+                    max_retries = min(max_retries, attempt + 1)
+                    continue
+                return None
+
+            if kind == "profile_lock":
+                logger.error(
+                    "Не удалось создать сессию Selenium (профиль занят / DevToolsActivePort / "
+                    "Chrome instance exited). Повторные запуски только откроют пустые окна. "
+                    "Закройте Яндекс.Браузер с профилем '%s' и повторите.",
+                    profile_directory,
+                )
+                # One optional driver ensure (non-force) in case a stale driver
+                # crashed the browser; never open three empty windows.
+                if not driver_repaired:
+                    driver_repaired = True
+                    ensure_yandex_driver_updated(force=False)
+                    if is_yandex_profile_busy(
+                        Path(profile_user_data_dir) if profile_user_data_dir else None
+                    ):
+                        return None
+                    logger.info("Профиль свободен после проверки драйвера — одна повторная попытка")
+                    max_retries = min(max_retries, attempt + 1)
+                    continue
+                return None
         finally:
             if driver is not None:
                 try:
