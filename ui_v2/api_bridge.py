@@ -1930,6 +1930,18 @@ class ApiBridge:
                     runtime.auth_error = "Не удалось получить валидные cookies для Контур.Маркировки."
                     runtime.auth_updated_at = time.time()
                     raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
+                if not cookies_module.validate_kontur_session(cookies):
+                    runtime.auth_state = "browser"
+                    runtime.auth_message = "Сохраненная сессия отклонена Контуром. Собираем новые cookies..."
+                    runtime.auth_error = ""
+                    runtime.auth_updated_at = time.time()
+                    cookies = cookies_module.get_cookies()
+                if not cookies or not cookies_module.validate_kontur_session(cookies):
+                    runtime.auth_state = "error"
+                    runtime.auth_message = "Контур не подтвердил сессию."
+                    runtime.auth_error = "Контур.Маркировка отклонила cookies. Выполните вход в Контур и повторите обновление сессии."
+                    runtime.auth_updated_at = time.time()
+                    raise RuntimeError(runtime.auth_error)
                 runtime.auth_state = "validating"
                 runtime.auth_message = "Проверяем доступ к Контур.Маркировке..."
                 runtime.auth_error = ""
