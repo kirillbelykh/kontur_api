@@ -7,6 +7,8 @@ import {
   Download,
   Home,
   Layers3,
+  Moon,
+  Sun,
   PanelLeftOpen,
   Printer,
   RefreshCw,
@@ -25,6 +27,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import { usePageZoom } from '@/hooks/usePageZoom'
+import { useTheme } from '@/hooks/useTheme'
 
 const DESKTOP_SIDEBAR_OPEN_WIDTH = 256
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = 64
@@ -233,6 +236,7 @@ export function AppLayout() {
   const [sessionLoading, setSessionLoading] = useState(false)
   const { updateAvailable, applying, applyUpdate, remoteShort } = useAppUpdate()
   const { zoom, zoomIn, zoomOut, resetZoom } = usePageZoom()
+  const { isDark, toggleTheme } = useTheme()
 
   const title = useMemo(() => {
     const exact = titles[location.pathname]
@@ -426,6 +430,15 @@ export function AppLayout() {
                   {applying ? 'Обновляем…' : `Обновить${remoteShort ? ` · ${remoteShort}` : ''}`}
                 </Button>
               ) : null}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label={isDark ? 'Светлая тема' : 'Тёмная тема'}
+                title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+              >
+                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
               <Badge tone={sessionTone}>{sessionLabel}</Badge>
               <Button
                 variant="outline"
