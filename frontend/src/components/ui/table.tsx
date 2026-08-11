@@ -23,6 +23,19 @@ type TableColumn = {
   label: string
 }
 
+/**
+ * Row activation runs through React Aria press handling, not DOM click bubbling,
+ * so a checkbox inside a row would fire the control and the row action both.
+ * One press is in flight at a time, so a module-level flag is enough.
+ */
+const ROW_CONTROL_SELECTOR =
+  'input, button, a, label, select, textarea, [role="checkbox"], [role="button"], [data-table-resize-handle]'
+let pressStartedOnControl = false
+
+function notePressTarget(target: EventTarget | null) {
+  pressStartedOnControl = target instanceof Element && Boolean(target.closest(ROW_CONTROL_SELECTOR))
+}
+
 type TablePreferences = {
   hidden: string[]
   widths: Record<string, number>
@@ -233,7 +246,15 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
   }
 
   return (
-    <div className="relative w-full" onMouseDown={handleMouseDown} {...props}>
+    <div
+      className="relative w-full"
+      onMouseDown={handleMouseDown}
+      onPointerDownCapture={(event) => notePressTarget(event.target)}
+      onKeyDownCapture={() => {
+        pressStartedOnControl = false
+      }}
+      {...props}
+    >
       {columns.length > 0 ? (
         <div className="mb-2 flex justify-end print:hidden">
           <div className="relative">
@@ -329,13 +350,15 @@ export function TableRow({ className, children, onClick, id, ...props }: TableRo
       className={className}
       onAction={
         onClick
-          ? () =>
+          ? () => {
+              if (pressStartedOnControl) return
               onClick({
                 target: null,
                 currentTarget: null,
                 preventDefault() {},
                 stopPropagation() {},
               } as never)
+            }
           : undefined
       }
       {...props}

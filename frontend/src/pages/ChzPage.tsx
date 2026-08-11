@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent } from 'react'
 import { Archive, ArchiveRestore, CheckCheck, PlayCircle, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 type ChzItem = {
   order_item_id?: string | number
@@ -78,6 +79,7 @@ function toneForStatus(status?: string) {
 
 function ChzTable({
   rows,
+  ariaLabel,
   selected,
   onToggle,
   onToggleAll,
@@ -85,6 +87,7 @@ function ChzTable({
   timeLabel,
 }: {
   rows: ChzRequest[]
+  ariaLabel: string
   selected: Set<string>
   onToggle: (ref: string) => void
   onToggleAll: (refs: string[], nextSelected: boolean) => void
@@ -94,69 +97,84 @@ function ChzTable({
   const refs = rows.map(refOf).filter(Boolean)
   const allSelected = refs.length > 0 && refs.every((ref) => selected.has(ref))
 
+  /* React Aria отбрасывает onDoubleClick на Row, поэтому ловим двойной клик на обёртке и ищем строку по позиции в tbody. */
+  const openDetailsFromEvent = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null
+    const rowElement = target?.closest('tbody tr')
+    const body = rowElement?.parentElement
+    if (!rowElement || !body) return
+    const row = rows[Array.from(body.children).indexOf(rowElement)]
+    if (row) onOpenDetails(row)
+  }
+
   return (
-    <div className="max-h-[360px] overflow-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="sticky top-0 bg-card text-[11px] uppercase tracking-wide text-muted-foreground">
-          <tr className="border-b border-border">
-            <th className="w-8 px-2 py-2">
+    <div className="max-h-[360px] overflow-auto" onDoubleClick={openDetailsFromEvent}>
+      <Table aria-label={ariaLabel}>
+        <TableHeader>
+          <TableRow>
+            <TableHead>
               <Checkbox
                 isSelected={allSelected}
                 aria-label={allSelected ? 'Снять выделение' : 'Выделить видимые'}
                 onChange={() => onToggleAll(refs, !allSelected)}
               />
-            </th>
-            <th className="px-2 py-2 font-medium">Тип</th>
-            <th className="px-2 py-2 font-medium">Заказ №</th>
-            <th className="px-2 py-2 font-medium">Автор</th>
-            <th className="px-2 py-2 font-medium">Номенклатура</th>
-            <th className="px-2 py-2 font-medium">Размер</th>
-            <th className="px-2 py-2 font-medium">Партия</th>
-            <th className="px-2 py-2 font-medium">Цвет</th>
-            <th className="px-2 py-2 font-medium">Кол-во пар</th>
-            <th className="px-2 py-2 font-medium">Статус</th>
-            <th className="px-2 py-2 font-medium">{timeLabel}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
+            </TableHead>
+            <TableHead>Тип</TableHead>
+            <TableHead>Заказ №</TableHead>
+            <TableHead>Автор</TableHead>
+            <TableHead>Номенклатура</TableHead>
+            <TableHead>Размер</TableHead>
+            <TableHead>Партия</TableHead>
+            <TableHead>Цвет</TableHead>
+            <TableHead>Кол-во пар</TableHead>
+            <TableHead>Статус</TableHead>
+            <TableHead>{timeLabel}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row, index) => {
             const ref = refOf(row)
+            const rowId = ref || `chz-row-${index}`
             const isSelected = selected.has(ref)
             return (
-              <tr
-                key={ref}
-                className={cn(
-                  'cursor-pointer border-b border-border/70 hover:bg-muted/40',
-                  isSelected && 'bg-muted/60',
-                )}
+              <TableRow
+                key={rowId}
+                id={rowId}
+                className={cn(isSelected && 'bg-muted/60')}
                 onClick={() => onToggle(ref)}
-                onDoubleClick={() => onOpenDetails(row)}
                 title="Клик — выбрать, двойной клик — подробнее"
               >
-                <td className="px-2 py-2" onClick={(event) => event.stopPropagation()}>
-                  <Checkbox
-                    isSelected={isSelected}
-                    aria-label={`Выбрать запрос ${row.order_number || row.request_id || ''}`}
-                    onChange={() => onToggle(ref)}
-                  />
-                </td>
-                <td className="px-2 py-2">{row.type_label || '—'}</td>
-                <td className="px-2 py-2 font-medium">{row.order_number || row.order_name || '—'}</td>
-                <td className="px-2 py-2 text-muted-foreground">{row.author || 'WMS'}</td>
-                <td className="px-2 py-2">{row.item_title || '—'}</td>
-                <td className="px-2 py-2 text-muted-foreground">{row.item_size || '—'}</td>
-                <td className="px-2 py-2 text-muted-foreground">{row.batch_number || '—'}</td>
-                <td className="px-2 py-2 text-muted-foreground">{row.item_color || '—'}</td>
-                <td className="px-2 py-2 tabular-nums">{row.pairs_total ?? 0}</td>
-                <td className="px-2 py-2">
+                <TableCell onClick={(event) => event.stopPropagation()}>
+                  {/* Свой span: React Aria не пробрасывает onClick ячейки в DOM, а press строки нужно погасить до всплытия. */}
+                  <span
+                    className="inline-flex"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <Checkbox
+                      isSelected={isSelected}
+                      aria-label={`Выбрать запрос ${row.order_number || row.request_id || ''}`}
+                      onChange={() => onToggle(ref)}
+                    />
+                  </span>
+                </TableCell>
+                <TableCell>{row.type_label || '—'}</TableCell>
+                <TableCell className="font-medium">{row.order_number || row.order_name || '—'}</TableCell>
+                <TableCell className="text-muted-foreground">{row.author || 'WMS'}</TableCell>
+                <TableCell>{row.item_title || '—'}</TableCell>
+                <TableCell className="text-muted-foreground">{row.item_size || '—'}</TableCell>
+                <TableCell className="text-muted-foreground">{row.batch_number || '—'}</TableCell>
+                <TableCell className="text-muted-foreground">{row.item_color || '—'}</TableCell>
+                <TableCell className="tabular-nums">{row.pairs_total ?? 0}</TableCell>
+                <TableCell>
                   <Badge tone={toneForStatus(row.status)}>{row.status_label || row.status || '—'}</Badge>
-                </td>
-                <td className="px-2 py-2 text-xs text-muted-foreground">{row.requested_at_label || '—'}</td>
-              </tr>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{row.requested_at_label || '—'}</TableCell>
+              </TableRow>
             )
           })}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   )
 }
@@ -362,6 +380,7 @@ export function ChzPage() {
             ) : (
               <ChzTable
                 rows={neu}
+                ariaLabel="Новые запросы ЧЗ"
                 selected={selectedNew}
                 onToggle={toggleIn(setSelectedNew)}
                 onToggleAll={toggleAllIn(setSelectedNew)}
@@ -383,6 +402,7 @@ export function ChzPage() {
             ) : (
               <ChzTable
                 rows={work}
+                ariaLabel="Запросы ЧЗ в работе"
                 selected={selectedWork}
                 onToggle={toggleIn(setSelectedWork)}
                 onToggleAll={toggleAllIn(setSelectedWork)}
@@ -405,6 +425,7 @@ export function ChzPage() {
               ) : (
                 <ChzTable
                   rows={archive}
+                  ariaLabel="Архив запросов ЧЗ"
                   selected={selectedArchive}
                   onToggle={toggleIn(setSelectedArchive)}
                   onToggleAll={toggleAllIn(setSelectedArchive)}
