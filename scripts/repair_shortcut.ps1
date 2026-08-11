@@ -69,10 +69,7 @@ function New-KonturShortcut {
         $shortcut.Description = $Description
     }
 
-    $iconPath = Join-Path $projectDir "assets\icons\icon.ico"
-    if (-not (Test-Path $iconPath)) {
-        $iconPath = Join-Path $projectDir "icon.ico"
-    }
+    $iconPath = Join-Path $projectDir "assets\icons\kontur.ico"
     if (Test-Path $iconPath) {
         $shortcut.IconLocation = $iconPath
     }

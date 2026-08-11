@@ -56,7 +56,7 @@ $launchBat = Join-Path $ProjectDir "KonturMarkirovka.bat"
 if (-not (Test-Path -LiteralPath $launchBat)) {
     throw "Launcher not found: $launchBat"
 }
-$icon = Join-Path $ProjectDir "assets\icons\icon.ico"
+$icon = Join-Path $ProjectDir "assets\icons\kontur.ico"
 $shortcutPath = Join-Path $desktop "Контур Маркировка.lnk"
 $wscript = Join-Path $env:WINDIR "System32\wscript.exe"
 $vbs = Join-Path $ProjectDir "run_kontur.vbs"

@@ -20,8 +20,8 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\dist\installer
 OutputBaseFilename=KonturMarkirovka-Setup
-SetupIconFile=..\assets\icons\icon.ico
-UninstallDisplayIcon={app}\assets\icons\icon.ico
+SetupIconFile=..\assets\icons\kontur.ico
+UninstallDisplayIcon={app}\assets\icons\kontur.ico
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -41,8 +41,8 @@ Name: "desktopicon"; Description: "Создать ярлык на рабочем
 Source: "payload\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icons\icon.ico"; WorkingDir: "{app}"; Tasks: desktopicon
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icons\icon.ico"; WorkingDir: "{app}"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icons\kontur.ico"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\icons\kontur.ico"; WorkingDir: "{app}"
 Name: "{group}\Удалить {#MyAppName}"; Filename: "{uninstallexe}"
 
 [Run]

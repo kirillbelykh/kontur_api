@@ -54,7 +54,7 @@ def _resolve_pythonw() -> str:
 
 def _ensure_desktop_shortcut() -> None:
     shortcut_path = Path.home() / "Desktop" / "Контур Маркировка.lnk"
-    icon_path = REPO_ROOT / "assets" / "icons" / "icon.ico"
+    icon_path = REPO_ROOT / "assets" / "icons" / "kontur.ico"
     try:
         import win32com.client  # type: ignore
 

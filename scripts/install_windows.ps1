@@ -621,10 +621,7 @@ function Create-DesktopShortcut {
         $shortcut.Description = $Description
     }
 
-    $iconPath = Join-Path $ProjectDir "assets\icons\icon.ico"
-    if (-not (Test-Path $iconPath)) {
-        $iconPath = Join-Path $ProjectDir "icon.ico"
-    }
+    $iconPath = Join-Path $ProjectDir "assets\icons\kontur.ico"
     if (Test-Path $iconPath) {
         $shortcut.IconLocation = $iconPath
     }

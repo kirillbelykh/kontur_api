@@ -100,7 +100,7 @@ foreach ($required in @(
     "main.py",
     "KonturMarkirovka.bat",
     "run_kontur.vbs",
-    "assets\icons\icon.ico",
+    "assets\icons\kontur.ico",
     "scripts\post_install.ps1",
     "scripts\ensure_yandex_driver.ps1",
     "scripts\install_windows.ps1"

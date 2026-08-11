@@ -140,8 +140,7 @@ class WindowsTrayController:
 
     def _load_icon(self):  # type: ignore[no-untyped-def]
         icon_candidates = [
-            Path(__file__).resolve().parent.parent / "assets" / "icons" / "icon.ico",
-            Path(__file__).resolve().parent.parent / "icon.ico",
+            Path(__file__).resolve().parent.parent / "assets" / "icons" / "kontur.ico",
         ]
 
         for icon_path in icon_candidates:
