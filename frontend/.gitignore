@@ -1,5 +1,5 @@
 node_modules
-dist
+# dist is committed on purpose: the desktop app loads it and updates ship via git pull
 .DS_Store
 *.local
 .vite
