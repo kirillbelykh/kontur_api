@@ -9,6 +9,8 @@ into circulation, TSD tasks, aggregation, BarTender labels, WMS CHZ requests.
 # already installed
 .\.venv\Scripts\python.exe main.py
 # or
+KonturMarkirovka.bat
+# or
 wscript run_kontur.vbs
 ```
 
@@ -39,7 +41,8 @@ See [AGENTS.md](AGENTS.md). Short map:
 | `archive/legacy_ui/` | Old CustomTkinter UI (reserve only) |
 | `archive/ui_v2_static/` | Previous HTML/JS UI (reserve) |
 | `assets/labels/` | BarTender `.btw` templates |
-| `runtime/` | Local cookies, logs, temp (not committed) |
+| `runtime/` | Local cookies, logs, backups, temp (not committed) |
+| `scripts/launchers/` | Extra VBS launchers (CRPT bridge) |
 | `tests/` | Unit tests |
 
 ## Rules

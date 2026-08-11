@@ -40,7 +40,7 @@ if (-not [string]::IsNullOrWhiteSpace($SourceZip) -and (Test-Path -LiteralPath $
     robocopy $SourceDir $TargetDir /E /XD .git .venv node_modules __pycache__ .pytest_cache dist installer .cursor /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
 } elseif (Test-Path (Join-Path $scriptRoot "..\main.py")) {
     $repo = (Resolve-Path (Join-Path $scriptRoot "..")).Path
-    robocopy $repo $TargetDir /E /XD .git .venv node_modules __pycache__ .pytest_cache dist installer .cursor .history_update_backup /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+    robocopy $repo $TargetDir /E /XD .git .venv node_modules __pycache__ .pytest_cache dist installer .cursor runtime\backups /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
 } else {
     throw "Provide -SourceZip or -SourceDir, or run from the repo scripts folder."
 }

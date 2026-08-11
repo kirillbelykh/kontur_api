@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$RepoUrl = "https://github.com/kirillbelykh/kontur_api.git",
     [string]$Branch = "main"
@@ -44,7 +44,7 @@ function Backup-OrderHistory {
         return $null
     }
 
-    $backupDir = Join-Path $ProjectDir ".history_update_backup"
+    $backupDir = Join-Path $ProjectDir "runtime\backups\history"
     New-Item -ItemType Directory -Force -Path $backupDir | Out-Null
     $backupPath = Join-Path $backupDir ("full_orders_history-" + (Get-Date -Format "yyyyMMdd-HHmmss") + ".json")
     Copy-Item -LiteralPath $historyPath -Destination $backupPath -Force
@@ -161,7 +161,9 @@ function Stop-KonturRuntimeProcesses {
 
 $projectDir = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $installScript = Join-Path $projectDir "scripts\install_windows.ps1"
-$logPath = Join-Path $projectDir "kontur_update.log"
+$logDir = Join-Path $projectDir "runtime\logs"
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+$logPath = Join-Path $projectDir "runtime\logs\kontur_update.log"
 $stashCreated = $false
 $stashRestored = $false
 $stashRestoreFailed = $false
@@ -201,13 +203,13 @@ try {
         }
 
         $stashableStatusLines = @($statusLines | Where-Object {
-            $_ -notmatch 'full_orders_history\.json$' -and $_ -notmatch '^(\?\?| M|M |MM|A |AM| D|D |R |RM|C |CM) \.history_update_backup/'
+            $_ -notmatch 'full_orders_history\.json$' -and $_ -notmatch '^(\?\?| M|M |MM|A |AM| D|D |R |RM|C |CM) runtime/backups/'
         })
 
         if ($stashableStatusLines.Count -gt 0) {
             $stashName = "autostash-before-full-update-" + (Get-Date -Format "yyyyMMdd-HHmmss")
             Write-Step "Saving local changes to temporary git stash"
-            Invoke-Git -Arguments @("stash", "push", "-u", "-m", $stashName, "--", ":(exclude)full_orders_history.json", ":(exclude).history_update_backup")
+            Invoke-Git -Arguments @("stash", "push", "-u", "-m", $stashName, "--", ":(exclude)full_orders_history.json", ":(exclude)runtime/backups")
             $stashCreated = $true
         }
 

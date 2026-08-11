@@ -6,28 +6,26 @@ Desktop app for Kontur.Markirovka: orders, code download, introduction into circ
 
 ```
 kontur_api/
-  AGENTS.md                 # this file
-  README.md
-  pyproject.toml            # Python deps (uv)
-  .env.example
+  AGENTS.md / README.md / pyproject.toml / uv.lock / requirements.txt
+  .env.example / .gitignore / mypy.ini / .flake8
   main.py                   # thin desktop launcher → backend.app.desktop
-  backend/                  # all Python business logic
-    auth/                   # cookies, Selenium, prolongation
-    kontur/                 # HTTP API, CryptoPro, WinHTTP
-    services/               # history, aggregation, labels, queue, utils
-    app/                    # ApiBridge, PyWebView entry, CHZ bridge
+  cookies.py                # thin shim → backend.auth (legacy imports)
+  KonturMarkirovka.bat      # primary Windows launcher
+  run_kontur.vbs            # silent launcher (desktop shortcuts)
+  run_crpt_server.vbs       # thin stub → scripts/launchers/
+  setup.bat / Build-Installer.bat / update.bat  # thin entrypoints → scripts/
+  full_orders_history.json  # order history DB (path expected by history_db)
+  backend/                  # Python business logic (auth, kontur, services, app)
   frontend/                 # React + Vite + TypeScript + Tailwind
-  archive/
-    legacy_ui/              # CustomTkinter main (read-only reserve)
-  assets/
-    labels/                 # BarTender .btw templates
-    icons/
+  archive/                  # legacy_ui, ui_v2_static, local_junk
+  assets/                   # labels/, icons/
   data/                     # xlsx reference data
   driver/                   # yandexdriver.exe
-  runtime/                  # local cookies, logs, tmp (not committed)
-  scripts/                  # Windows install / update
-  tests/
-  docs/
+  runtime/                  # cookies, logs/, backups/, tmp (not committed)
+  scripts/                  # install / update / launchers/
+    launchers/              # run_crpt_server.vbs, run_kontur_v2.vbs
+  installer/                # Inno / payload staging
+  tests/ / docs/
 ```
 
 ## How to run (local)

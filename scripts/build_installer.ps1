@@ -52,7 +52,7 @@ New-Item -ItemType Directory -Force -Path $payloadDir | Out-Null
 
 $excludeDirNames = @(
     ".git", ".venv", ".pytest_cache", "__pycache__", "node_modules",
-    ".history_update_backup", "dist", "installer", ".cursor", "runtime"
+    "runtime/backups", "dist", "installer", ".cursor", "runtime"
 )
 $excludeFileGlobs = @("*.pyc", "*.log", ".DS_Store", "uv.lock.bak")
 
@@ -68,7 +68,7 @@ function Should-SkipPath([string]$FullPath, [string]$Root) {
         if ($parts[-1] -like $glob) { return $true }
     }
     # Keep frontend/dist, skip huge history backups
-    if ($rel -like ".history_update_backup*") { return $true }
+    if ($rel -like "runtime/backups*") { return $true }
     return $false
 }
 

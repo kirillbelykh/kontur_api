@@ -700,7 +700,7 @@ Create-DesktopShortcut `
     -Description "Kontur Markirovka"
 
 if (-not $singleShortcut) {
-    Ensure-StartupShortcut -ProjectDir $projectDir -ShortcutName "CRPT server" -LauncherFile "run_crpt_server.vbs" -Description "Kontur API background bridge"
+    Ensure-StartupShortcut -ProjectDir $projectDir -ShortcutName "CRPT server" -LauncherFile "scripts\launchers\run_crpt_server.vbs" -Description "Kontur API background bridge"
 }
 
 Write-Host ""

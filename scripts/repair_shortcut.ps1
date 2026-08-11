@@ -106,10 +106,11 @@ function Remove-KonturShortcut {
     }
 }
 
-New-KonturShortcut -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
-New-KonturShortcut -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
-New-KonturShortcut -ShortcutName "KonturMobile" -LauncherFile "run_kontur_mobile.vbs" -Description "Kontur API mobile UI"
-New-KonturShortcut -ShortcutName "CRPT server" -LauncherFile "run_crpt_server.vbs" -Description "Kontur API background bridge"
-New-KonturStartupShortcut -ShortcutName "CRPT server" -LauncherFile "run_crpt_server.vbs" -Description "Kontur API background bridge"
+# Single primary app shortcut + optional CRPT bridge + update helper
+Remove-KonturShortcut -ShortcutName "KonturTestAPI"
+Remove-KonturShortcut -ShortcutName "KonturMobile"
 Remove-KonturShortcut -ShortcutName "KonturAccessProlongation"
-New-KonturShortcut -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LUuYmF0") -Description "Kontur API full update and rebuild"
+New-KonturShortcut -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur Markirovka"
+New-KonturShortcut -ShortcutName "CRPT server" -LauncherFile "scripts\launchers\run_crpt_server.vbs" -Description "Kontur API background bridge"
+New-KonturStartupShortcut -ShortcutName "CRPT server" -LauncherFile "scripts\launchers\run_crpt_server.vbs" -Description "Kontur API background bridge"
+New-KonturShortcut -ShortcutName (ConvertFrom-Utf8Base64 "0J7QsdC90L7QstC70LXQvdC40LU=") -LauncherFile "update.bat" -Description "Kontur API full update and rebuild"
