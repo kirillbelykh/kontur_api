@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes } from 'react'
-import { RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
+import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { cn, getErrorMessage } from '@/lib/utils'
@@ -136,6 +136,7 @@ export function OrdersPage() {
   const [showDeleted, setShowDeleted] = useState(false)
   const [details, setDetails] = useState<OrderDetailsPayload | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [historyFullscreen, setHistoryFullscreen] = useState(false)
 
   const setField = <K extends keyof OrderForm>(key: K, value: OrderForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -356,6 +357,40 @@ export function OrdersPage() {
     })
 
   const isBusy = Boolean(busy)
+
+  const renderHistoryTable = (limit: number) => (
+    <Table aria-label="История заказов">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Заявка</TableHead>
+          <TableHead>Статус</TableHead>
+          <TableHead>GTIN</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {filteredHistory.slice(0, limit).map((item, index) => {
+          const rowId = item.document_id || `${rowTitle(item)}-${index}`
+          return (
+            <TableRow
+              key={rowId}
+              id={rowId}
+              className={cn(item.document_id === selectedHistoryId && 'bg-muted/60')}
+              onClick={() => setSelectedHistoryId(item.document_id || '')}
+            >
+              <TableCell>
+                <div className="font-medium">{rowTitle(item)}</div>
+                <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
+              </TableCell>
+              <TableCell>
+                <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
+              </TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
+  )
 
   return (
     <div className="page-shell">
@@ -679,6 +714,15 @@ export function OrdersPage() {
               <Button size="sm" variant="ghost" onClick={() => setShowDeleted((v) => !v)}>
                 {showDeleted ? 'Скрыть удалённые' : 'Удалённые'}
               </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setHistoryFullscreen(true)}
+                aria-label="Развернуть таблицу"
+                title="Развернуть таблицу"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -690,39 +734,7 @@ export function OrdersPage() {
             {filteredHistory.length === 0 ? (
               <EmptyState>История пуста</EmptyState>
             ) : (
-              <div className="max-h-[320px] overflow-auto">
-                <Table aria-label="История заказов">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Заявка</TableHead>
-                      <TableHead>Статус</TableHead>
-                      <TableHead>GTIN</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredHistory.slice(0, 100).map((item, index) => {
-                      const rowId = item.document_id || `${rowTitle(item)}-${index}`
-                      return (
-                        <TableRow
-                          key={rowId}
-                          id={rowId}
-                          className={cn(item.document_id === selectedHistoryId && 'bg-muted/60')}
-                          onClick={() => setSelectedHistoryId(item.document_id || '')}
-                        >
-                          <TableCell>
-                            <div className="font-medium">{rowTitle(item)}</div>
-                            <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+              <div className="max-h-[320px] overflow-auto">{renderHistoryTable(100)}</div>
             )}
           </CardContent>
         </Card>
@@ -779,6 +791,16 @@ export function OrdersPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      <Dialog open={historyFullscreen} onOpenChange={setHistoryFullscreen}>
+        <DialogContent className="max-w-[96vw]">
+          <DialogHeader>
+            <DialogTitle>История заказов</DialogTitle>
+            <p className="text-xs text-muted-foreground">Escape — закрыть. Показаны первые 500 записей.</p>
+          </DialogHeader>
+          <div className="max-h-[78vh] overflow-auto">{renderHistoryTable(500)}</div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-2xl">
