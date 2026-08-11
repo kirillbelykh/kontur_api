@@ -1,0 +1,207 @@
+"""Certificate thumbprint helpers (Windows CryptoPro/CAdES)."""
+
+from __future__ import annotations
+
+import time
+from typing import Any, Optional
+
+# Константы
+CAPICOM_CURRENT_USER_STORE = 2
+CAPICOM_MY_STORE = "My"
+CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED = 2
+
+
+def _require_windows_com() -> tuple[Any, Any]:
+    try:
+        import pythoncom
+        import win32com.client
+    except ImportError as exc:
+        raise RuntimeError(
+            "Поиск сертификатов требует Windows и pywin32."
+        ) from exc
+    return pythoncom, win32com.client
+
+
+def _is_cert_usable(cert) -> bool:
+    """Проверка сертификата на пригодность для подписи."""
+    try:
+        thumbprint = getattr(cert, "Thumbprint", None)
+        if not thumbprint:
+            return False
+
+        valid_to = getattr(cert, "ValidToDate", None)
+        if valid_to is not None and hasattr(valid_to, "timestamp"):
+            if valid_to.timestamp() <= time.time():
+                return False
+
+        has_private_key = getattr(cert, "HasPrivateKey", True)
+        return bool(has_private_key)
+    except Exception:
+        return False
+
+
+def find_certificate_thumbprint() -> Optional[str]:
+    """
+    Находит и возвращает thumbprint первого действительного сертификата в хранилище.
+    Возвращает None, если сертификаты не найдены.
+    """
+    try:
+        pythoncom, win32com_client = _require_windows_com()
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        return None
+
+    pythoncom.CoInitialize()
+
+    try:
+        store = win32com_client.Dispatch("CAdESCOM.Store")
+        store.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+
+        thumbprint = None
+
+        for cert in store.Certificates:
+            try:
+                current_thumbprint = getattr(cert, "Thumbprint", None)
+                if current_thumbprint and _is_cert_usable(cert):
+                    thumbprint = current_thumbprint.lower()
+                    print(f"✅ Найден сертификат: {thumbprint}")
+                    break
+            except Exception as e:
+                print(f"⚠️ Ошибка при чтении сертификата: {e}")
+                continue
+
+        store.Close()
+
+        if not thumbprint:
+            print("❌ Сертификаты не найдены в хранилище")
+
+        return thumbprint
+
+    except Exception as e:
+        print(f"❌ Ошибка доступа к хранилищу сертификатов: {e}")
+        return None
+    finally:
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
+
+
+def find_certificate_thumbprint_detailed() -> Optional[str]:
+    """
+    Находит thumbprint сертификата с подробной информацией о найденном сертификате.
+    """
+    try:
+        pythoncom, win32com_client = _require_windows_com()
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        return None
+
+    pythoncom.CoInitialize()
+
+    try:
+        store = win32com_client.Dispatch("CAdESCOM.Store")
+        store.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+
+        certificate_count = 0
+        thumbprint = None
+        certificate_info = {}
+
+        for cert in store.Certificates:
+            certificate_count += 1
+            try:
+                current_thumbprint = getattr(cert, "Thumbprint", None)
+                subject = getattr(cert, "SubjectName", "Неизвестно")
+                issuer = getattr(cert, "IssuerName", "Неизвестно")
+                valid_to = getattr(cert, "ValidToDate", None)
+
+                if current_thumbprint and _is_cert_usable(cert):
+                    if not thumbprint:
+                        thumbprint = current_thumbprint
+                        certificate_info = {
+                            "thumbprint": current_thumbprint.lower(),
+                            "subject": subject,
+                            "issuer": issuer,
+                            "valid_to": valid_to,
+                        }
+
+                    print(f"Сертификат {certificate_count}:")
+                    print(f"  Владелец: {subject}")
+                    print(f"  Thumbprint: {current_thumbprint.lower()}")
+
+            except Exception as e:
+                print(f"  Ошибка чтения сертификата {certificate_count}: {e}")
+                continue
+
+        store.Close()
+
+        print("\n📊 ИТОГИ ПОИСКА:")
+        print(f"   Всего сертификатов: {certificate_count}")
+
+        if thumbprint:
+            print("✅ ИСПОЛЬЗУЕМ СЕРТИФИКАТ:")
+            print(f"   Thumbprint: {certificate_info['thumbprint']}")
+            print(f"   Владелец: {certificate_info['subject']}")
+            print(f"   Издатель: {certificate_info['issuer']}")
+            print(f"   Действует до: {certificate_info['valid_to']}")
+        else:
+            print("❌ Действительных сертификатов не найдено")
+
+        return thumbprint
+
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
+        return None
+    finally:
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
+
+
+def get_thumbprint() -> Optional[str]:
+    """
+    Простая функция для получения thumbprint.
+    Используется в основном проекте.
+    """
+    try:
+        pythoncom, win32com_client = _require_windows_com()
+        pythoncom.CoInitialize()
+        store = win32com_client.Dispatch("CAdESCOM.Store")
+        store.Open(CAPICOM_CURRENT_USER_STORE, CAPICOM_MY_STORE, CAPICOM_STORE_OPEN_MAXIMUM_ALLOWED)
+
+        for cert in store.Certificates:
+            thumbprint = getattr(cert, "Thumbprint", None)
+            if thumbprint and _is_cert_usable(cert):
+                store.Close()
+                pythoncom.CoUninitialize()
+                return thumbprint.lower()
+
+        store.Close()
+        return None
+
+    except Exception:
+        return None
+    finally:
+        try:
+            pythoncom.CoUninitialize()
+        except Exception:
+            pass
+
+
+if __name__ == "__main__":
+    print("=== ПРОСТОЙ ПОИСК ===")
+    thumbprint = find_certificate_thumbprint()
+    print(f"Результат: {thumbprint.lower() if thumbprint else 'not found'}")
+
+    print("\n" + "=" * 50 + "\n")
+
+    print("=== ДЕТАЛЬНЫЙ ПОИСК ===")
+    thumbprint_detailed = find_certificate_thumbprint_detailed()
+    print(f"Итоговый thumbprint: {thumbprint_detailed.lower() if thumbprint_detailed else 'not found'}")
+
+    print("\n" + "=" * 50 + "\n")
+
+    print("=== ДЛЯ ИСПОЛЬЗОВАНИЯ В ПРОЕКТЕ ===")
+    thumb = get_thumbprint()
+    print(f"Thumbprint для .env: {thumb.lower() if thumb else 'not found'}")

@@ -33,3 +33,6 @@ orders_history.json
 
 # Ignore editor and AI assistant local rules.
 .github/instructions/codacy.instructions.md
+
+/dist/
+

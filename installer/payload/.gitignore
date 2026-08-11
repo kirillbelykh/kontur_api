@@ -1,0 +1,35 @@
+.env
+.DS_Store
+/venv
+/.venv
+__pycache__
+*.pyc
+*.log
+*.log.*
+*.tmp
+*.bak
+*.old
+*.pid
+tmp_*
+bundle-legacy.*.js
+index.*.js
+polyfills.*.js
+Yandex.exe
+kontur_cookies.json
+kontur_access_prolongation.json
+last_snapshot.json
+История заказов.txt
+lookup.log
+/driver
+driver/
+yandexdriver.exe
+orders_history.json
+.history_sync_cache/
+/runtime/
+/Удаленные/
+
+# Frontend
+/frontend/node_modules/
+
+# Ignore editor and AI assistant local rules.
+.github/instructions/codacy.instructions.md
