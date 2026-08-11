@@ -228,6 +228,7 @@ def get_cookies(
         profile_directory,
     )
 
+    version_mismatch_hint_logged = False
     for attempt in range(1, max_retries + 1):
         logger.info("Попытка получения cookies #%s", attempt)
         driver = None
@@ -280,8 +281,43 @@ def get_cookies(
             if save_cookies_to_file(cookies):
                 logger.info("Успешно получили и сохранили валидные cookies")
                 return dict(cookies)
-        except Exception:
+        except Exception as exc:
             logger.exception("get_cookies failed on attempt %s", attempt)
+            message = str(exc).lower()
+            if (not version_mismatch_hint_logged) and (
+                "supports chrome version" in message
+                or "devtoolsactiveport" in message
+                or "session not created" in message
+            ):
+                version_mismatch_hint_logged = True
+                logger.error(
+                    "YandexDriver не совместим с текущим Яндекс.Браузером или профиль занят. "
+                    "Закройте браузер и выполните: "
+                    "powershell -ExecutionPolicy Bypass -File scripts\\ensure_yandex_driver.ps1"
+                )
+                # One automatic repair attempt on first failure.
+                if attempt == 1:
+                    try:
+                        import subprocess
+
+                        ensure_script = Path(__file__).resolve().parents[2] / "scripts" / "ensure_yandex_driver.ps1"
+                        if ensure_script.exists():
+                            logger.info("Пробуем автоматически обновить YandexDriver...")
+                            subprocess.run(
+                                [
+                                    "powershell",
+                                    "-NoProfile",
+                                    "-ExecutionPolicy",
+                                    "Bypass",
+                                    "-File",
+                                    str(ensure_script),
+                                    "-Force",
+                                ],
+                                check=False,
+                                timeout=180,
+                            )
+                    except Exception as repair_exc:
+                        logger.warning("Автообновление YandexDriver не удалось: %s", repair_exc)
         finally:
             if driver is not None:
                 try:

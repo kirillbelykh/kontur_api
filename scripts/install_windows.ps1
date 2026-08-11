@@ -347,19 +347,41 @@ function Extract-VersionParts {
 function Get-YandexBrowserVersion {
     param([Parameter(Mandatory = $true)][string]$BrowserPath)
 
-    $version = (Get-Item $BrowserPath).VersionInfo.ProductVersion
-    if ([string]::IsNullOrWhiteSpace($version)) {
+    $appDir = Split-Path -Parent $BrowserPath
+    $folderVersion = Get-ChildItem -LiteralPath $appDir -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\d+\.\d+' } |
+        Sort-Object {
+            $p = Extract-VersionParts $_.Name
+            "{0:D4}{1:D4}{2:D4}{3:D4}" -f $p[0], $p[1], $p[2], $p[3]
+        } -Descending |
+        Select-Object -First 1 -ExpandProperty Name
+
+    $productVersion = $null
+    try {
+        $productVersion = (Get-Item -LiteralPath $BrowserPath).VersionInfo.ProductVersion
+    } catch {
+    }
+
+    foreach ($candidate in @($folderVersion, $productVersion)) {
+        $parts = Extract-VersionParts -Text $candidate
+        # Yandex marketing versions are 20-40.x; Chromium majors are ~100+.
+        if ($parts.Count -gt 0 -and $parts[0] -ge 20 -and $parts[0] -le 40) {
+            return ($parts -join '.')
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($productVersion)) {
         try {
             $output = & $BrowserPath --version 2>$null
-            $match = [regex]::Match($output, "\d+(?:\.\d+){1,3}")
+            $match = [regex]::Match("$output", "\d+(?:\.\d+){1,3}")
             if ($match.Success) {
-                $version = $match.Value
+                $productVersion = $match.Value
             }
         } catch {
         }
     }
 
-    $parts = Extract-VersionParts -Text $version
+    $parts = Extract-VersionParts -Text $productVersion
     if ($parts.Count -eq 0) {
         throw "Unable to detect Yandex Browser version from $BrowserPath"
     }
@@ -436,43 +458,24 @@ function Get-YandexDriverSelection {
 function Install-YandexDriver {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectDir,
-        [Parameter(Mandatory = $true)][string]$BrowserVersion
+        [Parameter(Mandatory = $true)][string]$BrowserVersion,
+        [Parameter()][string]$BrowserPath = "",
+        [switch]$Force
     )
 
-    $selection = Get-YandexDriverSelection -BrowserVersion $BrowserVersion
-    Write-Step "Selected YandexDriver release $($selection.ReleaseTag) asset $($selection.AssetName)"
+    # BrowserVersion kept for call-site compatibility; ensure script re-detects from BrowserPath.
+    $ensureScript = Join-Path $PSScriptRoot "ensure_yandex_driver.ps1"
+    if (-not (Test-Path -LiteralPath $ensureScript)) {
+        throw "Missing driver ensure script: $ensureScript"
+    }
 
-    $driverDir = Join-Path $ProjectDir "driver"
-    New-Item -ItemType Directory -Path $driverDir -Force | Out-Null
-
-    $tmpRoot = Join-Path $env:TEMP ("konturapi-yandexdriver-" + [Guid]::NewGuid().ToString("N"))
-    New-Item -ItemType Directory -Path $tmpRoot -Force | Out-Null
-
-    try {
-        $zipPath = Join-Path $tmpRoot $selection.AssetName
-        Invoke-WebRequest -Uri $selection.DownloadUrl -OutFile $zipPath -Headers @{ "User-Agent" = "KonturAPI-Installer" }
-
-        Expand-Archive -Path $zipPath -DestinationPath $tmpRoot -Force
-        $driverExe = Get-ChildItem -Path $tmpRoot -Recurse -Filter "yandexdriver.exe" | Select-Object -First 1
-        if (-not $driverExe) {
-            throw "yandexdriver.exe was not found in the downloaded archive."
-        }
-
-        $targetExe = Join-Path $driverDir "yandexdriver.exe"
-        if (Test-Path $targetExe) {
-            try {
-                $lockProbe = [System.IO.File]::Open($targetExe, "Open", "ReadWrite", "None")
-                $lockProbe.Close()
-            } catch {
-                Write-WarnMsg "Existing YandexDriver is currently in use. Keeping current file: $targetExe"
-                return
-            }
-        }
-
-        Copy-Item -Path $driverExe.FullName -Destination $targetExe -Force
-        Write-Ok "YandexDriver installed: $targetExe"
-    } finally {
-        Remove-Item -Path $tmpRoot -Recurse -Force -ErrorAction SilentlyContinue
+    if ([string]::IsNullOrWhiteSpace($BrowserPath)) {
+        & $ensureScript -ProjectDir $ProjectDir -Force:$Force
+    } else {
+        & $ensureScript -ProjectDir $ProjectDir -BrowserPath $BrowserPath -Force:$Force
+    }
+    if ($LASTEXITCODE -ne 0) {
+        throw "YandexDriver ensure failed with exit code $LASTEXITCODE."
     }
 }
 
@@ -681,7 +684,7 @@ $browserPath = Ensure-YandexBrowser -ProjectDir $projectDir
 $browserVersion = Get-YandexBrowserVersion -BrowserPath $browserPath
 Write-Ok "Yandex Browser version: $browserVersion"
 
-Install-YandexDriver -ProjectDir $projectDir -BrowserVersion $browserVersion
+Install-YandexDriver -ProjectDir $projectDir -BrowserVersion $browserVersion -BrowserPath $browserPath
 Test-BarTenderInstallation
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturAPI" -LauncherFile "run_kontur.vbs" -Description "Kontur API classic UI"
 Create-DesktopShortcut -ProjectDir $projectDir -ShortcutName "KonturTestAPI" -LauncherFile "run_kontur_v2.vbs" -Description "Kontur API v2 UI"
