@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
-import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
+import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -39,6 +39,45 @@ type IntroResult = {
   errors?: Array<{ document_id?: string; error?: string }>
   state?: IntroState
 }
+
+/** Строка заявки — memo: выбор строки не перерисовывает остальные строки. */
+const IntroRow = memo(function IntroRow({
+  item,
+  rowId,
+  checked,
+  onToggle,
+}: {
+  item: IntroItem
+  rowId: string
+  checked: boolean
+  onToggle: (documentId: string) => void
+}) {
+  const documentId = item.document_id || ''
+  return (
+    <TableRow
+      id={rowId}
+      className={cn(checked && 'row-selected')}
+      onClick={() => onToggle(documentId)}
+    >
+      <TableCell>
+        <Checkbox
+          isSelected={checked}
+          aria-label={`Выбрать заказ ${item.order_name || documentId}`}
+          onChange={() => onToggle(documentId)}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="font-medium">{item.order_name || item.document_id || 'Без названия'}</div>
+        <div className="font-mono text-xs text-muted-foreground">{item.document_id || '—'}</div>
+      </TableCell>
+      <TableCell className="text-muted-foreground">{item.full_name || item.simpl || '—'}</TableCell>
+      <TableCell>
+        <StatusBadge status={item.status} />
+      </TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+    </TableRow>
+  )
+})
 
 export function IntroPage() {
   const [loading, setLoading] = useState(false)
@@ -104,12 +143,12 @@ export function IntroPage() {
     })
   }, [items, search, statusFilter])
 
-  const toggleId = (documentId: string) => {
+  const toggleId = useCallback((documentId: string) => {
     if (!documentId) return
     setSelectedIds((prev) =>
       prev.includes(documentId) ? prev.filter((id) => id !== documentId) : [...prev, documentId],
     )
-  }
+  }, [])
 
   const runBusy = async (key: string, action: () => Promise<void>, successMessage: string) => {
     setBusy(key)
@@ -177,14 +216,16 @@ export function IntroPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        <StatPill label="Документов" value={items.length} />
-        <StatPill label="Показано" value={filteredItems.length} />
-        <StatPill label="Выбрано" value={selectedIds.length} />
-      </div>
+      <StatRow
+        items={[
+          { label: 'Документов', value: items.length },
+          { label: 'Показано', value: filteredItems.length },
+          { label: 'Выбрано', value: selectedIds.length },
+        ]}
+      />
 
-      <div className="grid items-stretch gap-4 xl:grid-cols-[minmax(260px,0.55fr)_minmax(0,1.45fr)]">
-        <Card className="min-h-[560px]">
+      <div className="grid items-start gap-3 xl:grid-cols-[minmax(260px,0.55fr)_minmax(0,1.45fr)]">
+        <Card>
           <CardHeader>
             <CardTitle>Параметры ввода в оборот</CardTitle>
           </CardHeader>
@@ -216,14 +257,18 @@ export function IntroPage() {
           </CardContent>
         </Card>
 
-        <Card className="min-h-[560px]">
+        <Card>
           <CardHeader>
             <CardTitle>Готовые заявки</CardTitle>
             <CardDescription>Отметьте заказы чекбоксами — ввод выполняется для всех выбранных.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
             <div className="grid gap-2 sm:grid-cols-2">
-              <SelectNative value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <SelectNative
+                value={statusFilter}
+                aria-label="Фильтр по статусу"
+                onChange={(event) => setStatusFilter(event.target.value)}
+              >
                 <option value="">Все статусы</option>
                 {statusOptions.map((value) => (
                   <option key={value} value={value}>
@@ -254,31 +299,14 @@ export function IntroPage() {
                     {pager.pageRows.map((item, index) => {
                       const documentId = item.document_id || ''
                       const rowId = documentId || `${item.order_name}-${index}`
-                      const checked = Boolean(documentId) && selectedIds.includes(documentId)
                       return (
-                        <TableRow
+                        <IntroRow
                           key={rowId}
-                          id={rowId}
-                          className={cn(checked && 'bg-muted/60')}
-                          onClick={() => toggleId(documentId)}
-                        >
-                          <TableCell>
-                            <Checkbox
-                              isSelected={checked}
-                              aria-label={`Выбрать заказ ${item.order_name || documentId}`}
-                              onChange={() => toggleId(documentId)}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{item.order_name || item.document_id || 'Без названия'}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{item.full_name || item.simpl || '—'}</TableCell>
-                          <TableCell>
-                            <StatusBadge status={item.status} />
-                          </TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
-                        </TableRow>
+                          rowId={rowId}
+                          item={item}
+                          checked={Boolean(documentId) && selectedIds.includes(documentId)}
+                          onToggle={toggleId}
+                        />
                       )
                     })}
                   </TableBody>

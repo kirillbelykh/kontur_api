@@ -32,6 +32,9 @@
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Единый набор токенов приложения: цвета, радиусы, размеры контролов.
+   ───────────────────────────────────────────────────────────────────────── */
 :root {
   /* transitions.dev: нейтральные серые без синего подтона, светлый воздушный фон */
   --wms-background: 240 9% 97%;
@@ -44,6 +47,26 @@
   --wms-border-thin: 240 6% 80%;
   --wms-ring: 240 4% 42%;
 
+  /* Радиусы: контролы 6px, панели 8px. Пилюли (9999px) — только круглые
+     иконко-кнопки и точки статусов. HeroUI-шкала --radius-* сведена к той же
+     двухступенчатой сетке, чтобы все rounded-* следовали одному масштабу. */
+  --radius-control: 0.375rem; /* 6px: кнопки, инпуты, селекты */
+  --radius-panel: 0.5rem; /* 8px: карточки, диалоги, панели */
+  --radius: 0.5rem;
+  --field-radius: var(--radius-control);
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-panel);
+  --radius-xl: var(--radius-panel);
+  --radius-2xl: var(--radius-panel);
+  --radius-3xl: var(--radius-panel);
+  --radius-4xl: var(--radius-panel);
+
+  /* Размеры контролов: поля/кнопки md — 36px, компактные кнопки — 32px */
+  --control-height: 2.25rem;
+  --control-height-sm: 2rem;
+
   --border-width-default: 1px;
   --border-width-hover: 1px;
   --border-width-focus: 1px;
@@ -52,7 +75,7 @@
   --wms-ring-offset-width: 1px;
 
   /* HeroUI fields share the border tokens so inputs and selects look identical.
-     Скрин 3: мягкая почти незаметная граница + светло-серый фон, без жирного контура. */
+     Мягкая почти незаметная граница + белый фон, без жирного контура. */
   --field-border-width: 1px;
   --field-border: hsl(240 6% 88%);
   --field-border-hover: hsl(240 5% 77%);
@@ -71,19 +94,61 @@
   --modal-scale: 0.97;
   --modal-blur: 2px;
 
-  /* MagicCard (modal mouse-follow glow) — нейтральные, без purple */
-  --magic-spotlight: #d9d9d955;
-  --magic-gradient-from: #94a3b8;
-  --magic-gradient-to: #e2e8f0;
-  
+  /* Shimmer text (загрузка/ожидание) */
+  --shimmer-dur: 2000ms;
+  --shimmer-base: hsl(var(--wms-muted-foreground));
+  --shimmer-highlight: hsl(var(--wms-foreground));
+  --shimmer-band: 400%;
+  --shimmer-ease: linear;
+
+  /* Success check (после создания заказа) */
+  --check-opacity-dur: 500ms;
+  --check-rotate-dur: 500ms;
+  --check-rotate-from: 80deg;
+  --check-bob-dur: 500ms;
+  --check-y-amount: 40px;
+  --check-blur-dur: 500ms;
+  --check-blur-from: 10px;
+  --check-path-dur: 500ms;
+  --check-path-delay: 80ms;
+  --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Error state shake (обязательные поля) */
+  --shake-distance: 6px;
+  --shake-overshoot: 4px;
+  --shake-dur-a: 80ms;
+  --shake-dur-b: 60ms;
+  --shake-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --revert-hold: 3000ms;
+  --revert-dur: 280ms;
+  --field-error-border: #f43f5e;
+
   color-scheme: light;
-  /* ... */
 }
 
-@keyframes modal-overlay-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+.dark {
+  --wms-background: 240 6% 10%;
+  --wms-foreground: 240 6% 88%;
+  --wms-card: 240 5% 13%;
+  --wms-card-foreground: 240 6% 88%;
+  --wms-muted: 240 5% 18%;
+  --wms-muted-foreground: 240 5% 63%;
+  --wms-border: 240 4% 32%;
+  --wms-border-thin: 240 4% 28%;
+  --wms-ring: 240 5% 68%;
+  --field-border: hsl(240 4% 30%);
+  --field-border-hover: hsl(240 4% 42%);
+  --field-border-focus: hsl(240 4% 55%);
+  --field-bg: hsl(240 5% 16%);
+  --field-ring: hsl(240 5% 65% / 0.3);
+  color-scheme: dark;
 }
+
+/* ─── Появление/уход строк таблиц ─── */
 
 /* Заказ «прилетает» в таблицу История после создания */
 @keyframes order-arrive {
@@ -122,15 +187,7 @@
   opacity: 0.25;
 }
 
-/* ── Transitions.dev — Shimmer text (загрузка/ожидание, как в marzban-custom) ── */
-:root {
-  --shimmer-dur: 2000ms;
-  --shimmer-base: hsl(var(--wms-muted-foreground));
-  --shimmer-highlight: hsl(var(--wms-foreground));
-  --shimmer-band: 400%;
-  --shimmer-ease: linear;
-}
-
+/* ─── Transitions.dev — Shimmer text ─── */
 .t-shimmer {
   position: relative;
   display: inline-block;
@@ -165,24 +222,7 @@
   .t-shimmer::before { animation: none !important; }
 }
 
-/* ── Transitions.dev — Success check (после создания заказа) ── */
-:root {
-  --check-opacity-dur: 500ms;
-  --check-rotate-dur: 500ms;
-  --check-rotate-from: 80deg;
-  --check-bob-dur: 500ms;
-  --check-y-amount: 40px;
-  --check-blur-dur: 500ms;
-  --check-blur-from: 10px;
-  --check-path-dur: 500ms;
-  --check-path-delay: 80ms;
-  --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
-  --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
+/* ─── Transitions.dev — Success check ─── */
 .t-success-check {
   display: inline-block;
   transform-origin: center;
@@ -223,25 +263,16 @@
   .t-success-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }
 }
 
-/* ── Transitions.dev — Error state shake (обязательные поля) ── */
-:root {
-  --shake-distance: 6px;
-  --shake-overshoot: 4px;
-  --shake-dur-a: 80ms;
-  --shake-dur-b: 60ms;
-  --shake-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --revert-dur: 280ms;
-}
-
+/* ─── Transitions.dev — Error state shake ─── */
 .t-input {
   transition: border-color 150ms ease-out;
-  will-change: transform;
 }
 .t-input.is-error {
   border-color: var(--color-error) !important;
   transition: border-color var(--revert-dur, 280ms) ease-out;
 }
 .t-input.is-shaking {
+  will-change: transform;
   animation: t-input-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2) linear;
 }
 @keyframes t-input-shake {
@@ -251,11 +282,45 @@
   78.57%  { transform: translateX(var(--shake-overshoot));           animation-timing-function: var(--shake-ease); }
   100%    { transform: translateX(0); }
 }
+
+/* HeroUI / native bordered controls inside the shake wrapper */
+.t-input.is-error :is(
+  [data-slot="input"],
+  [data-slot="textarea"],
+  [data-slot="select-trigger"],
+  [data-slot="date-input-group"],
+  [data-slot="search-field"] .input,
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select
+) {
+  border-color: var(--field-error-border) !important;
+  transition: border-color 150ms ease-out;
+}
+
+.t-error-msg {
+  margin: 0;
+  min-height: 0;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--revert-dur, 280ms) ease-out,
+    visibility 0s linear var(--revert-dur, 280ms);
+}
+
+.t-input-wrap.is-error .t-error-msg {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity var(--revert-dur, 280ms) ease-out,
+    visibility 0s linear 0s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .t-input { animation: none !important; transform: none !important; }
 }
 
-/* Тосты в стиле AnimatedList (MagicUI): spring scale-in сверху, scale-out при уходе */
+/* ─── Тосты в стиле AnimatedList: spring scale-in сверху, scale-out при уходе ─── */
 @keyframes toast-spring-in {
   0%   { opacity: 0; transform: scale(0); }
   55%  { opacity: 1; transform: scale(1.04); }
@@ -272,6 +337,12 @@
 [data-sonner-toast][data-removed="true"] {
   animation: toast-spring-out 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toast][data-mounted="true"],
+  [data-sonner-toast][data-removed="true"] {
+    animation: none !important;
+  }
+}
 
 /* Карточка уведомления: иконка в цветной плашке + крестик справа по центру */
 .kontur-toast-icon {
@@ -281,7 +352,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-panel);
   background: hsl(var(--wms-muted));
 }
 .kontur-toast[data-type="success"] .kontur-toast-icon { background: #ecfdf5; }
@@ -293,6 +364,7 @@
 .dark .kontur-toast[data-type="warning"] .kontur-toast-icon { background: hsl(40 60% 20%); }
 .dark .kontur-toast[data-type="info"]    .kontur-toast-icon { background: hsl(205 60% 22%); }
 
+/* Круглый крестик — иконко-кнопка, пилюля разрешена */
 .kontur-toast-close {
   position: absolute;
   right: 0.6rem;
@@ -312,6 +384,12 @@
 .kontur-toast-close:hover {
   background: hsl(var(--wms-muted));
   color: hsl(var(--wms-foreground));
+}
+
+/* ─── Modal / Drawer morph ─── */
+@keyframes modal-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes modal-overlay-out {
@@ -411,27 +489,7 @@
   }
 }
 
-.dark {
-  --wms-background: 240 6% 10%;
-  --wms-foreground: 240 6% 88%;
-  --wms-card: 240 5% 13%;
-  --wms-card-foreground: 240 6% 88%;
-  --wms-muted: 240 5% 18%;
-  --wms-muted-foreground: 240 5% 63%;
-  --wms-border: 240 4% 32%;
-  --wms-border-thin: 240 4% 28%;
-  --wms-ring: 240 5% 68%;
-  --field-border: hsl(240 4% 30%);
-  --field-border-hover: hsl(240 4% 42%);
-  --field-border-focus: hsl(240 4% 55%);
-  --field-bg: hsl(240 5% 16%);
-  --field-ring: hsl(240 5% 65% / 0.3);
-  --magic-spotlight: #262626;
-  --magic-gradient-from: #71717a;
-  --magic-gradient-to: #3f3f46;
-  color-scheme: dark;
-}
-
+/* ─── База ─── */
 * {
   box-sizing: border-box;
 }
@@ -551,12 +609,34 @@ button {
     box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring) / 0.45) !important;
   }
 
-  /* Кнопки HeroUI как в доке HeroUI (скрин 1): пилюля */
+  /* Кнопки: радиус контролов (6px), без пилюль */
   .button {
-    border-radius: 9999px;
+    border-radius: var(--radius-control);
   }
 
-  /* HeroUI Input/TextArea/DateField/SearchField/Select: мягкий фон + тонкая граница (скрин 3) */
+  /* Единые высоты контролов: md 36px, sm 32px */
+  .button--md:not(.button--icon-only) {
+    height: var(--control-height);
+  }
+  .button--sm:not(.button--icon-only) {
+    height: var(--control-height-sm);
+  }
+  .input:not(textarea) {
+    height: var(--control-height);
+    padding-block: 0;
+  }
+  .select__trigger {
+    min-height: var(--control-height);
+    padding-block: 0.375rem;
+  }
+  .date-input-group {
+    min-height: var(--control-height);
+  }
+  .search-field__group {
+    height: var(--control-height);
+  }
+
+  /* HeroUI Input/TextArea/DateField/SearchField/Select: мягкий фон + тонкая граница */
   .input,
   .textarea,
   .date-input-group,
@@ -590,15 +670,6 @@ button {
     box-shadow: 0 0 0 2px var(--field-ring) !important;
   }
 
-  /* Кнопки чуть выше — базовые HeroUI слишком тонкие */
-  .button--sm:not(.button--icon-only) {
-    min-height: 2.25rem;
-    padding-block: 0.4rem;
-  }
-  .button--md:not(.button--icon-only) {
-    min-height: 2.625rem;
-  }
-
   /* Текст в таблицах можно выделять и копировать (React Aria по умолчанию блокирует) */
   [data-slot="table"],
   [data-slot="table-cell"],
@@ -608,14 +679,56 @@ button {
     user-select: text !important;
   }
 
-  /* HeroUI Table uses text-muted; our --color-muted is a surface (shadcn bg-muted). */
-  [data-slot="table-column"] {
+  /* ── Таблицы: плотный профессиональный вид ──
+     Компактные строки, серая полоса шапки, волосяные разделители,
+     явные hover и selected (мягкий синий) состояния. */
+  .table__column {
+    padding: 0.5rem 0.75rem;
     color: hsl(var(--wms-muted-foreground));
+  }
+
+  .table__header {
+    background-color: #fafafa; /* zinc-50 */
+  }
+  .dark .table__header {
+    background-color: rgb(39 39 42 / 0.5); /* zinc-800/50 */
+  }
+
+  .table__cell {
+    padding: 0.375rem 0.75rem;
+    border-bottom-color: hsl(var(--wms-border) / 0.45);
+  }
+
+  /* Последняя колонка шире справа: в углу шапки живёт шестерёнка настроек колонок */
+  .table__column:last-child,
+  .table__cell:last-child {
+    padding-inline-end: 2rem;
+  }
+
+  /* Hover — нейтральный, чуть темнее поверхности */
+  .table__row:not(.row-selected):hover .table__cell,
+  .table__row:not(.row-selected)[data-hovered="true"] .table__cell {
+    background-color: color-mix(in oklab, var(--surface) 96%, var(--foreground) 4%);
+  }
+
+  /* Selected — мягкий синий (accent HeroUI) поверх поверхности */
+  .row-selected .table__cell {
+    background-color: color-mix(in oklab, var(--accent) 9%, var(--surface));
+  }
+  .row-selected:hover .table__cell,
+  .row-selected[data-hovered="true"] .table__cell {
+    background-color: color-mix(in oklab, var(--accent) 13%, var(--surface));
   }
 
   /* Card description: text-muted = surface, not foreground */
   .card__description {
     color: hsl(var(--wms-muted-foreground)) !important;
+  }
+
+  /* Карточки: плотнее (12/16px), меньше внутренних зазоров */
+  .card {
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
   }
 
   /* CloseButton: text-muted → светлый surface, крестик на белой модалке не виден */
@@ -630,238 +743,29 @@ button {
     background-color: hsl(var(--wms-border));
   }
 
-  select.input {
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 0.75rem center;
-    background-repeat: no-repeat;
-    background-size: 1.25em 1.25em;
-    padding-inline-end: 2.25rem;
-  }
-
   .page-shell {
     margin-inline: auto;
     width: 100%;
     max-width: 1600px;
-    padding: 1.25rem 1rem;
+    padding: 0.75rem 1rem 1rem;
   }
 
   @media (min-width: 640px) {
     .page-shell {
-      padding-inline: 1.5rem;
+      padding-inline: 1.25rem;
     }
   }
 
   @media (min-width: 1024px) {
     .page-shell {
-      padding-inline: 2rem;
+      padding-inline: 1.5rem;
     }
-  }
-
-  .data-card {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    border-radius: 0.5rem;
-    background: hsl(var(--wms-card));
-    color: hsl(var(--wms-card-foreground));
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   }
 
   .thin-border {
     border-width: var(--border-width-default);
     border-style: solid;
     border-color: hsl(var(--wms-border));
-  }
-
-  .thin-border-hover {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    transition: border-color 0.2s ease, border-width 0.2s ease;
-  }
-
-  .thin-border-hover:hover {
-    border-color: hsl(var(--wms-ring) / 0.3);
-    border-width: var(--border-width-hover);
-  }
-
-  .thin-border-focus {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, border-width 0.2s ease;
-  }
-
-  .thin-border-focus:focus {
-    border-color: hsl(var(--wms-ring));
-    border-width: var(--border-width-focus);
-    box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring) / 0.3);
-    outline: none;
-  }
-
-  .focus-thin {
-    outline: none;
-    transition: box-shadow 0.15s ease, border-color 0.15s ease, border-width 0.15s ease;
-  }
-
-  .focus-thin:focus-visible {
-    border-color: hsl(var(--wms-ring));
-    border-width: var(--border-width-focus);
-    box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring));
-    outline: none;
-  }
-
-  .card-thin {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    border-radius: 0.5rem;
-    background: hsl(var(--wms-card));
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, border-width 0.2s ease;
-  }
-
-  .card-thin:hover {
-    border-color: hsl(var(--wms-ring) / 0.2);
-    border-width: var(--border-width-hover);
-  }
-
-  .input-thin {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    border-radius: 0.375rem;
-    background: hsl(var(--wms-background));
-    padding: 0.5rem 0.75rem;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, border-width 0.15s ease;
-  }
-
-  .input-thin:focus {
-    border-color: hsl(var(--wms-ring));
-    border-width: var(--border-width-focus);
-    box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring) / 0.2);
-    outline: none;
-  }
-
-  .input-thin:hover {
-    border-color: hsl(var(--wms-ring) / 0.3);
-    border-width: var(--border-width-hover);
-  }
-
-  .btn-thin {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    border-radius: 0.375rem;
-    padding: 0.5rem 1rem;
-    transition: all 0.15s ease;
-    background: hsl(var(--wms-background));
-    color: hsl(var(--wms-foreground));
-  }
-
-  .btn-thin:hover {
-    border-color: hsl(var(--wms-ring) / 0.4);
-    border-width: var(--border-width-hover);
-    background: hsl(var(--wms-muted));
-  }
-
-  .btn-thin:focus-visible {
-    border-color: hsl(var(--wms-ring));
-    border-width: var(--border-width-focus);
-    box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring));
-    outline: none;
-  }
-
-  .btn-thin:active {
-    border-width: var(--border-width-active);
-  }
-
-  .select-thin {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    border-radius: 0.375rem;
-    background: hsl(var(--wms-background));
-    padding: 0.5rem 2rem 0.5rem 0.75rem;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, border-width 0.15s ease;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 0.5rem center;
-    background-repeat: no-repeat;
-    background-size: 1.5em 1.5em;
-  }
-
-  .select-thin:focus {
-    border-color: hsl(var(--wms-ring));
-    border-width: var(--border-width-focus);
-    box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring) / 0.2);
-    outline: none;
-  }
-
-  .select-thin:hover {
-    border-color: hsl(var(--wms-ring) / 0.3);
-    border-width: var(--border-width-hover);
-  }
-
-  .table-thin {
-    border-collapse: separate;
-    border-spacing: 0;
-  }
-
-  .table-thin th,
-  .table-thin td {
-    border-bottom-width: var(--border-width-default);
-    border-bottom-style: solid;
-    border-bottom-color: hsl(var(--wms-border));
-    padding: 0.5rem 0.75rem;
-  }
-
-  .table-thin tr:last-child td {
-    border-bottom: none;
-  }
-
-  .table-thin tr:hover td {
-    background: hsl(var(--wms-muted) / 0.3);
-  }
-
-  .badge-thin {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    border-radius: 9999px;
-    padding: 0.125rem 0.625rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    transition: border-color 0.15s ease, border-width 0.15s ease;
-  }
-
-  .badge-thin:hover {
-    border-color: hsl(var(--wms-ring) / 0.3);
-    border-width: var(--border-width-hover);
-  }
-
-  .divider-thin {
-    border: none;
-    border-top-width: var(--border-width-default);
-    border-top-style: solid;
-    border-top-color: hsl(var(--wms-border));
-    margin: 1rem 0;
-  }
-
-  .card-shadow-thin {
-    border-width: var(--border-width-default);
-    border-style: solid;
-    border-color: hsl(var(--wms-border));
-    border-radius: 0.5rem;
-    background: hsl(var(--wms-card));
-    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, border-width 0.2s ease;
-  }
-
-  .card-shadow-thin:hover {
-    border-color: hsl(var(--wms-ring) / 0.15);
-    border-width: var(--border-width-hover);
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
   }
 
   /* Legacy native fields only — do not restyle HeroUI ([data-slot]) controls */
@@ -877,10 +781,10 @@ button {
     border-width: var(--border-width-default);
     border-style: solid;
     border-color: hsl(var(--wms-border));
-    border-radius: 0.375rem;
+    border-radius: var(--radius-control);
     background: hsl(var(--wms-background));
     padding: 0.5rem 0.75rem;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease, border-width 0.15s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
 
   input[type="text"]:not([data-slot]):focus,
@@ -893,7 +797,6 @@ button {
   select:not([data-slot]):focus,
   textarea:not([data-slot]):focus {
     border-color: hsl(var(--wms-ring));
-    border-width: var(--border-width-focus);
     box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring) / 0.2);
     outline: none;
   }
@@ -908,14 +811,13 @@ button {
   select:not([data-slot]):hover,
   textarea:not([data-slot]):hover {
     border-color: hsl(var(--wms-ring) / 0.3);
-    border-width: var(--border-width-hover);
   }
 
   button:not([class*="btn-"]):not([data-slot]) {
     border-width: var(--border-width-default);
     border-style: solid;
     border-color: hsl(var(--wms-border));
-    border-radius: 0.375rem;
+    border-radius: var(--radius-control);
     padding: 0.5rem 1rem;
     transition: all 0.15s ease;
     background: hsl(var(--wms-background));
@@ -924,258 +826,27 @@ button {
 
   button:not([class*="btn-"]):not([data-slot]):hover {
     border-color: hsl(var(--wms-ring) / 0.4);
-    border-width: var(--border-width-hover);
     background: hsl(var(--wms-muted));
   }
 
   button:not([class*="btn-"]):not([data-slot]):focus-visible {
     border-color: hsl(var(--wms-ring));
-    border-width: var(--border-width-focus);
     box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring));
     outline: none;
   }
-
-  button:not([class*="btn-"]):not([data-slot]):active {
-    border-width: var(--border-width-active);
-  }
 }
 
-/* ⚠️ ВАЖНО: Переопределения для границ БЕЗ влияния на иконки */
 @layer utilities {
-  /* Применяем только к элементам с border классом, но исключаем иконки и HeroUI */
-  .border:not(svg):not([class*="lucide"]):not([class*="icon"]):not([data-slot]) {
-    border-width: var(--border-width-default) !important;
-  }
-
-  .border-2:not(svg):not([class*="lucide"]):not([class*="icon"]):not([data-slot]) {
-    border-width: var(--border-width-default) !important;
-  }
-
-  .border-4:not(svg):not([class*="lucide"]):not([class*="icon"]):not([data-slot]) {
-    border-width: var(--border-width-default) !important;
-  }
-
-  .border-t:not(svg):not([class*="lucide"]):not([class*="icon"]):not([data-slot]) {
-    border-top-width: var(--border-width-default) !important;
-  }
-
-  .border-b:not(svg):not([class*="lucide"]):not([class*="icon"]):not([data-slot]) {
-    border-bottom-width: var(--border-width-default) !important;
-  }
-
-  .border-l:not(svg):not([class*="lucide"]):not([class*="icon"]):not([data-slot]) {
-    border-left-width: var(--border-width-default) !important;
-  }
-
-  .border-r:not(svg):not([class*="lucide"]):not([class*="icon"]):not([data-slot]) {
-    border-right-width: var(--border-width-default) !important;
-  }
-
-  /* Защита иконок (не трогаем HeroUI data-slot) */
-  svg:not(:where([data-slot] *)),
-  .lucide,
-  [class*="lucide"],
-  [class*="icon"]:not(:where([data-slot], [data-slot] *)) {
-    border: none !important;
-    border-width: 0 !important;
-    outline: none !important;
-    box-shadow: none !important;
-    display: inline-block;
-    flex-shrink: 0;
-    vertical-align: middle;
-  }
-
-  /* Тонкий фокус-ринг для legacy-элементов (не HeroUI [data-slot]) */
-  input:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]):focus-visible,
-  textarea:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]):focus-visible,
-  select:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]):focus-visible,
-  button:not(svg):not([class*="lucide"]):not([class*="icon"]):focus-visible {
-    outline: none;
-    border-color: hsl(var(--wms-ring)) !important;
-    border-width: var(--border-width-focus) !important;
-    box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring) / 0.3) !important;
-  }
-
-  /* Ховер эффекты для legacy-элементов (не HeroUI [data-slot]) */
-  input:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]),
-  textarea:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]),
-  select:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]) {
-    transition: border-color 0.15s ease, border-width 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
-  }
-
-  input:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]):hover,
-  textarea:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]):hover,
-  select:not([data-slot]):not(svg):not([class*="lucide"]):not([class*="icon"]):hover {
-    border-color: hsl(var(--wms-ring) / 0.2) !important;
-    border-width: var(--border-width-hover) !important;
-  }
-
-  /* Дополнительная защита для иконок внутри кнопок (не трогаем HeroUI) */
-  button:not([data-slot]) svg,
-  button:not([data-slot]) .lucide,
-  button:not([data-slot]) [class*="lucide"],
-  button:not([data-slot]) [class*="icon"] {
-    border: none !important;
-    border-width: 0 !important;
-    outline: none !important;
-    box-shadow: none !important;
-    pointer-events: none;
-  }
-
   /* DatePicker/Select popover portaled вне Dialog: body получает pointer-events:none от Radix */
   [data-slot="date-picker-popover"],
   [data-slot="select-popover"] {
     pointer-events: auto !important;
   }
 
-  /* --- Transitions.dev — Error state shake --- */
-  :root {
-    --shake-distance: 6px;
-    --shake-overshoot: 4px;
-    --shake-dur-a: 80ms;
-    --shake-dur-b: 60ms;
-    --shake-ease: cubic-bezier(0.22, 1, 0.36, 1);
-    --revert-hold: 3000ms;
-    --revert-dur: 280ms;
-    --field-error-border: #f43f5e;
-  }
-
-  .t-input {
-    transition: border-color 150ms ease-out;
-  }
-
-  .t-input.is-shaking {
-    will-change: transform;
-  }
-
-  .t-input.is-error {
-    transition: border-color var(--revert-dur, 280ms) ease-out;
-  }
-
-  /* HeroUI / native bordered controls inside the shake wrapper */
-  .t-input.is-error :is(
-    [data-slot="input"],
-    [data-slot="textarea"],
-    [data-slot="select-trigger"],
-    [data-slot="date-input-group"],
-    [data-slot="search-field"] .input,
-    input:not([type="checkbox"]):not([type="radio"]),
-    textarea,
-    select
-  ) {
-    border-color: var(--field-error-border) !important;
-    transition: border-color 150ms ease-out;
-  }
-
-  .t-error-msg {
-    margin: 0;
-    min-height: 0;
-    opacity: 0;
-    visibility: hidden;
-    transition:
-      opacity var(--revert-dur, 280ms) ease-out,
-      visibility 0s linear var(--revert-dur, 280ms);
-  }
-
-  .t-input-wrap.is-error .t-error-msg {
-    opacity: 1;
-    visibility: visible;
-    transition:
-      opacity var(--revert-dur, 280ms) ease-out,
-      visibility 0s linear 0s;
-  }
-
-  .t-input.is-shaking {
-    animation: t-input-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2) linear;
-  }
-
-  @keyframes t-input-shake {
-    0% {
-      transform: translateX(0);
-      animation-timing-function: var(--shake-ease);
-    }
-    28.57% {
-      transform: translateX(var(--shake-distance));
-      animation-timing-function: var(--shake-ease);
-    }
-    57.14% {
-      transform: translateX(calc(var(--shake-distance) * -1));
-      animation-timing-function: var(--shake-ease);
-    }
-    78.57% {
-      transform: translateX(var(--shake-overshoot));
-      animation-timing-function: var(--shake-ease);
-    }
-    100% {
-      transform: translateX(0);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .t-input {
-      animation: none !important;
-      transform: none !important;
-    }
-  }
-
-  /* Классы для управления толщиной */
-  .border-thin {
-    border-width: 1px !important;
-  }
-  
-  .border-medium {
-    border-width: 2px !important;
-  }
-  
-  .border-thick {
-    border-width: 3px !important;
-  }
-  
-  .border-extra-thick {
-    border-width: 4px !important;
-  }
-  
-  .hover\:border-thin:hover {
-    border-width: 1px !important;
-  }
-  
-  .hover\:border-medium:hover {
-    border-width: 2px !important;
-  }
-  
-  .hover\:border-thick:hover {
-    border-width: 3px !important;
-  }
-
-  /* Явные стили для иконок Trash2 */
-  .lucide-trash-2,
-  .lucide-trash,
-  .lucide-x,
-  .lucide-x-circle,
-  .lucide-delete {
-    border: none !important;
-    border-width: 0 !important;
-    outline: none !important;
-    box-shadow: none !important;
-    color: inherit;
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: inline-block !important;
-    width: auto !important;
-    height: auto !important;
-  }
-
-  /* Убеждаемся, что иконки в кнопках видимы */
-  .group-hover\:opacity-100 {
-    opacity: 1 !important;
-  }
-
-  .opacity-0 {
-    opacity: 0;
-  }
-
-  .group:hover .group-hover\:opacity-100 {
-    opacity: 1 !important;
+  /* Тяжёлые блоки ниже сгиба: браузер пропускает layout/paint вне вьюпорта */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 480px;
   }
 }
 

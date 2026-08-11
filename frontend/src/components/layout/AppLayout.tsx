@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
 import {
   ClipboardList,
   Download,
@@ -10,6 +10,7 @@ import {
   Moon,
   Sun,
   PanelLeftOpen,
+  PanelRight,
   Printer,
   RefreshCw,
   Smartphone,
@@ -25,6 +26,7 @@ import { cn, getErrorMessage } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AnimatedNumber, AnimatedTextSwap } from '@/components/ui/animated-number'
+import { JOURNAL_WIDTH, JournalPanel } from '@/components/layout/JournalPanel'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import { usePageZoom } from '@/hooks/usePageZoom'
 import { useTheme } from '@/hooks/useTheme'
@@ -32,10 +34,16 @@ import { useTheme } from '@/hooks/useTheme'
 const DESKTOP_SIDEBAR_OPEN_WIDTH = 256
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = 64
 const SIDEBAR_STORAGE_KEY = 'kontur_desktop_sidebar_open_v1'
+const JOURNAL_STORAGE_KEY = 'kontur_journal_open_v1'
 
 const sidebarTransition = {
   duration: 0.28,
   ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+}
+
+const journalTransition = {
+  duration: 0.2,
+  ease: 'easeOut' as const,
 }
 
 const textTransition = {
@@ -77,16 +85,16 @@ const titles: Record<string, string> = {
 
 type TooltipState = { label: string; top: number; left: number }
 
-function readSidebarOpen() {
-  if (typeof window === 'undefined') return true
-  const saved = window.localStorage.getItem(SIDEBAR_STORAGE_KEY)
+function readStoredFlag(key: string, fallback: boolean) {
+  if (typeof window === 'undefined') return fallback
+  const saved = window.localStorage.getItem(key)
   if (saved === 'true') return true
   if (saved === 'false') return false
-  return true
+  return fallback
 }
 
-function writeSidebarOpen(value: boolean) {
-  window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(value))
+function writeStoredFlag(key: string, value: boolean) {
+  window.localStorage.setItem(key, String(value))
 }
 
 function SidebarTooltip({ tooltip }: { tooltip: TooltipState | null }) {
@@ -103,7 +111,7 @@ function SidebarTooltip({ tooltip }: { tooltip: TooltipState | null }) {
         left: tooltip.left,
         transform: 'translateY(calc(-50% - 10px))',
       }}
-      className="pointer-events-none z-[9999] whitespace-nowrap rounded-lg bg-[#202123] px-3 py-1.5 text-xs font-semibold leading-none text-white shadow-xl"
+      className="pointer-events-none z-[9999] whitespace-nowrap rounded-md bg-[#202123] px-3 py-1.5 text-xs font-semibold leading-none text-white shadow-xl"
     >
       {tooltip.label}
     </motion.div>,
@@ -140,7 +148,7 @@ function Navigation({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
               onBlur={() => setTooltip(null)}
               className={({ isActive }) =>
                 cn(
-                  'focus-ring flex h-10 w-full items-center overflow-hidden rounded-xl text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground',
+                  'focus-ring flex h-10 w-full items-center overflow-hidden rounded-lg text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground',
                   isActive && 'bg-zinc-200/70 text-foreground dark:bg-zinc-800',
                 )
               }
@@ -228,7 +236,9 @@ function SidebarBrand({
 export function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
+  const reduceMotion = useReducedMotion()
+  const [sidebarOpen, setSidebarOpen] = useState(() => readStoredFlag(SIDEBAR_STORAGE_KEY, true))
+  const [journalOpen, setJournalOpen] = useState(() => readStoredFlag(JOURNAL_STORAGE_KEY, false))
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
@@ -272,8 +282,12 @@ export function AppLayout() {
   }, [loadSession])
 
   useEffect(() => {
-    writeSidebarOpen(sidebarOpen)
+    writeStoredFlag(SIDEBAR_STORAGE_KEY, sidebarOpen)
   }, [sidebarOpen])
+
+  useEffect(() => {
+    writeStoredFlag(JOURNAL_STORAGE_KEY, journalOpen)
+  }, [journalOpen])
 
   const sessionTone = session?.has_session ? 'success' : 'warning'
   const sessionLabel = session?.has_session
@@ -306,7 +320,7 @@ export function AppLayout() {
           <Button
             variant="ghost"
             onClick={() => navigate('/welcome')}
-            className="h-9 w-full overflow-hidden rounded-xl p-0 text-muted-foreground hover:text-foreground"
+            className="h-9 w-full overflow-hidden rounded-lg p-0 text-muted-foreground hover:text-foreground"
             aria-label="На главную"
             title={!sidebarOpen ? 'На главную' : undefined}
           >
@@ -352,47 +366,60 @@ export function AppLayout() {
         </div>
       )}
 
+      {/* Правая панель «Журнал» — как в Cursor: контент сжимается, оверлея нет */}
+      <motion.aside
+        initial={false}
+        animate={{ width: journalOpen ? JOURNAL_WIDTH : 0 }}
+        transition={reduceMotion ? { duration: 0 } : journalTransition}
+        className="fixed right-0 top-0 z-20 hidden h-screen overflow-hidden border-l border-border bg-card md:block"
+      >
+        <JournalPanel open={journalOpen} onClose={() => setJournalOpen(false)} />
+      </motion.aside>
+
       <div
         className={cn(
-          'min-h-screen transition-[padding-left] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)]',
+          'min-h-screen',
           sidebarOpen ? 'md:pl-64' : 'md:pl-16',
+          journalOpen && 'md:pr-[320px]',
         )}
+        style={{
+          transition: reduceMotion
+            ? undefined
+            : 'padding-left 280ms cubic-bezier(0.22, 1, 0.36, 1), padding-right 200ms ease-out',
+        }}
       >
         <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-          <div className="relative flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
-            <div className="flex min-w-0 items-center gap-3">
+          <div className="relative flex h-12 items-center justify-between gap-2 px-4 sm:px-5 lg:px-6">
+            <div className="flex min-w-0 items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setMobileSidebarOpen(true)}
-                className="md:hidden"
+                className="h-8 w-8 md:hidden"
                 aria-label="Открыть меню"
               >
-                <PanelLeftOpen className="h-5 w-5" />
+                <PanelLeftOpen className="h-4 w-4" />
               </Button>
-              <div className="min-w-0">
-                <h1 className="truncate text-base font-semibold sm:text-lg">{title || 'Контур Маркировка'}</h1>
-                <p className="hidden truncate text-sm text-muted-foreground sm:block">
-                  Операции Контур.Маркировка
-                </p>
-              </div>
+              <h1 className="truncate text-base font-semibold">{title || 'Контур Маркировка'}</h1>
             </div>
 
-            {!isWelcome ? (
+            {/* С открытым журналом центру не хватает места — логотип уступает контролам */}
+            {!isWelcome && !journalOpen ? (
               <div className="pointer-events-none absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2">
                 <img
                   src={logo}
                   alt="Grundlage"
-                  className="h-12 w-auto object-contain opacity-90 transition-opacity hover:opacity-100 dark:invert dark:brightness-110 sm:h-[84px] md:h-[72px]"
+                  className="h-9 w-auto object-contain opacity-90 transition-opacity hover:opacity-100 dark:invert dark:brightness-110"
                 />
               </div>
             ) : null}
 
-            <div className="flex items-center gap-2">
-              <div className="hidden items-center rounded-lg thin-border sm:flex">
+            <div className="flex items-center gap-1.5">
+              <div className="hidden items-center rounded-md thin-border sm:flex">
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-8 w-8"
                   onClick={zoomOut}
                   aria-label="Уменьшить масштаб"
                   title="Уменьшить масштаб (Ctrl+−)"
@@ -410,6 +437,7 @@ export function AppLayout() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-8 w-8"
                   onClick={zoomIn}
                   aria-label="Увеличить масштаб"
                   title="Увеличить масштаб (Ctrl++)"
@@ -431,6 +459,7 @@ export function AppLayout() {
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8"
                 onClick={toggleTheme}
                 aria-label={isDark ? 'Светлая тема' : 'Тёмная тема'}
                 title={isDark ? 'Светлая тема' : 'Тёмная тема'}
@@ -460,6 +489,16 @@ export function AppLayout() {
                 <RefreshCw className={cn('h-3.5 w-3.5', sessionLoading && 'animate-spin')} />
                 <span className="hidden sm:inline">Сессия</span>
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('hidden h-8 w-8 md:inline-flex', journalOpen && 'bg-muted text-foreground')}
+                onClick={() => setJournalOpen((value) => !value)}
+                aria-label={journalOpen ? 'Скрыть журнал' : 'Показать журнал'}
+                title={journalOpen ? 'Скрыть журнал' : 'Журнал операций'}
+              >
+                <PanelRight className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </header>
@@ -467,7 +506,7 @@ export function AppLayout() {
         <motion.main
           key={location.pathname}
           {...pageTransition}
-          className="pb-8"
+          className="pb-6"
         >
           <Outlet />
         </motion.main>

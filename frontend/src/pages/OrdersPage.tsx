@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -6,14 +6,14 @@ import { apiCall } from '@/lib/bridge'
 import { celebrateOrderCreated } from '@/lib/celebrate'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
-import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
+import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
-import { SelectNative, type SelectNativeProps } from '@/components/ui/select'
+import { SelectNative } from '@/components/ui/select'
 import { Shimmer } from '@/components/ui/shimmer'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -106,17 +106,13 @@ function rowTitle(item: { order_name?: string; name?: string; document_id?: stri
   return item.order_name || item.name || item.document_id || 'Без названия'
 }
 
-function TextSelect(props: SelectNativeProps) {
-  return <SelectNative {...props} className={cn('w-full', props.className)} />
-}
-
 function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: OrderMode) => void }) {
   const items = [
     { id: 'params' as const, label: 'По параметрам' },
     { id: 'gtin' as const, label: 'По GTIN' },
   ]
   return (
-    <div className="inline-flex rounded-full border border-border bg-muted/50 p-0.5">
+    <div className="inline-flex rounded-md border border-border bg-muted/50 p-0.5">
       {items.map((item) => {
         const active = mode === item.id
         return (
@@ -125,7 +121,7 @@ function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: Orde
             type="button"
             onClick={() => onChange(item.id)}
             className={cn(
-              'relative rounded-full border-0 bg-transparent px-4 py-1.5 text-sm font-medium transition-colors',
+              'relative rounded-sm border-0 bg-transparent px-4 py-1 text-sm font-medium transition-colors',
               active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
@@ -133,7 +129,7 @@ function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: Orde
               <motion.span
                 layoutId="orders-mode-toggle"
                 transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
-                className="absolute inset-0 rounded-full bg-card shadow-sm"
+                className="absolute inset-0 rounded-sm bg-card shadow-sm"
               />
             ) : null}
             <span className="relative z-10">{item.label}</span>
@@ -143,6 +139,116 @@ function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: Orde
     </div>
   )
 }
+
+/** Строка «Истории» — memo: выбор строки не перерисовывает остальные 100 строк. */
+const HistoryRow = memo(function HistoryRow({
+  item,
+  rowId,
+  checked,
+  arrived,
+  onToggle,
+}: {
+  item: OrderRow
+  rowId: string
+  checked: boolean
+  arrived: boolean
+  onToggle: (documentId: string) => void
+}) {
+  const documentId = item.document_id || ''
+  return (
+    <TableRow
+      id={rowId}
+      className={cn(checked && 'row-selected', arrived && 'order-arrive')}
+      onClick={() => onToggle(documentId)}
+    >
+      <TableCell>
+        <Checkbox
+          isSelected={checked}
+          aria-label={`Выбрать заказ ${rowTitle(item)}`}
+          onChange={() => onToggle(documentId)}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="font-medium">{rowTitle(item)}</div>
+        <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={item.status} />
+      </TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+    </TableRow>
+  )
+})
+
+/** Строка «Очереди» — memo по той же причине. */
+const QueueRow = memo(function QueueRow({
+  item,
+  rowId,
+  checked,
+  leaving,
+  onSelect,
+}: {
+  item: QueueItem
+  rowId: string
+  checked: boolean
+  leaving: boolean
+  onSelect: (uid: string) => void
+}) {
+  return (
+    <TableRow
+      id={rowId}
+      className={cn(checked && 'row-selected', leaving && 'order-leave')}
+      onClick={() => onSelect(item.uid || '')}
+    >
+      <TableCell>
+        <Checkbox
+          isSelected={checked}
+          aria-label={`Выбрать позицию ${item.order_name || rowId}`}
+          onChange={() => onSelect(item.uid || '')}
+        />
+      </TableCell>
+      <TableCell className="font-medium">{item.order_name || '—'}</TableCell>
+      <TableCell className="text-muted-foreground">{item.simpl_name || '—'}</TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+      <TableCell className="text-right tabular-nums">{item.codes_count ?? '—'}</TableCell>
+    </TableRow>
+  )
+})
+
+const DeletedRow = memo(function DeletedRow({
+  item,
+  rowId,
+  checked,
+  onSelect,
+}: {
+  item: OrderRow
+  rowId: string
+  checked: boolean
+  onSelect: (documentId: string) => void
+}) {
+  const documentId = item.document_id || ''
+  return (
+    <TableRow
+      id={rowId}
+      className={cn(checked && 'row-selected')}
+      onClick={() => onSelect(documentId)}
+    >
+      <TableCell>
+        <Checkbox
+          isSelected={checked}
+          aria-label={`Выбрать удалённый заказ ${rowTitle(item)}`}
+          onChange={() => onSelect(documentId)}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="font-medium">{rowTitle(item)}</div>
+        <div className="font-mono text-xs text-muted-foreground">{item.document_id || '—'}</div>
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">{item.deleted_at || '—'}</TableCell>
+      <TableCell className="text-xs text-muted-foreground">{item.deleted_by || '—'}</TableCell>
+    </TableRow>
+  )
+})
 
 export function OrdersPage() {
   const [loading, setLoading] = useState(false)
@@ -181,7 +287,7 @@ export function OrdersPage() {
       chip.textContent = label
       chip.style.cssText =
         `position:fixed;left:${rect.left}px;top:${rect.top}px;max-width:${Math.max(180, Math.min(rect.width, 360))}px;` +
-        'z-index:2147483000;pointer-events:none;padding:8px 16px;border-radius:9999px;' +
+        'z-index:2147483000;pointer-events:none;padding:8px 16px;border-radius:8px;' +
         'background:hsl(var(--wms-card));color:hsl(var(--wms-foreground));border:1px solid hsl(var(--wms-border));' +
         'box-shadow:0 8px 24px rgba(15,23,42,0.18);font-size:13px;font-weight:500;' +
         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:1;will-change:transform,opacity;' +
@@ -443,12 +549,21 @@ export function OrdersPage() {
 
   const isBusy = Boolean(busy)
 
-  const toggleHistoryId = (documentId: string) => {
+  // Стабильные обработчики — иначе memo строк не работает
+  const toggleHistoryId = useCallback((documentId: string) => {
     if (!documentId) return
     setSelectedHistoryIds((prev) =>
       prev.includes(documentId) ? prev.filter((id) => id !== documentId) : [...prev, documentId],
     )
-  }
+  }, [])
+
+  const selectQueueId = useCallback((uid: string) => {
+    setSelectedQueueId((prev) => (prev === uid ? '' : uid))
+  }, [])
+
+  const selectDeletedId = useCallback((documentId: string) => {
+    setSelectedDeletedId((prev) => (prev === documentId ? '' : documentId))
+  }, [])
 
   const historyPager = usePagination(filteredHistory, 50)
   const fullscreenPager = usePagination(filteredHistory, 200)
@@ -468,30 +583,15 @@ export function OrdersPage() {
         {rows.map((item, index) => {
           const documentId = item.document_id || ''
           const rowId = documentId || `${rowTitle(item)}-${index}`
-          const checked = Boolean(documentId) && selectedHistoryIds.includes(documentId)
           return (
-            <TableRow
+            <HistoryRow
               key={rowId}
-              id={rowId}
-              className={cn(checked && 'bg-muted/60', arrivedIds.has(documentId) && 'order-arrive')}
-              onClick={() => toggleHistoryId(documentId)}
-            >
-              <TableCell>
-                <Checkbox
-                  isSelected={checked}
-                  aria-label={`Выбрать заказ ${rowTitle(item)}`}
-                  onChange={() => toggleHistoryId(documentId)}
-                />
-              </TableCell>
-              <TableCell>
-                <div className="font-medium">{rowTitle(item)}</div>
-                <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
-              </TableCell>
-              <TableCell>
-                <StatusBadge status={item.status} />
-              </TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
-            </TableRow>
+              rowId={rowId}
+              item={item}
+              checked={Boolean(documentId) && selectedHistoryIds.includes(documentId)}
+              arrived={arrivedIds.has(documentId)}
+              onToggle={toggleHistoryId}
+            />
           )
         })}
       </TableBody>
@@ -516,13 +616,15 @@ export function OrdersPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <StatPill label="Очередь" value={queue.length} />
-        <StatPill label="История" value={history.length} />
-        <StatPill label="Удалённые" value={deletedOrders.length} />
-      </div>
+      <StatRow
+        items={[
+          { label: 'Очередь', value: queue.length },
+          { label: 'История', value: history.length },
+          { label: 'Удалённые', value: deletedOrders.length },
+        ]}
+      />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
         <Card>
           <CardHeader>
             <CardTitle>Новый заказ</CardTitle>
@@ -539,7 +641,7 @@ export function OrdersPage() {
 
               <div className="sm:col-span-2">
                 <FieldLabel>Наименование</FieldLabel>
-                <TextSelect
+                <SelectNative
                   placeholder="Упрощённое имя"
                   value={form.name}
                   disabled={!paramsMode}
@@ -551,24 +653,24 @@ export function OrdersPage() {
                       {value}
                     </option>
                   ))}
-                </TextSelect>
+                </SelectNative>
               </div>
 
               <div>
                 <FieldLabel>Размер</FieldLabel>
-                <TextSelect value={form.size} disabled={!paramsMode} onChange={(e) => setField('size', e.target.value)}>
+                <SelectNative value={form.size} disabled={!paramsMode} onChange={(e) => setField('size', e.target.value)}>
                   <option value="">Выберите</option>
                   {(options.size_options || []).map((value) => (
                     <option key={value} value={value}>
                       {value}
                     </option>
                   ))}
-                </TextSelect>
+                </SelectNative>
               </div>
 
               <div>
                 <FieldLabel>Ед. в упаковке</FieldLabel>
-                <TextSelect
+                <SelectNative
                   value={form.units_per_pack}
                   disabled={!paramsMode}
                   onChange={(e) => setField('units_per_pack', e.target.value)}
@@ -579,12 +681,12 @@ export function OrdersPage() {
                       {value}
                     </option>
                   ))}
-                </TextSelect>
+                </SelectNative>
               </div>
 
               <div>
                 <FieldLabel>Цвет{colorNeeded ? ' *' : ''}</FieldLabel>
-                <TextSelect
+                <SelectNative
                   value={form.color}
                   disabled={!paramsMode || !colorNeeded}
                   onChange={(e) => setField('color', e.target.value)}
@@ -595,12 +697,12 @@ export function OrdersPage() {
                       {value}
                     </option>
                   ))}
-                </TextSelect>
+                </SelectNative>
               </div>
 
               <div>
                 <FieldLabel>Венчик{venchikNeeded ? ' *' : ''}</FieldLabel>
-                <TextSelect
+                <SelectNative
                   value={form.venchik}
                   disabled={!paramsMode || !venchikNeeded}
                   onChange={(e) => setField('venchik', e.target.value)}
@@ -611,7 +713,7 @@ export function OrdersPage() {
                       {value}
                     </option>
                   ))}
-                </TextSelect>
+                </SelectNative>
               </div>
 
               <div>
@@ -708,32 +810,21 @@ export function OrdersPage() {
                       <TableHead isRowHeader>Заявка</TableHead>
                       <TableHead>Товар</TableHead>
                       <TableHead>GTIN</TableHead>
-                      <TableHead>Кодов</TableHead>
+                      <TableHead className="text-right">Кодов</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {queue.map((item, index) => {
                       const rowId = item.uid || `${item.order_name}-${index}`
-                      const checked = Boolean(item.uid) && item.uid === selectedQueueId
                       return (
-                        <TableRow
+                        <QueueRow
                           key={rowId}
-                          id={rowId}
-                          className={cn(checked && 'bg-muted/60', queueLeaving && 'order-leave')}
-                          onClick={() => setSelectedQueueId(item.uid === selectedQueueId ? '' : item.uid || '')}
-                        >
-                          <TableCell>
-                            <Checkbox
-                              isSelected={checked}
-                              aria-label={`Выбрать позицию ${item.order_name || rowId}`}
-                              onChange={(next) => setSelectedQueueId(next ? item.uid || '' : '')}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{item.order_name || '—'}</TableCell>
-                          <TableCell className="text-muted-foreground">{item.simpl_name || '—'}</TableCell>
-                          <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
-                          <TableCell className="tabular-nums">{item.codes_count ?? '—'}</TableCell>
-                        </TableRow>
+                          rowId={rowId}
+                          item={item}
+                          checked={Boolean(item.uid) && item.uid === selectedQueueId}
+                          leaving={queueLeaving}
+                          onSelect={selectQueueId}
+                        />
                       )
                     })}
                   </TableBody>
@@ -744,8 +835,8 @@ export function OrdersPage() {
         </Card>
       </div>
 
-      <div className="mt-4" ref={historyCardRef}>
-        <Card>
+      <div className="mt-3" ref={historyCardRef}>
+        <Card className="cv-auto">
           <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
             <div>
               <CardTitle>История</CardTitle>
@@ -768,6 +859,7 @@ export function OrdersPage() {
               <Button
                 size="icon"
                 variant="ghost"
+                className="h-8 w-8"
                 onClick={() => setHistoryFullscreen(true)}
                 aria-label="Развернуть таблицу"
                 title="Развернуть таблицу"
@@ -776,7 +868,7 @@ export function OrdersPage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
             <TableSearch value={historySearch} onChange={setHistorySearch} placeholder="Поиск по заявке, GTIN, ID…" />
             {loading && history.length === 0 ? (
               <TableSkeleton rows={6} />
@@ -784,7 +876,7 @@ export function OrdersPage() {
               <EmptyState>История пуста</EmptyState>
             ) : (
               <>
-                <div className="max-h-[360px] overflow-auto">{renderHistoryTable(historyPager.pageRows)}</div>
+                <div className="max-h-[420px] overflow-auto">{renderHistoryTable(historyPager.pageRows)}</div>
                 <TablePagination
                   page={historyPager.page}
                   pageCount={historyPager.pageCount}
@@ -798,7 +890,7 @@ export function OrdersPage() {
       </div>
 
       {showDeleted ? (
-        <Card className="mt-4">
+        <Card className="cv-auto mt-3">
           <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
             <div>
               <CardTitle>Удалённые</CardTitle>
@@ -828,28 +920,14 @@ export function OrdersPage() {
                     {deletedPager.pageRows.map((item, index) => {
                       const documentId = item.document_id || ''
                       const rowId = documentId || `${rowTitle(item)}-${index}`
-                      const checked = Boolean(documentId) && documentId === selectedDeletedId
                       return (
-                        <TableRow
+                        <DeletedRow
                           key={rowId}
-                          id={rowId}
-                          className={cn(checked && 'bg-muted/60')}
-                          onClick={() => setSelectedDeletedId(documentId === selectedDeletedId ? '' : documentId)}
-                        >
-                          <TableCell>
-                            <Checkbox
-                              isSelected={checked}
-                              aria-label={`Выбрать удалённый заказ ${rowTitle(item)}`}
-                              onChange={(next) => setSelectedDeletedId(next ? documentId : '')}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{rowTitle(item)}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">{item.document_id || '—'}</div>
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{item.deleted_at || '—'}</TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{item.deleted_by || '—'}</TableCell>
-                        </TableRow>
+                          rowId={rowId}
+                          item={item}
+                          checked={Boolean(documentId) && documentId === selectedDeletedId}
+                          onSelect={selectDeletedId}
+                        />
                       )
                     })}
                   </TableBody>
@@ -903,7 +981,7 @@ export function OrdersPage() {
               <dl className="grid gap-2 sm:grid-cols-2">
                 {(details.fields || []).map((field, index) => (
                   <div key={`${field.label}-${index}`} className="rounded-md border border-border/80 px-3 py-2">
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{field.label || '—'}</dt>
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">{field.label || '—'}</dt>
                     <dd className="mt-0.5 break-words text-sm">{field.value || '—'}</dd>
                   </div>
                 ))}

@@ -31,7 +31,7 @@ export function WelcomePage() {
   }, [navigate])
 
   return (
-    <main className="relative min-h-[calc(100vh-4rem)] bg-background">
+    <main className="relative min-h-[calc(100vh-3rem)] bg-background">
       <AnimatePresence onExitComplete={finishGreeting}>
         {visible ? (
           <motion.div

@@ -256,21 +256,22 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
       {...props}
     >
       {columns.length > 0 ? (
-        <div className="mb-2 flex justify-end print:hidden">
-          <div className="relative">
+        /* Шестерёнка не занимает свою строку: накладывается на полосу шапки таблицы */
+        <div className="pointer-events-none relative z-10 -mb-7 flex justify-end pr-1.5 pt-1 print:hidden">
+          <div className="pointer-events-auto relative">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground"
+              className="h-6 w-6 text-muted-foreground"
               onClick={() => setSettingsOpen((current) => !current)}
               title="Настроить колонки"
               aria-label="Настроить колонки"
             >
-              <Settings2 className="h-4 w-4" />
+              <Settings2 className="h-3.5 w-3.5" />
             </Button>
             {settingsOpen ? (
-              <div className="absolute right-0 z-40 mt-2 w-72 rounded-md border border-border bg-card p-3 text-sm shadow-panel">
+              <div className="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-border bg-card p-3 text-sm shadow-panel">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="font-medium">Колонки таблицы</div>
                   <Button

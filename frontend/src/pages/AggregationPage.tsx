@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
-import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
+import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,6 +42,54 @@ type AggregationState = {
 
 const PAGE_SIZE = 200
 
+/** Строка АК — memo: выбор/снятие строки не перерисовывает остальные 200 строк страницы. */
+const AkRow = memo(function AkRow({
+  row,
+  rowId,
+  globalIndex,
+  selected,
+  arrived,
+  onToggle,
+}: {
+  row: AggregationItem
+  rowId: string
+  globalIndex: number
+  selected: boolean
+  arrived: boolean
+  onToggle: (documentId: string, index: number) => void
+}) {
+  const id = String(row.document_id || '')
+  const errorsCount = row.codes_check_errors_count ?? 0
+  return (
+    <TableRow
+      id={rowId}
+      className={cn(selected && 'row-selected', arrived && 'order-arrive')}
+      onClick={() => onToggle(id, globalIndex)}
+    >
+      <TableCell onClick={(event) => event.stopPropagation()}>
+        <Checkbox isSelected={selected} onChange={() => onToggle(id, globalIndex)} aria-label="Выбрать АК" />
+      </TableCell>
+      <TableCell>
+        <div className="font-medium">{row.aggregate_code || '—'}</div>
+        <div className="text-xs text-muted-foreground">{row.comment || '—'}</div>
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={row.status_label || row.status} />
+        {row.status === 'readyForSendAfterApproved' ? (
+          <div className="mt-1 text-xs text-muted-foreground">
+            Изменённый состав после прошлой регистрации
+          </div>
+        ) : null}
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">{row.created_at_label || '—'}</TableCell>
+      <TableCell className="text-right tabular-nums">{row.includes_units_count ?? 0}</TableCell>
+      <TableCell className={cn('text-right tabular-nums', errorsCount > 0 && 'font-medium text-rose-600 dark:text-rose-400')}>
+        {errorsCount}
+      </TableCell>
+    </TableRow>
+  )
+})
+
 export function AggregationPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
@@ -63,13 +111,15 @@ export function AggregationPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [lastClickedIndex, setLastClickedIndex] = useState(-1)
   // Создание АК: плейсхолдеры в таблице + подсветка «прилетевших» строк
   const [pendingCreate, setPendingCreate] = useState(0)
   const [arrivedIds, setArrivedIds] = useState<Set<string>>(new Set())
   const prevIdsRef = useRef<Set<string> | null>(null)
   // TableRow отдаёт onAction без исходного события — модификатор снимаем в capture-фазе до действия строки
   const shiftPressedRef = useRef(false)
+  // Ссылки для стабильного toggleRow (иначе memo строк бесполезен)
+  const lastClickedIndexRef = useRef(-1)
+  const filteredItemsRef = useRef<AggregationItem[]>([])
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const load = useCallback(async (force = false) => {
     setLoading(true)
@@ -126,6 +176,8 @@ export function AggregationPage() {
     })
   }, [items, searchQuery, statusFilter])
 
+  filteredItemsRef.current = filteredItems
+
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
   const page = Math.min(Math.max(0, currentPage), totalPages - 1)
   const pageStart = page * PAGE_SIZE
@@ -153,9 +205,10 @@ export function AggregationPage() {
     return ids
   }
 
-  const toggleRow = (documentId: string, index: number) => {
+  const toggleRow = useCallback((documentId: string, index: number) => {
     if (!documentId) return
     const shiftKey = shiftPressedRef.current
+    const lastClickedIndex = lastClickedIndexRef.current
     setSelectedIds((prev) => {
       const next = new Set(prev)
       const selected = next.has(documentId)
@@ -163,7 +216,7 @@ export function AggregationPage() {
         const start = Math.min(lastClickedIndex, index)
         const end = Math.max(lastClickedIndex, index)
         const shouldSelect = !selected
-        filteredItems.slice(start, end + 1).forEach((row) => {
+        filteredItemsRef.current.slice(start, end + 1).forEach((row) => {
           const id = String(row.document_id || '')
           if (!id) return
           if (shouldSelect) next.add(id)
@@ -176,8 +229,8 @@ export function AggregationPage() {
       }
       return next
     })
-    setLastClickedIndex(index)
-  }
+    lastClickedIndexRef.current = index
+  }, [])
 
   const selectVisible = () => {
     setSelectedIds(new Set(filteredItems.map((item) => String(item.document_id || '')).filter(Boolean)))
@@ -203,7 +256,7 @@ export function AggregationPage() {
 
   const clearSelection = () => {
     setSelectedIds(new Set())
-    setLastClickedIndex(-1)
+    lastClickedIndexRef.current = -1
   }
 
   const createCodes = () =>
@@ -338,14 +391,16 @@ export function AggregationPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatPill label="Всего АК" value={state.total_items ?? items.length} />
-        <StatPill label="Найдено" value={filteredItems.length} />
-        <StatPill label="Выбрано" value={selectedIds.size} />
-        <StatPill label="Возраст кэша" value={cacheAge > 0 ? `${cacheAge} с` : '—'} />
-      </div>
+      <StatRow
+        items={[
+          { label: 'Всего АК', value: state.total_items ?? items.length },
+          { label: 'Найдено', value: filteredItems.length },
+          { label: 'Выбрано', value: selectedIds.size },
+          { label: 'Возраст кэша', value: cacheAge > 0 ? `${cacheAge} с` : '—' },
+        ]}
+      />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <Card>
           <CardHeader>
             <CardTitle>Создание АК</CardTitle>
@@ -478,7 +533,7 @@ export function AggregationPage() {
         </Card>
       </div>
 
-      <Card className="mt-4">
+      <Card className="cv-auto mt-3">
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>Список АК из Контур.Маркировки</CardTitle>
@@ -503,7 +558,7 @@ export function AggregationPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2">
           <div className="grid gap-2 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
             <div>
               <FieldLabel>Статус</FieldLabel>
@@ -512,7 +567,7 @@ export function AggregationPage() {
                 onChange={(e) => {
                   setStatusFilter(e.target.value)
                   setCurrentPage(0)
-                  setLastClickedIndex(-1)
+                  lastClickedIndexRef.current = -1
                 }}
               >
                 {statusOptions.length === 0 ? <option value="">Все статусы</option> : null}
@@ -530,7 +585,7 @@ export function AggregationPage() {
                 onChange={(value) => {
                   setSearchQuery(value)
                   setCurrentPage(0)
-                  setLastClickedIndex(-1)
+                  lastClickedIndexRef.current = -1
                 }}
                 placeholder="Название или код агрегации"
               />
@@ -556,12 +611,12 @@ export function AggregationPage() {
                 <Table aria-label="Коды агрегации">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>✓</TableHead>
-                      <TableHead>АК</TableHead>
+                      <TableHead isRowHeader={false}>Выбор</TableHead>
+                      <TableHead isRowHeader>АК</TableHead>
                       <TableHead>Статус</TableHead>
                       <TableHead>Создан</TableHead>
-                      <TableHead>КМ</TableHead>
-                      <TableHead>Ошибки</TableHead>
+                      <TableHead className="text-right">КМ</TableHead>
+                      <TableHead className="text-right">Ошибки</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -585,48 +640,28 @@ export function AggregationPage() {
                               <Skeleton className="h-3 w-20" />
                             </TableCell>
                             <TableCell>
-                              <Skeleton className="h-3 w-8" />
+                              <Skeleton className="ml-auto h-3 w-8" />
                             </TableCell>
                             <TableCell>
-                              <Skeleton className="h-3 w-8" />
+                              <Skeleton className="ml-auto h-3 w-8" />
                             </TableCell>
                           </TableRow>
                         ))
                       : null}
                     {pageRows.map((row, localIndex) => {
                       const id = String(row.document_id || '')
-                      const selected = selectedIds.has(id)
                       const globalIndex = pageStart + localIndex
+                      const rowId = id || `${row.aggregate_code}-${globalIndex}`
                       return (
-                        <TableRow
-                          key={id || `${row.aggregate_code}-${globalIndex}`}
-                          id={id || `${row.aggregate_code}-${globalIndex}`}
-                          className={cn(selected && 'bg-muted/60', arrivedIds.has(id) && 'order-arrive')}
-                          onClick={() => toggleRow(id, globalIndex)}
-                        >
-                          <TableCell onClick={(event) => event.stopPropagation()}>
-                            <Checkbox
-                              isSelected={selected}
-                              onChange={() => toggleRow(id, globalIndex)}
-                              aria-label="Выбрать АК"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{row.aggregate_code || '—'}</div>
-                            <div className="text-[11px] text-muted-foreground">{row.comment || '—'}</div>
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={row.status_label || row.status} />
-                            {row.status === 'readyForSendAfterApproved' ? (
-                              <div className="mt-1 text-[11px] text-muted-foreground">
-                                Изменённый состав после прошлой регистрации
-                              </div>
-                            ) : null}
-                          </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">{row.created_at_label || '—'}</TableCell>
-                          <TableCell className="tabular-nums">{row.includes_units_count ?? 0}</TableCell>
-                          <TableCell className="tabular-nums">{row.codes_check_errors_count ?? 0}</TableCell>
-                        </TableRow>
+                        <AkRow
+                          key={rowId}
+                          rowId={rowId}
+                          row={row}
+                          globalIndex={globalIndex}
+                          selected={selectedIds.has(id)}
+                          arrived={arrivedIds.has(id)}
+                          onToggle={toggleRow}
+                        />
                       )
                     })}
                   </TableBody>

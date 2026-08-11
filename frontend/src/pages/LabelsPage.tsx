@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Maximize2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
-import { cn, getErrorMessage } from '@/lib/utils'
-import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
+import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
+import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -103,21 +103,69 @@ type LabelActionResult = {
 type PrintScope = 'all' | 'single' | 'range'
 type TableKey = 'orders' | 'aggregation' | 'marking'
 type Row = Record<string, unknown>
-type Column = { label: string; key: string }
+type Column = { label: string; key: string; align?: 'right'; mono?: boolean }
 
 const TEMPLATE_PAGE_SIZE = 3
 const EMPTY_MANUAL: ManualFields = { gtin: '', size: '', batch: '', color: '', units_per_pack: '' }
 
-function filterRows(rows: Row[], query: string): Row[] {
-  const normalized = query.trim().toLowerCase()
-  if (!normalized) return rows
-  return rows.filter((row) =>
-    Object.values(row)
-      .map((value) => String(value ?? '').toLowerCase())
-      .join(' ')
-      .includes(normalized),
+/* Колонки — модульные константы: стабильные props для memo-строк */
+const ORDER_COLUMNS: Column[] = [
+  { label: 'Заявка', key: 'order_name' },
+  { label: 'Полное наименование', key: 'full_name' },
+  { label: 'GTIN', key: 'gtin', mono: true },
+  { label: 'Размер', key: 'size' },
+  { label: 'Партия', key: 'batch' },
+]
+
+const FILE_COLUMNS: Column[] = [
+  { label: 'Файл', key: 'name' },
+  { label: 'Папка', key: 'folder_name' },
+  { label: 'Строк', key: 'record_count', align: 'right' },
+]
+
+/** Строка выбираемой таблицы — memo: клик не перерисовывает остальные строки. */
+const SelectableRow = memo(function SelectableRow({
+  row,
+  rowId,
+  index,
+  columns,
+  selected,
+  onSelect,
+}: {
+  row: Row
+  rowId: string
+  index: number
+  columns: Column[]
+  selected: boolean
+  onSelect: (id: string) => void
+}) {
+  return (
+    <TableRow
+      id={rowId || `row-${index}`}
+      className={cn(selected && 'row-selected')}
+      onClick={() => onSelect(selected ? '' : rowId)}
+    >
+      <TableCell>
+        <Checkbox
+          isSelected={selected}
+          aria-label={`Выбрать строку ${index + 1}`}
+          onChange={(next) => onSelect(next ? rowId : '')}
+        />
+      </TableCell>
+      {columns.map((column) => (
+        <TableCell
+          key={column.key}
+          className={cn(
+            column.align === 'right' && 'text-right tabular-nums',
+            column.mono && 'font-mono text-xs text-muted-foreground',
+          )}
+        >
+          {String(row[column.key] ?? '') || '—'}
+        </TableCell>
+      ))}
+    </TableRow>
   )
-}
+})
 
 function SelectableTable({
   ariaLabel,
@@ -151,32 +199,29 @@ function SelectableTable({
           <TableRow>
             <TableHead isRowHeader={false}>Выбор</TableHead>
             {columns.map((column, index) => (
-              <TableHead key={column.key} isRowHeader={index === 0}>{column.label}</TableHead>
+              <TableHead
+                key={column.key}
+                isRowHeader={index === 0}
+                className={cn(column.align === 'right' && 'text-right')}
+              >
+                {column.label}
+              </TableHead>
             ))}
           </TableRow>
         </TableHeader>
         <TableBody>
           {pager.pageRows.map((row, index) => {
             const id = rowId(row)
-            const selected = Boolean(id) && id === selectedId
             return (
-              <TableRow
+              <SelectableRow
                 key={id || index}
-                id={id || `row-${index}`}
-                className={cn(selected && 'bg-muted/60')}
-                onClick={() => onSelect(selected ? '' : id)}
-              >
-                <TableCell>
-                  <Checkbox
-                    isSelected={selected}
-                    aria-label={`Выбрать строку ${index + 1}`}
-                    onChange={(next) => onSelect(next ? id : '')}
-                  />
-                </TableCell>
-                {columns.map((column) => (
-                  <TableCell key={column.key}>{String(row[column.key] ?? '') || '—'}</TableCell>
-                ))}
-              </TableRow>
+                rowId={id}
+                row={row}
+                index={index}
+                columns={columns}
+                selected={Boolean(id) && id === selectedId}
+                onSelect={onSelect}
+              />
             )
           })}
         </TableBody>
@@ -299,25 +344,40 @@ export function LabelsPage() {
     setManualFields((prev) => ({ ...prev, [key]: value }))
   }
 
+  // Стабильные обработчики выбора — иначе memo строк не работает
+  const selectOrder = useCallback((id: string) => {
+    setOrderId(id)
+    setManualEnabled(false)
+    setManualPrompt('')
+    setManualFields(EMPTY_MANUAL)
+    setPreview(null)
+  }, [])
+
+  const selectAggregation = useCallback((id: string) => {
+    setAggregationPath(id)
+    setManualEnabled(false)
+    setManualPrompt('')
+    setManualFields(EMPTY_MANUAL)
+    setPreview(null)
+  }, [])
+
+  const selectMarking = useCallback((id: string) => {
+    setMarkingPath(id)
+    setManualEnabled(false)
+    setManualPrompt('')
+    setManualFields(EMPTY_MANUAL)
+    setPreview(null)
+  }, [])
+
   const tableConfig = (key: TableKey) => {
     if (key === 'orders') {
       return {
         title: 'Заказы',
         rows: orders as Row[],
-        columns: [
-          { label: 'Заявка', key: 'order_name' },
-          { label: 'Полное наименование', key: 'full_name' },
-          { label: 'GTIN', key: 'gtin' },
-          { label: 'Размер', key: 'size' },
-          { label: 'Партия', key: 'batch' },
-        ] as Column[],
+        columns: ORDER_COLUMNS,
         rowId: (row: Row) => String(row.document_id ?? ''),
         selectedId: orderId,
-        onSelect: (id: string) => {
-          setOrderId(id)
-          resetManual()
-          setPreview(null)
-        },
+        onSelect: selectOrder,
         emptyText: 'Заказы не найдены',
       }
     }
@@ -326,19 +386,10 @@ export function LabelsPage() {
     return {
       title: isAggregation ? 'Агрег коды км' : 'Коды км',
       rows: (isAggregation ? aggregationFiles : markingFiles) as Row[],
-      columns: [
-        { label: 'Файл', key: 'name' },
-        { label: 'Папка', key: 'folder_name' },
-        { label: 'Строк', key: 'record_count' },
-      ] as Column[],
+      columns: FILE_COLUMNS,
       rowId: (row: Row) => String(row.path ?? ''),
       selectedId: isAggregation ? aggregationPath : markingPath,
-      onSelect: (id: string) => {
-        if (isAggregation) setAggregationPath(id)
-        else setMarkingPath(id)
-        resetManual()
-        setPreview(null)
-      },
+      onSelect: isAggregation ? selectAggregation : selectMarking,
       emptyText: 'Файлы с кодами не найдены',
     }
   }
@@ -458,7 +509,7 @@ export function LabelsPage() {
   const renderTableCard = (key: TableKey) => {
     const config = tableConfig(key)
     return (
-      <Card>
+      <Card className="cv-auto">
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>{config.title}</CardTitle>
@@ -466,7 +517,8 @@ export function LabelsPage() {
           </div>
           <Button
             size="icon"
-            variant="outline"
+            variant="ghost"
+            className="h-8 w-8"
             title="На весь экран"
             aria-label="На весь экран"
             onClick={() => setFullscreen(key)}
@@ -485,7 +537,7 @@ export function LabelsPage() {
           ) : (
             <SelectableTable
               ariaLabel={config.title}
-              rows={filterRows(config.rows, search[key])}
+              rows={config.rows.filter((row) => rowMatchesQuery(row, search[key]))}
               columns={config.columns}
               rowId={config.rowId}
               selectedId={config.selectedId}
@@ -522,14 +574,16 @@ export function LabelsPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatPill label="Шаблоны формата" value={visibleTemplates.length} />
-        <StatPill label="Принтеры" value={printers.length} />
-        <StatPill label="Записей в файле" value={totalRecords || '—'} />
-        <StatPill label="Формат" value={sheetFormatLabel} />
-      </div>
+      <StatRow
+        items={[
+          { label: 'Шаблоны формата', value: visibleTemplates.length },
+          { label: 'Принтеры', value: printers.length },
+          { label: 'Записей в файле', value: totalRecords || '—' },
+          { label: 'Формат', value: sheetFormatLabel },
+        ]}
+      />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Параметры печати {sheetFormatLabel}</CardTitle>
@@ -587,7 +641,7 @@ export function LabelsPage() {
               </div>
             </div>
 
-            <div className="rounded-md border border-border bg-muted/30 p-3">
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
               <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <FieldLabel>Что печатаем</FieldLabel>
@@ -610,6 +664,7 @@ export function LabelsPage() {
                     <Button
                       size="icon"
                       variant="outline"
+                      className="h-9 w-9 shrink-0"
                       aria-label="Предыдущая запись"
                       disabled={printScope !== 'single' || totalRecords <= 0 || recordNumber <= 1}
                       onClick={() => {
@@ -633,6 +688,7 @@ export function LabelsPage() {
                     <Button
                       size="icon"
                       variant="outline"
+                      className="h-9 w-9 shrink-0"
                       aria-label="Следующая запись"
                       disabled={printScope !== 'single' || totalRecords <= 0 || recordNumber >= totalRecords}
                       onClick={() => {
@@ -676,7 +732,7 @@ export function LabelsPage() {
               <p className="mt-2 text-xs text-muted-foreground">{recordInfoText()}</p>
             </div>
 
-            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs">
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
               {previewLines.length === 0 ? (
                 <span className="text-muted-foreground">
                   Выберите шаблон, файл и заказ, затем нажмите «Показать контекст».
@@ -691,7 +747,7 @@ export function LabelsPage() {
             </div>
 
             {manualEnabled ? (
-              <div className="space-y-2 rounded-md border border-warning/40 bg-muted/30 p-3">
+              <div className="space-y-2 rounded-lg border border-warning/40 bg-muted/30 p-3">
                 <div className="text-sm font-medium">Ручное заполнение</div>
                 <p className="text-xs text-muted-foreground">
                   {manualPrompt ||
@@ -788,7 +844,7 @@ export function LabelsPage() {
                       key={String(template.path)}
                       type="button"
                       className={cn(
-                        'w-full rounded-xl border bg-[var(--field-bg)] px-3.5 py-2.5 text-left transition',
+                        'w-full rounded-lg border bg-[var(--field-bg)] px-3.5 py-2.5 text-left transition',
                         selected
                           ? 'border-foreground/40 ring-1 ring-foreground/15'
                           : 'border-border hover:border-[var(--field-border-hover)]',
@@ -801,14 +857,14 @@ export function LabelsPage() {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium">{template.name || '—'}</span>
-                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        <span className="shrink-0 rounded-sm bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                           {template.source_label || template.data_source_kind || '—'}
                         </span>
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
                         {template.sheet_format_label || template.sheet_format} • {template.category || '—'}
                       </div>
-                      <div className="truncate text-[11px] text-muted-foreground">{template.relative_path || ''}</div>
+                      <div className="truncate text-xs text-muted-foreground">{template.relative_path || ''}</div>
                     </button>
                   )
                 })}
@@ -819,9 +875,9 @@ export function LabelsPage() {
       </div>
 
       {/* Стопкой во всю ширину — в три узкие колонки данные было не видно */}
-      <div className="mt-4 space-y-4">
+      <div className="mt-3 space-y-3">
         {renderTableCard('orders')}
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-3 xl:grid-cols-2">
           {renderTableCard('aggregation')}
           {renderTableCard('marking')}
         </div>
@@ -846,7 +902,7 @@ export function LabelsPage() {
               />
               <SelectableTable
                 ariaLabel={fullscreenConfig.title}
-                rows={filterRows(fullscreenConfig.rows, search[fullscreen])}
+                rows={fullscreenConfig.rows.filter((row) => rowMatchesQuery(row, search[fullscreen]))}
                 columns={fullscreenConfig.columns}
                 rowId={fullscreenConfig.rowId}
                 selectedId={fullscreenConfig.selectedId}

@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -12,8 +13,8 @@ import { Download, Printer, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
-import { cn, getErrorMessage } from '@/lib/utils'
-import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
+import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
+import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -67,14 +68,63 @@ const EMPTY_SELECTION: Selection = { ids: [], focus: '' }
 /** Клик по этим элементам внутри строки не должен менять выбор */
 const CONTROL_SELECTOR = 'input, button, a, label, [role="checkbox"], [data-table-resize-handle]'
 
-function matchesQuery(item: DownloadItem, query: string) {
-  const normalized = query.trim().toLowerCase()
-  if (!normalized) return true
-  return Object.values(item)
-    .map((value) => String(value ?? '').toLowerCase())
-    .join(' ')
-    .includes(normalized)
-}
+/** Строка заказа — memo: выбор строки не перерисовывает остальные 50 строк страницы. */
+const DownloadRow = memo(function DownloadRow({
+  item,
+  rowId,
+  index,
+  checked,
+  focused,
+  onActivate,
+  onToggle,
+}: {
+  item: DownloadItem
+  rowId: string
+  index: number
+  checked: boolean
+  focused: boolean
+  onActivate: (documentId: string, rowIndex: number) => void
+  onToggle: (documentId: string) => void
+}) {
+  const documentId = item.document_id || ''
+  return (
+    <TableRow
+      id={rowId}
+      className={cn('select-none', (checked || focused) && 'row-selected')}
+      onClick={() => onActivate(documentId, index)}
+    >
+      <TableCell onClick={(event) => event.stopPropagation()}>
+        <Checkbox
+          isSelected={checked}
+          aria-label={`Выбрать заказ ${item.order_name || documentId}`}
+          onChange={() => onToggle(documentId)}
+        />
+      </TableCell>
+      <TableCell textValue={item.order_name || documentId}>
+        <div className="font-medium">{item.order_name || documentId || 'Без названия'}</div>
+        <div className="font-mono text-xs text-muted-foreground">{documentId || '—'}</div>
+      </TableCell>
+      <TableCell className="text-muted-foreground">
+        <div className="max-w-[280px] truncate">{item.full_name || item.simpl || '—'}</div>
+        {item.from_history ? (
+          <Badge tone="neutral" className="mt-1">
+            Из истории
+          </Badge>
+        ) : null}
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={item.status} />
+        {item.status_summary ? (
+          <div className="mt-1 text-xs text-muted-foreground">{item.status_summary}</div>
+        ) : null}
+      </TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+      <TableCell className="text-xs text-muted-foreground">
+        <div className="max-w-[220px] truncate">{item.file_label || '—'}</div>
+      </TableCell>
+    </TableRow>
+  )
+})
 
 export function DownloadPage() {
   const [loading, setLoading] = useState(false)
@@ -89,6 +139,8 @@ export function DownloadPage() {
   const lastClickedIndex = useRef(-1)
   // TableRow отдаёт onAction без исходного события — модификаторы снимаем до его срабатывания
   const clickMeta = useRef({ ctrl: false, shift: false, fromControl: false })
+  // Строки текущей страницы для стабильного activateRow (иначе memo строк бесполезен)
+  const pageRowsRef = useRef<DownloadItem[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -126,8 +178,9 @@ export function DownloadPage() {
   const items = state.items ?? []
   const printers = state.printers ?? []
 
-  const rows = useMemo(() => items.filter((item) => matchesQuery(item, search)), [items, search])
+  const rows = useMemo(() => items.filter((item) => rowMatchesQuery(item, search)), [items, search])
   const pager = usePagination(rows)
+  pageRowsRef.current = pager.pageRows
 
   const targetIds = selection.ids.length ? selection.ids : [selection.focus].filter(Boolean)
   const printTargetId = selection.focus || selection.ids[0] || ''
@@ -145,12 +198,12 @@ export function DownloadPage() {
     }
   }
 
-  const toggleId = (documentId: string) => {
+  const toggleId = useCallback((documentId: string) => {
     setSelection((prev) => ({
       ids: prev.ids.includes(documentId) ? prev.ids.filter((id) => id !== documentId) : [...prev.ids, documentId],
       focus: documentId,
     }))
-  }
+  }, [])
 
   const visibleIds = useMemo(() => rows.map((row) => row.document_id || '').filter(Boolean), [rows])
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selection.ids.includes(id))
@@ -182,7 +235,7 @@ export function DownloadPage() {
     }
   }
 
-  const activateRow = (documentId: string, rowIndex: number) => {
+  const activateRow = useCallback((documentId: string, rowIndex: number) => {
     if (!documentId) return
     const { ctrl, shift, fromControl } = clickMeta.current
     if (fromControl) return
@@ -190,7 +243,7 @@ export function DownloadPage() {
       const start = Math.min(lastClickedIndex.current, rowIndex)
       const end = Math.max(lastClickedIndex.current, rowIndex)
       // Индексы — в пределах текущей страницы таблицы
-      const rangeIds = pager.pageRows.slice(start, end + 1).map((row) => row.document_id || '').filter(Boolean)
+      const rangeIds = pageRowsRef.current.slice(start, end + 1).map((row) => row.document_id || '').filter(Boolean)
       setSelection((prev) => ({
         ids: Array.from(new Set([...prev.ids, ...rangeIds])),
         focus: documentId,
@@ -201,7 +254,7 @@ export function DownloadPage() {
       setSelection({ ids: [documentId], focus: documentId })
     }
     lastClickedIndex.current = rowIndex
-  }
+  }, [toggleId])
 
   const syncStatuses = () =>
     runBusy(
@@ -298,14 +351,16 @@ export function DownloadPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatPill label="Всего заказов" value={items.length} />
-        <StatPill label="Выбрано" value={selection.ids.length} />
-        <StatPill label="Принтеры" value={printers.length} />
-        <StatPill label="По умолчанию" value={state.default_printer || '—'} />
-      </div>
+      <StatRow
+        items={[
+          { label: 'Всего заказов', value: items.length },
+          { label: 'Выбрано', value: selection.ids.length },
+          { label: 'Принтеры', value: printers.length },
+          { label: 'По умолчанию', value: state.default_printer || '—' },
+        ]}
+      />
 
-      <Card className="mb-4">
+      <Card className="mb-3">
         <CardHeader>
           <CardTitle>Активные загрузки</CardTitle>
           <CardDescription>
@@ -378,7 +433,7 @@ export function DownloadPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="cv-auto">
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>Заказы</CardTitle>
@@ -419,45 +474,17 @@ export function DownloadPage() {
                   {pager.pageRows.map((item, index) => {
                     const documentId = item.document_id || ''
                     const rowId = documentId || `${item.order_name}-${index}`
-                    const checked = selection.ids.includes(documentId)
-                    const focused = selection.focus === documentId
                     return (
-                      <TableRow
+                      <DownloadRow
                         key={rowId}
-                        id={rowId}
-                        className={cn('select-none', (checked || focused) && 'bg-muted/60')}
-                        onClick={() => activateRow(documentId, index)}
-                      >
-                        <TableCell onClick={(event) => event.stopPropagation()}>
-                          <Checkbox
-                            isSelected={checked}
-                            aria-label={`Выбрать заказ ${item.order_name || documentId}`}
-                            onChange={() => toggleId(documentId)}
-                          />
-                        </TableCell>
-                        <TableCell textValue={item.order_name || documentId}>
-                          <div className="font-medium">{item.order_name || documentId || 'Без названия'}</div>
-                          <div className="font-mono text-[11px] text-muted-foreground">{documentId || '—'}</div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          <div className="max-w-[280px] truncate">{item.full_name || item.simpl || '—'}</div>
-                          {item.from_history ? (
-                            <Badge tone="neutral" className="mt-1">
-                              Из истории
-                            </Badge>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={item.status} />
-                          {item.status_summary ? (
-                            <div className="mt-1 text-[11px] text-muted-foreground">{item.status_summary}</div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          <div className="max-w-[220px] truncate">{item.file_label || '—'}</div>
-                        </TableCell>
-                      </TableRow>
+                        rowId={rowId}
+                        item={item}
+                        index={index}
+                        checked={selection.ids.includes(documentId)}
+                        focused={selection.focus === documentId}
+                        onActivate={activateRow}
+                        onToggle={toggleId}
+                      />
                     )
                   })}
                 </TableBody>

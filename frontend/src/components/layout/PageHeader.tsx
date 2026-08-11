@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { Card } from '@heroui/react'
 import { cn } from '@/lib/utils'
 import { AnimatedNumber } from '@/components/ui/animated-number'
 
@@ -15,31 +14,48 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('mb-4 flex flex-wrap items-start justify-between gap-3', className)}>
-      <div className="min-w-0 space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
-        {subtitle ? <p className="max-w-3xl text-sm text-muted-foreground">{subtitle}</p> : null}
+    <div className={cn('mb-3 flex flex-wrap items-center justify-between gap-2', className)}>
+      <div className="min-w-0">
+        <h1 className="text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+        {subtitle ? <p className="max-w-3xl truncate text-xs text-muted-foreground">{subtitle}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   )
 }
 
+/** Компактная стат-пилюля: подпись и значение в одну строку. */
 export function StatPill({ label, value }: { label: string; value: string | number }) {
-  // Та же поверхность, что у остальных блоков (HeroUI Card)
   return (
-    <Card className="gap-0 px-4 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
+    <div className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-card px-3">
+      <span className="whitespace-nowrap text-xs text-muted-foreground">{label}</span>
+      <span className="whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">
         <AnimatedNumber value={value} />
-      </div>
-    </Card>
+      </span>
+    </div>
+  )
+}
+
+/** Одна компактная строка статистики над контентом страницы. */
+export function StatRow({
+  items,
+  className,
+}: {
+  items: Array<{ label: string; value: string | number }>
+  className?: string
+}) {
+  return (
+    <div className={cn('mb-3 flex flex-wrap items-center gap-2', className)}>
+      {items.map((item) => (
+        <StatPill key={item.label} label={item.label} value={item.value} />
+      ))}
+    </div>
   )
 }
 
 export function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+    <div className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
       {children}
     </div>
   )

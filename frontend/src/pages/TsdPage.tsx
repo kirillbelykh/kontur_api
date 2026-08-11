@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { PenLine, PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
-import { cn, getErrorMessage } from '@/lib/utils'
-import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
+import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
+import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -60,14 +60,55 @@ const EMPTY_FORM: TsdForm = {
   batch_number: '',
 }
 
-function matchesQuery(item: TsdItem, query: string) {
-  const normalized = query.trim().toLowerCase()
-  if (!normalized) return true
-  return Object.values(item)
-    .map((value) => String(value ?? '').toLowerCase())
-    .join(' ')
-    .includes(normalized)
-}
+/** Строка заказа ТСД — memo: выбор строки не перерисовывает остальные строки. */
+const TsdRow = memo(function TsdRow({
+  item,
+  rowId,
+  selected,
+  onToggle,
+}: {
+  item: TsdItem
+  rowId: string
+  selected: boolean
+  onToggle: (documentId: string) => void
+}) {
+  const documentId = item.document_id || ''
+  return (
+    <TableRow
+      id={rowId}
+      className={cn(selected && 'row-selected')}
+      onClick={() => onToggle(documentId)}
+    >
+      <TableCell>
+        <Checkbox
+          isSelected={selected}
+          aria-label={`Выбрать заказ ${item.order_name || documentId}`}
+          onChange={() => onToggle(documentId)}
+        />
+      </TableCell>
+      <TableCell textValue={item.order_name || documentId}>
+        <div className="font-medium">{item.order_name || documentId || 'Без названия'}</div>
+        <div className="font-mono text-xs text-muted-foreground">{documentId || '—'}</div>
+      </TableCell>
+      <TableCell className="text-muted-foreground">
+        <div className="max-w-[280px] truncate">{item.full_name || item.simpl || '—'}</div>
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={item.status} />
+        {item.status_summary ? (
+          <div className="mt-1 text-xs text-muted-foreground">{item.status_summary}</div>
+        ) : null}
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={item.tsd_status} />
+        {item.tsd_intro_number ? (
+          <div className="mt-1 font-mono text-xs text-muted-foreground">{item.tsd_intro_number}</div>
+        ) : null}
+      </TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
+    </TableRow>
+  )
+})
 
 export function TsdPage() {
   const [loading, setLoading] = useState(false)
@@ -89,12 +130,12 @@ export function TsdPage() {
     setSelectedIds((prev) => prev.filter((id) => next.some((item) => item.document_id === id)))
   }
 
-  const toggleId = (documentId: string) => {
+  const toggleId = useCallback((documentId: string) => {
     if (!documentId) return
     setSelectedIds((prev) =>
       prev.includes(documentId) ? prev.filter((id) => id !== documentId) : [...prev, documentId],
     )
-  }
+  }, [])
 
   const load = useCallback(async (useLive = false) => {
     setLoading(true)
@@ -134,7 +175,7 @@ export function TsdPage() {
   const rows = useMemo(
     () =>
       items.filter((item) => {
-        if (!matchesQuery(item, search)) return false
+        if (!rowMatchesQuery(item, search)) return false
         if (!statusFilter) return true
         return String(item.tsd_status || '').trim() === statusFilter
       }),
@@ -247,14 +288,16 @@ export function TsdPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <StatPill label="Документов" value={items.length} />
-        <StatPill label="Готовы к ТСД" value={readyCount} />
-        <StatPill label="Выбрано" value={selectedIds.length} />
-        <StatPill label="Режим" value={live ? 'Live' : 'Кэш'} />
-      </div>
+      <StatRow
+        items={[
+          { label: 'Документов', value: items.length },
+          { label: 'Готовы к ТСД', value: readyCount },
+          { label: 'Выбрано', value: selectedIds.length },
+          { label: 'Режим', value: live ? 'Live' : 'Кэш' },
+        ]}
+      />
 
-      <Card className="mb-4">
+      <Card className="mb-3">
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>Параметры задания</CardTitle>
@@ -321,7 +364,7 @@ export function TsdPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="cv-auto">
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>Заказы</CardTitle>
@@ -332,6 +375,7 @@ export function TsdPage() {
               <SelectNative
                 value={statusFilter}
                 placeholder="Все статусы"
+                aria-label="Фильтр по статусу ТСД"
                 onChange={(event) => setStatusFilter(event.target.value)}
               >
                 <option value="">Все статусы</option>
@@ -369,42 +413,14 @@ export function TsdPage() {
                   {pager.pageRows.map((item, index) => {
                     const documentId = item.document_id || ''
                     const rowId = documentId || `${item.order_name}-${index}`
-                    const selected = Boolean(documentId) && selectedIds.includes(documentId)
                     return (
-                      <TableRow
+                      <TsdRow
                         key={rowId}
-                        id={rowId}
-                        className={cn(selected && 'bg-muted/60')}
-                        onClick={() => toggleId(documentId)}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            isSelected={selected}
-                            aria-label={`Выбрать заказ ${item.order_name || documentId}`}
-                            onChange={() => toggleId(documentId)}
-                          />
-                        </TableCell>
-                        <TableCell textValue={item.order_name || documentId}>
-                          <div className="font-medium">{item.order_name || documentId || 'Без названия'}</div>
-                          <div className="font-mono text-[11px] text-muted-foreground">{documentId || '—'}</div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          <div className="max-w-[280px] truncate">{item.full_name || item.simpl || '—'}</div>
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={item.status} />
-                          {item.status_summary ? (
-                            <div className="mt-1 text-[11px] text-muted-foreground">{item.status_summary}</div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell>
-                          <StatusBadge status={item.tsd_status} />
-                          {item.tsd_intro_number ? (
-                            <div className="mt-1 font-mono text-[11px] text-muted-foreground">{item.tsd_intro_number}</div>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
-                      </TableRow>
+                        rowId={rowId}
+                        item={item}
+                        selected={Boolean(documentId) && selectedIds.includes(documentId)}
+                        onToggle={toggleId}
+                      />
                     )
                   })}
                 </TableBody>

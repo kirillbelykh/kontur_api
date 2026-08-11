@@ -1,35 +1,43 @@
+import { Suspense, lazy } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { AlertTriangle, CheckCircle2, Info, Loader2, XCircle } from 'lucide-react'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AppUpdateProvider } from '@/hooks/useAppUpdate'
 import { PageZoomProvider } from '@/hooks/usePageZoom'
-import { AggregationPage } from '@/pages/AggregationPage'
-import { DownloadPage } from '@/pages/DownloadPage'
-import { IntroPage } from '@/pages/IntroPage'
-import { LabelsPage } from '@/pages/LabelsPage'
-import { OrdersPage } from '@/pages/OrdersPage'
-import { TsdPage } from '@/pages/TsdPage'
 import { WelcomePage } from '@/pages/WelcomePage'
+
+// Стартовый экран и каркас — сразу; рабочие страницы — отдельными чанками по требованию
+const OrdersPage = lazy(() => import('@/pages/OrdersPage').then((m) => ({ default: m.OrdersPage })))
+const DownloadPage = lazy(() => import('@/pages/DownloadPage').then((m) => ({ default: m.DownloadPage })))
+const IntroPage = lazy(() => import('@/pages/IntroPage').then((m) => ({ default: m.IntroPage })))
+const TsdPage = lazy(() => import('@/pages/TsdPage').then((m) => ({ default: m.TsdPage })))
+const AggregationPage = lazy(() => import('@/pages/AggregationPage').then((m) => ({ default: m.AggregationPage })))
+const LabelsPage = lazy(() => import('@/pages/LabelsPage').then((m) => ({ default: m.LabelsPage })))
 
 export default function App() {
   return (
     <HashRouter>
       <PageZoomProvider>
       <AppUpdateProvider>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Navigate to="/welcome" replace />} />
-            <Route path="/welcome" element={<WelcomePage />} />
-            <Route path="/orders" element={<OrdersPage />} />
-            <Route path="/download" element={<DownloadPage />} />
-            <Route path="/intro" element={<IntroPage />} />
-            <Route path="/tsd" element={<TsdPage />} />
-            <Route path="/aggregation" element={<AggregationPage />} />
-            <Route path="/labels" element={<LabelsPage />} />
-            <Route path="*" element={<Navigate to="/welcome" replace />} />
-          </Route>
-        </Routes>
+        <ErrorBoundary>
+          <Suspense fallback={null}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Navigate to="/welcome" replace />} />
+                <Route path="/welcome" element={<WelcomePage />} />
+                <Route path="/orders" element={<OrdersPage />} />
+                <Route path="/download" element={<DownloadPage />} />
+                <Route path="/intro" element={<IntroPage />} />
+                <Route path="/tsd" element={<TsdPage />} />
+                <Route path="/aggregation" element={<AggregationPage />} />
+                <Route path="/labels" element={<LabelsPage />} />
+                <Route path="*" element={<Navigate to="/welcome" replace />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
         <Toaster
           position="top-right"
           closeButton
@@ -46,7 +54,7 @@ export default function App() {
             unstyled: true,
             classNames: {
               toast:
-                'kontur-toast group relative flex w-full items-center gap-3 rounded-2xl border border-border bg-card py-3 pl-3 pr-10 text-sm text-foreground shadow-panel',
+                'kontur-toast group relative flex w-full items-center gap-3 rounded-lg border border-border bg-card py-3 pl-3 pr-10 text-sm text-foreground shadow-panel',
               title: 'font-medium leading-snug',
               description: 'mt-0.5 text-xs text-muted-foreground',
               icon: 'kontur-toast-icon',
