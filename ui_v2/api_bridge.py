@@ -1896,56 +1896,48 @@ class ApiBridge:
         with runtime.lock:
             age = time.time() - runtime.session_created_at if runtime.session_created_at else 0.0
             if force_refresh or runtime.session is None or age >= runtime.session_ttl_seconds:
-                cookies: Optional[Dict[str, str]]
+                # One orchestration path: auth.get_valid_cookies always proves
+                # cookies against Kontur API and opens Selenium only when the
+                # cheaper sources are dead. force_browser_refresh keeps the
+                # historical UI wording but no longer skips API validation or
+                # hides a broken "already have cookies" short-circuit.
                 if force_browser_refresh:
                     runtime.auth_state = "browser"
-                    runtime.auth_message = "Открываем браузер и собираем cookies..."
-                    runtime.auth_error = ""
-                    runtime.auth_updated_at = time.time()
-                    browser_cookies = cookies_module.load_cookies_from_yandex_profile()
-                    saved_cookies = browser_cookies or cookies_module.load_cookies_from_file(allow_stale=True)
-                    if saved_cookies and cookies_module.validate_kontur_session(saved_cookies):
-                        # A refresh button should not interrupt a working
-                        # session just because the browser profile is locked.
-                        cookies_module.save_cookies_to_file(saved_cookies)
-                        cookies = saved_cookies
-                        runtime.auth_message = "Сессия Контур обновлена."
-                    else:
-                        cookies = cookies_module.get_cookies()
-                elif force_refresh:
-                    runtime.auth_state = "cookies"
-                    runtime.auth_message = "Проверяем сохраненные cookies..."
-                    runtime.auth_error = ""
-                    runtime.auth_updated_at = time.time()
-                    cookies = get_valid_cookies() or cookies_module.get_cookies()
+                    runtime.auth_message = (
+                        "Обновляем cookies в фоновом браузере..."
+                    )
                 else:
                     runtime.auth_state = "cookies"
-                    runtime.auth_message = "Проверяем действующую сессию..."
-                    runtime.auth_error = ""
-                    runtime.auth_updated_at = time.time()
-                    cookies = get_valid_cookies()
+                    runtime.auth_message = (
+                        "Проверяем сохраненные cookies..."
+                        if force_refresh
+                        else "Проверяем действующую сессию..."
+                    )
+                runtime.auth_error = ""
+                runtime.auth_updated_at = time.time()
+
+                cookies = get_valid_cookies(force_refresh=bool(force_refresh or force_browser_refresh))
                 if not cookies:
                     runtime.auth_state = "error"
                     runtime.auth_message = "Cookies не получены."
                     runtime.auth_error = "Не удалось получить валидные cookies для Контур.Маркировки."
                     runtime.auth_updated_at = time.time()
                     raise RuntimeError("Не удалось получить валидные cookies для Контур.Маркировки.")
-                if not cookies_module.validate_kontur_session(cookies):
-                    runtime.auth_state = "browser"
-                    runtime.auth_message = "Сохраненная сессия отклонена Контуром. Собираем новые cookies..."
-                    runtime.auth_error = ""
-                    runtime.auth_updated_at = time.time()
-                    cookies = cookies_module.get_cookies()
-                if not cookies or not cookies_module.validate_kontur_session(cookies):
-                    runtime.auth_state = "error"
-                    runtime.auth_message = "Контур не подтвердил сессию."
-                    runtime.auth_error = "Контур.Маркировка отклонила cookies. Выполните вход в Контур и повторите обновление сессии."
-                    runtime.auth_updated_at = time.time()
-                    raise RuntimeError(runtime.auth_error)
+
                 runtime.auth_state = "validating"
                 runtime.auth_message = "Проверяем доступ к Контур.Маркировке..."
                 runtime.auth_error = ""
                 runtime.auth_updated_at = time.time()
+                if not cookies_module.validate_kontur_session(cookies):
+                    runtime.auth_state = "error"
+                    runtime.auth_message = "Контур не подтвердил сессию."
+                    runtime.auth_error = (
+                        "Контур.Маркировка отклонила cookies. "
+                        "Выполните вход в Контур и повторите обновление сессии."
+                    )
+                    runtime.auth_updated_at = time.time()
+                    raise RuntimeError(runtime.auth_error)
+
                 runtime.session = make_session_with_cookies(cookies)
                 runtime.session_created_at = time.time()
                 runtime.auth_state = "ready"

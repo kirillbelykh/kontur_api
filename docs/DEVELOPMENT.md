@@ -18,9 +18,10 @@ uv sync --python 3.12 --group dev
 Перед пушем запускайте минимум:
 
 ```powershell
-python -m py_compile ui_v2\api_bridge.py ui_v2\main_v2.py
+uv sync --python 3.12 --group dev
+python -m py_compile auth\__init__.py cookies.py session_manager.py ui_v2\api_bridge.py ui_v2\main_v2.py
 node --check ui_v2\ui\app.js
-python -m unittest tests.test_ui_v2_api_bridge tests.test_history_db_unit
+python -m unittest tests.test_auth_cookies tests.test_cookies_prolongation tests.test_ui_v2_api_bridge tests.test_history_db_unit
 ```
 
 Если менялись утилиты верхнего уровня, добавьте их в `py_compile` или точечные
