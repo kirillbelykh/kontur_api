@@ -1,6 +1,58 @@
 {
   "orders": [
     {
+      "order_name": "тест з-1",
+      "document_id": "6b951cc6-af8d-465d-b425-87ac48667f41",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
+      "gtin": "4650118040083",
+      "positions": [
+        {
+          "gtin": "4650118040083",
+          "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-08-11T22:05:10.002772",
+      "created_by": "user",
+      "updated_at": "2026-08-11T22:05:10.002772",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
+      "order_name": "тест з-1",
+      "document_id": "ec7533ba-b51e-4256-a536-cc8c6a3b9871",
+      "status": "Выполнен",
+      "filename": null,
+      "simpl": "wheelChairs",
+      "full_name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
+      "gtin": "4650118040083",
+      "positions": [
+        {
+          "gtin": "4650118040083",
+          "name": "Перчатки Sterä диагностические стерильные одноразовые из натурального латекса неопудренные текстурированные неанатомической формы, с венчиком, р-р M",
+          "tnvedCode": "4015120009",
+          "quantity": 1,
+          "cisType": "unit"
+        }
+      ],
+      "created_at": "2026-08-11T22:03:02.657756",
+      "created_by": "user",
+      "updated_at": "2026-08-11T22:03:02.657756",
+      "updated_by": "user",
+      "tsd_created": false,
+      "tsd_created_at": null,
+      "tsd_intro_number": null,
+      "tsd_created_by": null
+    },
+    {
       "order_name": "тестовый з 4",
       "document_id": "73eb946e-653e-45f4-b7a5-521fa67c011b",
       "status": "Выполнен",
@@ -36191,7 +36243,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-11T22:02:24.089354",
+  "last_update": "2026-08-11T22:05:13.919176",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
