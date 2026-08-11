@@ -6657,52 +6657,6 @@ class ApiBridge:
     def introduce_aggregations(
         self,
         comment_filter: str,
-        tsd_token: str,
-        production_date: str,
-        expiration_date: str,
-        batch_number: str,
-    ) -> Dict[str, Any]:
-        try:
-            cert = self._get_certificate()
-            if not cert:
-                raise RuntimeError("Не найден сертификат для подписи.")
-
-            normalized_token = str(tsd_token or "").strip()
-            normalized_batch = str(batch_number or "").strip()
-            if not normalized_token:
-                raise RuntimeError("Введите TSD токен.")
-            if not normalized_batch:
-                raise RuntimeError("Укажите номер партии.")
-
-            prod = self._parse_iso_date(production_date, field_name="Дата производства")
-            exp = self._parse_iso_date(expiration_date, field_name="Срок годности")
-            normalized_filter = str(comment_filter or "").strip()
-            if normalized_filter:
-                self._log("aggregation", f"Запускаем ввод в оборот АК по фильтру '{normalized_filter}'.")
-            else:
-                self._log("aggregation", "Запускаем ввод в оборот для всех АК в статусе readyForSend.")
-
-            summary = self._run_with_session_retry(
-                lambda session: self._introduce_aggregations_via_exact_codes(
-                    session,
-                    comment_filter=normalized_filter,
-                    tsd_token=normalized_token,
-                    production_date=prod,
-                    expiration_date=exp,
-                    batch_number=normalized_batch,
-                    cert=cert,
-                ),
-                log_channel="aggregation",
-                retry_message="Обновляем сессию перед повторной отправкой ввода в оборот АК",
-            )
-            return {"success": True, "summary": summary}
-        except Exception as exc:
-            self._log("aggregation", f"Ошибка ввода в оборот АК: {exc}")
-            return {"success": False, "error": str(exc)}
-
-    def introduce_aggregations(
-        self,
-        comment_filter: str,
         production_date: str,
         expiration_date: str,
         batch_number: str,
