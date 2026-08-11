@@ -54,6 +54,11 @@ See [AGENTS.md](AGENTS.md). Short map:
 .\.venv\Scripts\python.exe -m unittest tests.test_auth_cookies tests.test_cookies_prolongation tests.test_ui_v2_api_bridge tests.test_history_db_unit
 ```
 
+
+## Windows installer
+
+Run `Build-Installer.bat` from the project root. Intermediates stay under `dist\installer\` / `installer\payload\`; the deliverable `KonturMarkirovka-Setup.exe` is published to the **project root** (large binaries are gitignored).
+
 ## Update
 
 ```powershell

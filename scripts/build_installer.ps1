@@ -23,6 +23,28 @@ $distDir = Join-Path $ProjectDir "dist\installer"
 $issPath = Join-Path $installerDir "KonturMarkirovka.iss"
 
 New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+
+function Publish-Deliverables {
+    param(
+        [string]$Root,
+        [string]$Dist,
+        [string]$Version
+    )
+    $names = @(
+        "KonturMarkirovka-Setup.exe",
+        "Setup-KonturMarkirovka.bat",
+        "KonturMarkirovka-$Version-payload.zip",
+        "Install-KonturMarkirovka.ps1"
+    )
+    foreach ($name in $names) {
+        $src = Join-Path $Dist $name
+        if (Test-Path -LiteralPath $src) {
+            $dst = Join-Path $Root $name
+            Copy-Item -LiteralPath $src -Destination $dst -Force
+            Write-Ok "Published to root: $dst"
+        }
+    }
+}
 if (Test-Path -LiteralPath $payloadDir) {
     Remove-Item -LiteralPath $payloadDir -Recurse -Force
 }
@@ -64,6 +86,11 @@ Get-ChildItem -LiteralPath $ProjectDir -Force | ForEach-Object {
     } else {
         if ($_.Name -match '\.log$') { return }
         if ($_.Name -eq 'full_orders_history.json') { return }
+        # Do not nest previous installer deliverables into the next payload
+        if ($_.Name -eq 'KonturMarkirovka-Setup.exe') { return }
+        if ($_.Name -like 'KonturMarkirovka-*-payload.zip') { return }
+        if ($_.Name -eq 'Setup-KonturMarkirovka.bat') { return }
+        if ($_.Name -eq 'Install-KonturMarkirovka.ps1') { return }
         Copy-Item -LiteralPath $_.FullName -Destination $dest -Force
     }
 }
@@ -114,6 +141,7 @@ Write-Ok "PS installer: $psInstaller"
 
 if ($SkipInno) {
     Write-WarnMsg "SkipInno set - Setup.exe not built"
+    Publish-Deliverables -Root $ProjectDir -Dist $distDir -Version $Version
     exit 0
 }
 
@@ -212,6 +240,7 @@ SourceFiles0=$distDir\
     $setup = Get-Item -LiteralPath (Join-Path $distDir "KonturMarkirovka-Setup.exe") -ErrorAction SilentlyContinue
     if ($null -ne $setup) {
         Write-Ok "Installer ready: $($setup.FullName)"
+        Publish-Deliverables -Root $ProjectDir -Dist $distDir -Version $Version
         exit 0
     }
     Write-WarnMsg "Setup.exe was not created."
@@ -230,6 +259,8 @@ try {
 $setup = Get-ChildItem -LiteralPath $distDir -Filter "KonturMarkirovka-Setup*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if ($null -ne $setup) {
     Write-Ok "Installer ready: $($setup.FullName)"
+    Publish-Deliverables -Root $ProjectDir -Dist $distDir -Version $Version
 } else {
     Write-WarnMsg "Setup.exe not found in $distDir"
+    Publish-Deliverables -Root $ProjectDir -Dist $distDir -Version $Version
 }

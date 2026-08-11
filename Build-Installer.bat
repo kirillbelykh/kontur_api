@@ -10,6 +10,11 @@ if not "%ERR%"=="0" (
   exit /b %ERR%
 )
 echo.
-echo Output: dist\installer\
-dir /b "%~dp0dist\installer\"
+echo Deliverable: KonturMarkirovka-Setup.exe (project root)
+if exist "%~dp0KonturMarkirovka-Setup.exe" (
+  dir /b "%~dp0KonturMarkirovka-Setup.exe"
+) else (
+  echo Setup.exe not found in project root - check dist\installer\
+  dir /b "%~dp0dist\installer\"
+)
 pause

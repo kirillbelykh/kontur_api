@@ -42,6 +42,11 @@ npm run dev
 # then set VITE_DEV_URL=http://127.0.0.1:5173 and restart main.py
 ```
 
+
+## Windows installer
+
+`Build-Installer.bat` -> `KonturMarkirovka-Setup.exe` appears in the **project root** (build cache: `dist\installer\`, payload staging: `installer\payload\`).
+
 ## Architecture
 
 ```
