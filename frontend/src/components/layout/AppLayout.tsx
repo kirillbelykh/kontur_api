@@ -12,6 +12,8 @@ import {
   RefreshCw,
   Shield,
   Smartphone,
+  ZoomIn,
+  ZoomOut,
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -22,6 +24,7 @@ import { cn, getErrorMessage } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
+import { usePageZoom } from '@/hooks/usePageZoom'
 
 const DESKTOP_SIDEBAR_OPEN_WIDTH = 256
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = 64
@@ -229,6 +232,7 @@ export function AppLayout() {
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
   const { updateAvailable, applying, applyUpdate, remoteShort } = useAppUpdate()
+  const { zoom, zoomIn, zoomOut, resetZoom } = usePageZoom()
 
   const title = useMemo(() => {
     const exact = titles[location.pathname]
@@ -383,6 +387,34 @@ export function AppLayout() {
             ) : null}
 
             <div className="flex items-center gap-2">
+              <div className="hidden items-center rounded-lg thin-border sm:flex">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={zoomOut}
+                  aria-label="Уменьшить масштаб"
+                  title="Уменьшить масштаб (Ctrl+−)"
+                >
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <button
+                  type="button"
+                  onClick={resetZoom}
+                  title="Сбросить масштаб (Ctrl+0)"
+                  className="min-w-[3.25rem] border-0 bg-transparent px-1 py-0 text-xs font-medium tabular-nums text-muted-foreground hover:text-foreground"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={zoomIn}
+                  aria-label="Увеличить масштаб"
+                  title="Увеличить масштаб (Ctrl++)"
+                >
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+              </div>
               {updateAvailable ? (
                 <Button
                   variant="warning"

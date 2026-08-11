@@ -2,6 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AppUpdateProvider } from '@/hooks/useAppUpdate'
+import { PageZoomProvider } from '@/hooks/usePageZoom'
 import { AggregationPage } from '@/pages/AggregationPage'
 import { ChzPage } from '@/pages/ChzPage'
 import { DownloadPage } from '@/pages/DownloadPage'
@@ -14,6 +15,7 @@ import { WelcomePage } from '@/pages/WelcomePage'
 export default function App() {
   return (
     <HashRouter>
+      <PageZoomProvider>
       <AppUpdateProvider>
         <Routes>
           <Route element={<AppLayout />}>
@@ -38,6 +40,7 @@ export default function App() {
           }}
         />
       </AppUpdateProvider>
+      </PageZoomProvider>
     </HashRouter>
   )
 }
