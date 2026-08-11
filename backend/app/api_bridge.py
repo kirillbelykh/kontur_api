@@ -83,6 +83,8 @@ from backend.services.options import (
     venchik_required,
 )
 from backend.services.queue_utils import is_order_ready_for_intro, is_order_ready_for_tsd, remove_order_by_document_id
+from backend.services.update import apply_update as apply_git_update
+from backend.services.update import probe_updates
 from backend.services.utils import get_tnved_code, make_session_with_cookies
 
 LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS = 300
@@ -4152,6 +4154,20 @@ class ApiBridge:
         try:
             self._ensure_session(force_refresh=True, force_browser_refresh=True)
             return {"success": True, "session": self.get_session_info()}
+        except Exception as exc:
+            return {"success": False, "error": str(exc)}
+
+    def check_for_updates(self) -> Dict[str, Any]:
+        """Fetch origin and report whether origin/main is ahead of HEAD."""
+        try:
+            return probe_updates()
+        except Exception as exc:
+            return {"update_available": False, "error": str(exc)}
+
+    def apply_update(self) -> Dict[str, Any]:
+        """Fast-forward to origin/main. Restart is left to the user (desktop shell)."""
+        try:
+            return apply_git_update(auto_restart=False, allow_hard_reset=False)
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
