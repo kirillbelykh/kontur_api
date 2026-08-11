@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Card } from '@heroui/react'
 import { cn } from '@/lib/utils'
+import { AnimatedNumber } from '@/components/ui/animated-number'
 
 export function PageHeader({
   title,
@@ -29,7 +30,9 @@ export function StatPill({ label, value }: { label: string; value: string | numb
   return (
     <Card className="gap-0 px-4 py-3">
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{value}</div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">
+        <AnimatedNumber value={value} />
+      </div>
     </Card>
   )
 }

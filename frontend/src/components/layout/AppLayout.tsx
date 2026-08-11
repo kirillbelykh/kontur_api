@@ -24,6 +24,7 @@ import { apiCall, type SessionInfo } from '@/lib/bridge'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { AnimatedNumber, AnimatedTextSwap } from '@/components/ui/animated-number'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import { usePageZoom } from '@/hooks/usePageZoom'
 import { useTheme } from '@/hooks/useTheme'
@@ -404,7 +405,7 @@ export function AppLayout() {
                   title="Сбросить масштаб (Ctrl+0)"
                   className="min-w-[3.25rem] border-0 bg-transparent px-1 py-0 text-xs font-medium tabular-nums text-muted-foreground hover:text-foreground"
                 >
-                  {Math.round(zoom * 100)}%
+                  <AnimatedNumber value={`${Math.round(zoom * 100)}%`} />
                 </button>
                 <Button
                   variant="ghost"
@@ -434,9 +435,22 @@ export function AppLayout() {
                 aria-label={isDark ? 'Светлая тема' : 'Тёмная тема'}
                 title={isDark ? 'Светлая тема' : 'Тёмная тема'}
               >
-                {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={isDark ? 'sun' : 'moon'}
+                    initial={{ scale: 0.4, opacity: 0, rotate: -90, filter: 'blur(3px)' }}
+                    animate={{ scale: 1, opacity: 1, rotate: 0, filter: 'blur(0px)' }}
+                    exit={{ scale: 0.4, opacity: 0, rotate: 90, filter: 'blur(3px)' }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 0.7 }}
+                    className="inline-flex"
+                  >
+                    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                  </motion.span>
+                </AnimatePresence>
               </Button>
-              <Badge tone={sessionTone}>{sessionLabel}</Badge>
+              <Badge tone={sessionTone}>
+                <AnimatedTextSwap text={sessionLabel} />
+              </Badge>
               <Button
                 variant="outline"
                 size="sm"
