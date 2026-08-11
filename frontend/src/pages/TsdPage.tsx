@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PenLine, PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
+import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -9,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
+import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
+import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -79,23 +82,16 @@ function matchesQuery(item: TsdItem, query: string) {
     .includes(normalized)
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</label>
-}
-
-function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
-}
-
 export function TsdPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [items, setItems] = useState<TsdItem[]>([])
+  const [items, setItems] = useCachedState<TsdItem[]>('tsd.items', [])
   const [live, setLive] = useState(false)
   const [form, setForm] = useState<TsdForm>(EMPTY_FORM)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [introNumberError, setIntroNumberError] = useState(false)
 
   const setField = <K extends keyof TsdForm>(key: K, value: TsdForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -130,6 +126,19 @@ export function TsdPage() {
     void load(false)
   }, [load])
 
+  // Автозаполнение дат (01-03-2026 / 01-03-2031 из бэкенда)
+  useEffect(() => {
+    void apiCall<{ production_date?: string; expiration_date?: string }>('get_default_date_window')
+      .then((window) => {
+        setForm((prev) => ({
+          ...prev,
+          production_date: prev.production_date || String(window.production_date || ''),
+          expiration_date: prev.expiration_date || String(window.expiration_date || ''),
+        }))
+      })
+      .catch(() => null)
+  }, [])
+
   const statusOptions = useMemo(
     () => Array.from(new Set(items.map((item) => String(item.tsd_status || '').trim()).filter(Boolean))),
     [items],
@@ -147,6 +156,7 @@ export function TsdPage() {
 
   const readyCount = useMemo(() => items.filter((item) => item.can_tsd).length, [items])
   const isBusy = Boolean(busy)
+  const pager = usePagination(rows)
 
   const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
     setBusy(key)
@@ -160,12 +170,21 @@ export function TsdPage() {
     }
   }
 
+  const flagIntroNumberError = () => {
+    setIntroNumberError(false)
+    requestAnimationFrame(() => setIntroNumberError(true))
+    window.setTimeout(() => setIntroNumberError(false), 3000)
+  }
+
   const createTasks = () =>
     runBusy(
       'create',
       async () => {
         if (!selectedIds.length) throw new Error('Выберите хотя бы один заказ для задания на ТСД.')
-        if (!form.intro_number.trim()) throw new Error('Укажите номер ввода в оборот.')
+        if (!form.intro_number.trim()) {
+          flagIntroNumberError()
+          throw new Error('Укажите номер ввода в оборот.')
+        }
 
         const result = await apiCall<TsdRunResult>(
           'create_tsd_tasks',
@@ -263,7 +282,11 @@ export function TsdPage() {
               <FieldLabel>Ввод в оборот №</FieldLabel>
               <TextInput
                 value={form.intro_number}
-                onChange={(event) => setField('intro_number', event.target.value)}
+                className={cn('t-input', introNumberError && 'is-error is-shaking')}
+                onChange={(event) => {
+                  setField('intro_number', event.target.value)
+                  setIntroNumberError(false)
+                }}
                 placeholder="Номер ввода в оборот"
               />
             </div>
@@ -315,7 +338,7 @@ export function TsdPage() {
               </SelectNative>
             </div>
             <div className="w-52">
-              <TextInput value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по заказам" />
+              <TableSearch value={search} onChange={setSearch} placeholder="Поиск по заказам" />
             </div>
           </div>
         </CardHeader>
@@ -338,7 +361,7 @@ export function TsdPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((item, index) => {
+                  {pager.pageRows.map((item, index) => {
                     const documentId = item.document_id || ''
                     const rowId = documentId || `${item.order_name}-${index}`
                     const selected = Boolean(documentId) && selectedIds.includes(documentId)
@@ -383,6 +406,12 @@ export function TsdPage() {
               </Table>
             </div>
           )}
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            onPageChange={pager.setPage}
+          />
         </CardContent>
       </Card>
     </div>

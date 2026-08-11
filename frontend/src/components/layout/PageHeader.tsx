@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Card } from '@heroui/react'
 import { cn } from '@/lib/utils'
 
 export function PageHeader({
@@ -24,11 +25,12 @@ export function PageHeader({
 }
 
 export function StatPill({ label, value }: { label: string; value: string | number }) {
+  // Та же поверхность, что у остальных блоков (HeroUI Card)
   return (
-    <div className="rounded-md border border-border bg-muted/40 px-3 py-2">
+    <Card className="gap-0 px-4 py-3">
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-foreground">{value}</div>
-    </div>
+    </Card>
   )
 }
 

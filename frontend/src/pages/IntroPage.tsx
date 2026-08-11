@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
+import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -9,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
+import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
+import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -48,29 +51,25 @@ function toneForStatus(status?: string) {
   return 'info' as const
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</label>
-}
-
-function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
-}
-
 export function IntroPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [items, setItems] = useState<IntroItem[]>([])
+  const [items, setItems] = useCachedState<IntroItem[]>('intro.items', [])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [productionDate, setProductionDate] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
   const [batchNumber, setBatchNumber] = useState('')
+  const [batchError, setBatchError] = useState(false)
 
-  const applyItems = useCallback((next: IntroItem[]) => {
-    setItems(next)
-    setSelectedIds((prev) => prev.filter((id) => next.some((item) => item.document_id === id)))
-  }, [])
+  const applyItems = useCallback(
+    (next: IntroItem[]) => {
+      setItems(next)
+      setSelectedIds((prev) => prev.filter((id) => next.some((item) => item.document_id === id)))
+    },
+    [setItems],
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -87,6 +86,16 @@ export function IntroPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Автозаполнение дат (01-03-2026 / 01-03-2031 из бэкенда)
+  useEffect(() => {
+    void apiCall<{ production_date?: string; expiration_date?: string }>('get_default_date_window')
+      .then((window) => {
+        setProductionDate((prev) => prev || String(window.production_date || ''))
+        setExpirationDate((prev) => prev || String(window.expiration_date || ''))
+      })
+      .catch(() => null)
+  }, [])
 
   const statusOptions = useMemo(
     () => [...new Set(items.map((item) => String(item.status || '').trim()).filter(Boolean))],
@@ -130,12 +139,22 @@ export function IntroPage() {
       await load()
     }, 'Список заказов обновлён.')
 
+  const flagBatchError = () => {
+    setBatchError(false)
+    // Перезапуск shake-анимации: класс снимается и вешается заново
+    requestAnimationFrame(() => setBatchError(true))
+    window.setTimeout(() => setBatchError(false), 3000)
+  }
+
   const runIntroduction = () =>
     runBusy(
       'run',
       async () => {
         if (!selectedIds.length) throw new Error('Выберите хотя бы один заказ для ввода в оборот.')
-        if (!batchNumber.trim()) throw new Error('Укажите номер партии.')
+        if (!batchNumber.trim()) {
+          flagBatchError()
+          throw new Error('Укажите номер партии.')
+        }
         const result = await apiCall<IntroResult>(
           'introduce_orders',
           selectedIds,
@@ -154,6 +173,7 @@ export function IntroPage() {
     )
 
   const isBusy = Boolean(busy) || loading
+  const pager = usePagination(filteredItems)
 
   return (
     <div className="page-shell">
@@ -178,7 +198,6 @@ export function IntroPage() {
         <Card className="min-h-[560px]">
           <CardHeader>
             <CardTitle>Параметры ввода в оборот</CardTitle>
-            <CardDescription>Даты принимаются в форматах YYYY-MM, YYYY-MM-DD или DD-MM-YYYY.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -193,7 +212,11 @@ export function IntroPage() {
               <FieldLabel>Номер партии</FieldLabel>
               <TextInput
                 value={batchNumber}
-                onChange={(event) => setBatchNumber(event.target.value)}
+                className={cn('t-input', batchError && 'is-error is-shaking')}
+                onChange={(event) => {
+                  setBatchNumber(event.target.value)
+                  setBatchError(false)
+                }}
                 placeholder="Номер партии"
               />
             </div>
@@ -219,11 +242,7 @@ export function IntroPage() {
                   </option>
                 ))}
               </SelectNative>
-              <TextInput
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Поиск по заказам"
-              />
+              <TableSearch value={search} onChange={setSearch} placeholder="Поиск по заказам" />
             </div>
 
             {loading && items.length === 0 ? (
@@ -243,7 +262,7 @@ export function IntroPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredItems.map((item, index) => {
+                    {pager.pageRows.map((item, index) => {
                       const documentId = item.document_id || ''
                       const rowId = documentId || `${item.order_name}-${index}`
                       const checked = Boolean(documentId) && selectedIds.includes(documentId)
@@ -277,6 +296,12 @@ export function IntroPage() {
                 </Table>
               </div>
             )}
+            <TablePagination
+              page={pager.page}
+              pageCount={pager.pageCount}
+              total={pager.total}
+              onPageChange={pager.setPage}
+            />
           </CardContent>
         </Card>
       </div>

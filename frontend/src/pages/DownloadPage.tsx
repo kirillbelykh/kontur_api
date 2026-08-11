@@ -4,20 +4,22 @@ import {
   useMemo,
   useRef,
   useState,
-  type InputHTMLAttributes,
   type KeyboardEvent,
   type PointerEvent,
-  type ReactNode,
 } from 'react'
+import { Label, ProgressBar } from '@heroui/react'
 import { Download, Printer, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
+import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
+import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -85,18 +87,10 @@ function matchesQuery(item: DownloadItem, query: string) {
     .includes(normalized)
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</label>
-}
-
-function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
-}
-
 export function DownloadPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [state, setState] = useState<DownloadState>({})
+  const [state, setState] = useCachedState<DownloadState>('download.state', {})
   const [search, setSearch] = useState('')
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
   const [printer, setPrinter] = useState('')
@@ -134,7 +128,7 @@ export function DownloadPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setState])
 
   useEffect(() => {
     void load()
@@ -144,6 +138,7 @@ export function DownloadPage() {
   const printers = state.printers ?? []
 
   const rows = useMemo(() => items.filter((item) => matchesQuery(item, search)), [items, search])
+  const pager = usePagination(rows)
 
   const targetIds = selection.ids.length ? selection.ids : [selection.focus].filter(Boolean)
   const printTargetId = selection.focus || selection.ids[0] || ''
@@ -205,7 +200,8 @@ export function DownloadPage() {
     if (shift && lastClickedIndex.current >= 0) {
       const start = Math.min(lastClickedIndex.current, rowIndex)
       const end = Math.max(lastClickedIndex.current, rowIndex)
-      const rangeIds = rows.slice(start, end + 1).map((row) => row.document_id || '').filter(Boolean)
+      // Индексы — в пределах текущей страницы таблицы
+      const rangeIds = pager.pageRows.slice(start, end + 1).map((row) => row.document_id || '').filter(Boolean)
       setSelection((prev) => ({
         ids: Array.from(new Set([...prev.ids, ...rangeIds])),
         focus: documentId,
@@ -377,15 +373,17 @@ export function DownloadPage() {
           </div>
 
           {progress ? (
-            <div className="space-y-1">
-              <div className="h-1.5 w-full overflow-hidden rounded bg-muted">
-                <div
-                  className={cn('h-full rounded bg-primary transition-all', progress.active && 'animate-pulse')}
-                  style={{ width: `${progress.total ? Math.round((progress.processed / progress.total) * 100) : 0}%` }}
-                />
-              </div>
-              <div className="text-xs text-muted-foreground">{progress.label}</div>
-            </div>
+            <ProgressBar
+              aria-label="Прогресс скачивания"
+              className="w-full"
+              value={progress.total ? Math.round((progress.processed / progress.total) * 100) : 0}
+            >
+              <Label>{progress.label}</Label>
+              <ProgressBar.Output />
+              <ProgressBar.Track>
+                <ProgressBar.Fill className={cn(progress.active && 'animate-pulse')} />
+              </ProgressBar.Track>
+            </ProgressBar>
           ) : (
             <div className="text-xs text-muted-foreground">Прогресс скачивания появится во время массовой загрузки.</div>
           )}
@@ -403,7 +401,7 @@ export function DownloadPage() {
               <span className="text-sm">Выбрать все</span>
             </Checkbox>
             <div className="w-56">
-              <TextInput value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Поиск по заказам" />
+              <TableSearch value={search} onChange={setSearch} placeholder="Поиск по заказам" />
             </div>
           </div>
         </CardHeader>
@@ -430,7 +428,7 @@ export function DownloadPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((item, index) => {
+                  {pager.pageRows.map((item, index) => {
                     const documentId = item.document_id || ''
                     const rowId = documentId || `${item.order_name}-${index}`
                     const checked = selection.ids.includes(documentId)
@@ -478,6 +476,12 @@ export function DownloadPage() {
               </Table>
             </div>
           )}
+          <TablePagination
+            page={pager.page}
+            pageCount={pager.pageCount}
+            total={pager.total}
+            onPageChange={pager.setPage}
+          />
         </CardContent>
       </Card>
     </div>

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Maximize2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
+import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
+import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -106,14 +109,6 @@ type Column = { label: string; key: string }
 const TEMPLATE_PAGE_SIZE = 3
 const EMPTY_MANUAL: ManualFields = { gtin: '', size: '', batch: '', color: '', units_per_pack: '' }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</label>
-}
-
-function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
-}
-
 function filterRows(rows: Row[], query: string): Row[] {
   const normalized = query.trim().toLowerCase()
   if (!normalized) return rows
@@ -144,9 +139,13 @@ function SelectableTable({
   maxHeight?: string
   emptyText: string
 }) {
+  // Пагинация внутри таблиц печати — списки файлов/заказов бывают большими
+  const pager = usePagination(rows, 25)
+
   if (rows.length === 0) return <EmptyState>{emptyText}</EmptyState>
 
   return (
+    <div>
     <div className={cn('overflow-auto', maxHeight)}>
       <Table aria-label={ariaLabel}>
         <TableHeader>
@@ -158,7 +157,7 @@ function SelectableTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row, index) => {
+          {pager.pageRows.map((row, index) => {
             const id = rowId(row)
             const selected = Boolean(id) && id === selectedId
             return (
@@ -184,13 +183,21 @@ function SelectableTable({
         </TableBody>
       </Table>
     </div>
+    <TablePagination
+      page={pager.page}
+      pageCount={pager.pageCount}
+      total={pager.total}
+      pageSize={25}
+      onPageChange={pager.setPage}
+    />
+    </div>
   )
 }
 
 export function LabelsPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [state, setState] = useState<LabelsState>({})
+  const [state, setState] = useCachedState<LabelsState>('labels.state', {})
 
   const [sheetFormat, setSheetFormat] = useState('')
   const [printer, setPrinter] = useState('')
@@ -230,7 +237,7 @@ export function LabelsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setState])
 
   useEffect(() => {
     void load()
@@ -469,9 +476,9 @@ export function LabelsPage() {
           </Button>
         </CardHeader>
         <CardContent className="space-y-2">
-          <TextInput
+          <TableSearch
             value={search[key]}
-            onChange={(e) => setSearch((prev) => ({ ...prev, [key]: e.target.value }))}
+            onChange={(value) => setSearch((prev) => ({ ...prev, [key]: value }))}
             placeholder="Поиск по таблице"
           />
           {loading && config.rows.length === 0 ? (
@@ -827,9 +834,9 @@ export function LabelsPage() {
               <DialogTitle>{fullscreenConfig.title}</DialogTitle>
             </DialogHeader>
             <div className="space-y-2">
-              <TextInput
+              <TableSearch
                 value={search[fullscreen]}
-                onChange={(e) => setSearch((prev) => ({ ...prev, [fullscreen]: e.target.value }))}
+                onChange={(value) => setSearch((prev) => ({ ...prev, [fullscreen]: value }))}
                 placeholder="Поиск по таблице"
               />
               <SelectableTable

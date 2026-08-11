@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
+import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
+import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -47,18 +49,10 @@ function toneForStatus(status?: string) {
   return 'info' as const
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</label>
-}
-
-function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
-}
-
 export function AggregationPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [state, setState] = useState<AggregationState>({})
+  const [state, setState] = useCachedState<AggregationState>('aggregation.state', {})
 
   const [createComment, setCreateComment] = useState('')
   const [createCount, setCreateCount] = useState('1')
@@ -91,7 +85,7 @@ export function AggregationPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setState])
 
   useEffect(() => {
     void load(false)
@@ -483,10 +477,10 @@ export function AggregationPage() {
             </div>
             <div>
               <FieldLabel>Поиск</FieldLabel>
-              <TextInput
+              <TableSearch
                 value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
+                onChange={(value) => {
+                  setSearchQuery(value)
                   setCurrentPage(0)
                   setLastClickedIndex(-1)
                 }}

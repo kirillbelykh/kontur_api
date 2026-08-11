@@ -15,8 +15,11 @@ export default defineConfig({
     },
   },
   server: {
-    host: '127.0.0.1',
+    // LAN + ngrok: bind all interfaces; allow any Host (Vite DNS-rebinding guard → 403)
+    host: true,
     port: 5173,
     strictPort: true,
+    allowedHosts: true,
   },
 })
+

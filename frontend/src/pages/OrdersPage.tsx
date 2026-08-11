@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type InputHTMLAttributes, type ReactNode } from 'react'
-import { motion } from 'framer-motion'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Tabs } from '@heroui/react'
 import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
+import { celebrateOrderCreated } from '@/lib/celebrate'
+import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
+import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative, type SelectNativeProps } from '@/components/ui/select'
+import { Shimmer } from '@/components/ui/shimmer'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -111,54 +116,43 @@ function toneForStatus(status?: string) {
   return 'info' as const
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</label>
-}
-
-function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
-}
-
 function TextSelect(props: SelectNativeProps) {
   return <SelectNative {...props} className={cn('w-full', props.className)} />
 }
 
 function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: OrderMode) => void }) {
   return (
-    <div className="inline-flex rounded-[var(--field-radius)] border border-border bg-muted/40 p-0.5">
-      {(
-        [
-          { id: 'params', label: 'По параметрам' },
-          { id: 'gtin', label: 'По GTIN' },
-        ] as const
-      ).map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onChange(item.id)}
-          className={cn(
-            'relative rounded-[var(--field-radius)] border-0 bg-transparent px-3 py-1.5 text-xs font-medium transition-colors',
-            mode === item.id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-          )}
-        >
-          {mode === item.id ? (
-            <motion.span
-              layoutId="orders-mode-toggle"
-              transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
-              className="absolute inset-0 rounded-[var(--field-radius)] bg-card shadow-sm"
-            />
-          ) : null}
-          <span className="relative z-10">{item.label}</span>
-        </button>
-      ))}
-    </div>
+    <Tabs
+      selectedKey={mode}
+      onSelectionChange={(key) => onChange(key as OrderMode)}
+    >
+      <Tabs.ListContainer>
+        <Tabs.List aria-label="Режим создания заказа">
+          <Tabs.Tab id="params">
+            По параметрам
+            <Tabs.Indicator />
+          </Tabs.Tab>
+          <Tabs.Tab id="gtin">
+            <Tabs.Separator />
+            По GTIN
+            <Tabs.Indicator />
+          </Tabs.Tab>
+        </Tabs.List>
+      </Tabs.ListContainer>
+      <Tabs.Panel id="params" className="hidden">
+        <span className="sr-only">По параметрам</span>
+      </Tabs.Panel>
+      <Tabs.Panel id="gtin" className="hidden">
+        <span className="sr-only">По GTIN</span>
+      </Tabs.Panel>
+    </Tabs>
   )
 }
 
 export function OrdersPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
-  const [state, setState] = useState<OrdersViewState>({})
+  const [state, setState] = useCachedState<OrdersViewState>('orders.state', {})
   const [options, setOptions] = useState<OptionsState>({})
   const [mode, setMode] = useState<OrderMode>('params')
   const [form, setForm] = useState<OrderForm>(EMPTY_FORM)
@@ -197,7 +191,7 @@ export function OrdersPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [setState])
 
   const loadOptions = useCallback(async () => {
     try {
@@ -308,6 +302,7 @@ export function OrdersPage() {
         await apiCall('create_order', buildPayload())
         setForm((prev) => ({ ...EMPTY_FORM, order_name: prev.order_name }))
         setLookup(null)
+        celebrateOrderCreated()
         await load(true)
       },
       'Заказ создан',
@@ -329,6 +324,8 @@ export function OrdersPage() {
           setSelectedQueueId('')
           if (result.errors?.length) {
             toast.error(`Часть заказов с ошибками: ${result.errors.length}`)
+          } else {
+            celebrateOrderCreated()
           }
         } finally {
           setQueueLeaving(false)
@@ -422,7 +419,11 @@ export function OrdersPage() {
     )
   }
 
-  const renderHistoryTable = (limit: number) => (
+  const historyPager = usePagination(filteredHistory, 50)
+  const fullscreenPager = usePagination(filteredHistory, 200)
+  const deletedPager = usePagination(deletedOrders, 50)
+
+  const renderHistoryTable = (rows: OrderRow[]) => (
     <Table aria-label="История заказов">
       <TableHeader>
         <TableRow>
@@ -433,7 +434,7 @@ export function OrdersPage() {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filteredHistory.slice(0, limit).map((item, index) => {
+        {rows.map((item, index) => {
           const documentId = item.document_id || ''
           const rowId = documentId || `${rowTitle(item)}-${index}`
           const checked = Boolean(documentId) && selectedHistoryIds.includes(documentId)
@@ -490,7 +491,7 @@ export function OrdersPage() {
         <StatPill label="Удалённые" value={deletedOrders.length} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]">
         <Card>
           <CardHeader>
             <CardTitle>Новый заказ</CardTitle>
@@ -744,17 +745,21 @@ export function OrdersPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <TextInput
-              value={historySearch}
-              onChange={(e) => setHistorySearch(e.target.value)}
-              placeholder="Поиск по заявке, GTIN, ID…"
-            />
+            <TableSearch value={historySearch} onChange={setHistorySearch} placeholder="Поиск по заявке, GTIN, ID…" />
             {loading && history.length === 0 ? (
               <TableSkeleton rows={6} />
             ) : filteredHistory.length === 0 ? (
               <EmptyState>История пуста</EmptyState>
             ) : (
-              <div className="max-h-[360px] overflow-auto">{renderHistoryTable(100)}</div>
+              <>
+                <div className="max-h-[360px] overflow-auto">{renderHistoryTable(historyPager.pageRows)}</div>
+                <TablePagination
+                  page={historyPager.page}
+                  pageCount={historyPager.pageCount}
+                  total={historyPager.total}
+                  onPageChange={historyPager.setPage}
+                />
+              </>
             )}
           </CardContent>
         </Card>
@@ -776,6 +781,7 @@ export function OrdersPage() {
             {deletedOrders.length === 0 ? (
               <EmptyState>Удалённых заказов нет</EmptyState>
             ) : (
+              <div className="space-y-2">
               <div className="max-h-[260px] overflow-auto">
                 <Table aria-label="Удалённые заказы">
                   <TableHeader>
@@ -787,7 +793,7 @@ export function OrdersPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {deletedOrders.map((item, index) => {
+                    {deletedPager.pageRows.map((item, index) => {
                       const documentId = item.document_id || ''
                       const rowId = documentId || `${rowTitle(item)}-${index}`
                       const checked = Boolean(documentId) && documentId === selectedDeletedId
@@ -817,6 +823,13 @@ export function OrdersPage() {
                   </TableBody>
                 </Table>
               </div>
+              <TablePagination
+                page={deletedPager.page}
+                pageCount={deletedPager.pageCount}
+                total={deletedPager.total}
+                onPageChange={deletedPager.setPage}
+              />
+              </div>
             )}
           </CardContent>
         </Card>
@@ -826,9 +839,16 @@ export function OrdersPage() {
         <DialogContent className="max-w-[96vw]">
           <DialogHeader>
             <DialogTitle>История заказов</DialogTitle>
-            <p className="text-xs text-muted-foreground">Escape — закрыть. Показаны первые 500 записей.</p>
+            <p className="text-xs text-muted-foreground">Escape — закрыть.</p>
           </DialogHeader>
-          <div className="max-h-[78vh] overflow-auto">{renderHistoryTable(500)}</div>
+          <div className="max-h-[78vh] overflow-auto">{renderHistoryTable(fullscreenPager.pageRows)}</div>
+          <TablePagination
+            page={fullscreenPager.page}
+            pageCount={fullscreenPager.pageCount}
+            total={fullscreenPager.total}
+            pageSize={200}
+            onPageChange={fullscreenPager.setPage}
+          />
         </DialogContent>
       </Dialog>
 
@@ -842,7 +862,9 @@ export function OrdersPage() {
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto">
             {!details ? (
-              <div className="py-8 text-center text-sm text-muted-foreground">Загружаем метаданные…</div>
+              <div className="py-8 text-center">
+                <Shimmer>Загружаем метаданные…</Shimmer>
+              </div>
             ) : (details.fields || []).length === 0 ? (
               <EmptyState>Нет данных по заказу</EmptyState>
             ) : (

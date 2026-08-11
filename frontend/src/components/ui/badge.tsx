@@ -3,25 +3,29 @@ import { cn } from '@/lib/utils'
 
 type BadgeTone = 'neutral' | 'success' | 'warning' | 'danger' | 'primary' | 'secondary' | 'info'
 
+/** Статусы в стиле marzban-custom: цветная точка + текст, без заливки. */
 const toneClass: Record<BadgeTone, string> = {
-  neutral: 'bg-muted text-muted-foreground',
-  success: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200',
-  warning: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200',
-  danger: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200',
-  primary: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200',
-  secondary: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
-  info: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
+  neutral: 'text-muted-foreground [--status-dot:theme(colors.slate.400)]',
+  success: 'text-emerald-700 dark:text-emerald-300 [--status-dot:theme(colors.emerald.500)]',
+  warning: 'text-amber-700 dark:text-amber-300 [--status-dot:theme(colors.amber.500)]',
+  danger: 'text-rose-700 dark:text-rose-300 [--status-dot:theme(colors.rose.500)]',
+  primary: 'text-indigo-700 dark:text-indigo-300 [--status-dot:theme(colors.indigo.500)]',
+  secondary: 'text-muted-foreground [--status-dot:theme(colors.slate.400)]',
+  info: 'text-sky-700 dark:text-sky-300 [--status-dot:theme(colors.sky.500)]',
 }
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone
 }
 
-export function Badge({ className, tone = 'neutral', ...props }: BadgeProps) {
+export function Badge({ className, tone = 'neutral', children, ...props }: BadgeProps) {
   return (
     <span
-      className={cn('inline-flex items-center rounded px-2 py-1 text-xs font-semibold', toneClass[tone], className)}
+      className={cn('inline-flex items-center gap-1.5 text-xs font-medium', toneClass[tone], className)}
       {...props}
-    />
+    >
+      <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-[var(--status-dot)]" />
+      {children}
+    </span>
   )
 }
