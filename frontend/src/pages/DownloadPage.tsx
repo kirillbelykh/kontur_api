@@ -319,7 +319,6 @@ export function DownloadPage() {
               <SelectNative
                 value={printer}
                 placeholder="Выберите принтер"
-                searchable={printers.length > 8}
                 onChange={(event) => setPrinter(event.target.value)}
               >
                 <option value="">Выберите принтер</option>

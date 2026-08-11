@@ -539,7 +539,6 @@ export function OrdersPage() {
               <div className="sm:col-span-2">
                 <FieldLabel>Наименование</FieldLabel>
                 <TextSelect
-                  searchable
                   placeholder="Упрощённое имя"
                   value={form.name}
                   disabled={!paramsMode}
