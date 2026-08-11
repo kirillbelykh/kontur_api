@@ -18,7 +18,7 @@ export function TextInput({ className, ...props }: TextInputProps) {
 export function TableSearch({
   value,
   onChange,
-  placeholder = 'Поиск по таблице',
+  placeholder = 'Поиск',
   className,
 }: {
   value: string

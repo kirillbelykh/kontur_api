@@ -13,17 +13,17 @@ type BadgeTone =
   | 'violet'
   | 'teal'
 
-/** Цвет кружка статуса — у каждого тона свой (marzban-style: точка + текст). */
+/** Цвет кружка статуса — токены темы (Графит приглушает палитру). */
 const dotClass: Record<BadgeTone, string> = {
-  neutral: 'bg-zinc-400',
-  secondary: 'bg-zinc-400',
-  success: 'bg-emerald-500',
-  warning: 'bg-amber-500',
-  danger: 'bg-rose-500',
-  primary: 'bg-indigo-500',
-  info: 'bg-sky-500',
-  violet: 'bg-violet-500',
-  teal: 'bg-teal-500',
+  neutral: 'bg-[var(--status-neutral)]',
+  secondary: 'bg-[var(--status-neutral)]',
+  success: 'bg-[var(--status-success)]',
+  warning: 'bg-[var(--status-warning)]',
+  danger: 'bg-[var(--status-danger)]',
+  primary: 'bg-[var(--status-primary)]',
+  info: 'bg-[var(--status-info)]',
+  violet: 'bg-[var(--status-violet)]',
+  teal: 'bg-[var(--status-teal)]',
 }
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {

@@ -7,12 +7,11 @@ import {
   Download,
   Home,
   Layers3,
-  Moon,
-  Sun,
   PanelLeftOpen,
   PanelRight,
   Printer,
   RefreshCw,
+  Settings,
   Smartphone,
   ZoomIn,
   ZoomOut,
@@ -27,9 +26,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AnimatedNumber, AnimatedTextSwap } from '@/components/ui/animated-number'
 import { JOURNAL_WIDTH, JournalPanel } from '@/components/layout/JournalPanel'
+import { SettingsDialog } from '@/components/layout/SettingsDialog'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import { usePageZoom } from '@/hooks/usePageZoom'
-import { useTheme } from '@/hooks/useTheme'
 
 const DESKTOP_SIDEBAR_OPEN_WIDTH = 256
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = 64
@@ -149,7 +148,7 @@ function Navigation({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
               className={({ isActive }) =>
                 cn(
                   'focus-ring flex h-10 w-full items-center overflow-hidden rounded-lg text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground',
-                  isActive && 'bg-zinc-200/70 text-foreground dark:bg-zinc-800',
+                  isActive && 'bg-[hsl(var(--wms-border)/0.5)] text-foreground',
                 )
               }
             >
@@ -240,11 +239,14 @@ export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(() => readStoredFlag(SIDEBAR_STORAGE_KEY, true))
   const [journalOpen, setJournalOpen] = useState(() => readStoredFlag(JOURNAL_STORAGE_KEY, false))
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  // ?qa-settings=1 — только dev: скриншот-прогон диалога настроек без кликов
+  const [settingsOpen, setSettingsOpen] = useState(
+    () => import.meta.env.DEV && new URLSearchParams(window.location.search).has('qa-settings'),
+  )
   const [session, setSession] = useState<SessionInfo | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
   const { updateAvailable, applying, applyUpdate, remoteShort } = useAppUpdate()
   const { zoom, zoomIn, zoomOut, resetZoom } = usePageZoom()
-  const { isDark, toggleTheme } = useTheme()
 
   const title = useMemo(() => {
     const exact = titles[location.pathname]
@@ -288,6 +290,18 @@ export function AppLayout() {
   useEffect(() => {
     writeStoredFlag(JOURNAL_STORAGE_KEY, journalOpen)
   }, [journalOpen])
+
+  // Ctrl+, — настройки (как в VS Code)
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === ',') {
+        event.preventDefault()
+        setSettingsOpen((value) => !value)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   const sessionTone = session?.has_session ? 'success' : 'warning'
   const sessionLabel = session?.has_session
@@ -460,22 +474,11 @@ export function AppLayout() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={toggleTheme}
-                aria-label={isDark ? 'Светлая тема' : 'Тёмная тема'}
-                title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+                onClick={() => setSettingsOpen(true)}
+                aria-label="Настройки"
+                title="Настройки (Ctrl+,)"
               >
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <motion.span
-                    key={isDark ? 'sun' : 'moon'}
-                    initial={{ scale: 0.4, opacity: 0, rotate: -90, filter: 'blur(3px)' }}
-                    animate={{ scale: 1, opacity: 1, rotate: 0, filter: 'blur(0px)' }}
-                    exit={{ scale: 0.4, opacity: 0, rotate: 90, filter: 'blur(3px)' }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 30, mass: 0.7 }}
-                    className="inline-flex"
-                  >
-                    {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                  </motion.span>
-                </AnimatePresence>
+                <Settings className="h-4 w-4" />
               </Button>
               <Badge tone={sessionTone}>
                 <AnimatedTextSwap text={sessionLabel} />
@@ -511,6 +514,15 @@ export function AppLayout() {
           <Outlet />
         </motion.main>
       </div>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onOpenJournal={() => {
+          setSettingsOpen(false)
+          setJournalOpen(true)
+        }}
+      />
     </div>
   )
 }

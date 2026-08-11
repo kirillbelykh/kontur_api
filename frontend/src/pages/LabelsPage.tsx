@@ -15,6 +15,7 @@ import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 type SheetFormat = { key?: string; label?: string }
 
@@ -267,6 +268,7 @@ export function LabelsPage() {
   const [manualFields, setManualFields] = useState<ManualFields>(EMPTY_MANUAL)
 
   const [search, setSearch] = useState<Record<TableKey, string>>({ orders: '', aggregation: '', marking: '' })
+  const debouncedSearch = useDebouncedValue(search)
   const [fullscreen, setFullscreen] = useState<TableKey | ''>('')
 
   const load = useCallback(async () => {
@@ -510,11 +512,8 @@ export function LabelsPage() {
     const config = tableConfig(key)
     return (
       <Card className="cv-auto">
-        <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-          <div>
-            <CardTitle>{config.title}</CardTitle>
-            <CardDescription>Кликните по строке, чтобы выбрать.</CardDescription>
-          </div>
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+          <CardTitle>{config.title}</CardTitle>
           <Button
             size="icon"
             variant="ghost"
@@ -530,14 +529,13 @@ export function LabelsPage() {
           <TableSearch
             value={search[key]}
             onChange={(value) => setSearch((prev) => ({ ...prev, [key]: value }))}
-            placeholder="Поиск по таблице"
           />
           {loading && config.rows.length === 0 ? (
             <TableSkeleton rows={6} />
           ) : (
             <SelectableTable
               ariaLabel={config.title}
-              rows={config.rows.filter((row) => rowMatchesQuery(row, search[key]))}
+              rows={config.rows.filter((row) => rowMatchesQuery(row, debouncedSearch[key]))}
               columns={config.columns}
               rowId={config.rowId}
               selectedId={config.selectedId}
@@ -557,7 +555,6 @@ export function LabelsPage() {
     <div className="page-shell">
       <PageHeader
         title="Печать этикеток"
-        subtitle="Шаблоны BarTender 100x180 и 100x136, контекст печати и запуск печати."
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || isBusy}>
@@ -568,7 +565,7 @@ export function LabelsPage() {
               Показать контекст
             </Button>
             <Button size="sm" onClick={() => void print()} disabled={isBusy}>
-              Выполнить печать
+              Печать
             </Button>
           </>
         }
@@ -587,7 +584,6 @@ export function LabelsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Параметры печати {sheetFormatLabel}</CardTitle>
-            <CardDescription>Формат, принтер, даты и количество для контекста BarTender.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -636,7 +632,7 @@ export function LabelsPage() {
                   step={1}
                   value={quantityValue}
                   onChange={(e) => setQuantityValue(e.target.value)}
-                  placeholder="Для шаблонов Латекс, Нитрил, HR"
+                  placeholder="0"
                 />
               </div>
             </div>
@@ -734,9 +730,7 @@ export function LabelsPage() {
 
             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
               {previewLines.length === 0 ? (
-                <span className="text-muted-foreground">
-                  Выберите шаблон, файл и заказ, затем нажмите «Показать контекст».
-                </span>
+                <span className="text-muted-foreground">Выберите шаблон, файл и заказ.</span>
               ) : (
                 <ul className="space-y-0.5">
                   {previewLines.map((line, index) => (
@@ -750,8 +744,7 @@ export function LabelsPage() {
               <div className="space-y-2 rounded-lg border border-warning/40 bg-muted/30 p-3">
                 <div className="text-sm font-medium">Ручное заполнение</div>
                 <p className="text-xs text-muted-foreground">
-                  {manualPrompt ||
-                    'Если автоподбор не сработал, заполните поля вручную и повторите предпросмотр или печать.'}
+                  {manualPrompt || 'Заполните поля и повторите.'}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
@@ -759,7 +752,6 @@ export function LabelsPage() {
                     <TextInput
                       value={manualFields.gtin}
                       onChange={(e) => setManualField('gtin', e.target.value)}
-                      placeholder="GTIN"
                     />
                   </div>
                   <div>
@@ -767,7 +759,7 @@ export function LabelsPage() {
                     <TextInput
                       value={manualFields.size}
                       onChange={(e) => setManualField('size', e.target.value)}
-                      placeholder="Например, M или 7,5"
+                      placeholder="M"
                     />
                   </div>
                   <div>
@@ -775,7 +767,6 @@ export function LabelsPage() {
                     <TextInput
                       value={manualFields.batch}
                       onChange={(e) => setManualField('batch', e.target.value)}
-                      placeholder="Номер партии"
                     />
                   </div>
                   <div>
@@ -783,7 +774,6 @@ export function LabelsPage() {
                     <TextInput
                       value={manualFields.color}
                       onChange={(e) => setManualField('color', e.target.value)}
-                      placeholder="Можно оставить пустым"
                     />
                   </div>
                   <div>
@@ -794,7 +784,7 @@ export function LabelsPage() {
                       step={1}
                       value={manualFields.units_per_pack}
                       onChange={(e) => setManualField('units_per_pack', e.target.value)}
-                      placeholder="Например, 10"
+                      placeholder="10"
                     />
                   </div>
                 </div>
@@ -898,11 +888,10 @@ export function LabelsPage() {
               <TableSearch
                 value={search[fullscreen]}
                 onChange={(value) => setSearch((prev) => ({ ...prev, [fullscreen]: value }))}
-                placeholder="Поиск по таблице"
               />
               <SelectableTable
                 ariaLabel={fullscreenConfig.title}
-                rows={fullscreenConfig.rows.filter((row) => rowMatchesQuery(row, search[fullscreen]))}
+                rows={fullscreenConfig.rows.filter((row) => rowMatchesQuery(row, debouncedSearch[fullscreen]))}
                 columns={fullscreenConfig.columns}
                 rowId={fullscreenConfig.rowId}
                 selectedId={fullscreenConfig.selectedId}

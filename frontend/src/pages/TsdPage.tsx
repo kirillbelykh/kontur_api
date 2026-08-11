@@ -7,7 +7,8 @@ import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
@@ -172,14 +173,15 @@ export function TsdPage() {
     [items],
   )
 
+  const debouncedSearch = useDebouncedValue(search)
   const rows = useMemo(
     () =>
       items.filter((item) => {
-        if (!rowMatchesQuery(item, search)) return false
+        if (!rowMatchesQuery(item, debouncedSearch)) return false
         if (!statusFilter) return true
         return String(item.tsd_status || '').trim() === statusFilter
       }),
-    [items, search, statusFilter],
+    [items, debouncedSearch, statusFilter],
   )
 
   const readyCount = useMemo(() => items.filter((item) => item.can_tsd).length, [items])
@@ -274,7 +276,6 @@ export function TsdPage() {
     <div className="page-shell">
       <PageHeader
         title="Задание на ТСД"
-        subtitle="Создание заданий на терминал сбора данных, контроль статусов и подпись ввода в оборот."
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load(false)} disabled={loading || isBusy}>
@@ -335,7 +336,6 @@ export function TsdPage() {
                   setField('intro_number', event.target.value)
                   setIntroNumberError(false)
                 }}
-                placeholder="Номер ввода в оборот"
               />
             </div>
             <div>
@@ -357,7 +357,6 @@ export function TsdPage() {
               <TextInput
                 value={form.batch_number}
                 onChange={(event) => setField('batch_number', event.target.value)}
-                placeholder="Номер партии"
               />
             </div>
           </div>
@@ -365,16 +364,12 @@ export function TsdPage() {
       </Card>
 
       <Card className="cv-auto">
-        <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-          <div>
-            <CardTitle>Заказы</CardTitle>
-            <CardDescription>Отметьте заказы чекбоксами — задания создаются для всех выбранных.</CardDescription>
-          </div>
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+          <CardTitle>Заказы</CardTitle>
           <div className="flex flex-wrap items-center gap-2">
             <div className="w-44">
               <SelectNative
                 value={statusFilter}
-                placeholder="Все статусы"
                 aria-label="Фильтр по статусу ТСД"
                 onChange={(event) => setStatusFilter(event.target.value)}
               >
@@ -387,7 +382,7 @@ export function TsdPage() {
               </SelectNative>
             </div>
             <div className="w-52">
-              <TableSearch value={search} onChange={setSearch} placeholder="Поиск по заказам" />
+              <TableSearch value={search} onChange={setSearch} />
             </div>
           </div>
         </CardHeader>

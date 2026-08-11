@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Trash2, X } from 'lucide-react'
+import { useAppSetting } from '@/lib/app-settings'
 import { apiCall } from '@/lib/bridge'
 import { getErrorMessage } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -77,14 +78,16 @@ export function JournalPanel({ open, onClose }: { open: boolean; onClose: () => 
     }
   }, [])
 
-  // Поллинг каждые 5 с — только пока панель открыта
+  // Поллинг каждые 5 с — только пока панель открыта (и включено автообновление)
+  const autoRefresh = useAppSetting('journalAutoRefresh')
   useEffect(() => {
     if (!open) return
     setLoaded(false)
     void refresh(channel)
+    if (!autoRefresh) return
     const id = window.setInterval(() => void refresh(channel), REFRESH_MS)
     return () => window.clearInterval(id)
-  }, [open, channel, refresh])
+  }, [open, channel, refresh, autoRefresh])
 
   const clear = async () => {
     try {

@@ -127,6 +127,16 @@
   --revert-dur: 280ms;
   --field-error-border: #f43f5e;
 
+  /* Кружки статусов (StatusBadge): темы могут приглушать палитру (Графит) */
+  --status-neutral: #a1a1aa;
+  --status-success: #10b981;
+  --status-warning: #f59e0b;
+  --status-danger: #f43f5e;
+  --status-primary: #6366f1;
+  --status-info: #0ea5e9;
+  --status-violet: #8b5cf6;
+  --status-teal: #14b8a6;
+
   color-scheme: light;
 }
 
@@ -145,6 +155,137 @@
   --field-border-focus: hsl(240 4% 55%);
   --field-bg: hsl(240 5% 16%);
   --field-ring: hsl(240 5% 65% / 0.3);
+  color-scheme: dark;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Темы (html[data-theme]) — переопределяют и --wms-*, и переменные HeroUI
+   (--surface/--overlay/--accent/…), чтобы карточки, модалки и кнопки
+   следовали палитре. «Светлая» = :root, «Тёмная» = .dark (базовые наборы).
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Графит: глубокая нейтральная тьма (Cursor Dark), приглушённые статусы */
+html[data-theme='graphite'] {
+  --wms-background: 0 0% 7%;
+  --wms-foreground: 0 0% 86%;
+  --wms-card: 0 0% 10%;
+  --wms-card-foreground: 0 0% 86%;
+  --wms-muted: 0 0% 15%;
+  --wms-muted-foreground: 0 0% 57%;
+  --wms-border: 0 0% 24%;
+  --wms-border-thin: 0 0% 20%;
+  --wms-ring: 0 0% 60%;
+  --field-border: hsl(0 0% 23%);
+  --field-border-hover: hsl(0 0% 33%);
+  --field-border-focus: hsl(0 0% 46%);
+  --field-bg: hsl(0 0% 12%);
+  --field-ring: hsl(0 0% 60% / 0.28);
+
+  /* HeroUI */
+  --background: hsl(0 0% 7%);
+  --foreground: hsl(0 0% 86%);
+  --surface: hsl(0 0% 10%);
+  --surface-secondary: hsl(0 0% 13%);
+  --surface-tertiary: hsl(0 0% 16%);
+  --overlay: hsl(0 0% 11%);
+  --muted: hsl(0 0% 55%);
+  --default: hsl(0 0% 16%);
+  --segment: hsl(0 0% 22%);
+  --field-background: hsl(0 0% 12%);
+  --border: hsl(0 0% 20%);
+  --separator: hsl(0 0% 18%);
+  --accent: hsl(211 25% 62%);
+  --accent-foreground: hsl(0 0% 8%);
+  --success: hsl(160 40% 45%);
+  --warning: hsl(38 50% 52%);
+  --danger: hsl(352 45% 50%);
+  --backdrop: rgba(0, 0, 0, 0.65);
+
+  /* Приглушённые кружки статусов */
+  --status-neutral: hsl(0 0% 45%);
+  --status-success: hsl(160 38% 42%);
+  --status-warning: hsl(38 48% 48%);
+  --status-danger: hsl(352 45% 52%);
+  --status-primary: hsl(235 30% 60%);
+  --status-info: hsl(203 40% 52%);
+  --status-violet: hsl(263 30% 60%);
+  --status-teal: hsl(175 35% 42%);
+
+  color-scheme: dark;
+}
+
+/* Слоновая кость: тёплая светлая, бумажный тон, бронзовый акцент */
+html[data-theme='ivory'] {
+  --wms-background: 42 32% 94%;
+  --wms-foreground: 35 25% 14%;
+  --wms-card: 45 40% 98%;
+  --wms-card-foreground: 35 25% 14%;
+  --wms-muted: 42 25% 90%;
+  --wms-muted-foreground: 35 12% 42%;
+  --wms-border: 40 18% 78%;
+  --wms-border-thin: 40 18% 74%;
+  --wms-ring: 35 18% 40%;
+  --field-border: hsl(40 20% 82%);
+  --field-border-hover: hsl(40 18% 68%);
+  --field-border-focus: hsl(38 20% 52%);
+  --field-bg: hsl(45 44% 99%);
+  --field-ring: hsl(38 25% 50% / 0.22);
+
+  /* HeroUI */
+  --background: hsl(42 32% 94%);
+  --foreground: hsl(35 25% 14%);
+  --surface: hsl(45 40% 98%);
+  --surface-secondary: hsl(43 32% 93%);
+  --surface-tertiary: hsl(42 28% 90%);
+  --overlay: hsl(45 42% 98%);
+  --muted: hsl(35 12% 44%);
+  --default: hsl(42 26% 89%);
+  --default-foreground: hsl(35 25% 14%);
+  --segment: hsl(45 44% 99%);
+  --field-background: hsl(45 44% 99%);
+  --border: hsl(40 20% 84%);
+  --separator: hsl(41 22% 87%);
+  --accent: hsl(28 55% 42%);
+  --accent-foreground: hsl(45 40% 98%);
+  --backdrop: rgba(43, 34, 24, 0.45);
+
+  color-scheme: light;
+}
+
+/* Океан: тёмно-синяя, спокойный синий акцент */
+html[data-theme='ocean'] {
+  --wms-background: 215 45% 9%;
+  --wms-foreground: 210 25% 88%;
+  --wms-card: 215 38% 13%;
+  --wms-card-foreground: 210 25% 88%;
+  --wms-muted: 215 30% 18%;
+  --wms-muted-foreground: 213 15% 62%;
+  --wms-border: 214 25% 28%;
+  --wms-border-thin: 214 25% 24%;
+  --wms-ring: 210 30% 66%;
+  --field-border: hsl(214 25% 27%);
+  --field-border-hover: hsl(213 25% 37%);
+  --field-border-focus: hsl(211 30% 50%);
+  --field-bg: hsl(215 34% 16%);
+  --field-ring: hsl(207 45% 60% / 0.3);
+
+  /* HeroUI */
+  --background: hsl(215 45% 9%);
+  --foreground: hsl(210 25% 88%);
+  --surface: hsl(215 38% 13%);
+  --surface-secondary: hsl(215 34% 16%);
+  --surface-tertiary: hsl(215 32% 19%);
+  --overlay: hsl(215 36% 14%);
+  --muted: hsl(213 16% 60%);
+  --default: hsl(215 30% 19%);
+  --segment: hsl(214 28% 26%);
+  --field-background: hsl(215 34% 16%);
+  --border: hsl(215 28% 22%);
+  --separator: hsl(215 30% 19%);
+  --accent: hsl(205 65% 55%);
+  --accent-foreground: hsl(215 45% 8%);
+  --backdrop: rgba(2, 8, 20, 0.65);
+
   color-scheme: dark;
 }
 
@@ -687,11 +828,9 @@ button {
     color: hsl(var(--wms-muted-foreground));
   }
 
+  /* Полоса шапки таблиц следует теме (светлее карточки на волос) */
   .table__header {
-    background-color: #fafafa; /* zinc-50 */
-  }
-  .dark .table__header {
-    background-color: rgb(39 39 42 / 0.5); /* zinc-800/50 */
+    background-color: hsl(var(--wms-muted) / 0.55);
   }
 
   .table__cell {

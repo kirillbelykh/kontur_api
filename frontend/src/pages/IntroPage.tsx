@@ -7,7 +7,8 @@ import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
@@ -130,8 +131,9 @@ export function IntroPage() {
     [items],
   )
 
+  const debouncedSearch = useDebouncedValue(search)
   const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase()
+    const query = debouncedSearch.trim().toLowerCase()
     return items.filter((item) => {
       if (statusFilter && String(item.status || '').trim() !== statusFilter) return false
       if (!query) return true
@@ -141,7 +143,7 @@ export function IntroPage() {
         .toLowerCase()
       return haystack.includes(query)
     })
-  }, [items, search, statusFilter])
+  }, [items, debouncedSearch, statusFilter])
 
   const toggleId = useCallback((documentId: string) => {
     if (!documentId) return
@@ -207,11 +209,10 @@ export function IntroPage() {
     <div className="page-shell">
       <PageHeader
         title="Ввод в оборот"
-        subtitle="Документы для ввода кодов маркировки в оборот."
         actions={
           <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={isBusy}>
             <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
-            Обновить список заказов
+            Обновить
           </Button>
         }
       />
@@ -227,7 +228,7 @@ export function IntroPage() {
       <div className="grid items-start gap-3 xl:grid-cols-[minmax(260px,0.55fr)_minmax(0,1.45fr)]">
         <Card>
           <CardHeader>
-            <CardTitle>Параметры ввода в оборот</CardTitle>
+            <CardTitle>Параметры</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -247,12 +248,11 @@ export function IntroPage() {
                   setBatchNumber(event.target.value)
                   setBatchError(false)
                 }}
-                placeholder="Номер партии"
               />
             </div>
             <Button size="sm" onClick={() => void runIntroduction()} disabled={isBusy || selectedIds.length === 0}>
               <PlayCircle className="h-3.5 w-3.5" />
-              Выполнить ввод в оборот{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
+              Ввести в оборот{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
             </Button>
           </CardContent>
         </Card>
@@ -260,7 +260,6 @@ export function IntroPage() {
         <Card>
           <CardHeader>
             <CardTitle>Готовые заявки</CardTitle>
-            <CardDescription>Отметьте заказы чекбоксами — ввод выполняется для всех выбранных.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -276,7 +275,7 @@ export function IntroPage() {
                   </option>
                 ))}
               </SelectNative>
-              <TableSearch value={search} onChange={setSearch} placeholder="Поиск по заказам" />
+              <TableSearch value={search} onChange={setSearch} />
             </div>
 
             {loading && items.length === 0 ? (

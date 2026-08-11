@@ -18,6 +18,7 @@ import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
@@ -178,7 +179,8 @@ export function DownloadPage() {
   const items = state.items ?? []
   const printers = state.printers ?? []
 
-  const rows = useMemo(() => items.filter((item) => rowMatchesQuery(item, search)), [items, search])
+  const debouncedSearch = useDebouncedValue(search)
+  const rows = useMemo(() => items.filter((item) => rowMatchesQuery(item, debouncedSearch)), [items, debouncedSearch])
   const pager = usePagination(rows)
   pageRowsRef.current = pager.pageRows
 
@@ -337,7 +339,6 @@ export function DownloadPage() {
     <div className="page-shell">
       <PageHeader
         title="Загрузка кодов"
-        subtitle="Скачивание кодов маркировки, статусы заказов и печать термоэтикеток 30x20."
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || isBusy}>
@@ -363,19 +364,12 @@ export function DownloadPage() {
       <Card className="mb-3">
         <CardHeader>
           <CardTitle>Активные загрузки</CardTitle>
-          <CardDescription>
-            Скачивание выбранных заказов и печать термоэтикеток. Автоскачивание применяется при обновлении статусов.
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
               <FieldLabel>Принтер термоэтикеток</FieldLabel>
-              <SelectNative
-                value={printer}
-                placeholder="Выберите принтер"
-                onChange={(event) => setPrinter(event.target.value)}
-              >
+              <SelectNative value={printer} onChange={(event) => setPrinter(event.target.value)}>
                 <option value="">Выберите принтер</option>
                 {printers.map((name) => (
                   <option key={name} value={name}>
@@ -385,14 +379,14 @@ export function DownloadPage() {
               </SelectNative>
             </div>
             <div>
-              <FieldLabel>Номер этикетки по порядку</FieldLabel>
+              <FieldLabel>Номер этикетки</FieldLabel>
               <TextInput
                 type="number"
                 min={1}
                 step={1}
                 value={recordNumber}
                 onChange={(event) => setRecordNumber(event.target.value)}
-                placeholder="Если пусто — печать всего файла"
+                placeholder="Весь файл"
               />
             </div>
           </div>
@@ -404,15 +398,13 @@ export function DownloadPage() {
             </Button>
             <Button size="sm" onClick={() => void printLabels()} disabled={isBusy || !printTargetId || !printer}>
               <Printer className="h-3.5 w-3.5" />
-              Печать термоэтикеток 30x20
+              Печать 30×20
             </Button>
-            <Checkbox isSelected={autoDownload} isDisabled={isBusy} onChange={setAutoDownload}>
-              <span className="text-sm">Автоскачивание</span>
-            </Checkbox>
-          </div>
-
-          <div className="text-xs text-muted-foreground">
-            Всего заказов: {items.length} • Выбрано: {selection.ids.length}
+            <span title="Скачивать готовые заказы при обновлении статусов">
+              <Checkbox isSelected={autoDownload} isDisabled={isBusy} onChange={setAutoDownload}>
+                <span className="text-sm">Автоскачивание</span>
+              </Checkbox>
+            </span>
           </div>
 
           {progress ? (
@@ -427,9 +419,7 @@ export function DownloadPage() {
                 <ProgressBar.Fill className={cn(progress.active && 'animate-pulse')} />
               </ProgressBar.Track>
             </ProgressBar>
-          ) : (
-            <div className="text-xs text-muted-foreground">Прогресс скачивания появится во время массовой загрузки.</div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -437,14 +427,14 @@ export function DownloadPage() {
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
             <CardTitle>Заказы</CardTitle>
-            <CardDescription>Клик по строке выбирает заказ, Ctrl / Shift — множественный выбор.</CardDescription>
+            <CardDescription>Ctrl / Shift — множественный выбор</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Checkbox isSelected={allVisibleSelected} isDisabled={rows.length === 0} onChange={toggleAllVisible}>
               <span className="text-sm">Выбрать все</span>
             </Checkbox>
             <div className="w-56">
-              <TableSearch value={search} onChange={setSearch} placeholder="Поиск по заказам" />
+              <TableSearch value={search} onChange={setSearch} />
             </div>
           </div>
         </CardHeader>

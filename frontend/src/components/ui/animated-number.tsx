@@ -1,4 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { useAppSetting } from '@/lib/app-settings'
 import { cn } from '@/lib/utils'
 
 /**
@@ -13,9 +14,10 @@ export function AnimatedNumber({
   className?: string
 }) {
   const reduceMotion = useReducedMotion()
+  const animations = useAppSetting('animations')
   const text = String(value ?? '')
 
-  if (reduceMotion || text.length > 16) {
+  if (reduceMotion || !animations || text.length > 16) {
     return <span className={cn('tabular-nums', className)}>{text}</span>
   }
 
@@ -55,7 +57,8 @@ export function AnimatedTextSwap({
   className?: string
 }) {
   const reduceMotion = useReducedMotion()
-  if (reduceMotion) return <span className={className}>{text}</span>
+  const animations = useAppSetting('animations')
+  if (reduceMotion || !animations) return <span className={className}>{text}</span>
 
   return (
     <span className={cn('relative inline-flex overflow-hidden align-bottom', className)}>

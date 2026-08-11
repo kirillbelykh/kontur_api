@@ -1,4 +1,5 @@
 import confetti from 'canvas-confetti'
+import { getAppSetting } from '@/lib/app-settings'
 
 let turn = 0
 
@@ -35,6 +36,7 @@ function showSuccessCheck() {
 
 /** После создания заказа: чередуем конфетти и анимированную галочку. */
 export function celebrateOrderCreated() {
+  if (!getAppSetting('animations')) return
   if (turn++ % 2 === 0) fireConfetti()
   else showSuccessCheck()
 }

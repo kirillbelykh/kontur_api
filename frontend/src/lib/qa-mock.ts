@@ -128,8 +128,10 @@ function reply<T>(value: T): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(structuredClone(value)), 30))
 }
 
+const QA_THEMES = ['light', 'ivory', 'dark', 'graphite', 'ocean', 'system']
+
 export function installQaMock(theme: string) {
-  if (theme === 'dark' || theme === 'light') {
+  if (QA_THEMES.includes(theme)) {
     window.localStorage.setItem('kontur_theme', theme)
   }
   // Детерминированное состояние панелей между прогонами одного chrome-профиля
@@ -140,6 +142,7 @@ export function installQaMock(theme: string) {
   const api: Record<string, (...args: unknown[]) => Promise<unknown>> = {
     get_session_info: () => reply({ has_session: true, minutes_until_update: 42 }),
     refresh_session: () => reply({ success: true, session: { has_session: true, minutes_until_update: 60 } }),
+    get_app_version: () => reply({ version: '0.1.0', commit: 'a1b2c3d4e5' }),
     check_for_updates: () => reply({ update_available: false }),
     apply_update: () => reply({ success: true }),
     get_default_date_window: () => reply({ production_date: '01-03-2026', expiration_date: '01-03-2031' }),

@@ -4,6 +4,8 @@
  * Частицы рисуются на одном полноэкранном canvas — сотни точек без DOM-нод.
  */
 
+import { getAppSetting } from '@/lib/app-settings'
+
 type DustParticle = {
   x: number
   y: number
@@ -111,7 +113,7 @@ function spawnParticlesForRect(rect: DOMRect, perElementBudget: number) {
 /** Запускает распад элементов; резолвится, когда пыль улетела. */
 export function dissolveToDust(elements: HTMLElement[]): Promise<void> {
   const targets = elements.filter(Boolean)
-  if (targets.length === 0 || typeof document === 'undefined') {
+  if (targets.length === 0 || typeof document === 'undefined' || !getAppSetting('animations')) {
     return Promise.resolve()
   }
 

@@ -8,7 +8,8 @@ import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { DatePickerField } from '@/components/ui/date-picker'
 import { dissolveToDust, restoreDissolved } from '@/components/ui/dust-effect'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -76,9 +77,7 @@ const AkRow = memo(function AkRow({
       <TableCell>
         <StatusBadge status={row.status_label || row.status} />
         {row.status === 'readyForSendAfterApproved' ? (
-          <div className="mt-1 text-xs text-muted-foreground">
-            Изменённый состав после прошлой регистрации
-          </div>
+          <div className="mt-1 text-xs text-muted-foreground">Состав изменён</div>
         ) : null}
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{row.created_at_label || '—'}</TableCell>
@@ -163,8 +162,10 @@ export function AggregationPage() {
     return () => window.clearTimeout(timer)
   }, [items])
 
+  // Debounce 150 мс: АК бывает 200+ строк, фильтр не пересчитывается на каждый символ
+  const debouncedQuery = useDebouncedValue(searchQuery)
   const filteredItems = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
+    const query = debouncedQuery.trim().toLowerCase()
     const status = statusFilter.trim()
     return items.filter((item) => {
       if (status && item.status !== status) return false
@@ -174,7 +175,7 @@ export function AggregationPage() {
         .join(' ')
       return haystack.includes(query)
     })
-  }, [items, searchQuery, statusFilter])
+  }, [items, debouncedQuery, statusFilter])
 
   filteredItemsRef.current = filteredItems
 
@@ -382,7 +383,6 @@ export function AggregationPage() {
     <div className="page-shell">
       <PageHeader
         title="Коды агрегации"
-        subtitle="Создание, скачивание, проведение и повторное наполнение АК."
         actions={
           <Button variant="outline" size="sm" onClick={() => void refreshList()} disabled={loading || isBusy}>
             <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
@@ -404,7 +404,6 @@ export function AggregationPage() {
         <Card>
           <CardHeader>
             <CardTitle>Создание АК</CardTitle>
-            <CardDescription>Запрос новых агрегационных кодов в Контур.Маркировке.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div>
@@ -412,7 +411,7 @@ export function AggregationPage() {
               <TextInput
                 value={createComment}
                 onChange={(e) => setCreateComment(e.target.value)}
-                placeholder="Например: лат диаг S 260316 (249к)"
+                placeholder="Название"
               />
             </div>
             <div>
@@ -426,7 +425,7 @@ export function AggregationPage() {
               />
             </div>
             <Button size="sm" onClick={() => void createCodes()} disabled={isBusy}>
-              Создать коды агрегации
+              Создать
             </Button>
           </CardContent>
         </Card>
@@ -434,7 +433,6 @@ export function AggregationPage() {
         <Card>
           <CardHeader>
             <CardTitle>Проведение и ввод в оборот</CardTitle>
-            <CardDescription>Действия над выбранными АК.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid gap-2 sm:grid-cols-2">
@@ -448,38 +446,34 @@ export function AggregationPage() {
               </div>
               <div>
                 <FieldLabel>Номер партии</FieldLabel>
-                <TextInput
-                  value={batchNumber}
-                  onChange={(e) => setBatchNumber(e.target.value)}
-                  placeholder="Введите номер партии"
-                />
+                <TextInput value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} />
               </div>
               <div>
-                <FieldLabel>Название документа ввода в оборот</FieldLabel>
+                <FieldLabel>Название документа</FieldLabel>
                 <TextInput
                   value={documentTitle}
                   onChange={(e) => setDocumentTitle(e.target.value)}
-                  placeholder="Можно оставить пустым для автоназвания"
+                  placeholder="Автоназвание"
                 />
               </div>
             </div>
 
             <Checkbox isSelected={allowDisaggregate} onChange={setAllowDisaggregate}>
-              <span className="text-sm">Разрешить расформирование чужих АК при проведении</span>
+              <span className="text-sm">Разрешить расформирование чужих АК</span>
             </Checkbox>
 
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => void downloadSelected()} disabled={isBusy || !hasSelection}>
-                Скачать выбранные АК
+                Скачать
               </Button>
               <Button size="sm" variant="outline" onClick={() => void approveSelected()} disabled={isBusy || !hasSelection}>
-                Провести выбранные АК
+                Провести
               </Button>
               <Button size="sm" variant="outline" onClick={() => void archiveSelected()} disabled={isBusy || !hasSelection}>
                 В архив
               </Button>
               <Button size="sm" variant="outline" onClick={() => void introduceSelected()} disabled={isBusy || !hasSelection}>
-                Ввести в оборот выбранные АК
+                Ввести в оборот
               </Button>
               <Button
                 size="sm"
@@ -502,28 +496,22 @@ export function AggregationPage() {
                 >
                   <div className="space-y-3 border-t border-border pt-3">
                     <div>
-                      <FieldLabel>Название для повторного наполнения</FieldLabel>
+                      <FieldLabel>Название АК</FieldLabel>
                       <TextInput
                         value={commentFilter}
                         onChange={(e) => setCommentFilter(e.target.value)}
-                        placeholder="Название АК для поиска"
+                        placeholder="Название"
                       />
                     </div>
                     <div>
                       <FieldLabel>TSD токен</FieldLabel>
-                      <TextInput
-                        value={refillToken}
-                        onChange={(e) => setRefillToken(e.target.value)}
-                        placeholder="Токен ТСД"
-                      />
+                      <TextInput value={refillToken} onChange={(e) => setRefillToken(e.target.value)} />
                     </div>
-                    <p className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                      Повторное наполнение используйте только для АК, которые ещё не были зарегистрированы в ГИС МТ. Для
-                      уже зарегистрированных АК нужна переагрегация только по изменяемым кодам, а не повторная отправка
-                      всего состава.
+                    <p className="text-xs text-muted-foreground">
+                      Только для АК, не зарегистрированных в ГИС МТ.
                     </p>
                     <Button size="sm" onClick={() => void refill()} disabled={isBusy}>
-                      Выполнить повторное наполнение
+                      Наполнить
                     </Button>
                   </div>
                 </motion.div>
@@ -534,15 +522,8 @@ export function AggregationPage() {
       </div>
 
       <Card className="cv-auto mt-3">
-        <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-          <div>
-            <CardTitle>Список АК из Контур.Маркировки</CardTitle>
-            <CardDescription>
-              Всего АК: {state.total_items ?? items.length} • Найдено: {filteredItems.length} • Выбрано:{' '}
-              {selectedIds.size} • Страница: {page + 1}/{totalPages}
-              {cacheAge > 0 ? ` • Кэш: ${cacheAge} сек.` : ''}
-            </CardDescription>
-          </div>
+        <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+          <CardTitle>Список АК</CardTitle>
           <div className="flex flex-wrap gap-1.5">
             <Button size="sm" variant="outline" onClick={selectVisible} disabled={filteredItems.length === 0}>
               Выбрать найденные
@@ -587,7 +568,6 @@ export function AggregationPage() {
                   setCurrentPage(0)
                   lastClickedIndexRef.current = -1
                 }}
-                placeholder="Название или код агрегации"
               />
             </div>
           </div>
@@ -595,7 +575,7 @@ export function AggregationPage() {
           {loading && items.length === 0 && pendingCreate === 0 ? (
             <TableSkeleton rows={8} />
           ) : filteredItems.length === 0 && pendingCreate === 0 ? (
-            <EmptyState>Агрегационные коды по текущему фильтру не найдены.</EmptyState>
+            <EmptyState>Ничего не найдено</EmptyState>
           ) : (
             <>
               <div

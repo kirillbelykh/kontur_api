@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { getAppSetting } from '@/lib/app-settings'
 import { apiCall } from '@/lib/bridge'
 import { celebrateOrderCreated } from '@/lib/celebrate'
 import { useCachedState } from '@/lib/view-cache'
@@ -9,7 +10,7 @@ import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
@@ -19,6 +20,7 @@ import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CoolMode } from '@/components/ui/cool-mode'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 type OrderMode = 'params' | 'gtin'
 
@@ -275,6 +277,7 @@ export function OrdersPage() {
 
   /** Видимый перелёт: чипы с названиями заявок летят из «Очереди» в «Историю». */
   const flyQueueToHistory = () => {
+    if (!getAppSetting('animations')) return
     const container = queueTableRef.current
     const target = historyCardRef.current
     if (!container || !target) return
@@ -359,8 +362,10 @@ export function OrdersPage() {
     return () => window.clearTimeout(timer)
   }, [history])
 
+  // Debounce 150 мс: история бывает на сотни строк, фильтр не дёргается на каждый символ
+  const debouncedHistorySearch = useDebouncedValue(historySearch)
   const filteredHistory = useMemo(() => {
-    const query = historySearch.trim().toLowerCase()
+    const query = debouncedHistorySearch.trim().toLowerCase()
     if (!query) return history
     return history.filter((item) => {
       const haystack = [item.order_name, item.full_name, item.gtin, item.document_id, item.status]
@@ -369,7 +374,7 @@ export function OrdersPage() {
         .toLowerCase()
       return haystack.includes(query)
     })
-  }, [history, historySearch])
+  }, [history, debouncedHistorySearch])
 
   const buildPayload = () => ({
     order_name: form.order_name.trim(),
@@ -602,7 +607,6 @@ export function OrdersPage() {
     <div className="page-shell">
       <PageHeader
         title="Заказ кодов"
-        subtitle="Создание, очередь и история заказов кодов маркировки."
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load(true)} disabled={loading || isBusy}>
@@ -628,7 +632,6 @@ export function OrdersPage() {
         <Card>
           <CardHeader>
             <CardTitle>Новый заказ</CardTitle>
-            <CardDescription>Параметры номенклатуры или прямой GTIN → очередь / сразу в Контур.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <ModeToggle mode={mode} onChange={setMode} />
@@ -636,13 +639,12 @@ export function OrdersPage() {
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <FieldLabel>Название заявки</FieldLabel>
-                <TextInput value={form.order_name} onChange={(e) => setField('order_name', e.target.value)} placeholder="Номер / имя заказа" />
+                <TextInput value={form.order_name} onChange={(e) => setField('order_name', e.target.value)} placeholder="Название" />
               </div>
 
               <div className="sm:col-span-2">
                 <FieldLabel>Наименование</FieldLabel>
                 <SelectNative
-                  placeholder="Упрощённое имя"
                   value={form.name}
                   disabled={!paramsMode}
                   onChange={(e) => setField('name', e.target.value)}
@@ -779,11 +781,8 @@ export function OrdersPage() {
         </Card>
 
         <Card>
-          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-            <div>
-              <CardTitle>Очередь</CardTitle>
-              <CardDescription>Позиции к массовой отправке в Контур.</CardDescription>
-            </div>
+          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+            <CardTitle>Очередь</CardTitle>
             <div className="flex flex-wrap gap-1.5">
               <CoolMode>
                 <Button size="sm" onClick={() => void submitQueue()} disabled={isBusy || queue.length === 0}>
@@ -837,11 +836,8 @@ export function OrdersPage() {
 
       <div className="mt-3" ref={historyCardRef}>
         <Card className="cv-auto">
-          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-            <div>
-              <CardTitle>История</CardTitle>
-              <CardDescription>Документы Контура / локальная история.</CardDescription>
-            </div>
+          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+            <CardTitle>История</CardTitle>
             <div className="flex flex-wrap gap-1.5">
               <Button size="sm" variant="outline" onClick={() => void openDetails()} disabled={isBusy || selectedHistoryIds.length !== 1}>
                 Подробнее
@@ -869,7 +865,7 @@ export function OrdersPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
-            <TableSearch value={historySearch} onChange={setHistorySearch} placeholder="Поиск по заявке, GTIN, ID…" />
+            <TableSearch value={historySearch} onChange={setHistorySearch} />
             {loading && history.length === 0 ? (
               <TableSkeleton rows={6} />
             ) : filteredHistory.length === 0 ? (
@@ -891,11 +887,8 @@ export function OrdersPage() {
 
       {showDeleted ? (
         <Card className="cv-auto mt-3">
-          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
-            <div>
-              <CardTitle>Удалённые</CardTitle>
-              <CardDescription>Архив удалённых заказов — можно восстановить.</CardDescription>
-            </div>
+          <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
+            <CardTitle>Удалённые</CardTitle>
             <Button size="sm" variant="outline" onClick={() => void restoreDeleted()} disabled={isBusy || !selectedDeletedId}>
               <Undo2 className="h-3.5 w-3.5" />
               Восстановить
@@ -949,7 +942,6 @@ export function OrdersPage() {
         <DialogContent className="max-w-[96vw]">
           <DialogHeader>
             <DialogTitle>История заказов</DialogTitle>
-            <p className="text-xs text-muted-foreground">Escape — закрыть.</p>
           </DialogHeader>
           <div className="max-h-[78vh] overflow-auto">{renderHistoryTable(fullscreenPager.pageRows)}</div>
           <TablePagination
@@ -966,9 +958,9 @@ export function OrdersPage() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Подробнее о заказе</DialogTitle>
-            <p className="text-xs text-muted-foreground">
-              {details?.document_id ? `Документ ${details.document_id}` : 'Метаданные из Контура и локальной истории'}
-            </p>
+            {details?.document_id ? (
+              <p className="text-xs text-muted-foreground">Документ {details.document_id}</p>
+            ) : null}
           </DialogHeader>
           <div className="max-h-[70vh] overflow-auto">
             {!details ? (

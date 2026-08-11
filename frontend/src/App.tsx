@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { AlertTriangle, CheckCircle2, Info, Loader2, XCircle } from 'lucide-react'
@@ -6,19 +6,44 @@ import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AppUpdateProvider } from '@/hooks/useAppUpdate'
 import { PageZoomProvider } from '@/hooks/usePageZoom'
+import { ThemeProvider } from '@/hooks/useTheme'
 import { WelcomePage } from '@/pages/WelcomePage'
 
 // Стартовый экран и каркас — сразу; рабочие страницы — отдельными чанками по требованию
-const OrdersPage = lazy(() => import('@/pages/OrdersPage').then((m) => ({ default: m.OrdersPage })))
-const DownloadPage = lazy(() => import('@/pages/DownloadPage').then((m) => ({ default: m.DownloadPage })))
-const IntroPage = lazy(() => import('@/pages/IntroPage').then((m) => ({ default: m.IntroPage })))
-const TsdPage = lazy(() => import('@/pages/TsdPage').then((m) => ({ default: m.TsdPage })))
-const AggregationPage = lazy(() => import('@/pages/AggregationPage').then((m) => ({ default: m.AggregationPage })))
-const LabelsPage = lazy(() => import('@/pages/LabelsPage').then((m) => ({ default: m.LabelsPage })))
+const pageLoaders = [
+  () => import('@/pages/OrdersPage'),
+  () => import('@/pages/DownloadPage'),
+  () => import('@/pages/IntroPage'),
+  () => import('@/pages/TsdPage'),
+  () => import('@/pages/AggregationPage'),
+  () => import('@/pages/LabelsPage'),
+] as const
+
+const OrdersPage = lazy(() => pageLoaders[0]().then((m) => ({ default: m.OrdersPage })))
+const DownloadPage = lazy(() => pageLoaders[1]().then((m) => ({ default: m.DownloadPage })))
+const IntroPage = lazy(() => pageLoaders[2]().then((m) => ({ default: m.IntroPage })))
+const TsdPage = lazy(() => pageLoaders[3]().then((m) => ({ default: m.TsdPage })))
+const AggregationPage = lazy(() => pageLoaders[4]().then((m) => ({ default: m.AggregationPage })))
+const LabelsPage = lazy(() => pageLoaders[5]().then((m) => ({ default: m.LabelsPage })))
+
+/** После первой отрисовки греем ленивые чанки в простое — переходы мгновенные */
+function usePreloadPages() {
+  useEffect(() => {
+    const warm = () => pageLoaders.forEach((load) => void load().catch(() => undefined))
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 3000 })
+      return () => window.cancelIdleCallback(id)
+    }
+    const id = window.setTimeout(warm, 1200)
+    return () => window.clearTimeout(id)
+  }, [])
+}
 
 export default function App() {
+  usePreloadPages()
   return (
     <HashRouter>
+      <ThemeProvider>
       <PageZoomProvider>
       <AppUpdateProvider>
         <ErrorBoundary>
@@ -64,6 +89,7 @@ export default function App() {
         />
       </AppUpdateProvider>
       </PageZoomProvider>
+      </ThemeProvider>
     </HashRouter>
   )
 }
