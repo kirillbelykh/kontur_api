@@ -28,21 +28,26 @@
   --color-warning: #f59e0b;
   --color-error: #f43f5e;
 
-  --shadow-panel: 0 1px 2px rgba(15, 23, 42, 0.08), 0 8px 24px rgba(15, 23, 42, 0.06);
+  /* transitions.dev: тени едва заметные и нейтральные, глубину задаёт рамка */
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
 :root {
-  /* Чуть серее, чем раньше — поля/карточки белые и читаются на этом фоне */
-  --wms-background: 220 14% 96%;
-  --wms-foreground: 222 47% 11%;
+  /* transitions.dev: нейтральные серые без синего подтона, светлый воздушный фон */
+  --wms-background: 240 9% 97%;
+  --wms-foreground: 240 8% 9%;
   --wms-card: 0 0% 100%;
-  --wms-card-foreground: 222 47% 11%;
-  --wms-muted: 210 40% 94%;
-  --wms-muted-foreground: 215 16% 47%;
-  --wms-border: 214 20% 82%;
-  --wms-border-thin: 214 20% 78%;
-  --wms-ring: 210 5% 45%;  /* ← ИЗМЕНЕНО: #6f7379 в HSL */
-  
+  --wms-card-foreground: 240 8% 9%;
+  --wms-muted: 240 5% 95%;
+  --wms-muted-foreground: 240 4% 46%;
+  --wms-border: 240 6% 84%;
+  --wms-border-thin: 240 6% 80%;
+  --wms-ring: 240 4% 42%;
+
+  /* transitions.dev: акцент — почти чёрный, а не синий; hover/soft выводятся сами */
+  --accent: var(--eclipse);
+  --accent-foreground: var(--snow);
+
   --border-width-default: 1px;
   --border-width-hover: 1px;
   --border-width-focus: 1px;
@@ -53,12 +58,12 @@
   /* HeroUI fields share the border tokens so inputs and selects look identical.
      Скрин 3: мягкая почти незаметная граница + светло-серый фон, без жирного контура. */
   --field-border-width: 1px;
-  --field-border: hsl(214 18% 88%);
-  --field-border-hover: hsl(214 16% 78%);
-  --field-border-focus: hsl(214 16% 70%);
+  --field-border: hsl(240 6% 88%);
+  --field-border-hover: hsl(240 5% 77%);
+  --field-border-focus: hsl(240 5% 62%);
   /* Поля белые (как в доке HeroUI), фон страницы серее */
   --field-bg: #ffffff;
-  --field-ring: hsl(210 12% 60% / 0.22);
+  --field-ring: hsl(240 5% 60% / 0.22);
 
   /* Modal morph (transitions.dev Plus→menu motion language) */
   --modal-open-dur: 350ms;
@@ -105,11 +110,20 @@
   animation: order-arrive 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Строка очереди «улетает» вниз к Истории перед отправкой */
+/* Строка очереди «улетает» вниз к Истории перед отправкой.
+   Keyframes вместо transition: на <tr> в WebView transition срабатывает ненадёжно. */
+@keyframes order-leave-kf {
+  to {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
 .order-leave {
-  opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.32s ease-in, transform 0.32s ease-in;
+  animation: order-leave-kf 0.4s ease-in forwards;
+}
+.order-leave td {
+  transition: opacity 0.4s ease-in;
+  opacity: 0.25;
 }
 
 /* ── Transitions.dev — Shimmer text (загрузка/ожидание, как в marzban-custom) ── */
@@ -402,23 +416,26 @@
 }
 
 .dark {
-  --wms-background: 220 13% 18%;
-  --wms-foreground: 219 14% 71%;
-  --wms-card: 220 13% 16%;
-  --wms-card-foreground: 219 14% 71%;
-  --wms-muted: 220 13% 22%;
-  --wms-muted-foreground: 220 10% 65%;
-  --wms-border: 220 13% 38%;
-  --wms-border-thin: 220 13% 34%;
-  --wms-ring: 207 82% 66%;
-  --field-border: hsl(220 13% 34%);
-  --field-border-hover: hsl(220 13% 46%);
-  --field-border-focus: hsl(220 13% 55%);
-  --field-bg: hsl(220 13% 22%);
-  --field-ring: hsl(207 60% 66% / 0.35);
+  --wms-background: 240 6% 10%;
+  --wms-foreground: 240 6% 88%;
+  --wms-card: 240 5% 13%;
+  --wms-card-foreground: 240 6% 88%;
+  --wms-muted: 240 5% 18%;
+  --wms-muted-foreground: 240 5% 63%;
+  --wms-border: 240 4% 32%;
+  --wms-border-thin: 240 4% 28%;
+  --wms-ring: 240 5% 68%;
+  /* Тёмная тема: акцент инвертируется — светлые кнопки на тёмном, как у transitions.dev */
+  --accent: var(--snow);
+  --accent-foreground: var(--eclipse);
+  --field-border: hsl(240 4% 30%);
+  --field-border-hover: hsl(240 4% 42%);
+  --field-border-focus: hsl(240 4% 55%);
+  --field-bg: hsl(240 5% 16%);
+  --field-ring: hsl(240 5% 65% / 0.3);
   --magic-spotlight: #262626;
-  --magic-gradient-from: #64748b;
-  --magic-gradient-to: #475569;
+  --magic-gradient-from: #71717a;
+  --magic-gradient-to: #3f3f46;
   color-scheme: dark;
 }
 

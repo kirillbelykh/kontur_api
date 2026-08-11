@@ -163,6 +163,40 @@ export function OrdersPage() {
   const [queueLeaving, setQueueLeaving] = useState(false)
   const [arrivedIds, setArrivedIds] = useState<Set<string>>(new Set())
   const prevHistoryIdsRef = useRef<Set<string> | null>(null)
+  const queueTableRef = useRef<HTMLDivElement>(null)
+  const historyCardRef = useRef<HTMLDivElement>(null)
+
+  /** Видимый перелёт: чипы с названиями заявок летят из «Очереди» в «Историю». */
+  const flyQueueToHistory = () => {
+    const container = queueTableRef.current
+    const target = historyCardRef.current
+    if (!container || !target) return
+    const rows = Array.from(container.querySelectorAll('tbody tr')).slice(0, 8)
+    const targetRect = target.getBoundingClientRect()
+    rows.forEach((row, index) => {
+      const rect = row.getBoundingClientRect()
+      const label = (row.querySelector('td:nth-child(2)')?.textContent || 'Заказ').trim().slice(0, 48)
+      const chip = document.createElement('div')
+      chip.textContent = label
+      chip.style.cssText =
+        `position:fixed;left:${rect.left}px;top:${rect.top}px;max-width:${Math.max(180, Math.min(rect.width, 360))}px;` +
+        'z-index:2147483000;pointer-events:none;padding:8px 16px;border-radius:9999px;' +
+        'background:hsl(var(--wms-card));color:hsl(var(--wms-foreground));border:1px solid hsl(var(--wms-border));' +
+        'box-shadow:0 8px 24px rgba(15,23,42,0.18);font-size:13px;font-weight:500;' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:1;will-change:transform,opacity;' +
+        `transition:transform 700ms cubic-bezier(0.22,1,0.36,1) ${index * 80}ms,opacity 700ms ease-in ${index * 80}ms;`
+      document.body.appendChild(chip)
+      const dx = targetRect.left + 32 - rect.left
+      const dy = targetRect.top + 56 - rect.top
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          chip.style.transform = `translate(${dx}px, ${dy}px) scale(0.5)`
+          chip.style.opacity = '0.1'
+        }),
+      )
+      window.setTimeout(() => chip.remove(), 1000 + index * 80)
+    })
+  }
 
   const setField = <K extends keyof OrderForm>(key: K, value: OrderForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -306,12 +340,13 @@ export function OrdersPage() {
     runBusy(
       'submit',
       async () => {
-        // Анимация «улёта» строк стартует сразу; запрос идёт параллельно, не ждём HTTP для отклика
+        // Отклик мгновенно: чипы летят в «Историю», строки очереди гаснут; запрос идёт параллельно
+        flyQueueToHistory()
         setQueueLeaving(true)
         const request = apiCall<{ state?: OrdersViewState; errors?: Array<{ order_name?: string; error?: string }> }>(
           'submit_order_queue',
         )
-        const animation = new Promise((resolve) => window.setTimeout(resolve, 340))
+        const animation = new Promise((resolve) => window.setTimeout(resolve, 700))
         try {
           const [result] = await Promise.all([request, animation])
           if (result.state) setState(result.state)
@@ -663,7 +698,7 @@ export function OrdersPage() {
             {queue.length === 0 ? (
               <EmptyState>Очередь пуста</EmptyState>
             ) : (
-              <div className="max-h-[360px] overflow-auto">
+              <div ref={queueTableRef} className="max-h-[360px] overflow-auto">
                 <Table aria-label="Очередь заявок">
                   <TableHeader>
                     <TableRow>
@@ -707,7 +742,7 @@ export function OrdersPage() {
         </Card>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4" ref={historyCardRef}>
         <Card>
           <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
             <div>
