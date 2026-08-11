@@ -1,12 +1,16 @@
-"""Selenium / YandexDriver cookie collection."""
+"""Selenium / YandexDriver cookie collection.
+
+Default mode matches the historical background auth flow:
+off-screen window + Win32 hide, using the real Yandex profile.
+True Chrome ``--headless=new`` is available via ``HEADLESS`` / env.
+"""
 
 from __future__ import annotations
 
-import shutil
-import tempfile
+import os
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from logger import logger
 
@@ -23,17 +27,19 @@ from auth.constants import (
 from auth.store import save_cookies_to_file, validate_cookies
 
 
-def _is_profile_lock_error(exc: BaseException) -> bool:
-    message = str(exc or "").lower()
-    markers = (
-        "user data directory is already in use",
-        "session not created",
-        "chrome instance exited",
-        "devtoolsactiveport",
-        "cannot connect to chrome",
-        "profile is already in use",
-    )
-    return any(marker in message for marker in markers)
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _effective_headless(explicit: Optional[bool] = None) -> bool:
+    if explicit is not None:
+        return bool(explicit)
+    if os.getenv("KONTUR_BROWSER_HEADLESS") is not None:
+        return _env_flag("KONTUR_BROWSER_HEADLESS", False)
+    return bool(HEADLESS)
 
 
 def _click_cookie_accept_if_present(driver, by) -> None:
@@ -55,8 +61,8 @@ def build_browser_options(
     profile_user_data_dir: Optional[Path],
     profile_directory: Optional[str],
     headless: bool,
-    visible: bool = False,
 ) -> Any:
+    """Build Chrome/Yandex options for background cookie collection."""
     from selenium.webdriver.chrome.options import Options
 
     options = Options()
@@ -71,22 +77,22 @@ def build_browser_options(
     if normalized_profile_directory:
         options.add_argument(f"--profile-directory={normalized_profile_directory}")
 
-    if headless and not visible:
+    if headless:
         options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
+        options.add_argument("--disable-gpu")
+    else:
+        # Historical "works in background" mode: keep a real profile session,
+        # but keep the window off-screen and hidden via Win32.
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-position=-32000,-32000")
+        options.add_argument("--window-size=1920,1080")
+
     options.add_argument("--no-first-run")
     options.add_argument("--no-default-browser-check")
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--remote-debugging-port=0")
-    if visible:
-        options.add_argument("--window-position=80,80")
-        options.add_argument("--window-size=1280,900")
-        options.add_argument("--start-maximized")
-    else:
-        options.add_argument("--window-position=-32000,-32000")
-        options.add_argument("--window-size=1920,1080")
     return options
 
 
@@ -176,16 +182,15 @@ def get_cookies(
     browser_path: Optional[Path] = YANDEX_BROWSER_PATH,
     profile_user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
     profile_directory: str = PROFILE_DIRECTORY,
-    headless: bool = HEADLESS,
+    headless: Optional[bool] = None,
     target_url: str = TARGET_URL,
     max_retries: int = 3,
 ) -> Optional[Dict[str, str]]:
-    """Collect Kontur cookies via YandexDriver.
+    """Collect Kontur cookies via YandexDriver in background mode.
 
-    Flow:
-    1. Try the real Yandex profile quietly.
-    2. Only fall back to a visible temporary profile when the real profile is
-       locked or still does not yield valid cookies after UI interaction.
+    Uses the real Yandex profile. Window stays hidden/off-screen (historical
+    background auth). Optional true Chrome headless via ``HEADLESS`` /
+    ``KONTUR_BROWSER_HEADLESS=1``.
     """
     try:
         from selenium import webdriver
@@ -197,6 +202,19 @@ def get_cookies(
         logger.error("Selenium не установлен или недоступен: %s", exc)
         return None
 
+    win32_available = False
+    try:
+        import win32con  # noqa: F401
+        import win32gui  # noqa: F401
+        import win32process  # noqa: F401
+
+        win32_available = True
+    except ImportError as exc:
+        logger.warning(
+            "pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32"
+        )
+        logger.debug("Ошибка импорта pywin32: %s", exc)
+
     if not driver_path or not Path(driver_path).exists():
         logger.error("Driver not found: %s", driver_path)
         return None
@@ -204,54 +222,44 @@ def get_cookies(
         logger.error("Browser binary not found: %s", browser_path)
         return None
 
-    temporary_profile_dir: Optional[Path] = None
-    use_visible_login = False
-    active_user_data_dir = profile_user_data_dir
-    active_profile_directory = profile_directory
-    active_headless = headless
+    use_headless = _effective_headless(headless)
+    logger.info(
+        "Сбор cookies через Selenium (headless=%s, profile=%s)",
+        use_headless,
+        profile_directory,
+    )
 
     for attempt in range(1, max_retries + 1):
-        logger.info(
-            "Попытка получения cookies #%s (visible=%s, temp_profile=%s)",
-            attempt,
-            use_visible_login,
-            bool(temporary_profile_dir),
-        )
+        logger.info("Попытка получения cookies #%s", attempt)
         driver = None
         try:
             options = build_browser_options(
                 browser_path=Path(browser_path),
-                profile_user_data_dir=active_user_data_dir,
-                profile_directory=active_profile_directory,
-                headless=active_headless,
-                visible=use_visible_login,
+                profile_user_data_dir=profile_user_data_dir,
+                profile_directory=profile_directory,
+                headless=use_headless,
             )
             service = Service(str(driver_path))
             driver = webdriver.Chrome(service=service, options=options)
             remove_webdriver_marker(driver)
             wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
-            if not use_visible_login:
+            if not use_headless and win32_available:
                 hide_driver_windows(driver)
 
             driver.get(target_url)
             time.sleep(2.0)
             _click_cookie_accept_if_present(driver, By)
 
-            cookies = wait_for_valid_cookies(
-                driver,
-                timeout_seconds=WAIT_TIMEOUT if not use_visible_login else 30.0,
-            )
+            cookies = wait_for_valid_cookies(driver, timeout_seconds=WAIT_TIMEOUT)
             if cookies and save_cookies_to_file(cookies):
                 logger.info("Successfully refreshed Kontur cookies")
                 return dict(cookies)
 
             _try_select_profile_and_warehouse(driver, wait, By, EC)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            cookies = wait_for_valid_cookies(
-                driver,
-                timeout_seconds=180.0 if use_visible_login else WAIT_TIMEOUT,
-            )
+
+            cookies = wait_for_valid_cookies(driver, timeout_seconds=WAIT_TIMEOUT)
             if cookies and save_cookies_to_file(cookies):
                 logger.info("Successfully refreshed Kontur cookies")
                 return dict(cookies)
@@ -259,42 +267,21 @@ def get_cookies(
             raw_cookies = driver.get_cookies()
             if not raw_cookies:
                 logger.warning("После загрузки страницы cookies не найдены")
-            else:
-                cookies = {item["name"]: item["value"] for item in raw_cookies}
-                is_valid, missing_fields = validate_cookies(cookies)
-                if is_valid and save_cookies_to_file(cookies):
-                    logger.info("Успешно получили и сохранили валидные cookies")
-                    return dict(cookies)
-                logger.warning("Полученные cookies невалидны. Отсутствуют поля: %s", missing_fields)
-
-            # Real profile did not yield cookies: open a visible clean profile
-            # so the operator can sign in manually.
-            if temporary_profile_dir is None:
-                temporary_profile_dir = Path(tempfile.mkdtemp(prefix="kontur_yandex_"))
-                active_user_data_dir = temporary_profile_dir
-                active_profile_directory = "Default"
-                active_headless = False
-                use_visible_login = True
-                logger.warning(
-                    "Профиль Yandex не отдал валидные cookies — "
-                    "открываем видимый браузер для ручного входа"
-                )
                 continue
-        except Exception as exc:
+
+            cookies = {item["name"]: item["value"] for item in raw_cookies}
+            is_valid, missing_fields = validate_cookies(cookies)
+            if not is_valid:
+                logger.warning("Полученные cookies невалидны. Отсутствуют поля: %s", missing_fields)
+                if attempt < max_retries:
+                    time.sleep(2.0)
+                continue
+
+            if save_cookies_to_file(cookies):
+                logger.info("Успешно получили и сохранили валидные cookies")
+                return dict(cookies)
+        except Exception:
             logger.exception("get_cookies failed on attempt %s", attempt)
-            if temporary_profile_dir is None and (
-                _is_profile_lock_error(exc) or active_user_data_dir is not None
-            ):
-                temporary_profile_dir = Path(tempfile.mkdtemp(prefix="kontur_yandex_"))
-                active_user_data_dir = temporary_profile_dir
-                active_profile_directory = "Default"
-                active_headless = False
-                use_visible_login = True
-                logger.warning(
-                    "Не удалось запустить браузер с обычным профилем (%s). "
-                    "Повторяем в видимом временном профиле.",
-                    exc,
-                )
         finally:
             if driver is not None:
                 try:
@@ -303,8 +290,6 @@ def get_cookies(
                     pass
 
     logger.error("Не удалось получить валидные cookies после %s попыток", max_retries)
-    if temporary_profile_dir:
-        shutil.rmtree(temporary_profile_dir, ignore_errors=True)
     return None
 
 

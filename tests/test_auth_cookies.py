@@ -124,7 +124,7 @@ class KonturCheckTests(unittest.TestCase):
 
 
 class BrowserOptionsTests(unittest.TestCase):
-    def test_visible_login_does_not_use_offscreen_window(self):
+    def test_background_mode_keeps_offscreen_window(self):
         from auth.browser import build_browser_options
 
         fake_options = mock.Mock()
@@ -142,10 +142,32 @@ class BrowserOptionsTests(unittest.TestCase):
                 profile_user_data_dir=Path("profile"),
                 profile_directory="Default",
                 headless=False,
-                visible=True,
             )
 
-        self.assertTrue(any(arg.startswith("--window-position=80,") for arg in fake_options.arguments))
+        self.assertTrue(any("-32000" in arg for arg in fake_options.arguments))
+        self.assertFalse(any(arg.startswith("--headless") for arg in fake_options.arguments))
+
+    def test_true_headless_mode_uses_chrome_headless(self):
+        from auth.browser import build_browser_options
+
+        fake_options = mock.Mock()
+        fake_options.arguments = []
+
+        def add_argument(value):
+            fake_options.arguments.append(value)
+
+        fake_options.add_argument.side_effect = add_argument
+        fake_options.add_experimental_option = mock.Mock()
+
+        with mock.patch("selenium.webdriver.chrome.options.Options", return_value=fake_options):
+            build_browser_options(
+                browser_path=Path("browser.exe"),
+                profile_user_data_dir=Path("profile"),
+                profile_directory="Default",
+                headless=True,
+            )
+
+        self.assertTrue(any(arg == "--headless=new" for arg in fake_options.arguments))
         self.assertFalse(any("-32000" in arg for arg in fake_options.arguments))
 
 

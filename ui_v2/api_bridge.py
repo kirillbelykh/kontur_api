@@ -1904,7 +1904,7 @@ class ApiBridge:
                 if force_browser_refresh:
                     runtime.auth_state = "browser"
                     runtime.auth_message = (
-                        "Проверяем сессию Контур; при необходимости откроется браузер..."
+                        "Обновляем cookies в фоновом браузере..."
                     )
                 else:
                     runtime.auth_state = "cookies"
