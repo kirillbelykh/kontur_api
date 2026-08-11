@@ -4,10 +4,10 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Apple-style: SF Pro on Apple, system UI elsewhere */
+  /* HeroUI-style UI font (Inter), совпадает со скринами документации */
   --font-sans:
-    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
+    "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji";
   --font-mono:
     ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, Consolas,
@@ -49,11 +49,14 @@
   --wms-ring-width-default: 2px;
   --wms-ring-offset-width: 1px;
 
-  /* HeroUI fields share the border tokens so inputs and selects look identical */
+  /* HeroUI fields share the border tokens so inputs and selects look identical.
+     Скрин 3: мягкая почти незаметная граница + светло-серый фон, без жирного контура. */
   --field-border-width: 1px;
-  --field-border: hsl(214 20% 82%);
-  --field-border-hover: hsl(214 20% 68%);
-  --field-border-focus: #000000;
+  --field-border: hsl(214 18% 90%);
+  --field-border-hover: hsl(214 16% 82%);
+  --field-border-focus: hsl(214 16% 74%);
+  --field-bg: hsl(210 30% 96%);
+  --field-ring: hsl(210 12% 60% / 0.35);
 
   /* Modal morph (transitions.dev Plus→menu motion language) */
   --modal-open-dur: 350ms;
@@ -250,6 +253,14 @@
   animation: toast-spring-in 420ms cubic-bezier(0.34, 1.35, 0.64, 1);
 }
 
+/* Кастомные тосты: цветной акцент слева по типу */
+.kontur-toast { border-left-width: 3px; }
+.kontur-toast[data-type="success"] { border-left-color: #10b981; }
+.kontur-toast[data-type="error"]   { border-left-color: #f43f5e; }
+.kontur-toast[data-type="warning"] { border-left-color: #f59e0b; }
+.kontur-toast[data-type="info"]    { border-left-color: #0ea5e9; }
+.kontur-toast[data-type="loading"] { border-left-color: hsl(var(--wms-border)); }
+
 @keyframes modal-overlay-out {
   from { opacity: 1; }
   to { opacity: 0; }
@@ -357,9 +368,11 @@
   --wms-border: 220 13% 38%;
   --wms-border-thin: 220 13% 34%;
   --wms-ring: 207 82% 66%;
-  --field-border: hsl(220 13% 38%);
-  --field-border-hover: hsl(220 13% 50%);
-  --field-border-focus: #ffffff;
+  --field-border: hsl(220 13% 34%);
+  --field-border-hover: hsl(220 13% 46%);
+  --field-border-focus: hsl(220 13% 55%);
+  --field-bg: hsl(220 13% 22%);
+  --field-ring: hsl(207 60% 66% / 0.35);
   --magic-spotlight: #262626;
   --magic-gradient-from: #64748b;
   --magic-gradient-to: #475569;
@@ -485,12 +498,28 @@ button {
     box-shadow: 0 0 0 var(--wms-ring-width-default) hsl(var(--wms-ring) / 0.45) !important;
   }
 
-  /* Кнопки HeroUI: тот же радиус, что у Input / Select / SearchField */
+  /* Кнопки HeroUI как в доке HeroUI (скрин 1): пилюля */
   .button {
-    border-radius: var(--field-radius);
+    border-radius: 9999px;
   }
 
-  /* HeroUI Input/TextArea/DateField/SearchField: thin contrasting border on activation */
+  /* HeroUI Input/TextArea/DateField/SearchField: мягкий фон + тонкая граница (скрин 3) */
+  .input,
+  .textarea,
+  .date-input-group,
+  .search-field__group {
+    background-color: var(--field-bg) !important;
+    border-color: var(--field-border) !important;
+  }
+
+  .input:hover,
+  .textarea:hover,
+  .date-input-group:hover,
+  .search-field__group:hover {
+    border-color: var(--field-border-hover) !important;
+  }
+
+  /* Фокус — мягкое кольцо, без жирного чёрного контура */
   .input:is(:focus, :focus-visible, [data-focused="true"], [data-focus-visible="true"]),
   .textarea:is(:focus, :focus-visible, [data-focused="true"], [data-focus-visible="true"]),
   .date-input-group:is(:focus-within, [data-focus-within="true"]),
@@ -501,7 +530,16 @@ button {
     --tw-ring-shadow: 0 0 #0000 !important;
     --tw-ring-offset-shadow: 0 0 #0000 !important;
     --tw-ring-color: transparent !important;
-    box-shadow: var(--field-shadow) !important;
+    box-shadow: 0 0 0 3px var(--field-ring) !important;
+  }
+
+  /* Текст в таблицах можно выделять и копировать (React Aria по умолчанию блокирует) */
+  [data-slot="table"],
+  [data-slot="table-cell"],
+  [data-slot="table-column"],
+  [data-slot="table-cell"] * {
+    -webkit-user-select: text !important;
+    user-select: text !important;
   }
 
   /* HeroUI Table uses text-muted; our --color-muted is a surface (shadcn bg-muted). */

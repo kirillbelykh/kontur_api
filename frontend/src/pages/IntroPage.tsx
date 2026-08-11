@@ -5,7 +5,7 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -38,17 +38,6 @@ type IntroResult = {
   results?: Array<{ document_id?: string }>
   errors?: Array<{ document_id?: string; error?: string }>
   state?: IntroState
-}
-
-function toneForStatus(status?: string) {
-  const value = (status || '').toLowerCase()
-  if (!value) return 'secondary' as const
-  if (value.includes('ошиб') || value.includes('error')) return 'danger' as const
-  if (value.includes('ожид') || value.includes('pending') || value.includes('creat')) return 'warning' as const
-  if (value.includes('введен') || value.includes('готов') || value.includes('ready') || value.includes('received')) {
-    return 'success' as const
-  }
-  return 'info' as const
 }
 
 export function IntroPage() {
@@ -286,7 +275,7 @@ export function IntroPage() {
                           </TableCell>
                           <TableCell className="text-muted-foreground">{item.full_name || item.simpl || '—'}</TableCell>
                           <TableCell>
-                            <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
+                            <StatusBadge status={item.status} />
                           </TableCell>
                           <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
                         </TableRow>

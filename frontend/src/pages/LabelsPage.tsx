@@ -5,7 +5,6 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -482,7 +481,7 @@ export function LabelsPage() {
             placeholder="Поиск по таблице"
           />
           {loading && config.rows.length === 0 ? (
-            <TableSkeleton rows={4} />
+            <TableSkeleton rows={6} />
           ) : (
             <SelectableTable
               ariaLabel={config.title}
@@ -491,6 +490,7 @@ export function LabelsPage() {
               rowId={config.rowId}
               selectedId={config.selectedId}
               onSelect={config.onSelect}
+              maxHeight="max-h-[360px]"
               emptyText={config.emptyText}
             />
           )}
@@ -788,8 +788,10 @@ export function LabelsPage() {
                       key={String(template.path)}
                       type="button"
                       className={cn(
-                        'w-full rounded-md border border-border px-3 py-2 text-left transition hover:bg-muted/40',
-                        selected && 'border-primary bg-muted/60',
+                        'w-full rounded-xl border bg-[var(--field-bg)] px-3.5 py-2.5 text-left transition',
+                        selected
+                          ? 'border-foreground/40 ring-1 ring-foreground/15'
+                          : 'border-border hover:border-[var(--field-border-hover)]',
                       )}
                       onClick={() => {
                         setTemplatePath(String(template.path || ''))
@@ -799,9 +801,9 @@ export function LabelsPage() {
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium">{template.name || '—'}</span>
-                        <Badge tone={template.data_source_kind === 'aggregation' ? 'primary' : 'secondary'}>
+                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                           {template.source_label || template.data_source_kind || '—'}
-                        </Badge>
+                        </span>
                       </div>
                       <div className="mt-0.5 text-xs text-muted-foreground">
                         {template.sheet_format_label || template.sheet_format} • {template.category || '—'}
@@ -816,10 +818,13 @@ export function LabelsPage() {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+      {/* Стопкой во всю ширину — в три узкие колонки данные было не видно */}
+      <div className="mt-4 space-y-4">
         {renderTableCard('orders')}
-        {renderTableCard('aggregation')}
-        {renderTableCard('marking')}
+        <div className="grid gap-4 xl:grid-cols-2">
+          {renderTableCard('aggregation')}
+          {renderTableCard('marking')}
+        </div>
       </div>
 
       {fullscreen && fullscreenConfig ? (

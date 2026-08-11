@@ -5,7 +5,7 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -58,19 +58,6 @@ const EMPTY_FORM: TsdForm = {
   production_date: '',
   expiration_date: '',
   batch_number: '',
-}
-
-function toneForStatus(status?: string) {
-  const value = (status || '').toLowerCase()
-  if (!value) return 'secondary' as const
-  if (value.includes('ошиб') || value.includes('error') || value.includes('reject')) return 'danger' as const
-  if (value.includes('не созд') || value.includes('ожид') || value.includes('pending') || value.includes('creat')) {
-    return 'warning' as const
-  }
-  if (value.includes('созд') || value.includes('готов') || value.includes('ready') || value.includes('released') || value.includes('received')) {
-    return 'success' as const
-  }
-  return 'info' as const
 }
 
 function matchesQuery(item: TsdItem, query: string) {
@@ -158,6 +145,14 @@ export function TsdPage() {
   const isBusy = Boolean(busy)
   const pager = usePagination(rows)
 
+  // Подписать и ввести в оборот можно только для заказа в статусе «Наполнен на ТСД»
+  const isFilledOnTsd = (item?: TsdItem) => {
+    const haystack = `${item?.tsd_status || ''} ${item?.status || ''}`.toLowerCase()
+    return haystack.includes('наполн')
+  }
+  const selectedItem = selectedIds.length === 1 ? items.find((item) => item.document_id === selectedIds[0]) : undefined
+  const canSign = Boolean(selectedItem && isFilledOnTsd(selectedItem))
+
   const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
     setBusy(key)
     try {
@@ -212,6 +207,10 @@ export function TsdPage() {
   const signIntroduction = () => {
     if (selectedIds.length !== 1) {
       toast.error('Выберите один заказ для подписи.')
+      return
+    }
+    if (!canSign) {
+      toast.error('Подписать можно только заказ в статусе «Наполнен на ТСД».')
       return
     }
     if (!window.confirm('Подписать и ввести в оборот?')) return
@@ -270,7 +269,13 @@ export function TsdPage() {
               <PlayCircle className="h-3.5 w-3.5" />
               Создать задания{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
             </Button>
-            <Button size="sm" variant="outline" onClick={() => void signIntroduction()} disabled={isBusy || selectedIds.length !== 1}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void signIntroduction()}
+              disabled={isBusy || !canSign}
+              title={!canSign ? 'Доступно только для статуса «Наполнен на ТСД»' : undefined}
+            >
               <PenLine className="h-3.5 w-3.5" />
               Подписать и ввести в оборот
             </Button>
@@ -387,13 +392,13 @@ export function TsdPage() {
                           <div className="max-w-[280px] truncate">{item.full_name || item.simpl || '—'}</div>
                         </TableCell>
                         <TableCell>
-                          <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
+                          <StatusBadge status={item.status} />
                           {item.status_summary ? (
                             <div className="mt-1 text-[11px] text-muted-foreground">{item.status_summary}</div>
                           ) : null}
                         </TableCell>
                         <TableCell>
-                          <Badge tone={toneForStatus(item.tsd_status)}>{item.tsd_status || '—'}</Badge>
+                          <StatusBadge status={item.tsd_status} />
                           {item.tsd_intro_number ? (
                             <div className="mt-1 font-mono text-[11px] text-muted-foreground">{item.tsd_intro_number}</div>
                           ) : null}

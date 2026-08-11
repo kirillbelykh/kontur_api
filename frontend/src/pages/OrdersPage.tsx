@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Tabs } from '@heroui/react'
+import { motion } from 'framer-motion'
 import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
@@ -7,7 +7,7 @@ import { celebrateOrderCreated } from '@/lib/celebrate'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -105,47 +105,41 @@ function rowTitle(item: { order_name?: string; name?: string; document_id?: stri
   return item.order_name || item.name || item.document_id || 'Без названия'
 }
 
-function toneForStatus(status?: string) {
-  const value = (status || '').toLowerCase()
-  if (!value) return 'secondary' as const
-  if (value.includes('ошиб') || value.includes('error') || value.includes('reject')) return 'danger' as const
-  if (value.includes('ожид') || value.includes('pending') || value.includes('creat')) return 'warning' as const
-  if (value.includes('готов') || value.includes('ready') || value.includes('released') || value.includes('received')) {
-    return 'success' as const
-  }
-  return 'info' as const
-}
-
 function TextSelect(props: SelectNativeProps) {
   return <SelectNative {...props} className={cn('w-full', props.className)} />
 }
 
 function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: OrderMode) => void }) {
+  const items = [
+    { id: 'params' as const, label: 'По параметрам' },
+    { id: 'gtin' as const, label: 'По GTIN' },
+  ]
   return (
-    <Tabs
-      selectedKey={mode}
-      onSelectionChange={(key) => onChange(key as OrderMode)}
-    >
-      <Tabs.ListContainer>
-        <Tabs.List aria-label="Режим создания заказа">
-          <Tabs.Tab id="params">
-            По параметрам
-            <Tabs.Indicator />
-          </Tabs.Tab>
-          <Tabs.Tab id="gtin">
-            <Tabs.Separator />
-            По GTIN
-            <Tabs.Indicator />
-          </Tabs.Tab>
-        </Tabs.List>
-      </Tabs.ListContainer>
-      <Tabs.Panel id="params" className="hidden">
-        <span className="sr-only">По параметрам</span>
-      </Tabs.Panel>
-      <Tabs.Panel id="gtin" className="hidden">
-        <span className="sr-only">По GTIN</span>
-      </Tabs.Panel>
-    </Tabs>
+    <div className="inline-flex rounded-full border border-border bg-muted/50 p-0.5">
+      {items.map((item) => {
+        const active = mode === item.id
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onChange(item.id)}
+            className={cn(
+              'relative rounded-full border-0 bg-transparent px-4 py-1.5 text-sm font-medium transition-colors',
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {active ? (
+              <motion.span
+                layoutId="orders-mode-toggle"
+                transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
+                className="absolute inset-0 rounded-full bg-card shadow-sm"
+              />
+            ) : null}
+            <span className="relative z-10">{item.label}</span>
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -312,13 +306,14 @@ export function OrdersPage() {
     runBusy(
       'submit',
       async () => {
+        // Анимация «улёта» строк стартует сразу; запрос идёт параллельно, не ждём HTTP для отклика
         setQueueLeaving(true)
+        const request = apiCall<{ state?: OrdersViewState; errors?: Array<{ order_name?: string; error?: string }> }>(
+          'submit_order_queue',
+        )
+        const animation = new Promise((resolve) => window.setTimeout(resolve, 340))
         try {
-          // Даём строкам очереди «улететь» перед отправкой
-          await new Promise((resolve) => window.setTimeout(resolve, 340))
-          const result = await apiCall<{ state?: OrdersViewState; errors?: Array<{ order_name?: string; error?: string }> }>(
-            'submit_order_queue',
-          )
+          const [result] = await Promise.all([request, animation])
           if (result.state) setState(result.state)
           else await load(true)
           setSelectedQueueId('')
@@ -457,7 +452,7 @@ export function OrdersPage() {
                 <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
               </TableCell>
               <TableCell>
-                <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
+                <StatusBadge status={item.status} />
               </TableCell>
               <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
             </TableRow>
@@ -544,7 +539,7 @@ export function OrdersPage() {
                   onChange={(e) => setField('units_per_pack', e.target.value)}
                 >
                   <option value="">Выберите</option>
-                  {(options.units_options || []).map((value) => (
+                  {[...(options.units_options || [])].reverse().map((value) => (
                     <option key={value} value={value}>
                       {value}
                     </option>

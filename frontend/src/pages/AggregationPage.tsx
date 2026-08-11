@@ -6,7 +6,7 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePickerField } from '@/components/ui/date-picker'
@@ -39,15 +39,6 @@ type AggregationState = {
 }
 
 const PAGE_SIZE = 200
-
-function toneForStatus(status?: string) {
-  const value = (status || '').toLowerCase()
-  if (!value) return 'secondary' as const
-  if (value.includes('ошиб') || value.includes('fail') || value.includes('error')) return 'danger' as const
-  if (value.includes('ожид') || value.includes('готов к') || value.includes('process')) return 'warning' as const
-  if (value.includes('провед') || value.includes('зарегистр') || value.includes('approved')) return 'success' as const
-  return 'info' as const
-}
 
 export function AggregationPage() {
   const [loading, setLoading] = useState(false)
@@ -539,9 +530,7 @@ export function AggregationPage() {
                             <div className="text-[11px] text-muted-foreground">{row.comment || '—'}</div>
                           </TableCell>
                           <TableCell>
-                            <Badge tone={toneForStatus(row.status_label || row.status)}>
-                              {row.status_label || row.status || '—'}
-                            </Badge>
+                            <StatusBadge status={row.status_label || row.status} />
                             {row.status === 'readyForSendAfterApproved' ? (
                               <div className="mt-1 text-[11px] text-muted-foreground">
                                 Изменённый состав после прошлой регистрации

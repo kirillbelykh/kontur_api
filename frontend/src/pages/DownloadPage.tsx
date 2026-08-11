@@ -14,7 +14,7 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatPill } from '@/components/layout/PageHeader'
-import { Badge } from '@/components/ui/badge'
+import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -66,17 +66,6 @@ const EMPTY_SELECTION: Selection = { ids: [], focus: '' }
 
 /** Клик по этим элементам внутри строки не должен менять выбор */
 const CONTROL_SELECTOR = 'input, button, a, label, [role="checkbox"], [data-table-resize-handle]'
-
-function toneForStatus(status?: string) {
-  const value = (status || '').toLowerCase()
-  if (!value) return 'secondary' as const
-  if (value.includes('ошиб') || value.includes('error') || value.includes('reject')) return 'danger' as const
-  if (value.includes('ожид') || value.includes('pending') || value.includes('creat')) return 'warning' as const
-  if (value.includes('скачан') || value.includes('готов') || value.includes('ready') || value.includes('released') || value.includes('received')) {
-    return 'success' as const
-  }
-  return 'info' as const
-}
 
 function matchesQuery(item: DownloadItem, query: string) {
   const normalized = query.trim().toLowerCase()
@@ -460,7 +449,7 @@ export function DownloadPage() {
                           ) : null}
                         </TableCell>
                         <TableCell>
-                          <Badge tone={toneForStatus(item.status)}>{item.status || '—'}</Badge>
+                          <StatusBadge status={item.status} />
                           {item.status_summary ? (
                             <div className="mt-1 text-[11px] text-muted-foreground">{item.status_summary}</div>
                           ) : null}
