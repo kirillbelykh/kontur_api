@@ -12,7 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DatePickerField } from '@/components/ui/date-picker'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
-import { TableSkeleton } from '@/components/ui/skeleton'
+import { Shimmer } from '@/components/ui/shimmer'
+import { Skeleton, TableSkeleton } from '@/components/ui/skeleton'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
@@ -62,6 +63,10 @@ export function AggregationPage() {
   const [currentPage, setCurrentPage] = useState(0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [lastClickedIndex, setLastClickedIndex] = useState(-1)
+  // Создание АК: плейсхолдеры в таблице + подсветка «прилетевших» строк
+  const [pendingCreate, setPendingCreate] = useState(0)
+  const [arrivedIds, setArrivedIds] = useState<Set<string>>(new Set())
+  const prevIdsRef = useRef<Set<string> | null>(null)
   // TableRow отдаёт onAction без исходного события — модификатор снимаем в capture-фазе до действия строки
   const shiftPressedRef = useRef(false)
   const load = useCallback(async (force = false) => {
@@ -89,6 +94,22 @@ export function AggregationPage() {
   }, [load])
 
   const items = useMemo(() => state.items ?? [], [state.items])
+
+  // После создания АК подсвечиваем новые строки анимацией «прилёта»
+  useEffect(() => {
+    const previous = prevIdsRef.current
+    if (!previous) return
+    const fresh = new Set(
+      items
+        .map((item) => String(item.document_id || ''))
+        .filter((id) => id && !previous.has(id)),
+    )
+    if (fresh.size === 0) return
+    prevIdsRef.current = null
+    setArrivedIds(fresh)
+    const timer = window.setTimeout(() => setArrivedIds(new Set()), 1200)
+    return () => window.clearTimeout(timer)
+  }, [items])
 
   const filteredItems = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -187,8 +208,18 @@ export function AggregationPage() {
     runBusy(
       'create',
       async () => {
-        await apiCall('create_aggregation_codes', createComment, Number(createCount || 0))
-        await load(true)
+        // Оптимистичные строки-плейсхолдеры сразу, реальные АК подъедут после создания
+        const count = Math.max(1, Number(createCount || 0))
+        prevIdsRef.current = new Set(
+          (state.items || []).map((item) => String(item.document_id || '')).filter(Boolean),
+        )
+        setPendingCreate(count)
+        try {
+          await apiCall('create_aggregation_codes', createComment, count)
+          await load(true)
+        } finally {
+          setPendingCreate(0)
+        }
       },
       'Агрегационные коды созданы.',
     )
@@ -480,9 +511,9 @@ export function AggregationPage() {
             </div>
           </div>
 
-          {loading && items.length === 0 ? (
+          {loading && items.length === 0 && pendingCreate === 0 ? (
             <TableSkeleton rows={8} />
-          ) : filteredItems.length === 0 ? (
+          ) : filteredItems.length === 0 && pendingCreate === 0 ? (
             <EmptyState>Агрегационные коды по текущему фильтру не найдены.</EmptyState>
           ) : (
             <>
@@ -507,6 +538,34 @@ export function AggregationPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {/* Плейсхолдеры создающихся АК: сразу видно строки, потом их заменяют реальные коды */}
+                    {page === 0 && pendingCreate > 0
+                      ? Array.from({ length: Math.min(pendingCreate, 20) }).map((_, index) => (
+                          <TableRow key={`pending-${index}`} id={`pending-${index}`} className="order-arrive">
+                            <TableCell>
+                              <Skeleton className="h-4 w-4 rounded-sm" />
+                            </TableCell>
+                            <TableCell>
+                              <div className="space-y-1.5">
+                                <Skeleton className="h-4 w-56" />
+                                <Skeleton className="h-3 w-36" />
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Shimmer className="text-xs">Создаётся…</Shimmer>
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-3 w-20" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-3 w-8" />
+                            </TableCell>
+                            <TableCell>
+                              <Skeleton className="h-3 w-8" />
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      : null}
                     {pageRows.map((row, localIndex) => {
                       const id = String(row.document_id || '')
                       const selected = selectedIds.has(id)
@@ -515,7 +574,7 @@ export function AggregationPage() {
                         <TableRow
                           key={id || `${row.aggregate_code}-${globalIndex}`}
                           id={id || `${row.aggregate_code}-${globalIndex}`}
-                          className={cn(selected && 'bg-muted/60')}
+                          className={cn(selected && 'bg-muted/60', arrivedIds.has(id) && 'order-arrive')}
                           onClick={() => toggleRow(id, globalIndex)}
                         >
                           <TableCell onClick={(event) => event.stopPropagation()}>

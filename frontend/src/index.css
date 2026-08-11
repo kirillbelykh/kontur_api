@@ -32,7 +32,8 @@
 }
 
 :root {
-  --wms-background: 210 40% 98%;
+  /* Чуть серее, чем раньше — поля/карточки белые и читаются на этом фоне */
+  --wms-background: 220 14% 96%;
   --wms-foreground: 222 47% 11%;
   --wms-card: 0 0% 100%;
   --wms-card-foreground: 222 47% 11%;
@@ -52,11 +53,12 @@
   /* HeroUI fields share the border tokens so inputs and selects look identical.
      Скрин 3: мягкая почти незаметная граница + светло-серый фон, без жирного контура. */
   --field-border-width: 1px;
-  --field-border: hsl(214 18% 90%);
-  --field-border-hover: hsl(214 16% 82%);
-  --field-border-focus: hsl(214 16% 74%);
-  --field-bg: hsl(210 30% 96%);
-  --field-ring: hsl(210 12% 60% / 0.35);
+  --field-border: hsl(214 18% 88%);
+  --field-border-hover: hsl(214 16% 78%);
+  --field-border-focus: hsl(214 16% 70%);
+  /* Поля белые (как в доке HeroUI), фон страницы серее */
+  --field-bg: #ffffff;
+  --field-ring: hsl(210 12% 60% / 0.22);
 
   /* Modal morph (transitions.dev Plus→menu motion language) */
   --modal-open-dur: 350ms;
@@ -243,23 +245,64 @@
   .t-input { animation: none !important; transform: none !important; }
 }
 
-/* Тосты sonner появляются с spring-скейлом (как AnimatedList) */
+/* Тосты в стиле AnimatedList (MagicUI): spring scale-in сверху, scale-out при уходе */
 @keyframes toast-spring-in {
-  0%   { opacity: 0; transform: scale(0.6) translateY(8px); }
-  60%  { opacity: 1; transform: scale(1.03) translateY(-2px); }
-  100% { opacity: 1; transform: scale(1) translateY(0); }
+  0%   { opacity: 0; transform: scale(0); }
+  55%  { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
 }
-[data-sonner-toast][data-mounted="true"][data-expanded="false"][data-front="true"] {
-  animation: toast-spring-in 420ms cubic-bezier(0.34, 1.35, 0.64, 1);
+@keyframes toast-spring-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.55); }
+}
+[data-sonner-toast][data-mounted="true"] {
+  transform-origin: top center;
+  animation: toast-spring-in 480ms cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+[data-sonner-toast][data-removed="true"] {
+  animation: toast-spring-out 240ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-/* Кастомные тосты: цветной акцент слева по типу */
-.kontur-toast { border-left-width: 3px; }
-.kontur-toast[data-type="success"] { border-left-color: #10b981; }
-.kontur-toast[data-type="error"]   { border-left-color: #f43f5e; }
-.kontur-toast[data-type="warning"] { border-left-color: #f59e0b; }
-.kontur-toast[data-type="info"]    { border-left-color: #0ea5e9; }
-.kontur-toast[data-type="loading"] { border-left-color: hsl(var(--wms-border)); }
+/* Карточка уведомления: иконка в цветной плашке + крестик справа по центру */
+.kontur-toast-icon {
+  display: flex;
+  height: 2.25rem;
+  width: 2.25rem;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  background: hsl(var(--wms-muted));
+}
+.kontur-toast[data-type="success"] .kontur-toast-icon { background: #ecfdf5; }
+.kontur-toast[data-type="error"]   .kontur-toast-icon { background: #fff1f2; }
+.kontur-toast[data-type="warning"] .kontur-toast-icon { background: #fffbeb; }
+.kontur-toast[data-type="info"]    .kontur-toast-icon { background: #f0f9ff; }
+.dark .kontur-toast[data-type="success"] .kontur-toast-icon { background: hsl(160 60% 20%); }
+.dark .kontur-toast[data-type="error"]   .kontur-toast-icon { background: hsl(350 60% 22%); }
+.dark .kontur-toast[data-type="warning"] .kontur-toast-icon { background: hsl(40 60% 20%); }
+.dark .kontur-toast[data-type="info"]    .kontur-toast-icon { background: hsl(205 60% 22%); }
+
+.kontur-toast-close {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  height: 1.6rem;
+  width: 1.6rem;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: hsl(var(--wms-muted-foreground));
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.kontur-toast-close:hover {
+  background: hsl(var(--wms-muted));
+  color: hsl(var(--wms-foreground));
+}
 
 @keyframes modal-overlay-out {
   from { opacity: 1; }
@@ -533,7 +576,17 @@ button {
     --tw-ring-shadow: 0 0 #0000 !important;
     --tw-ring-offset-shadow: 0 0 #0000 !important;
     --tw-ring-color: transparent !important;
-    box-shadow: 0 0 0 3px var(--field-ring) !important;
+    /* Тонкая активация: лёгкое кольцо вместо толстой границы */
+    box-shadow: 0 0 0 2px var(--field-ring) !important;
+  }
+
+  /* Кнопки чуть выше — базовые HeroUI слишком тонкие */
+  .button--sm:not(.button--icon-only) {
+    min-height: 2.25rem;
+    padding-block: 0.4rem;
+  }
+  .button--md:not(.button--icon-only) {
+    min-height: 2.625rem;
   }
 
   /* Текст в таблицах можно выделять и копировать (React Aria по умолчанию блокирует) */

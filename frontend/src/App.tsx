@@ -33,24 +33,24 @@ export default function App() {
         <Toaster
           position="top-right"
           closeButton
-          gap={10}
+          expand
+          gap={12}
           icons={{
-            success: <CheckCircle2 className="h-4 w-4 text-emerald-500" />,
-            error: <XCircle className="h-4 w-4 text-rose-500" />,
-            warning: <AlertTriangle className="h-4 w-4 text-amber-500" />,
-            info: <Info className="h-4 w-4 text-sky-500" />,
-            loading: <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />,
+            success: <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600" />,
+            error: <XCircle className="h-4.5 w-4.5 text-rose-600" />,
+            warning: <AlertTriangle className="h-4.5 w-4.5 text-amber-600" />,
+            info: <Info className="h-4.5 w-4.5 text-sky-600" />,
+            loading: <Loader2 className="h-4.5 w-4.5 animate-spin text-muted-foreground" />,
           }}
           toastOptions={{
             unstyled: true,
             classNames: {
               toast:
-                'kontur-toast group flex w-full items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3 text-sm text-foreground shadow-panel',
-              title: 'font-medium leading-tight',
-              description: 'text-muted-foreground',
-              icon: 'flex shrink-0 items-center',
-              closeButton:
-                'text-muted-foreground hover:text-foreground rounded-md border border-border bg-card',
+                'kontur-toast group relative flex w-full items-center gap-3 rounded-2xl border border-border bg-card py-3 pl-3 pr-10 text-sm text-foreground shadow-panel',
+              title: 'font-medium leading-snug',
+              description: 'mt-0.5 text-xs text-muted-foreground',
+              icon: 'kontur-toast-icon',
+              closeButton: 'kontur-toast-close',
             },
           }}
         />
