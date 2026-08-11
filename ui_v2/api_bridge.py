@@ -1930,10 +1930,13 @@ class ApiBridge:
                 runtime.auth_updated_at = time.time()
                 if not cookies_module.validate_kontur_session(cookies):
                     runtime.auth_state = "error"
-                    runtime.auth_message = "Cookies не прошли проверку Kontur."
-                    runtime.auth_error = "Сохраненные cookies отклонены API Контур.Маркировки."
+                    runtime.auth_message = "Контур не подтвердил сессию."
+                    runtime.auth_error = (
+                        "Контур.Маркировка отклонила cookies. "
+                        "Выполните вход в Контур и повторите обновление сессии."
+                    )
                     runtime.auth_updated_at = time.time()
-                    raise RuntimeError("Сохраненные cookies отклонены API Контур.Маркировки.")
+                    raise RuntimeError(runtime.auth_error)
 
                 runtime.session = make_session_with_cookies(cookies)
                 runtime.session_created_at = time.time()
