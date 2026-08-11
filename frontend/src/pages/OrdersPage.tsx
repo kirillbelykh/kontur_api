@@ -111,11 +111,11 @@ function FieldLabel({ children }: { children: ReactNode }) {
 }
 
 function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input-thin h-8 w-full px-2.5 text-sm', props.className)} />
+  return <input {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
 }
 
 function TextSelect(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select {...props} className={cn('input-thin h-8 w-full px-2.5 text-sm', props.className)} />
+  return <select {...props} className={cn('input-thin h-9 w-full px-2.5 py-0 text-sm', props.className)} />
 }
 
 export function OrdersPage() {

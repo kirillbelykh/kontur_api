@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import menuLogo from '@/assets/menu_logo.png'
+import menuLogo from '@/assets/menu_logo_3.png'
 import logo from '@/assets/logo.png'
 import { apiCall, type SessionInfo } from '@/lib/bridge'
 import { cn, getErrorMessage } from '@/lib/utils'
@@ -40,8 +40,7 @@ const textTransition = {
 const pageTransition = {
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -4 },
-  transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  transition: { duration: 0.18 },
 }
 
 type NavItem = {
@@ -190,10 +189,17 @@ function SidebarBrand({
             transition={{ duration: 0.14, ease: 'easeOut' }}
             className={cn(
               'block h-10 w-10 shrink-0 select-none object-contain border-0 bg-transparent shadow-none',
-              'outline-none ring-0 focus:outline-none focus:ring-0',
+              'outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0',
+              'active:outline-none active:ring-0 dark:invert dark:brightness-110',
               onLogoClick && 'cursor-pointer',
             )}
             draggable={false}
+            style={{
+              WebkitTapHighlightColor: 'transparent',
+              outline: 'none',
+              border: 'none',
+              boxShadow: 'none',
+            }}
           />
         </span>
         <AnimatePresence initial={false}>
@@ -367,11 +373,11 @@ export function AppLayout() {
             </div>
 
             {!isWelcome ? (
-              <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 sm:block">
+              <div className="pointer-events-none absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2">
                 <img
                   src={logo}
                   alt="Grundlage"
-                  className="h-12 w-auto object-contain opacity-90 sm:h-[72px]"
+                  className="h-12 w-auto object-contain opacity-90 transition-opacity hover:opacity-100 dark:invert dark:brightness-110 sm:h-[84px] md:h-[72px]"
                 />
               </div>
             ) : null}
