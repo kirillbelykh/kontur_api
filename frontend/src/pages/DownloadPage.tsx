@@ -13,6 +13,7 @@ import { Download, Printer, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
+import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
@@ -131,6 +132,7 @@ export function DownloadPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [state, setState] = useCachedState<DownloadState>('download.state', {})
+  const guard = useRequestGuard()
   const [search, setSearch] = useState('')
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
   const [printer, setPrinter] = useState('')
@@ -144,9 +146,11 @@ export function DownloadPage() {
   const pageRowsRef = useRef<DownloadItem[]>([])
 
   const load = useCallback(async () => {
+    const fresh = guard()
     setLoading(true)
     try {
       const result = await apiCall<DownloadState>('get_download_state')
+      if (!fresh()) return
       setState(result)
 
       const printers = result.printers ?? []
@@ -166,17 +170,18 @@ export function DownloadPage() {
         return { ids, focus }
       })
     } catch (error) {
+      if (!fresh()) return
       toast.error(getErrorMessage(error, 'Не удалось загрузить список загрузок'))
     } finally {
-      setLoading(false)
+      if (fresh()) setLoading(false)
     }
-  }, [setState])
+  }, [guard, setState])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const items = state.items ?? []
+  const items = useMemo(() => state.items ?? [], [state.items])
   const printers = state.printers ?? []
 
   const debouncedSearch = useDebouncedValue(search)

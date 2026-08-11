@@ -1,7 +1,7 @@
 declare global {
   interface Window {
     pywebview?: {
-      api: Record<string, (...args: any[]) => Promise<any>>
+      api: Record<string, (...args: unknown[]) => Promise<unknown>>
     }
   }
 }
@@ -41,7 +41,7 @@ export function waitForPywebview(timeoutMs = READY_TIMEOUT_MS): Promise<void> {
   return readyPromise
 }
 
-export async function apiCall<T = any>(method: string, ...args: any[]): Promise<T> {
+export async function apiCall<T = unknown>(method: string, ...args: unknown[]): Promise<T> {
   await waitForPywebview()
   const api = window.pywebview?.api
   const fn = api?.[method]

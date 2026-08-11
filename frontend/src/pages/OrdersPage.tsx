@@ -6,6 +6,7 @@ import { getAppSetting } from '@/lib/app-settings'
 import { apiCall } from '@/lib/bridge'
 import { celebrateOrderCreated } from '@/lib/celebrate'
 import { useCachedState } from '@/lib/view-cache'
+import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -256,6 +257,7 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [state, setState] = useCachedState<OrdersViewState>('orders.state', {})
+  const guard = useRequestGuard()
   const [options, setOptions] = useState<OptionsState>({})
   const [mode, setMode] = useState<OrderMode>('params')
   const [form, setForm] = useState<OrderForm>(EMPTY_FORM)
@@ -317,19 +319,22 @@ export function OrdersPage() {
   const paramsMode = mode === 'params'
 
   const load = useCallback(async (force = false) => {
+    const fresh = guard()
     setLoading(true)
     try {
       const result = await apiCall<OrdersViewState>('get_orders_view_state', force)
+      if (!fresh()) return
       setState(result)
       setSelectedQueueId((prev) => ((result.queue || []).some((item) => item.uid === prev) ? prev : ''))
       setSelectedHistoryIds((prev) => prev.filter((id) => (result.history || []).some((item) => item.document_id === id)))
       setSelectedDeletedId((prev) => ((result.deleted_orders || []).some((item) => item.document_id === prev) ? prev : ''))
     } catch (error) {
+      if (!fresh()) return
       toast.error(getErrorMessage(error, 'Не удалось загрузить заказы'))
     } finally {
-      setLoading(false)
+      if (fresh()) setLoading(false)
     }
-  }, [setState])
+  }, [guard, setState])
 
   const loadOptions = useCallback(async () => {
     try {
@@ -346,7 +351,7 @@ export function OrdersPage() {
   }, [load, loadOptions])
 
   const queue = state.queue ?? []
-  const history = state.history ?? []
+  const history = useMemo(() => state.history ?? [], [state.history])
   const deletedOrders = state.deleted_orders ?? []
 
   // Помечаем свежепоявившиеся документы Истории для анимации «прилёта»

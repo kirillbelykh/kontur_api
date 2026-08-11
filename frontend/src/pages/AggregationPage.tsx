@@ -4,6 +4,7 @@ import { ChevronDown, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
+import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -93,6 +94,7 @@ export function AggregationPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [state, setState] = useCachedState<AggregationState>('aggregation.state', {})
+  const guard = useRequestGuard()
 
   const [createComment, setCreateComment] = useState('')
   const [createCount, setCreateCount] = useState('1')
@@ -121,18 +123,21 @@ export function AggregationPage() {
   const filteredItemsRef = useRef<AggregationItem[]>([])
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const load = useCallback(async (force = false) => {
+    const fresh = guard()
     setLoading(true)
     try {
       const result = await apiCall<AggregationState>('get_aggregation_state', force)
+      if (!fresh()) return
       setState(result)
       const known = new Set((result.items || []).map((item) => String(item.document_id || '')))
       setSelectedIds((prev) => new Set([...prev].filter((id) => known.has(id))))
     } catch (error) {
+      if (!fresh()) return
       toast.error(getErrorMessage(error, 'Не удалось загрузить агрегацию'))
     } finally {
-      setLoading(false)
+      if (fresh()) setLoading(false)
     }
-  }, [setState])
+  }, [guard, setState])
 
   useEffect(() => {
     void load(false)

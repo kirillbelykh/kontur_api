@@ -3,6 +3,7 @@ import { PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
+import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -84,6 +85,7 @@ export function IntroPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [items, setItems] = useCachedState<IntroItem[]>('intro.items', [])
+  const guard = useRequestGuard()
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -101,16 +103,19 @@ export function IntroPage() {
   )
 
   const load = useCallback(async () => {
+    const fresh = guard()
     setLoading(true)
     try {
       const result = await apiCall<IntroState>('get_intro_state')
+      if (!fresh()) return
       applyItems(result.items ?? [])
     } catch (error) {
+      if (!fresh()) return
       toast.error(getErrorMessage(error, 'Не удалось загрузить ввод в оборот'))
     } finally {
-      setLoading(false)
+      if (fresh()) setLoading(false)
     }
-  }, [applyItems])
+  }, [applyItems, guard])
 
   useEffect(() => {
     void load()

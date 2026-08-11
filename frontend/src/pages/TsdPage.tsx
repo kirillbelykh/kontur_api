@@ -3,6 +3,7 @@ import { PenLine, PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
+import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -115,6 +116,7 @@ export function TsdPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [items, setItems] = useCachedState<TsdItem[]>('tsd.items', [])
+  const guard = useRequestGuard()
   const [live, setLive] = useState(false)
   const [form, setForm] = useState<TsdForm>(EMPTY_FORM)
   const [search, setSearch] = useState('')
@@ -126,10 +128,10 @@ export function TsdPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const applyItems = (next: TsdItem[]) => {
+  const applyItems = useCallback((next: TsdItem[]) => {
     setItems(next)
     setSelectedIds((prev) => prev.filter((id) => next.some((item) => item.document_id === id)))
-  }
+  }, [setItems])
 
   const toggleId = useCallback((documentId: string) => {
     if (!documentId) return
@@ -139,17 +141,20 @@ export function TsdPage() {
   }, [])
 
   const load = useCallback(async (useLive = false) => {
+    const fresh = guard()
     setLoading(true)
     try {
       const result = await apiCall<TsdState>('get_tsd_state', useLive)
+      if (!fresh()) return
       applyItems(result.items ?? [])
       setLive(Boolean(result.live || useLive))
     } catch (error) {
+      if (!fresh()) return
       toast.error(getErrorMessage(error, 'Не удалось загрузить задания ТСД'))
     } finally {
-      setLoading(false)
+      if (fresh()) setLoading(false)
     }
-  }, [])
+  }, [applyItems, guard])
 
   useEffect(() => {
     void load(false)

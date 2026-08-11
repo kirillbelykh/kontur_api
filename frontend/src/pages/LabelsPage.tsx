@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Maximize2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
+import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -243,6 +244,7 @@ export function LabelsPage() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [state, setState] = useCachedState<LabelsState>('labels.state', {})
+  const guard = useRequestGuard()
 
   const [sheetFormat, setSheetFormat] = useState('')
   const [printer, setPrinter] = useState('')
@@ -272,18 +274,21 @@ export function LabelsPage() {
   const [fullscreen, setFullscreen] = useState<TableKey | ''>('')
 
   const load = useCallback(async () => {
+    const fresh = guard()
     setLoading(true)
     try {
       const result = await apiCall<LabelsState>('get_labels_state')
+      if (!fresh()) return
       setState(result)
       setSheetFormat((prev) => prev || String(result.default_sheet_format || '100x180'))
       setPrinter((prev) => prev || String(result.default_printer || ''))
     } catch (error) {
+      if (!fresh()) return
       toast.error(getErrorMessage(error, 'Не удалось загрузить состояние этикеток'))
     } finally {
-      setLoading(false)
+      if (fresh()) setLoading(false)
     }
-  }, [setState])
+  }, [guard, setState])
 
   useEffect(() => {
     void load()
