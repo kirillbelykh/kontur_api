@@ -1,6 +1,6 @@
 import unittest
 
-from queue_utils import (
+from backend.services.queue_utils import (
     is_order_ready_for_intro,
     is_order_ready_for_tsd,
     remove_order_by_document_id,

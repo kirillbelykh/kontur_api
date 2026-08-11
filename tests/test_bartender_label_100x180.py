@@ -6,8 +6,8 @@ from unittest import mock
 
 import pandas as pd
 
-import bartender_print
-import bartender_label_100x180 as labels
+import backend.services.bartender_print as bartender_print
+import backend.services.bartender_label_100x180 as labels
 
 
 def _make_context(**overrides):

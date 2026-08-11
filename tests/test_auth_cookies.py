@@ -8,9 +8,9 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import auth.service as service
-import auth.store as store
-from auth.constants import REQUIRED_COOKIE_FIELDS
+import backend.auth.service as service
+import backend.auth.store as store
+from backend.auth.constants import REQUIRED_COOKIE_FIELDS
 
 
 def _valid_cookie_dict() -> dict[str, str]:
@@ -49,10 +49,10 @@ class AuthServiceTests(unittest.TestCase):
         with (
             mock.patch.object(store, "COOKIES_FILE", self.cookies_file),
             mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
-            mock.patch("auth.service.validate_kontur_session", side_effect=[False, True]) as validate_mock,
-            mock.patch("auth.service.load_cookies_from_yandex_profile", return_value=None),
-            mock.patch("auth.service.get_cookies", return_value=selenium_cookies) as selenium_mock,
-            mock.patch("auth.service.save_cookies_to_file", return_value=True),
+            mock.patch("backend.auth.service.validate_kontur_session", side_effect=[False, True]) as validate_mock,
+            mock.patch("backend.auth.service.load_cookies_from_yandex_profile", return_value=None),
+            mock.patch("backend.auth.service.get_cookies", return_value=selenium_cookies) as selenium_mock,
+            mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
             mock.patch("time.time", return_value=1_800_000_000.0),
         ):
             result = service.get_valid_cookies(force_refresh=False)
@@ -68,9 +68,9 @@ class AuthServiceTests(unittest.TestCase):
         with (
             mock.patch.object(store, "COOKIES_FILE", self.cookies_file),
             mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
-            mock.patch("auth.service.validate_kontur_session", return_value=True) as validate_mock,
-            mock.patch("auth.service.get_cookies") as selenium_mock,
-            mock.patch("auth.service.save_cookies_to_file", return_value=True),
+            mock.patch("backend.auth.service.validate_kontur_session", return_value=True) as validate_mock,
+            mock.patch("backend.auth.service.get_cookies") as selenium_mock,
+            mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
             mock.patch("time.time", return_value=1_800_000_000.0),
         ):
             result = service.get_valid_cookies(force_refresh=False)
@@ -84,10 +84,10 @@ class AuthServiceTests(unittest.TestCase):
         profile_cookies["token"] = "from-profile"
 
         with (
-            mock.patch("auth.service.validate_kontur_session", return_value=True),
-            mock.patch("auth.service.load_cookies_from_yandex_profile", return_value=profile_cookies),
-            mock.patch("auth.service.get_cookies") as selenium_mock,
-            mock.patch("auth.service.save_cookies_to_file", return_value=True),
+            mock.patch("backend.auth.service.validate_kontur_session", return_value=True),
+            mock.patch("backend.auth.service.load_cookies_from_yandex_profile", return_value=profile_cookies),
+            mock.patch("backend.auth.service.get_cookies") as selenium_mock,
+            mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
         ):
             result = service.get_valid_cookies(force_refresh=True)
 
@@ -97,7 +97,7 @@ class AuthServiceTests(unittest.TestCase):
 
 class KonturCheckTests(unittest.TestCase):
     def test_validate_kontur_session_rejects_login_redirect(self):
-        from auth.kontur_check import validate_kontur_session
+        from backend.auth.kontur_check import validate_kontur_session
 
         cookies = _valid_cookie_dict()
         response = mock.Mock()
@@ -106,11 +106,11 @@ class KonturCheckTests(unittest.TestCase):
         response.headers = {"Content-Type": "application/json"}
         response.json.return_value = {"id": "user-1"}
 
-        with mock.patch("auth.kontur_check.requests.get", return_value=response):
+        with mock.patch("backend.auth.kontur_check.requests.get", return_value=response):
             self.assertFalse(validate_kontur_session(cookies))
 
     def test_validate_kontur_session_accepts_user_payload(self):
-        from auth.kontur_check import validate_kontur_session
+        from backend.auth.kontur_check import validate_kontur_session
 
         cookies = _valid_cookie_dict()
         response = mock.Mock()
@@ -119,13 +119,13 @@ class KonturCheckTests(unittest.TestCase):
         response.headers = {"Content-Type": "application/json"}
         response.json.return_value = {"id": "user-1", "email": "a@b.c"}
 
-        with mock.patch("auth.kontur_check.requests.get", return_value=response):
+        with mock.patch("backend.auth.kontur_check.requests.get", return_value=response):
             self.assertTrue(validate_kontur_session(cookies))
 
 
 class BrowserOptionsTests(unittest.TestCase):
     def test_background_mode_keeps_offscreen_window(self):
-        from auth.browser import build_browser_options
+        from backend.auth.browser import build_browser_options
 
         fake_options = mock.Mock()
         fake_options.arguments = []
@@ -148,7 +148,7 @@ class BrowserOptionsTests(unittest.TestCase):
         self.assertFalse(any(arg.startswith("--headless") for arg in fake_options.arguments))
 
     def test_true_headless_mode_uses_chrome_headless(self):
-        from auth.browser import build_browser_options
+        from backend.auth.browser import build_browser_options
 
         fake_options = mock.Mock()
         fake_options.arguments = []
@@ -174,7 +174,7 @@ class BrowserOptionsTests(unittest.TestCase):
 
 class EnsureSessionBridgeTests(unittest.TestCase):
     def test_ensure_session_uses_get_valid_cookies_orchestration(self):
-        import ui_v2.api_bridge as api_bridge
+        import backend.app.api_bridge as api_bridge
 
         bridge = api_bridge.ApiBridge()
         runtime = api_bridge._get_runtime()

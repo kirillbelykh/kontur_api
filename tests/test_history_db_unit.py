@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from history_db import OrderHistoryDB
+from backend.services.history_db import OrderHistoryDB
 
 
 class OrderHistoryDBTests(unittest.TestCase):
@@ -90,7 +90,7 @@ class OrderHistoryDBTests(unittest.TestCase):
                 raise OSError("network unavailable")
             return original_exists(path_obj)
 
-        with patch("history_db.Path.exists", autospec=True, side_effect=fake_exists):
+        with patch("backend.services.history_db.Path.exists", autospec=True, side_effect=fake_exists):
             db = OrderHistoryDB(
                 db_file=str(db_path),
                 legacy_db_files=[str(unavailable_legacy)],

@@ -1,0 +1,36 @@
+---
+description: Frontend design and visual laws (WMS-aligned)
+globs: frontend/**/*.{tsx,ts,css}
+alwaysApply: false
+---
+
+# Design laws
+
+Visual system is ported from Desktop `wms/frontend` (Grundlage). Match that look — do not invent a new brand palette.
+
+## Tokens
+
+- Light-first cool slate UI. Primary gray `#6f7379`. Success / warning / error from WMS.
+- CSS variables in HSL (`--background`, `--foreground`, `--card`, `--muted`, `--border`, `--ring`).
+- Hairline borders (`0.1px` default). Soft `shadow-panel`. No purple gradients, no glow, no emoji chrome.
+
+## Layout
+
+- Shell: left sidebar + sticky topbar + `page-shell` main (`max-w-[1600px]`).
+- One job per page section. Dense ops tables/cards, not marketing layouts.
+- No dashboard-style hero on inner screens. Product name is a calm sidebar/topbar signal.
+
+## Motion
+
+- Framer Motion for route fade/slide (`opacity`, `y: 8→0`, ~180ms) and sidebar width.
+- Easing: `cubic-bezier(0.22, 1, 0.36, 1)`. Motion for hierarchy, not noise (2–3 intentional patterns).
+
+## Components
+
+- Prefer shared `components/ui/*` (button, card, input, badge, dialog, table, tabs).
+- Status via soft tinted badges (emerald / amber / rose / indigo / gray).
+- Native desktop feel: no "dev tools" chrome, no raw JSON dumps in primary UI, clear Russian labels.
+
+## Stack
+
+React + TypeScript + Vite + Tailwind + framer-motion + Lucide. Talk to Python only through the desktop bridge API.

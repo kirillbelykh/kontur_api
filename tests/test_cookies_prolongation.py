@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import auth.prolongation as prolongation
-from auth.constants import (
+import backend.auth.prolongation as prolongation
+from backend.auth.constants import (
     PROLONGATION_ENABLED_ENV,
     PROLONGATION_INTERVAL_HOURS_ENV,
 )

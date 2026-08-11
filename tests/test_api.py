@@ -31,7 +31,7 @@ winhttp_stub = types.ModuleType("winhttp")
 winhttp_stub.post_with_winhttp = lambda *args, **kwargs: None
 sys.modules.setdefault("winhttp", winhttp_stub)
 
-import api
+import backend.kontur.api as api
 
 
 class FakeResponse:

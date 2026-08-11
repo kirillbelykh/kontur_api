@@ -1,0 +1,37 @@
+---
+description: Backend structure and coding laws
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Backend laws
+
+## Packages
+
+- `backend/auth` — session cookies, Selenium, prolongation only.
+- `backend/kontur` — Kontur HTTP, CryptoPro, WinHTTP.
+- `backend/services` — history, aggregation, BarTender labels, queue helpers.
+- `backend/app` — ApiBridge (UI contract), desktop entry, optional CHZ bridge.
+
+Do not put UI markup in backend. Do not import `frontend`.
+
+## Contracts
+
+- `ApiBridge` public methods are the stable contract for the React UI. Rename only with a frontend update in the same change.
+- Prefer typed dicts / explicit return shapes `{ ok, error, ... }`. Log via project logger, not `print`.
+- Session: always validate with live Kontur check when trusting cookies; never TTL-alone.
+
+## Auth / Selenium
+
+- Default: real Yandex profile, off-screen window, Win32 hide. No `--headless=new` unless explicitly opted in.
+- Keep XPath automation best-effort with clear logs; failures must not crash the desktop process.
+
+## Files & runtime
+
+- Persist machine-local state under `runtime/` (cookies, logs, CHZ state). Do not commit secrets or live cookie files.
+- Label templates live in `assets/labels/`. Resolve paths from repo root helpers, not hard-coded Desktop paths.
+
+## Tests
+
+- Unit-test auth orchestration, ApiBridge session wiring, and pure helpers under `tests/`.
+- No network in unit tests — mock Kontur and Selenium.

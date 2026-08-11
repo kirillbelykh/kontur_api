@@ -4,7 +4,7 @@ import types
 import unittest
 from unittest import mock
 
-import ui_v2.api_bridge as api_bridge
+import backend.app.api_bridge as api_bridge
 
 
 class ApiBridgeUiV2Tests(unittest.TestCase):

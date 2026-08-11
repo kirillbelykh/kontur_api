@@ -1,20 +1,10 @@
-Option Explicit
-
-Dim fso, shell, projectDir, pythonw, python, mainScript, cmd
+' Alias launcher — same as run_kontur.vbs
 Set fso = CreateObject("Scripting.FileSystemObject")
-Set shell = CreateObject("WScript.Shell")
-
-projectDir = fso.GetParentFolderName(WScript.ScriptFullName)
-pythonw = fso.BuildPath(fso.BuildPath(fso.BuildPath(projectDir, ".venv"), "Scripts"), "pythonw.exe")
-python = fso.BuildPath(fso.BuildPath(fso.BuildPath(projectDir, ".venv"), "Scripts"), "python.exe")
-mainScript = fso.BuildPath(fso.BuildPath(projectDir, "ui_v2"), "main_v2.py")
-
-If fso.FileExists(pythonw) Then
-    cmd = """" & pythonw & """ """ & mainScript & """"
-    shell.Run cmd, 0, False
-ElseIf fso.FileExists(python) Then
-    cmd = """" & python & """ """ & mainScript & """"
-    shell.Run cmd, 0, False
-Else
-    MsgBox "Не найдена установленная среда KonturTestAPI (.venv). Запустите setup.bat заново.", vbExclamation, "KonturTestAPI"
+Set sh = CreateObject("WScript.Shell")
+repo = fso.GetParentFolderName(WScript.ScriptFullName)
+pythonw = repo & "\.venv\Scripts\pythonw.exe"
+If Not fso.FileExists(pythonw) Then
+  pythonw = "pythonw.exe"
 End If
+sh.CurrentDirectory = repo
+sh.Run """" & pythonw & """ """ & repo & "\main.py""", 0, False

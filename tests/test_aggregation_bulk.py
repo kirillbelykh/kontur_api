@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import requests
 
-from aggregation_bulk import BulkAggregationService
+from backend.services.aggregation_bulk import BulkAggregationService
 
 
 class FakeResponse:

@@ -1,7 +1,7 @@
 import unittest
 from datetime import date, datetime
 
-from date_defaults import get_default_production_window
+from backend.services.date_defaults import get_default_production_window
 
 
 class DefaultProductionWindowTests(unittest.TestCase):

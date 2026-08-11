@@ -1,0 +1,16 @@
+---
+description: Kontur API project overview and agent working agreements
+alwaysApply: true
+---
+
+# Project
+
+Kontur.Markirovka desktop app. Structure and run commands: see `AGENTS.md`.
+
+## Working agreements
+
+- Work on `main` locally; commit after meaningful steps; never `git push` unless the user explicitly asks.
+- Prefer editing `backend/` and `frontend/`. Do not grow `archive/legacy_ui/`.
+- WMS embed / `ui_mobile` are removed — do not bring them back.
+- Preserve business behavior when refactoring UI (ApiBridge methods stay the contract).
+- Cookie background auth must stay off-screen + Win32 hide (see `AGENTS.md`).

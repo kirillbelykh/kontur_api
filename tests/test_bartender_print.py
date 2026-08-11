@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
 
-import bartender_print
+import backend.services.bartender_print as bartender_print
 
 
 def _encode_value(value: str) -> str:
