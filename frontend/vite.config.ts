@@ -21,5 +21,17 @@ export default defineConfig({
     strictPort: true,
     allowedHosts: true,
   },
+  build: {
+    // Вендор отдельными чанками: быстрее парсинг при старте и кэш между обновлениями
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          heroui: ['@heroui/react'],
+          motion: ['framer-motion'],
+        },
+      },
+    },
+  },
 })
 

@@ -5,6 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from backend.services import history_db as history_db_module
 from backend.services.history_db import OrderHistoryDB
 
 
@@ -203,6 +204,76 @@ class OrderHistoryDBTests(unittest.TestCase):
         for _, kwargs in sync_mock.call_args_list:
             self.assertTrue(kwargs.get("push"))
             self.assertEqual(kwargs.get("reason"), "add_order")
+
+    def test_load_data_reuses_cache_until_file_changes(self):
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            sync_enabled=False,
+            startup_sync="none",
+        )
+        db.add_order({"document_id": "CACHE-1", "order_name": "cached", "status": "Ожидает"})
+
+        with patch.object(db, "_read_data", wraps=db._read_data) as read_mock:
+            first = db.get_all_orders()
+            second = db.get_all_orders()
+
+        self.assertEqual(len(first), 1)
+        self.assertEqual(len(second), 1)
+        # Первый вызов парсит файл (кэш сброшен записью), второй берёт из кэша
+        self.assertEqual(read_mock.call_count, 1)
+
+        # Мутация выданной копии не должна портить кэш
+        first[0]["status"] = "Испорчен"
+        self.assertEqual(db.get_all_orders()[0]["status"], "Ожидает")
+
+    def test_read_path_sync_pull_runs_in_background(self):
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            sync_enabled=False,
+            startup_sync="none",
+        )
+        db.sync_enabled = True
+
+        captured = {}
+
+        class FakeThread:
+            def __init__(self, target=None, daemon=None, name=None, **kwargs):
+                captured["target"] = target
+
+            def start(self):
+                captured["started"] = True
+
+        with (
+            patch.object(history_db_module.threading, "Thread", FakeThread),
+            patch.object(db, "_sync_with_github_locked", return_value=False) as locked_mock,
+        ):
+            result = db.sync_with_github(force=False, push=False, reason="test-read")
+            self.assertFalse(result)
+            # Читающий вызов не должен блокироваться на git
+            locked_mock.assert_not_called()
+            self.assertTrue(captured.get("started"))
+            # Выполняем фоновый pull синхронно (освобождает single-flight lock)
+            captured["target"]()
+            locked_mock.assert_called_once()
+            self.assertFalse(locked_mock.call_args.kwargs.get("push"))
+
+    def test_push_sync_stays_synchronous(self):
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            sync_enabled=False,
+            startup_sync="none",
+        )
+        db.sync_enabled = True
+
+        with patch.object(db, "_sync_with_github_locked", return_value=True) as locked_mock:
+            result = db.sync_with_github(force=True, push=True, reason="test-push")
+
+        self.assertTrue(result)
+        locked_mock.assert_called_once()
+        self.assertTrue(locked_mock.call_args.kwargs.get("push"))
 
     def test_add_order_does_not_bump_updated_at_for_unchanged_record(self):
         db = OrderHistoryDB(

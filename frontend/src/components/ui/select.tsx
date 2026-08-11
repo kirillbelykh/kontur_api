@@ -1,15 +1,11 @@
-import { createPortal } from 'react-dom'
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
-import { Check, ChevronDown, Search, X } from 'lucide-react'
+﻿import { Header, ListBox, Select } from '@heroui/react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { Search, X } from 'lucide-react'
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-/**
- * Собственный дропдаун вместо React Aria Select.
- * Панель позиционируется как position:fixed от rect триггера — это не зависит
- * от буферизованной математики overlay'ев RAC, которая ломается под CSS `zoom`
- * (масштаб страницы 110% и т.п.). Мягкий фон + тонкая граница — по скрину 3.
- */
+/** React Aria ╨╜╨╡ ╨╗╤О╨▒╨╕╤В ╨┐╤Г╤Б╤В╨╛╨╣ id тАФ ╨╝╨░╨┐╨┐╨╕╨╝ "" тЖФ sentinel */
+const EMPTY_KEY = '__wms_empty__'
 
 type OptionItem = {
   value: string
@@ -44,12 +40,15 @@ function parseOption(element: React.ReactElement): OptionItem {
 
 function parseSelectChildren(children: React.ReactNode): ParsedChild[] {
   const result: ParsedChild[] = []
+
   React.Children.forEach(children, (child, index) => {
     if (!React.isValidElement(child)) return
+
     if (child.type === 'option') {
       result.push({ kind: 'option', option: parseOption(child) })
       return
     }
+
     if (child.type === 'optgroup') {
       const props = child.props as React.OptgroupHTMLAttributes<HTMLOptGroupElement> & {
         children?: React.ReactNode
@@ -60,38 +59,55 @@ function parseSelectChildren(children: React.ReactNode): ParsedChild[] {
         if (!React.isValidElement(opt) || opt.type !== 'option') return
         options.push(parseOption(opt))
       })
-      result.push({ kind: 'group', id: `group-${index}-${props.label ?? ''}`, label: props.label ?? '', options })
+      result.push({
+        kind: 'group',
+        id: `group-${index}-${props.label ?? ''}`,
+        label: props.label ?? '',
+        options,
+      })
     }
   })
-  return result
-}
 
-function flattenOptions(parsed: ParsedChild[]): OptionItem[] {
-  const flat: OptionItem[] = []
-  for (const node of parsed) {
-    if (node.kind === 'option') flat.push(node.option)
-    else flat.push(...node.options)
-  }
-  return flat
+  return result
 }
 
 function filterParsed(parsed: ParsedChild[], query: string): ParsedChild[] {
   const normalized = query.trim().toLowerCase()
   if (!normalized) return parsed
+
   const result: ParsedChild[] = []
   for (const node of parsed) {
     if (node.kind === 'option') {
       if (node.option.label.toLowerCase().includes(normalized)) result.push(node)
       continue
     }
-    const options = node.options.filter((option) => option.label.toLowerCase().includes(normalized))
+    const options = node.options.filter((option) =>
+      option.label.toLowerCase().includes(normalized),
+    )
     if (options.length > 0) result.push({ ...node, options })
   }
   return result
 }
 
-function synthesizeChangeEvent(value: string, name?: string): React.ChangeEvent<HTMLSelectElement> {
-  const target = { value, name: name ?? '' } as HTMLSelectElement
+function toKey(value: string): string {
+  return value === '' ? EMPTY_KEY : value
+}
+
+function fromKey(key: React.Key | null): string {
+  if (key == null) return ''
+  const value = String(key)
+  return value === EMPTY_KEY ? '' : value
+}
+
+function synthesizeChangeEvent(
+  value: string,
+  name: string | undefined,
+): React.ChangeEvent<HTMLSelectElement> {
+  const target = {
+    value,
+    name: name ?? '',
+  } as HTMLSelectElement
+
   return {
     target,
     currentTarget: target,
@@ -111,24 +127,8 @@ function synthesizeChangeEvent(value: string, name?: string): React.ChangeEvent<
   }
 }
 
-type PanelRect = { left: number; top: number; width: number; maxHeight: number; placement: 'bottom' | 'top' }
-
-function computeRect(trigger: HTMLElement): PanelRect {
-  const rect = trigger.getBoundingClientRect()
-  const gap = 4
-  const viewport = window.innerHeight
-  const spaceBelow = viewport - rect.bottom - gap
-  const spaceAbove = rect.top - gap
-  const openUp = spaceBelow < 220 && spaceAbove > spaceBelow
-  const maxHeight = Math.max(160, Math.min(320, openUp ? spaceAbove : spaceBelow))
-  return {
-    left: rect.left,
-    top: openUp ? rect.top - gap : rect.bottom + gap,
-    width: rect.width,
-    maxHeight,
-    placement: openUp ? 'top' : 'bottom',
-  }
-}
+const springPanel = { type: 'spring' as const, stiffness: 520, damping: 36, mass: 0.85 }
+const springItem = { type: 'spring' as const, stiffness: 480, damping: 32, mass: 0.7 }
 
 export type SelectNativeProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> & {
   placeholder?: string
@@ -136,6 +136,11 @@ export type SelectNativeProps = Omit<React.SelectHTMLAttributes<HTMLSelectElemen
   searchPlaceholder?: string
 }
 
+/**
+ * Drop-in ╨╖╨░╨╝╨╡╨╜╨░ native `<select>` ╨╜╨░ HeroUI Select + ListBox.
+ * ╨Ъ╨╗╨╕╨║╨╕ ╤З╨╡╤А╨╡╨╖ React Aria (`isNonModal` тАФ ╤А╨░╨▒╨╛╤В╨░╨╡╤В ╨▓╨╜╤Г╤В╤А╨╕ Dialog).
+ * Spring/stagger тАФ ╤В╨╛╨╗╤М╨║╨╛ ╨▓╨╕╨╖╤Г╨░╨╗, ╨▒╨╡╨╖ ╤Б╨▓╨╛╨╡╨│╨╛ portal.
+ */
 export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProps>(
   (
     {
@@ -144,247 +149,191 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
       value,
       defaultValue,
       onChange,
+      onBlur,
       disabled,
       name,
       id,
-      placeholder = 'Выберите',
+      required,
+      placeholder = '╨Т╤Л╨▒╨╡╤А╨╕╤В╨╡',
       searchable = false,
-      searchPlaceholder = 'Поиск…',
+      searchPlaceholder = '╨Я╨╛╨╕╤Б╨║тАж',
       'aria-label': ariaLabel,
+      ...rest
     },
     _ref,
   ) => {
     void _ref
+    void required
+    void rest
+
     const reduceMotion = useReducedMotion()
-    const triggerRef = React.useRef<HTMLButtonElement>(null)
-    const panelRef = React.useRef<HTMLDivElement>(null)
+    const rootRef = React.useRef<HTMLDivElement>(null)
     const searchRef = React.useRef<HTMLInputElement>(null)
-    const [open, setOpen] = React.useState(false)
+    const [isOpen, setIsOpen] = React.useState(false)
     const [search, setSearch] = React.useState('')
-    const [rect, setRect] = React.useState<PanelRect | null>(null)
-    const [activeIndex, setActiveIndex] = React.useState(0)
 
     const parsed = React.useMemo(() => parseSelectChildren(children), [children])
-    const [internalValue, setInternalValue] = React.useState<string>(
-      value !== undefined ? String(value) : defaultValue !== undefined ? String(defaultValue) : '',
-    )
-    const currentValue = value !== undefined ? String(value) : internalValue
-
     const visible = React.useMemo(
       () => (searchable ? filterParsed(parsed, search) : parsed),
       [parsed, searchable, search],
     )
-    const flatVisible = React.useMemo(() => flattenOptions(visible), [visible])
-    const selectedLabel = React.useMemo(() => {
-      const found = flattenOptions(parsed).find((option) => option.value === currentValue && option.value !== '')
-      return found?.label ?? ''
-    }, [parsed, currentValue])
 
-    const reposition = React.useCallback(() => {
-      if (triggerRef.current) setRect(computeRect(triggerRef.current))
-    }, [])
+    const controlled = value !== undefined
+    const selectedKey = controlled ? toKey(String(value)) : undefined
+    const defaultSelectedKey =
+      !controlled && defaultValue !== undefined ? toKey(String(defaultValue)) : undefined
 
+    // isNonModal ╨▓╨╜╤Г╤В╤А╨╕ Dialog ╤Б╨░╨╝ ╨╜╨╡ ╨╖╨░╨║╤А╤Л╨▓╨░╨╡╤В╤Б╤П ╨┐╨╛ ╨║╨╗╨╕╨║╤Г ╤Б╨╜╨░╤А╤Г╨╢╨╕
     React.useEffect(() => {
-      if (!open) return
-      reposition()
-      const onScroll = () => reposition()
-      window.addEventListener('scroll', onScroll, true)
-      window.addEventListener('resize', onScroll)
-      return () => {
-        window.removeEventListener('scroll', onScroll, true)
-        window.removeEventListener('resize', onScroll)
-      }
-    }, [open, reposition])
+      if (!isOpen) return
 
-    React.useEffect(() => {
-      if (!open) return
       const onPointerDown = (event: PointerEvent) => {
-        const target = event.target as Node | null
-        if (triggerRef.current?.contains(target) || panelRef.current?.contains(target)) return
-        setOpen(false)
+        const target = event.target
+        if (!(target instanceof Element)) return
+        if (target.closest('[data-slot="select-popover"]')) return
+        if (rootRef.current?.contains(target)) {
+          // Trigger press while open: swallow it, otherwise the popover closes and reopens
+          event.preventDefault()
+          event.stopPropagation()
+          setIsOpen(false)
+          return
+        }
+        setIsOpen(false)
       }
+
       document.addEventListener('pointerdown', onPointerDown, true)
       return () => document.removeEventListener('pointerdown', onPointerDown, true)
-    }, [open])
+    }, [isOpen])
 
     React.useEffect(() => {
-      if (open && searchable) {
-        const frame = requestAnimationFrame(() => searchRef.current?.focus())
-        return () => cancelAnimationFrame(frame)
-      }
-      if (!open) setSearch('')
-    }, [open, searchable])
-
-    const commit = (option: OptionItem) => {
-      if (option.disabled) return
-      if (value === undefined) setInternalValue(option.value)
-      onChange?.(synthesizeChangeEvent(option.value, name))
-      setOpen(false)
-      triggerRef.current?.focus()
-    }
-
-    const onTriggerKeyDown = (event: React.KeyboardEvent) => {
-      if (disabled) return
-      if (!open && (event.key === 'ArrowDown' || event.key === 'Enter' || event.key === ' ')) {
-        event.preventDefault()
-        setOpen(true)
-        setActiveIndex(Math.max(0, flatVisible.findIndex((o) => o.value === currentValue)))
+      if (!isOpen) {
+        setSearch('')
         return
       }
-      if (!open) return
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setOpen(false)
-      } else if (event.key === 'ArrowDown') {
-        event.preventDefault()
-        setActiveIndex((index) => Math.min(flatVisible.length - 1, index + 1))
-      } else if (event.key === 'ArrowUp') {
-        event.preventDefault()
-        setActiveIndex((index) => Math.max(0, index - 1))
-      } else if (event.key === 'Enter') {
-        event.preventDefault()
-        const option = flatVisible[activeIndex]
-        if (option) commit(option)
-      }
-    }
+      if (!searchable) return
+      const frame = requestAnimationFrame(() => searchRef.current?.focus())
+      return () => cancelAnimationFrame(frame)
+    }, [isOpen, searchable])
 
-    let flatCursor = 0
+    let optionIndex = 0
+
     const renderOption = (option: OptionItem) => {
-      const index = flatCursor++
-      const selected = option.value === currentValue && option.value !== ''
-      const active = index === activeIndex
+      const idKey = toKey(option.value)
+      const index = optionIndex++
+      const itemTransition = reduceMotion
+        ? { duration: 0 }
+        : { ...springItem, delay: 0.02 + index * 0.035 }
+
       return (
-        <button
-          key={`${option.value}-${index}`}
-          type="button"
-          role="option"
-          aria-selected={selected}
-          disabled={option.disabled}
-          onMouseEnter={() => setActiveIndex(index)}
-          onClick={() => commit(option)}
-          className={cn(
-            'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors',
-            active ? 'bg-muted text-foreground' : 'text-foreground',
-            option.disabled && 'cursor-not-allowed opacity-40',
-          )}
-        >
-          <span className="min-w-0 flex-1 truncate">{option.label || '\u00A0'}</span>
-          {selected ? <Check className="h-3.5 w-3.5 shrink-0 text-foreground" strokeWidth={2.25} /> : null}
-        </button>
+        <ListBox.Item key={idKey} id={idKey} textValue={option.label || ' '} isDisabled={option.disabled}>
+          <motion.span
+            className="flex w-full min-w-0 items-center truncate"
+            initial={reduceMotion || !isOpen ? false : { opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={itemTransition}
+          >
+            {option.label}
+          </motion.span>
+          <ListBox.ItemIndicator />
+        </ListBox.Item>
       )
     }
 
-    const hasOptions = flatVisible.length > 0
+    const hasOptions = visible.some((node) =>
+      node.kind === 'option' ? true : node.options.length > 0,
+    )
 
     return (
-      <>
-        <button
-          ref={triggerRef}
-          type="button"
-          id={id}
-          name={name}
-          disabled={disabled}
-          aria-haspopup="listbox"
-          aria-expanded={open}
+      <div ref={rootRef} className={cn('w-full', className)}>
+        <Select
           aria-label={ariaLabel}
-          onClick={() => !disabled && setOpen((prev) => !prev)}
-          onKeyDown={onTriggerKeyDown}
-          className={cn(
-            'flex h-9 w-full items-center gap-2 rounded-[var(--field-radius,0.5rem)] px-2.5 text-left text-sm transition-colors',
-            'border bg-[var(--field-bg)] text-foreground',
-            open ? 'border-[var(--field-border-focus)]' : 'border-[var(--field-border)] hover:border-[var(--field-border-hover)]',
-            disabled && 'cursor-not-allowed opacity-50',
-            className,
-          )}
-          style={open ? { boxShadow: '0 0 0 3px var(--field-ring)' } : undefined}
+          className="w-full"
+          defaultSelectedKey={defaultSelectedKey}
+          fullWidth
+          id={id}
+          isDisabled={disabled}
+          isOpen={isOpen}
+          name={name}
+          placeholder={placeholder}
+          selectedKey={selectedKey}
+          onBlur={onBlur as (() => void) | undefined}
+          onOpenChange={setIsOpen}
+          onSelectionChange={(key) => {
+            onChange?.(synthesizeChangeEvent(fromKey(key), name))
+            setIsOpen(false)
+          }}
         >
-          <span className={cn('min-w-0 flex-1 truncate', !selectedLabel && 'text-muted-foreground')}>
-            {selectedLabel || placeholder}
-          </span>
-          <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
-        </button>
-
-        {open && rect
-          ? createPortal(
-              <div
-                ref={panelRef}
-                data-slot="select-popover"
-                className="fixed z-[9999]"
-                style={{
-                  left: rect.left,
-                  width: rect.width,
-                  ...(rect.placement === 'bottom'
-                    ? { top: rect.top }
-                    : { top: rect.top, transform: 'translateY(-100%)' }),
-                }}
-              >
-                <motion.div
-                  initial={reduceMotion ? false : { opacity: 0, y: rect.placement === 'bottom' ? -6 : 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 520, damping: 36, mass: 0.7 }}
-                  className="overflow-hidden rounded-xl border border-border bg-card shadow-panel"
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          {/*
+            isNonModal: ╨╕╨╜╨░╤З╨╡ Escape/underlay ╨╖╨░╨║╤А╤Л╨▓╨░╤О╤В Dialog ╨╕ ╤Б╤В╨░╨▓╤П╤В inert ╨╜╨░ #root тАФ
+            ╨║╨╗╨╕╨║╨╕ ╨┐╨╛ portaled-╤Б╨┐╨╕╤Б╨║╤Г ╨╜╨╡ ╨┤╨╛╤Е╨╛╨┤╤П╤В.
+          */}
+          <Select.Popover isNonModal className="pointer-events-auto">
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={reduceMotion ? { duration: 0 } : springPanel}
+              className="overflow-hidden"
+            >
+              {searchable ? (
+                <div
+                  className="flex h-10 items-center gap-2 border-b border-border px-2.5"
+                  // ╨╜╨╡ ╨┤╨░╤С╨╝ ListBox/Select ╨┐╨╡╤А╨╡╤Е╨▓╨░╤В╨╕╤В╤М ╨▓╨▓╨╛╨┤
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
                 >
-                  {searchable ? (
-                    <div className="flex h-10 items-center gap-2 border-b border-border px-2.5">
-                      <Search className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
-                      <input
-                        ref={searchRef}
-                        type="text"
-                        value={search}
-                        placeholder={searchPlaceholder}
-                        aria-label={searchPlaceholder}
-                        className="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                        onChange={(event) => {
-                          setSearch(event.target.value)
-                          setActiveIndex(0)
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === 'Escape') {
-                            onTriggerKeyDown(event as unknown as React.KeyboardEvent)
-                          }
-                        }}
-                      />
-                      {search ? (
-                        <button
-                          type="button"
-                          aria-label="Очистить поиск"
-                          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          onClick={() => {
-                            setSearch('')
-                            searchRef.current?.focus()
-                          }}
-                        >
-                          <X className="size-3.5" strokeWidth={1.75} />
-                        </button>
-                      ) : null}
-                    </div>
+                  <Search className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.75} />
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={search}
+                    placeholder={searchPlaceholder}
+                    aria-label={searchPlaceholder}
+                    className="h-full w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                  {search ? (
+                    <button
+                      type="button"
+                      aria-label="╨Ю╤З╨╕╤Б╤В╨╕╤В╤М ╨┐╨╛╨╕╤Б╨║"
+                      className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      onClick={() => {
+                        setSearch('')
+                        searchRef.current?.focus()
+                      }}
+                    >
+                      <X className="size-3.5" strokeWidth={1.75} />
+                    </button>
                   ) : null}
+                </div>
+              ) : null}
 
-                  <div className="overflow-auto p-1" style={{ maxHeight: rect.maxHeight }} role="listbox">
-                    {!hasOptions ? (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">Ничего не найдено</div>
-                    ) : (
-                      visible.map((node) =>
-                        node.kind === 'option' ? (
-                          renderOption(node.option)
-                        ) : (
-                          <div key={node.id}>
-                            <div className="px-2.5 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                              {node.label}
-                            </div>
-                            {node.options.map(renderOption)}
-                          </div>
-                        ),
+              <ListBox
+                renderEmptyState={
+                  !hasOptions
+                    ? () => (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">╨Э╨╕╤З╨╡╨│╨╛ ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜╨╛</div>
                       )
-                    )}
-                  </div>
-                </motion.div>
-              </div>,
-              document.body,
-            )
-          : null}
-        <AnimatePresence />
-      </>
+                    : undefined
+                }
+              >
+                {visible.map((node) => {
+                  if (node.kind === 'option') return renderOption(node.option)
+                  return (
+                    <ListBox.Section key={node.id} id={node.id}>
+                      <Header>{node.label}</Header>
+                      {node.options.map(renderOption)}
+                    </ListBox.Section>
+                  )
+                })}
+              </ListBox>
+            </motion.div>
+          </Select.Popover>
+        </Select>
+      </div>
     )
   },
 )

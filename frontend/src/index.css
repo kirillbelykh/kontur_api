@@ -503,11 +503,12 @@ button {
     border-radius: 9999px;
   }
 
-  /* HeroUI Input/TextArea/DateField/SearchField: мягкий фон + тонкая граница (скрин 3) */
+  /* HeroUI Input/TextArea/DateField/SearchField/Select: мягкий фон + тонкая граница (скрин 3) */
   .input,
   .textarea,
   .date-input-group,
-  .search-field__group {
+  .search-field__group,
+  .select__trigger {
     background-color: var(--field-bg) !important;
     border-color: var(--field-border) !important;
   }
@@ -515,7 +516,9 @@ button {
   .input:hover,
   .textarea:hover,
   .date-input-group:hover,
-  .search-field__group:hover {
+  .search-field__group:hover,
+  .select__trigger:hover,
+  .select__trigger[data-hovered="true"] {
     border-color: var(--field-border-hover) !important;
   }
 

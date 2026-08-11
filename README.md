@@ -3,6 +3,17 @@
 Windows desktop app for Kontur.Markirovka: order codes, download, introduction
 into circulation, TSD tasks, aggregation, BarTender labels, WMS CHZ requests.
 
+## Установка на новый ПК (Windows)
+
+1. Склонировать репозиторий (или скопировать `KonturMarkirovka-Setup.exe`).
+2. Запустить `KonturMarkirovka-Setup.exe` — установщик распакует приложение в
+   `%LOCALAPPDATA%\Programs\KonturMarkirovka`, поставит uv/Python/зависимости,
+   скачает YandexDriver и создаст ярлык «Контур Маркировка» на рабочем столе.
+3. Запустить ярлык — можно пользоваться.
+
+Пересборка установщика после изменений: `Build-Installer.bat`
+(готовый `KonturMarkirovka-Setup.exe` появляется в корне проекта).
+
 ## Quick start
 
 ```powershell
