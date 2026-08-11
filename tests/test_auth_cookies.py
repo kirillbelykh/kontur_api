@@ -51,7 +51,6 @@ class AuthServiceTests(unittest.TestCase):
             mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
             mock.patch("backend.auth.service.validate_kontur_session", side_effect=[False, True]) as validate_mock,
             mock.patch("backend.auth.service.load_cookies_from_yandex_profile", return_value=None),
-            mock.patch("backend.auth.service.is_yandex_profile_busy", return_value=False),
             mock.patch("backend.auth.service.get_cookies", return_value=selenium_cookies) as selenium_mock,
             mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
             mock.patch("time.time", return_value=1_800_000_000.0),
@@ -174,28 +173,28 @@ class BrowserOptionsTests(unittest.TestCase):
 
 
 class BrowserSessionErrorTests(unittest.TestCase):
-    def test_classify_version_mismatch(self):
-        from backend.auth.browser import classify_session_error
+    def test_detects_driver_version_mismatch(self):
+        from backend.auth.browser import is_driver_version_mismatch
 
         exc = RuntimeError(
             "session not created: This version of ChromeDriver only supports Chrome version 146"
         )
-        self.assertEqual(classify_session_error(exc), "version")
+        self.assertTrue(is_driver_version_mismatch(exc))
 
-    def test_classify_profile_lock(self):
-        from backend.auth.browser import classify_session_error
+    def test_profile_lock_is_not_a_version_mismatch(self):
+        from backend.auth.browser import is_driver_version_mismatch
 
         exc = RuntimeError(
             "session not created: DevToolsActivePort file doesn't exist; Chrome instance exited"
         )
-        self.assertEqual(classify_session_error(exc), "profile_lock")
+        self.assertFalse(is_driver_version_mismatch(exc))
 
-    def test_get_cookies_skips_selenium_when_profile_busy(self):
+    def test_get_cookies_launches_browser_even_when_yandex_is_running(self):
+        """Regression: a running Yandex Browser must not block cookie refresh."""
         from backend.auth import browser as browser_mod
 
         with (
-            mock.patch.object(browser_mod, "is_yandex_profile_busy", return_value=True),
-            mock.patch("selenium.webdriver.Chrome") as chrome_mock,
+            mock.patch("selenium.webdriver.Chrome", side_effect=RuntimeError("boom")) as chrome_mock,
             mock.patch.object(Path, "exists", return_value=True),
         ):
             result = browser_mod.get_cookies(
@@ -203,11 +202,10 @@ class BrowserSessionErrorTests(unittest.TestCase):
                 browser_path=Path("browser.exe"),
                 profile_user_data_dir=Path("User Data"),
                 profile_directory="Vinsent O`neal",
-                max_retries=3,
             )
 
         self.assertIsNone(result)
-        chrome_mock.assert_not_called()
+        chrome_mock.assert_called_once()
 
     def test_get_cookies_version_mismatch_repairs_once_then_stops(self):
         from backend.auth import browser as browser_mod
@@ -217,7 +215,6 @@ class BrowserSessionErrorTests(unittest.TestCase):
         )
 
         with (
-            mock.patch.object(browser_mod, "is_yandex_profile_busy", return_value=False),
             mock.patch.object(browser_mod, "ensure_yandex_driver_updated", return_value=True) as ensure_mock,
             mock.patch("selenium.webdriver.Chrome", side_effect=version_error) as chrome_mock,
             mock.patch.object(Path, "exists", return_value=True),
@@ -227,51 +224,12 @@ class BrowserSessionErrorTests(unittest.TestCase):
                 browser_path=Path("browser.exe"),
                 profile_user_data_dir=Path("User Data"),
                 profile_directory="Default",
-                max_retries=3,
             )
 
         self.assertIsNone(result)
         ensure_mock.assert_called_once()
         # First failure + one post-repair retry, not three pointless launches.
         self.assertEqual(chrome_mock.call_count, 2)
-
-
-class AuthBusyProfileTests(unittest.TestCase):
-    def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.cookies_file = Path(self.temp_dir.name) / "kontur_cookies.json"
-        store.clear_memoized_cookies()
-        store.set_cookie_refresh_in_progress(False)
-        store.cookie_refresh_event().set()
-
-    def tearDown(self):
-        store.clear_memoized_cookies()
-        store.set_cookie_refresh_in_progress(False)
-        store.cookie_refresh_event().set()
-        self.temp_dir.cleanup()
-
-    def test_force_refresh_skips_selenium_when_profile_busy_and_reuses_file(self):
-        cookies = _valid_cookie_dict()
-        payload = {
-            "timestamp": 1_800_000_000.0 - 30.0,
-            "cookies": cookies,
-        }
-        self.cookies_file.write_text(json.dumps(payload), encoding="utf-8")
-
-        with (
-            mock.patch.object(store, "COOKIES_FILE", self.cookies_file),
-            mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
-            mock.patch("backend.auth.service.validate_kontur_session", return_value=True),
-            mock.patch("backend.auth.service.load_cookies_from_yandex_profile", return_value=None),
-            mock.patch("backend.auth.service.is_yandex_profile_busy", return_value=True),
-            mock.patch("backend.auth.service.get_cookies") as selenium_mock,
-            mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
-            mock.patch("time.time", return_value=1_800_000_000.0),
-        ):
-            result = service.get_valid_cookies(force_refresh=True)
-
-        self.assertEqual(result, cookies)
-        selenium_mock.assert_not_called()
 
 
 class EnsureSessionBridgeTests(unittest.TestCase):

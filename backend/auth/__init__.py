@@ -7,10 +7,9 @@ from __future__ import annotations
 
 from backend.auth.browser import (
     build_browser_options,
-    classify_session_error,
     get_cookies,
     hide_driver_windows,
-    is_yandex_profile_busy,
+    is_driver_version_mismatch,
     remove_webdriver_marker,
     wait_for_valid_cookies,
 )
@@ -66,14 +65,13 @@ __all__ = [
     "YANDEX_BROWSER_PATH",
     "YANDEX_DRIVER_PATH",
     "build_browser_options",
-    "classify_session_error",
     "ensure_kontur_access_prolongation_worker_started",
     "find_yandex_paths",
     "get_cookies",
     "get_kontur_access_prolongation_state",
     "get_valid_cookies",
     "hide_driver_windows",
-    "is_yandex_profile_busy",
+    "is_driver_version_mismatch",
     "load_cookies_from_file",
     "load_cookies_from_yandex_profile",
     "prolong_kontur_access",
