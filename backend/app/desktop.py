@@ -88,7 +88,8 @@ def main() -> None:
         height=900,
         min_size=(1100, 700),
     )
-    window.events.loaded += lambda _window: api.start_session_auto_refresh()
+    # pywebview calls loaded handlers with no args on some backends, with the window on others
+    window.events.loaded += lambda *_: api.start_session_auto_refresh()
     debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
     webview.start(debug=debug_mode)
 
