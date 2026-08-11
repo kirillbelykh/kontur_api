@@ -115,7 +115,8 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     if (nextColumns.length === 0) return
 
     const signature = nextColumns.map((column) => column.label).join('|')
-    const nextStorageKey = `kontur_table_preferences_${TABLE_PREFS_VERSION}_${getPathname()}_${signature}`
+    // aria-label keeps two same-shaped tables on one page from sharing column preferences
+    const nextStorageKey = `kontur_table_preferences_${TABLE_PREFS_VERSION}_${getPathname()}_${ariaLabel || ''}_${signature}`
 
     setColumns((current) => {
       const currentSignature = current.map((column) => column.label).join('|')
@@ -125,7 +126,7 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
       setStorageKey(nextStorageKey)
       setPreferences(readPreferences(nextStorageKey))
     }
-  }, [children, storageKey])
+  }, [ariaLabel, children, storageKey])
 
   useLayoutEffect(() => {
     const table = tableRef.current
