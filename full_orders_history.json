@@ -471,8 +471,8 @@
     {
       "order_name": "1528 гинек 7,0 партия 250616",
       "document_id": "c4951ee7-2943-440e-b184-7baf78d51ff2",
-      "status": "Выполнен",
-      "filename": null,
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1528 гинек 70 партия 250616\\1528 гинек 70 партия 250616.pdf, C:\\Users\\user\\Desktop\\Коды км\\1528 гинек 70 партия 250616\\1528 гинек 7,0 партия 250616_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1528 гинек 70 партия 250616\\1528 гинек 7,0 партия 250616.xls",
       "simpl": "wheelChairs",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные анатомической формы с полимерным покрытием текстурированные с венчиком с удлиненной крагой, р-р 7,0",
       "gtin": "4640473506201",
@@ -492,7 +492,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1528 гинек 70 партия 250616\\1528 гинек 7,0 партия 250616.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1528 гинек 70 партия 250616\\1528 гинек 7,0 партия 250616_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1528 гинек 70 партия 250616\\1528 гинек 70 партия 250616.pdf"
     },
     {
       "order_name": "1527 хир 7,0 партия 260715",
@@ -36766,7 +36769,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-13T14:39:55.573654",
+  "last_update": "2026-08-13T14:41:49.655600",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
