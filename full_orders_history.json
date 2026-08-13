@@ -29,9 +29,9 @@
     {
       "order_name": "1531 хир 9,0 партия 260628",
       "document_id": "34bd70e1-bdf8-4ace-ab2d-92e24d4b9d8e",
-      "status": "Выполнен",
-      "filename": null,
-      "simpl": "wheelChairs",
+      "status": "Скачан",
+      "filename": "C:\\Users\\user\\Desktop\\Коды км\\1531 хир 90 партия 260628\\1531 хир 90 партия 260628.pdf, C:\\Users\\user\\Desktop\\Коды км\\1531 хир 90 партия 260628\\1531 хир 9,0 партия 260628_csv.csv, C:\\Users\\user\\Desktop\\Коды км\\1531 хир 90 партия 260628\\1531 хир 9,0 партия 260628.xls",
+      "simpl": "хир с полимерным",
       "full_name": "Перчатки Sover хирургические стерильные одноразовые из натурального латекса неопудренные с полимерным покрытием текстурированные анатомической формы с венчиком, р-р 9,0",
       "gtin": "4640473510642",
       "positions": [
@@ -50,7 +50,10 @@
       "tsd_created": false,
       "tsd_created_at": null,
       "tsd_intro_number": null,
-      "tsd_created_by": null
+      "tsd_created_by": null,
+      "xls_path": "C:\\Users\\user\\Desktop\\Коды км\\1531 хир 90 партия 260628\\1531 хир 9,0 партия 260628.xls",
+      "csv_path": "C:\\Users\\user\\Desktop\\Коды км\\1531 хир 90 партия 260628\\1531 хир 9,0 партия 260628_csv.csv",
+      "pdf_path": "C:\\Users\\user\\Desktop\\Коды км\\1531 хир 90 партия 260628\\1531 хир 90 партия 260628.pdf"
     },
     {
       "order_name": "1530 стер нитрил M заявка 7152",
@@ -36772,7 +36775,7 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-13T14:47:55.144634",
+  "last_update": "2026-08-13T14:58:23.795224",
   "created_by": "sklad",
   "updated_by": "user",
   "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
