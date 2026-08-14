@@ -16,7 +16,6 @@ flowchart LR
     Auth -.->|cookies| Kontur
     Kontur --> MK[("mk.kontur.ru")]
     Services --> Hist["full_orders_history.json"]
-    Hist <-->|"git-ветка orders-history"| Origin[("origin")]
     Services --> BT["BarTender"]
 ```
 
@@ -45,11 +44,9 @@ flowchart LR
 нужен. Жёсткий путь — `Update.bat` → `scripts/update_windows.ps1`
 (stash → pull/reset → пересборка окружения).
 
-**История между ПК.** `history_db.py` синхронизирует
-`full_orders_history.json` через служебную git-ветку `orders-history`
-(pull примерно раз в 20 с при обращениях, push с ретраями; кэш —
-`runtime/state/history_sync_cache`). Управляется `HISTORY_SYNC_ENABLED` /
-`HISTORY_SYNC_BRANCH`.
+**Локальная история.** `history_db.py` хранит в `full_orders_history.json`
+пути к CSV/PDF, флаги ТСД и архив удалённых. Список заказов на экране
+берётся из Контура; между ПК файл не синхронизируется.
 
 **WMS («Честный знак»).** `backend/app/chz_bridge_server.py` слушает
 `0.0.0.0:8791` (env `CHZ_BRIDGE_ENABLED/HOST/PORT/TOKEN`).
@@ -73,4 +70,4 @@ flowchart LR
 - Порт 8791 слушает `0.0.0.0`; POST защищён только токеном —
   `CHZ_BRIDGE_TOKEN` обязателен.
 - Копия из exe-установщика не содержит `.git`: внутриприложенческие
-  обновления и синхронизация истории там не работают.
+  обновления там не работают.

@@ -35,8 +35,8 @@ CI: `.github/workflows/ci.yml` — backend на `windows-latest`
 ## Git-гигиена
 
 - Не коммитьте `.env`, `runtime/`, `driver/`, cookies и логи.
-- `full_orders_history.json` синхронизируется автоматически через ветку
-  `orders-history` — не коммитьте его в `main` без осознанной причины.
+- `full_orders_history.json` — локальный файл метаданных, не коммитьте
+  рабочие изменения в `main`.
 - `frontend/dist` коммитится сознательно (обновления уезжают на рабочие ПК
   через git pull): после изменений фронта выполните `npm run build` и
   закоммитьте `dist` вместе с исходниками.

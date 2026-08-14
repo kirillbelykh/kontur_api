@@ -12,7 +12,7 @@ kontur_api/
   main.py                   # thin desktop launcher → backend.app.desktop
   cookies.py                # thin shim → backend.auth (legacy imports)
   Update.bat / Install.bat / Install.exe  # operator entrypoints (in-place on the git clone)
-  full_orders_history.json  # order history DB; auto-synced via git branch `orders-history`
+  full_orders_history.json  # local order metadata (CSV paths, TSD flags); not synced between PCs
   backend/                  # Python business logic (see below)
   frontend/                 # React 19 + Vite + TS + Tailwind 4 + HeroUI 3; dist/ is COMMITTED deliberately
   archive/                  # legacy_ui (CustomTkinter), ui_v2_static, local_junk
@@ -75,7 +75,7 @@ WMS --HTTP :8791 (X-CHZ-Token)-->  chz_bridge_server --^
 ```
 
 - **No WMS embed / no ui_mobile.** Desktop only. The CHZ HTTP bridge for WMS callbacks lives in `backend/app/chz_bridge_server.py` (also runs windowless via `server_only.py`, startup shortcut "CRPT server").
-- **History sync:** `full_orders_history.json` is shared between PCs through the dedicated git branch `orders-history` (`backend/services/history_db.py`).
+- **Order list:** live from Kontur. `full_orders_history.json` is a local cache of extras (CSV/PDF paths, TSD flags, deleted-archive) — not synced between PCs.
 - **Legacy CustomTkinter** lives only in `archive/legacy_ui/` — do not extend it.
 - **Git:** commit locally as you go; `git push` only after explicit user approval.
 - Details and data flows: `docs/ARCHITECTURE.md`.

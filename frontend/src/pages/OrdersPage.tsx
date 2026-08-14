@@ -526,17 +526,6 @@ export function OrdersPage() {
       'Заказ восстановлен',
     )
 
-  const exportHistory = () =>
-    runBusy(
-      'export',
-      async () => {
-        const result = await apiCall<{ state?: OrdersViewState }>('export_order_history')
-        if (result.state) setState(result.state)
-        else await load(false)
-      },
-      'История заказов выгружена',
-    )
-
   const addHistoryToActive = () =>
     runBusy(
       'to-active',
@@ -617,9 +606,6 @@ export function OrdersPage() {
             <Button variant="outline" size="sm" onClick={() => void load(true)} disabled={loading || isBusy}>
               <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
               Обновить
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => void exportHistory()} disabled={isBusy}>
-              Выгрузить историю
             </Button>
           </>
         }

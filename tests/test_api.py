@@ -6,7 +6,6 @@ from unittest.mock import Mock, patch
 
 import requests
 
-os.environ.setdefault("HISTORY_SYNC_ENABLED", "0")
 os.environ.setdefault("BASE_URL", "https://mk.kontur.ru")
 
 winreg_stub = types.ModuleType("winreg")

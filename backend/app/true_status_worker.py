@@ -16,7 +16,6 @@ def _repo_root() -> Path:
 
 
 sys.path.insert(0, str(_repo_root()))
-os.environ.setdefault("HISTORY_SYNC_ENABLED", "0")
 os.environ.setdefault("LOG_FILE", str(_repo_root() / "runtime" / "logs" / "ui_v2_true_status.log"))
 
 from backend.services.aggregation_bulk import BulkAggregationService

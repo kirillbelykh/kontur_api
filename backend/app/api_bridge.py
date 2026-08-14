@@ -425,25 +425,6 @@ class _BridgeRuntime:
         self.wms_chz_requests: List[Dict[str, Any]] = []
         self.wms_chz_last_synced_at = 0.0
         self.load_download_items_from_history(sync=False)
-        self.history_sync_thread: Optional[Thread] = None
-        self.start_history_sync_on_startup()
-
-    def _sync_history_on_startup(self) -> None:
-        try:
-            self.history_db.sync_with_github(force=True, push=False, reason="runtime-init")
-            self.load_download_items_from_history(sync=False)
-        except Exception:
-            logger.warning("Стартовая синхронизация истории заказов не удалась — работаем с локальной копией", exc_info=True)
-
-    def start_history_sync_on_startup(self) -> None:
-        if self.history_sync_thread is not None and self.history_sync_thread.is_alive():
-            return
-        self.history_sync_thread = Thread(
-            target=self._sync_history_on_startup,
-            name="UiV2HistorySync",
-            daemon=True,
-        )
-        self.history_sync_thread.start()
 
     def load_download_items_from_history(self, sync: bool = True) -> None:
         existing_ids = {item.get("document_id") for item in self.download_items if item.get("document_id")}
@@ -1290,15 +1271,10 @@ class ApiBridge:
             return history_db._load_data()  # type: ignore[attr-defined]
 
     def _save_history_payload(self, payload: Dict[str, Any], reason: str) -> None:
+        del reason
         history_db = _get_runtime().history_db
         with history_db._io_lock:  # type: ignore[attr-defined]
             history_db._save_data(payload)  # type: ignore[attr-defined]
-            sync_locked = getattr(history_db, "_sync_with_github_locked", None)
-            if callable(sync_locked):
-                try:
-                    sync_locked(push=True, reason=reason)
-                except Exception as exc:
-                    logger.warning("Не удалось выгрузить историю в GitHub (%s): %s", reason, exc)
 
     def _build_file_label(self, item: Dict[str, Any]) -> str:
         parts: List[str] = []
@@ -1815,7 +1791,6 @@ class ApiBridge:
 
         env = os.environ.copy()
         env.setdefault("PYTHONIOENCODING", "utf-8")
-        env.setdefault("HISTORY_SYNC_ENABLED", "0")
         env["LOG_FILE"] = str(_REPO_ROOT / "runtime" / "logs" / "ui_v2_true_status.log")
 
         command = [
@@ -4606,23 +4581,16 @@ class ApiBridge:
     def export_order_history(self) -> Dict[str, Any]:
         try:
             runtime = _get_runtime()
-            self._log("orders", "Выгружаем историю заказов в GitHub")
-            changed = runtime.history_db.sync_with_github(
-                force=True,
-                push=True,
-                reason="orders_manual_export",
-            )
             runtime.load_download_items_from_history(sync=False)
             history_count = len(runtime.history_db.get_all_orders())
-            self._log("orders", f"История заказов выгружена: {history_count} записей")
             return {
                 "success": True,
-                "changed": bool(changed),
+                "changed": False,
                 "history_count": history_count,
                 "state": self.get_orders_view_state(force_sync=False),
             }
         except Exception as exc:
-            self._log("orders", f"Ошибка выгрузки истории заказов: {exc}")
+            self._log("orders", f"Ошибка чтения локальной истории заказов: {exc}")
             return {"success": False, "error": str(exc)}
 
     def add_order_item(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -4686,12 +4654,6 @@ class ApiBridge:
                     if str(item.get("document_id") or "").strip() != normalized_id
                 ]
                 history_db._save_data(payload)  # type: ignore[attr-defined]
-                sync_locked = getattr(history_db, "_sync_with_github_locked", None)
-                if callable(sync_locked):
-                    try:
-                        sync_locked(push=True, reason="delete_order_ui_v2")
-                    except Exception as exc:
-                        logger.warning("Не удалось выгрузить историю в GitHub (delete_order_ui_v2): %s", exc)
 
             runtime.download_items = [
                 item for item in runtime.download_items
@@ -4849,11 +4811,6 @@ class ApiBridge:
                 except Exception as exc:
                     errors.append({"order_name": item["order_name"], "error": str(exc)})
                     self._log("orders", f"Ошибка заказа {item['order_name']}: {exc}")
-
-            try:
-                runtime.history_db.flush_github_sync(reason="submit_order_queue")
-            except Exception:
-                logger.exception("Не удалось выгрузить историю после очереди заказов")
 
             runtime.order_queue = []
             return {

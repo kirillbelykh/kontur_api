@@ -93,23 +93,6 @@ function Restore-OrderHistoryBackup {
     $historyPath = Join-Path $ProjectDir "full_orders_history.json"
     Copy-Item -LiteralPath $BackupPath -Destination $historyPath -Force
     Write-Ok "Restored local order history backup"
-
-    $python = Join-Path $ProjectDir ".venv\Scripts\python.exe"
-    if (-not (Test-Path $python)) {
-        $python = "python"
-    }
-
-    $mergeScript = @"
-from history_db import OrderHistoryDB
-db = OrderHistoryDB(startup_sync='none')
-db.sync_with_github(force=True, push=True, reason='update_restore_history')
-print('Order history restored and synchronized')
-"@
-
-    $mergeScript | & $python -
-    if ($LASTEXITCODE -ne 0) {
-        Write-WarnMsg "Order history backup was restored locally, but synchronization did not complete."
-    }
 }
 
 function Reset-OrderHistoryForCodeUpdate {

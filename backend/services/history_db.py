@@ -1,37 +1,27 @@
 import json
 import os
-import shutil
-import subprocess
 import threading
-import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from backend.services.logger import logger
-from backend.services.win_subprocess import hidden_console_kwargs
 
 DEFAULT_HISTORY_FILE = "full_orders_history.json"
 LEGACY_HISTORY_FILE = "orders_history.json"
 LEGACY_NETWORK_HISTORY = r"\\192.168.100.2\!files\orders_history.json"
 LEGACY_NETWORK_ENABLED_ENV = "HISTORY_ENABLE_LEGACY_NETWORK"
 
-DEFAULT_SYNC_BRANCH = "orders-history"
-SYNC_BRANCH_ENV = "HISTORY_SYNC_BRANCH"
-SYNC_ENABLED_ENV = "HISTORY_SYNC_ENABLED"
-SYNC_CACHE_DIR = os.getenv("HISTORY_SYNC_CACHE_DIR", str(Path("runtime") / "state" / "history_sync_cache"))
-SYNC_PULL_INTERVAL_SECONDS = 20
-SYNC_PUSH_RETRIES = 3
-GIT_INDEX_LOCK_STALE_SECONDS = 30
-GIT_INDEX_LOCK_WAIT_SECONDS = 10
-
 
 class OrderHistoryDB:
+    """Локальный JSON с метаданными заказов (пути к CSV, флаги ТСД).
+
+    Список заказов берётся из Контура. Git-ветка ``orders-history`` больше
+    не используется — ``sync_with_github`` / ``flush_github_sync`` оставлены
+    как no-op для старых вызовов.
+    """
+
     _io_lock = threading.RLock()
-    _startup_sync_lock = threading.Lock()
-    _startup_sync_started = False
-    # Single-flight guard: only one background pull across all instances.
-    _background_pull_lock = threading.Lock()
 
     def __init__(
         self,
@@ -39,73 +29,28 @@ class OrderHistoryDB:
         legacy_db_files: Optional[Iterable[str]] = None,
         sync_enabled: Optional[bool] = None,
         sync_branch: Optional[str] = None,
-        startup_sync: str = "background",
+        startup_sync: str = "none",
     ):
+        del sync_enabled, sync_branch, startup_sync
         self.repo_root = Path(__file__).resolve().parents[2]
         self.db_file = self._resolve_path(db_file or DEFAULT_HISTORY_FILE)
         self.legacy_db_files = self._build_legacy_paths(legacy_db_files)
-        self.sync_branch: str = sync_branch or os.getenv(SYNC_BRANCH_ENV) or DEFAULT_SYNC_BRANCH
-        self.sync_enabled = self._resolve_sync_enabled(sync_enabled)
-        self.sync_cache_dir = self.repo_root / SYNC_CACHE_DIR
-        self._last_sync_pull_at = 0.0
+        self.sync_enabled = False
+        self.sync_branch = ""
         # (cache_key, data) — parsed history JSON keyed by file mtime+size
         self._data_cache: Optional[Tuple[Tuple[int, int], Dict[str, Any]]] = None
         self._legacy_warning_keys: set[Tuple[str, str, str]] = set()
         self._last_logged_total_orders: Optional[int] = None
         self._last_logged_without_tsd: Optional[int] = None
 
-        self._sync_rel_path: Optional[Path] = self._resolve_sync_relative_path()
-        self._origin_url: Optional[str] = self._detect_origin_url() if self.sync_enabled else None
-        if self.sync_enabled and (not self._sync_rel_path or not self._origin_url):
-            self.sync_enabled = False
-
         self._ensure_db_exists()
         self._migrate_legacy_history()
-        self._run_startup_sync(startup_sync)
-
-    def _run_startup_sync(self, mode: str):
-        if mode == "none":
-            return
-
-        if mode == "sync":
-            self.sync_with_github(force=True, push=True, reason="startup")
-            return
-
-        # По умолчанию запускаем один общий фоновый startup-sync на процесс,
-        # чтобы не блокировать запуск GUI и не дублировать тяжелые git-операции.
-        with self._startup_sync_lock:
-            if OrderHistoryDB._startup_sync_started:
-                return
-            OrderHistoryDB._startup_sync_started = True
-
-        threading.Thread(
-            target=self.sync_with_github,
-            kwargs={"force": True, "push": True, "reason": "startup"},
-            daemon=True,
-            name="OrderHistoryStartupSync",
-        ).start()
 
     def _resolve_path(self, value: str) -> Path:
         path = Path(value)
         if path.is_absolute():
             return path
         return self.repo_root / path
-
-    def _resolve_sync_enabled(self, explicit: Optional[bool]) -> bool:
-        if explicit is not None:
-            return explicit
-        value = os.getenv(SYNC_ENABLED_ENV, "1").strip().lower()
-        return value not in {"0", "false", "no", "off"}
-
-    def _resolve_sync_relative_path(self) -> Optional[Path]:
-        try:
-            return self.db_file.relative_to(self.repo_root)
-        except ValueError:
-            logger.info(
-                "Синхронизация истории отключена: файл истории находится вне репозитория (%s)",
-                self.db_file,
-            )
-            return None
 
     def _build_legacy_paths(self, legacy_db_files: Optional[Iterable[str]]) -> List[Path]:
         if legacy_db_files is None:
@@ -365,284 +310,6 @@ class OrderHistoryDB:
         merged["last_update"] = merged["last_update"] or datetime.now().isoformat()
         return merged
 
-    def _subprocess_kwargs(self) -> Dict[str, Any]:
-        return {"text": True, **hidden_console_kwargs()}
-
-    def _run_git(
-        self,
-        args: List[str],
-        cwd: Path,
-        check: bool = True,
-        capture_output: bool = True,
-    ) -> subprocess.CompletedProcess[str]:
-        kwargs = self._subprocess_kwargs()
-        if capture_output:
-            kwargs["stdout"] = subprocess.PIPE
-            kwargs["stderr"] = subprocess.PIPE
-        else:
-            kwargs["stdout"] = subprocess.DEVNULL
-            kwargs["stderr"] = subprocess.DEVNULL
-
-        result = subprocess.run(["git"] + args, cwd=str(cwd), check=False, **kwargs)
-        stderr = (result.stderr or "").strip()
-        if result.returncode != 0 and self._is_git_index_lock_error(stderr):
-            self._wait_for_git_index_lock(cwd)
-            result = subprocess.run(["git"] + args, cwd=str(cwd), check=False, **kwargs)
-            stderr = (result.stderr or "").strip()
-        if check and result.returncode != 0:
-            raise RuntimeError(f"git {' '.join(args)} failed: {stderr}")
-        return result
-
-    def _is_git_index_lock_error(self, stderr: str) -> bool:
-        normalized = str(stderr or "").lower()
-        return "index.lock" in normalized and "file exists" in normalized
-
-    def _wait_for_git_index_lock(self, repo_dir: Path) -> None:
-        lock_path = repo_dir / ".git" / "index.lock"
-        deadline = time.time() + GIT_INDEX_LOCK_WAIT_SECONDS
-        while lock_path.exists() and time.time() < deadline:
-            try:
-                age_seconds = time.time() - lock_path.stat().st_mtime
-                if age_seconds >= GIT_INDEX_LOCK_STALE_SECONDS:
-                    lock_path.unlink()
-                    logger.warning("Удален зависший git index.lock для синхронизации истории: %s", lock_path)
-                    return
-            except FileNotFoundError:
-                return
-            except Exception as exc:
-                logger.warning("Не удалось проверить git index.lock %s: %s", lock_path, exc)
-                return
-            time.sleep(0.25)
-
-    def _detect_origin_url(self) -> Optional[str]:
-        try:
-            result = self._run_git(
-                ["remote", "get-url", "origin"],
-                cwd=self.repo_root,
-                check=True,
-                capture_output=True,
-            )
-            origin = (result.stdout or "").strip()
-            return origin or None
-        except Exception as e:
-            logger.warning(f"Синхронизация истории отключена: не удалось определить origin ({e})")
-            return None
-
-    def _ensure_git_identity(self, repo_dir: Path):
-        username = os.getenv("USERNAME") or os.getenv("USER") or "kontur-user"
-        email = os.getenv("HISTORY_SYNC_EMAIL", f"{username}@local")
-
-        name_result = self._run_git(
-            ["config", "--get", "user.name"],
-            cwd=repo_dir,
-            check=False,
-            capture_output=True,
-        )
-        if not (name_result.stdout or "").strip():
-            self._run_git(["config", "user.name", username], cwd=repo_dir, check=False, capture_output=True)
-
-        email_result = self._run_git(
-            ["config", "--get", "user.email"],
-            cwd=repo_dir,
-            check=False,
-            capture_output=True,
-        )
-        if not (email_result.stdout or "").strip():
-            self._run_git(["config", "user.email", email], cwd=repo_dir, check=False, capture_output=True)
-
-    def _ensure_sync_repo(self) -> Optional[Path]:
-        if not self.sync_enabled or not self._origin_url:
-            return None
-
-        try:
-            git_dir = self.sync_cache_dir / ".git"
-            if not git_dir.exists():
-                if self.sync_cache_dir.exists():
-                    shutil.rmtree(self.sync_cache_dir, ignore_errors=True)
-                self._run_git(
-                    ["clone", self._origin_url, str(self.sync_cache_dir)],
-                    cwd=self.repo_root,
-                    check=True,
-                    capture_output=False,
-                )
-
-            remote_result = self._run_git(
-                ["remote", "get-url", "origin"],
-                cwd=self.sync_cache_dir,
-                check=False,
-                capture_output=True,
-            )
-            current_origin = (remote_result.stdout or "").strip()
-            if not current_origin:
-                self._run_git(
-                    ["remote", "add", "origin", self._origin_url],
-                    cwd=self.sync_cache_dir,
-                    check=False,
-                    capture_output=True,
-                )
-            elif current_origin != self._origin_url:
-                self._run_git(
-                    ["remote", "set-url", "origin", self._origin_url],
-                    cwd=self.sync_cache_dir,
-                    check=False,
-                    capture_output=True,
-                )
-
-            self._ensure_git_identity(self.sync_cache_dir)
-            return self.sync_cache_dir
-        except Exception as e:
-            logger.warning(f"Синхронизация истории недоступна: {e}")
-            return None
-
-    def _remote_sync_branch_exists(self, repo_dir: Path) -> bool:
-        result = self._run_git(
-            ["ls-remote", "--heads", "origin", self.sync_branch],
-            cwd=repo_dir,
-            check=False,
-            capture_output=True,
-        )
-        if result.returncode != 0:
-            stderr = (result.stderr or "").strip()
-            raise RuntimeError(f"ls-remote failed: {stderr}")
-        return bool((result.stdout or "").strip())
-
-    def _checkout_sync_branch(self, repo_dir: Path):
-        self._run_git(["fetch", "origin", "--prune"], cwd=repo_dir, check=True, capture_output=True)
-
-        remote_exists = self._remote_sync_branch_exists(repo_dir)
-        if remote_exists:
-            self._run_git(
-                ["checkout", "-B", self.sync_branch, f"origin/{self.sync_branch}"],
-                cwd=repo_dir,
-                check=True,
-                capture_output=True,
-            )
-            return
-
-        self._run_git(["checkout", "-B", self.sync_branch], cwd=repo_dir, check=True, capture_output=True)
-
-    def _sync_history_file_path(self, repo_dir: Path) -> Path:
-        assert self._sync_rel_path is not None
-        return repo_dir / self._sync_rel_path
-
-    def _stage_and_commit_history(self, repo_dir: Path, commit_message: str) -> bool:
-        assert self._sync_rel_path is not None
-        rel_path = str(self._sync_rel_path).replace("\\", "/")
-        self._run_git(["add", rel_path], cwd=repo_dir, check=True, capture_output=True)
-
-        status_result = self._run_git(
-            ["status", "--porcelain", "--", rel_path],
-            cwd=repo_dir,
-            check=True,
-            capture_output=True,
-        )
-        if not (status_result.stdout or "").strip():
-            return False
-
-        self._run_git(["commit", "-m", commit_message], cwd=repo_dir, check=True, capture_output=True)
-        return True
-
-    def _push_sync_branch(self, repo_dir: Path) -> Tuple[bool, bool]:
-        push_result = self._run_git(
-            ["push", "origin", self.sync_branch],
-            cwd=repo_dir,
-            check=False,
-            capture_output=True,
-        )
-        if push_result.returncode == 0:
-            return True, False
-
-        stderr = (push_result.stderr or "").lower()
-        retryable = "non-fast-forward" in stderr or "rejected" in stderr
-        return False, retryable
-
-    def _sync_with_github_locked(self, push: bool, reason: str) -> bool:
-        if not self.sync_enabled:
-            return False
-
-        repo_dir = self._ensure_sync_repo()
-        if repo_dir is None:
-            return False
-
-        local_data = self._load_data()
-        merged_for_local = local_data
-
-        for attempt in range(SYNC_PUSH_RETRIES):
-            try:
-                self._checkout_sync_branch(repo_dir)
-            except Exception as e:
-                logger.warning(f"Синхронизация истории: не удалось обновить ветку {self.sync_branch}: {e}")
-                break
-
-            sync_file = self._sync_history_file_path(repo_dir)
-            remote_data = self._read_data(sync_file) if sync_file.exists() else self._empty_data()
-            merged_data = self._merge_history_payloads(remote_data, local_data)
-            merged_for_local = merged_data
-
-            if push and merged_data != remote_data:
-                self._write_data(sync_file, merged_data)
-                committed = self._stage_and_commit_history(
-                    repo_dir,
-                    commit_message=f"Sync order history ({reason or 'runtime'})",
-                )
-            else:
-                committed = False
-
-            if not push:
-                break
-
-            if not committed:
-                break
-
-            pushed, retryable = self._push_sync_branch(repo_dir)
-            if pushed:
-                break
-            if retryable and attempt < SYNC_PUSH_RETRIES - 1:
-                logger.info("Синхронизация истории: обнаружена гонка push, повторяем merge")
-                continue
-            logger.warning("Синхронизация истории: push не удался, история сохранена локально")
-            break
-
-        if merged_for_local != local_data:
-            self._save_data(merged_for_local)
-            return True
-        return False
-
-    def sync_with_github(self, force: bool = False, push: bool = False, reason: str = "") -> bool:
-        if not self.sync_enabled:
-            return False
-
-        now = time.time()
-        if not force and not push and (now - self._last_sync_pull_at) < SYNC_PULL_INTERVAL_SECONDS:
-            return False
-
-        if not force and not push:
-            # Read path: git fetch занимает секунды и раньше блокировал загрузку таблиц.
-            # Пуллим в фоне, читатель работает с локальным файлом.
-            self._schedule_background_pull(reason)
-            return False
-
-        with self._io_lock:
-            changed = self._sync_with_github_locked(push=push, reason=reason)
-            self._last_sync_pull_at = time.time()
-            return changed
-
-    def _schedule_background_pull(self, reason: str):
-        if not OrderHistoryDB._background_pull_lock.acquire(blocking=False):
-            return
-
-        def _pull():
-            try:
-                with self._io_lock:
-                    self._sync_with_github_locked(push=False, reason=reason)
-                    self._last_sync_pull_at = time.time()
-            except Exception as exc:
-                logger.warning("Фоновая синхронизация истории не удалась: %s", exc)
-            finally:
-                OrderHistoryDB._background_pull_lock.release()
-
-        threading.Thread(target=_pull, daemon=True, name="OrderHistoryPull").start()
-
     def _migrate_legacy_history(self):
         data = self._load_data()
         changed = False
@@ -675,12 +342,17 @@ class OrderHistoryDB:
         if changed:
             self._save_data(data)
 
-    def add_order(self, order_data: Dict[str, Any], *, sync: bool = True) -> bool:
-        """Добавляет новый заказ в историю или обновляет существующий.
+    def sync_with_github(self, force: bool = False, push: bool = False, reason: str = "") -> bool:
+        del force, push, reason
+        return False
 
-        ``sync=False`` пишет только локальный файл — вызывающий код делает
-        один ``flush_github_sync`` на пачку (очередь заказов).
-        """
+    def flush_github_sync(self, reason: str = "flush") -> bool:
+        del reason
+        return False
+
+    def add_order(self, order_data: Dict[str, Any], *, sync: bool = True) -> bool:
+        """Добавляет новый заказ в историю или обновляет существующий."""
+        del sync
         try:
             with self._io_lock:
                 data = self._load_data()
@@ -690,22 +362,9 @@ class OrderHistoryDB:
                     logger.info("История обновлена для заказа: %s", order_data.get("document_id"))
                 else:
                     logger.debug("Заказ %s уже актуален в истории", order_data.get("document_id"))
-
-                if sync:
-                    self._sync_with_github_locked(push=True, reason="add_order")
             return True
         except Exception:
             logger.exception("Ошибка добавления заказа %s", order_data.get("document_id"))
-            return False
-
-    def flush_github_sync(self, reason: str = "flush") -> bool:
-        if not self.sync_enabled:
-            return False
-        try:
-            with self._io_lock:
-                return bool(self._sync_with_github_locked(push=True, reason=reason))
-        except Exception:
-            logger.exception("Не удалось выгрузить историю (%s)", reason)
             return False
 
     def mark_tsd_created(self, document_id: str, intro_number: str) -> bool:
@@ -733,7 +392,6 @@ class OrderHistoryDB:
 
                 if updated:
                     self._save_data(data)
-                    self._sync_with_github_locked(push=True, reason="mark_tsd_created")
                     logger.info("Заказ %s помечен как отправленный на ТСД", document_id)
                 else:
                     logger.warning("Заказ %s не найден в истории", document_id)
@@ -745,7 +403,6 @@ class OrderHistoryDB:
     def get_orders_without_tsd(self) -> List[Dict[str, Any]]:
         """Возвращает заказы без ТСД (новые сверху)."""
         try:
-            self.sync_with_github(force=False, push=False, reason="get_orders_without_tsd")
             data = self._load_data()
             orders = [order for order in data["orders"] if not order.get("tsd_created", False)]
             self._sort_orders(orders)
@@ -760,7 +417,6 @@ class OrderHistoryDB:
     def get_all_orders(self) -> List[Dict[str, Any]]:
         """Возвращает все заказы (новые сверху)."""
         try:
-            self.sync_with_github(force=False, push=False, reason="get_all_orders")
             data = self._load_data()
             orders = list(data["orders"])
             self._sort_orders(orders)
@@ -775,7 +431,6 @@ class OrderHistoryDB:
     def get_order_by_document_id(self, document_id: str) -> Optional[Dict[str, Any]]:
         """Находит заказ по document_id."""
         try:
-            self.sync_with_github(force=False, push=False, reason="get_order_by_document_id")
             data = self._load_data()
             for order in data["orders"]:
                 if order.get("document_id") == document_id:
@@ -797,8 +452,7 @@ class OrderHistoryDB:
                 "last_update": data.get("last_update"),
                 "file_exists": self.db_file.exists(),
                 "file_size": self.db_file.stat().st_size if self.db_file.exists() else 0,
-                "sync_enabled": self.sync_enabled,
-                "sync_branch": self.sync_branch,
+                "sync_enabled": False,
             }
         except Exception as e:
             logger.error(f"Ошибка получения информации о БД: {e}")

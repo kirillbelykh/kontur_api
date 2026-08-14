@@ -1,11 +1,9 @@
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from backend.services import history_db as history_db_module
 from backend.services.history_db import OrderHistoryDB
 
 
@@ -157,71 +155,36 @@ class OrderHistoryDBTests(unittest.TestCase):
 
         self.assertEqual(merged_ids, {"REMOTE-1", "LOCAL-1"})
 
-    def test_init_requests_startup_sync_with_push(self):
-        db_path = self.base_path / "full_orders_history.json"
-        with patch.object(OrderHistoryDB, "sync_with_github", autospec=True) as sync_mock:
-            OrderHistoryDB(db_file=str(db_path), legacy_db_files=[], startup_sync="sync")
-
-        sync_mock.assert_called_once()
-        _, kwargs = sync_mock.call_args
-        self.assertTrue(kwargs.get("force"))
-        self.assertTrue(kwargs.get("push"))
-        self.assertEqual(kwargs.get("reason"), "startup")
-
-    def test_sync_is_enabled_by_default_when_env_flag_is_missing(self):
-        db_path = self.base_path / "full_orders_history.json"
-        with (
-            patch.dict(os.environ, {}, clear=False),
-            patch.object(OrderHistoryDB, "_detect_origin_url", return_value="https://example.test/repo.git"),
-            patch.object(OrderHistoryDB, "_resolve_sync_relative_path", return_value=Path("full_orders_history.json")),
-        ):
-            os.environ.pop("HISTORY_SYNC_ENABLED", None)
-            db = OrderHistoryDB(
-                db_file=str(db_path),
-                legacy_db_files=[],
-                startup_sync="none",
-            )
-
-        self.assertTrue(db.sync_enabled)
-
-    def test_add_order_attempts_sync_even_when_record_is_unchanged(self):
+    def test_github_sync_stays_disabled(self):
         db = OrderHistoryDB(
             db_file=str(self.base_path / "full_orders_history.json"),
             legacy_db_files=[],
-            startup_sync="none",
+            sync_enabled=True,
+            startup_sync="sync",
         )
-        order_data = {
-            "document_id": "DOC-SYNC-1",
-            "order_name": "sync test",
-            "status": "Ожидает",
-        }
+        self.assertFalse(db.sync_enabled)
+        self.assertFalse(db.sync_with_github(force=True, push=True, reason="startup"))
+        self.assertFalse(db.flush_github_sync(reason="submit_order_queue"))
 
-        with patch.object(db, "_sync_with_github_locked", autospec=True, return_value=False) as sync_mock:
-            db.add_order(order_data)
-            db.add_order(order_data)
-
-        self.assertEqual(sync_mock.call_count, 2)
-        for _, kwargs in sync_mock.call_args_list:
-            self.assertTrue(kwargs.get("push"))
-            self.assertEqual(kwargs.get("reason"), "add_order")
-
-    def test_add_order_can_defer_github_sync(self):
+    def test_add_order_writes_locally_without_github(self):
         db = OrderHistoryDB(
             db_file=str(self.base_path / "full_orders_history.json"),
             legacy_db_files=[],
-            startup_sync="none",
         )
-        db.sync_enabled = True
-        with patch.object(db, "_sync_with_github_locked", autospec=True, return_value=False) as sync_mock:
-            db.add_order(
-                {"document_id": "DOC-DEFER-1", "order_name": "defer", "status": "Ожидает"},
-                sync=False,
-            )
-            self.assertEqual(sync_mock.call_count, 0)
-            db.flush_github_sync(reason="submit_order_queue")
+        with patch.object(db, "sync_with_github", wraps=db.sync_with_github) as sync_mock:
+            db.add_order({
+                "document_id": "DOC-SYNC-1",
+                "order_name": "sync test",
+                "status": "Ожидает",
+            })
+            db.add_order({
+                "document_id": "DOC-SYNC-1",
+                "order_name": "sync test",
+                "status": "Ожидает",
+            })
 
-        self.assertEqual(sync_mock.call_count, 1)
-        self.assertEqual(sync_mock.call_args.kwargs.get("reason"), "submit_order_queue")
+        sync_mock.assert_not_called()
+        self.assertEqual(len(db.get_all_orders()), 1)
 
     def test_load_data_reuses_cache_until_file_changes(self):
         db = OrderHistoryDB(
@@ -244,54 +207,6 @@ class OrderHistoryDBTests(unittest.TestCase):
         # Мутация выданной копии не должна портить кэш
         first[0]["status"] = "Испорчен"
         self.assertEqual(db.get_all_orders()[0]["status"], "Ожидает")
-
-    def test_read_path_sync_pull_runs_in_background(self):
-        db = OrderHistoryDB(
-            db_file=str(self.base_path / "full_orders_history.json"),
-            legacy_db_files=[],
-            sync_enabled=False,
-            startup_sync="none",
-        )
-        db.sync_enabled = True
-
-        captured = {}
-
-        class FakeThread:
-            def __init__(self, target=None, daemon=None, name=None, **kwargs):
-                captured["target"] = target
-
-            def start(self):
-                captured["started"] = True
-
-        with (
-            patch.object(history_db_module.threading, "Thread", FakeThread),
-            patch.object(db, "_sync_with_github_locked", return_value=False) as locked_mock,
-        ):
-            result = db.sync_with_github(force=False, push=False, reason="test-read")
-            self.assertFalse(result)
-            # Читающий вызов не должен блокироваться на git
-            locked_mock.assert_not_called()
-            self.assertTrue(captured.get("started"))
-            # Выполняем фоновый pull синхронно (освобождает single-flight lock)
-            captured["target"]()
-            locked_mock.assert_called_once()
-            self.assertFalse(locked_mock.call_args.kwargs.get("push"))
-
-    def test_push_sync_stays_synchronous(self):
-        db = OrderHistoryDB(
-            db_file=str(self.base_path / "full_orders_history.json"),
-            legacy_db_files=[],
-            sync_enabled=False,
-            startup_sync="none",
-        )
-        db.sync_enabled = True
-
-        with patch.object(db, "_sync_with_github_locked", return_value=True) as locked_mock:
-            result = db.sync_with_github(force=True, push=True, reason="test-push")
-
-        self.assertTrue(result)
-        locked_mock.assert_called_once()
-        self.assertTrue(locked_mock.call_args.kwargs.get("push"))
 
     def test_add_order_does_not_bump_updated_at_for_unchanged_record(self):
         db = OrderHistoryDB(

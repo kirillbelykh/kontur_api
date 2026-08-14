@@ -51,33 +51,14 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 },
             )
 
-    def test_bridge_runtime_loads_local_history_then_syncs_in_background(self):
+    def test_bridge_runtime_loads_local_history_without_github_sync(self):
         fake_history_order = {"document_id": "doc-1", "order_name": "Order 1"}
-        sync_calls = []
-        started_targets = []
-
-        class FakeThread:
-            def __init__(self, *args, **kwargs):
-                self.target = kwargs.get("target")
-                self.started = False
-
-            def start(self):
-                self.started = True
-                started_targets.append(self.target)
-                if callable(self.target):
-                    self.target()
-
-            def is_alive(self):
-                return self.started
 
         class FakeHistoryDB:
             def __init__(self, *args, **kwargs):
                 self.args = args
                 self.kwargs = kwargs
                 self._io_lock = api_bridge.Lock()
-
-            def sync_with_github(self, **kwargs):
-                sync_calls.append(kwargs)
 
             def get_all_orders(self):
                 return [fake_history_order]
@@ -88,17 +69,9 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             def _sort_orders(self, orders):
                 return orders
 
-        with (
-            mock.patch.object(api_bridge, "OrderHistoryDB", FakeHistoryDB),
-            mock.patch.object(api_bridge, "Thread", side_effect=lambda *args, **kwargs: FakeThread(*args, **kwargs)),
-        ):
+        with mock.patch.object(api_bridge, "OrderHistoryDB", FakeHistoryDB):
             runtime = api_bridge._BridgeRuntime()
 
-        self.assertEqual(
-            sync_calls,
-            [{"force": True, "push": False, "reason": "runtime-init"}],
-        )
-        self.assertEqual(len(started_targets), 1)
         self.assertEqual(len(runtime.download_items), 1)
         self.assertEqual(runtime.download_items[0]["document_id"], "doc-1")
 
@@ -474,12 +447,10 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             ],
         )
 
-    def test_export_order_history_pushes_history(self):
-        sync_calls = []
+    def test_export_order_history_reads_local_file(self):
         load_calls = []
         history_db = types.SimpleNamespace(
             get_all_orders=lambda: [{"document_id": "doc-1"}],
-            sync_with_github=lambda **kwargs: sync_calls.append(kwargs) or True,
         )
         fake_runtime = types.SimpleNamespace(
             order_queue=[],
@@ -497,12 +468,8 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             result = self.bridge.export_order_history()
 
         self.assertTrue(result["success"])
-        self.assertTrue(result["changed"])
+        self.assertFalse(result["changed"])
         self.assertEqual(result["history_count"], 1)
-        self.assertEqual(
-            sync_calls,
-            [{"force": True, "push": True, "reason": "orders_manual_export"}],
-        )
         self.assertEqual(load_calls, [{"sync": False}])
 
     def test_create_aggregation_codes_splits_large_request_into_99_batches(self):
