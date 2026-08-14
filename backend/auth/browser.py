@@ -154,6 +154,19 @@ def build_browser_options(
     return options
 
 
+def build_chrome_service(driver_path: Path):
+    """YandexDriver without a console window (this PC runs Selenium; others often don't)."""
+    from selenium.webdriver.chrome.service import Service
+
+    from backend.services.win_subprocess import hidden_console_kwargs
+
+    service = Service(str(driver_path))
+    flags = hidden_console_kwargs().get("creationflags")
+    if flags:
+        service.creation_flags = int(flags)
+    return service
+
+
 def wait_for_valid_cookies(driver, *, timeout_seconds: float) -> Optional[Dict[str, str]]:
     deadline = time.time() + max(1.0, float(timeout_seconds))
     while time.time() < deadline:
@@ -414,7 +427,9 @@ def ensure_yandex_driver_updated(*, force: bool = True) -> bool:
         cmd.append("-Force")
     try:
         logger.info("Обновляем YandexDriver через ensure_yandex_driver.ps1...")
-        completed = subprocess.run(cmd, check=False, timeout=180)
+        from backend.services.win_subprocess import hidden_console_kwargs
+
+        completed = subprocess.run(cmd, check=False, timeout=180, **hidden_console_kwargs())
         return completed.returncode == 0
     except Exception as exc:
         logger.warning("Автообновление YandexDriver не удалось: %s", exc)
@@ -433,7 +448,6 @@ def get_cookies(
     """One Chrome on the app's persistent profile, then quit."""
     try:
         from selenium import webdriver
-        from selenium.webdriver.chrome.service import Service
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
@@ -480,7 +494,7 @@ def get_cookies(
 
     driver = None
     try:
-        service = Service(str(driver_path))
+        service = build_chrome_service(Path(driver_path))
         driver = webdriver.Chrome(service=service, options=opts)
         wait = WebDriverWait(driver, WAIT_TIMEOUT)
 

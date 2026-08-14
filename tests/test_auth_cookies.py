@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -434,6 +435,23 @@ class EnsureSessionBridgeTests(unittest.TestCase):
 
         self.assertIs(session, fake_session)
         get_valid_mock.assert_called_once_with(force_refresh=True, force_browser=True)
+
+
+class ChromeServiceTests(unittest.TestCase):
+    def test_hides_driver_console_on_windows(self):
+        if os.name != "nt":
+            self.skipTest("Windows only")
+        import subprocess
+
+        from backend.auth.browser import build_chrome_service
+
+        fake_service = mock.Mock()
+        with mock.patch("selenium.webdriver.chrome.service.Service", return_value=fake_service) as ctor:
+            result = build_chrome_service(Path("yandexdriver.exe"))
+
+        ctor.assert_called_once_with("yandexdriver.exe")
+        self.assertIs(result, fake_service)
+        self.assertEqual(fake_service.creation_flags, subprocess.CREATE_NO_WINDOW)
 
 
 if __name__ == "__main__":

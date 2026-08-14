@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from backend.services.logger import logger
 
-from backend.auth.browser import hide_driver_windows
+from backend.auth.browser import build_chrome_service, hide_driver_windows
 from backend.auth.constants import (
     DEFAULT_PROLONGATION_INTERVAL_HOURS,
     HEADLESS,
@@ -163,7 +163,6 @@ def _run_kontur_access_prolongation_browser_flow(
     try:
         from selenium import webdriver
         from selenium.webdriver.chrome.options import Options
-        from selenium.webdriver.chrome.service import Service
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
@@ -189,7 +188,7 @@ def _run_kontur_access_prolongation_browser_flow(
         options.add_argument("--window-position=-32000,-32000")
         options.add_argument("--window-size=1920,1080")
 
-        service = Service(str(driver_path))
+        service = build_chrome_service(Path(driver_path))
         driver = webdriver.Chrome(service=service, options=options)
         hide_driver_windows(driver)
 

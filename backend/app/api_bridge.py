@@ -1753,6 +1753,7 @@ class ApiBridge:
             timeout=TRUE_STATUS_WORKER_TIMEOUT_SECONDS,
             env=env,
             cwd=str(_get_runtime().root_dir),
+            **hidden_console_kwargs(),
         )
 
         output = (completed.stdout or "").strip()
