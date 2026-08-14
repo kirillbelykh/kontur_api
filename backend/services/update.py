@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -17,14 +18,29 @@ except Exception:  # pragma: no cover - headless / no tk
 from backend.services.logger import logger
 from backend.services.win_subprocess import hidden_console_kwargs
 
+HISTORY_FILE = "full_orders_history.json"
+STASH_EXCLUDES = (f":(exclude){HISTORY_FILE}", ":(exclude)runtime/backups")
+
 
 def _git_kwargs():
     """kwargs для subprocess: скрыть консоль на Windows и вернуть текст."""
-    return {"text": True, **hidden_console_kwargs()}
+    env = os.environ.copy()
+    # stash создаёт коммит и падает, если на ПК не заданы user.name / user.email
+    env.setdefault("GIT_AUTHOR_NAME", "KonturMarkirovka")
+    env.setdefault("GIT_AUTHOR_EMAIL", "kontur@markirovka.local")
+    env.setdefault("GIT_COMMITTER_NAME", env["GIT_AUTHOR_NAME"])
+    env.setdefault("GIT_COMMITTER_EMAIL", env["GIT_AUTHOR_EMAIL"])
+    return {"text": True, "env": env, **hidden_console_kwargs()}
 
 
 def _run_git(args, repo_dir, check=True):
-    return subprocess.run(["git"] + args, cwd=repo_dir, check=check, **_git_kwargs())
+    return subprocess.run(
+        ["git"] + args,
+        cwd=repo_dir,
+        check=check,
+        capture_output=True,
+        **_git_kwargs(),
+    )
 
 
 def _capture_git(args, repo_dir):
@@ -201,6 +217,50 @@ def schedule_process_restart(delay_sec: float = 0.8) -> None:
     timer.start()
 
 
+def porcelain_path(line: str) -> str:
+    raw = line.rstrip("\n")
+    if len(raw) < 4:
+        return ""
+    body = raw[3:]
+    if " -> " in body:
+        body = body.split(" -> ", 1)[1]
+    return body.strip().strip('"').replace("\\", "/")
+
+
+def is_operator_local_path(path: str) -> bool:
+    normalized = path.replace("\\", "/").lstrip("./")
+    return normalized == HISTORY_FILE or normalized.startswith("runtime/backups/")
+
+
+def local_changes_need_stash(porcelain: str) -> bool:
+    """История заказов на каждом ПК своя — её не прячем в stash и не блокируем обновление."""
+    for line in porcelain.splitlines():
+        path = porcelain_path(line)
+        if path and not is_operator_local_path(path):
+            return True
+    return False
+
+
+def _backup_order_history(repo: str) -> Optional[str]:
+    src = Path(repo) / HISTORY_FILE
+    if not src.exists():
+        return None
+    dest_dir = Path(repo) / "runtime" / "backups" / "history"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / f"full_orders_history-{time.strftime('%Y%m%d-%H%M%S')}.json"
+    shutil.copy2(src, dest)
+    return str(dest)
+
+
+def _restore_order_history(repo: str, backup: Optional[str]) -> None:
+    if not backup:
+        return
+    src = Path(backup)
+    if not src.exists():
+        return
+    shutil.copy2(src, Path(repo) / HISTORY_FILE)
+
+
 def apply_update(
     repo_dir: Optional[str] = None,
     *,
@@ -236,64 +296,76 @@ def apply_update(
             status = _capture_git(["status", "--porcelain"], repo)
             has_local_changes = bool(status.strip())
         except Exception:
+            status = ""
             has_local_changes = False
 
+        history_backup = _backup_order_history(repo)
         stash_created = False
-        if has_local_changes:
-            try:
-                _run_git(["stash", "push", "-u", "-m", "autostash-before-update"], repo)
-                stash_created = True
-            except subprocess.CalledProcessError:
-                return {
-                    "success": False,
-                    "error": "Не удалось временно сохранить локальные изменения",
-                }
-
         try:
-            _run_git(["merge", "--ff-only", "origin/main"], repo)
-        except subprocess.CalledProcessError:
-            if not allow_hard_reset:
-                if stash_created:
-                    try:
-                        _run_git(["stash", "pop"], repo)
-                    except Exception:
-                        logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
-                return {
-                    "success": False,
-                    "error": "Не удалось выполнить fast-forward. Ветка расходится с origin/main.",
-                }
+            if local_changes_need_stash(status):
+                stashed = _run_git(
+                    ["stash", "push", "-u", "-m", "autostash-before-update", "--", *STASH_EXCLUDES],
+                    repo,
+                    check=False,
+                )
+                if stashed.returncode == 0:
+                    stash_created = True
+                else:
+                    logger.warning(
+                        "stash пропущен, обновляем без него: %s",
+                        (stashed.stderr or stashed.stdout or "").strip(),
+                    )
+
+            if has_local_changes:
+                _run_git(["checkout", "--", HISTORY_FILE], repo, check=False)
+
             try:
-                _run_git(["reset", "--hard", "origin/main"], repo)
+                _run_git(["merge", "--ff-only", "origin/main"], repo)
             except subprocess.CalledProcessError:
-                if stash_created:
-                    try:
-                        _run_git(["stash", "pop"], repo)
-                    except Exception:
-                        logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
-                return {"success": False, "error": "Не удалось выполнить принудительное обновление"}
+                if not allow_hard_reset:
+                    if stash_created:
+                        try:
+                            _run_git(["stash", "pop"], repo)
+                        except Exception:
+                            logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
+                    return {
+                        "success": False,
+                        "error": "Не удалось выполнить fast-forward. Ветка расходится с origin/main.",
+                    }
+                try:
+                    _run_git(["reset", "--hard", "origin/main"], repo)
+                except subprocess.CalledProcessError:
+                    if stash_created:
+                        try:
+                            _run_git(["stash", "pop"], repo)
+                        except Exception:
+                            logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
+                    return {"success": False, "error": "Не удалось выполнить принудительное обновление"}
 
-        if stash_created:
-            try:
-                _run_git(["stash", "pop"], repo)
-            except subprocess.CalledProcessError:
-                logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
+            if stash_created:
+                try:
+                    _run_git(["stash", "pop"], repo)
+                except subprocess.CalledProcessError:
+                    logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
 
-        new_head = _capture_git(["rev-parse", "HEAD"], repo).strip()
-        result: Dict[str, Any] = {
-            "success": True,
-            "updated": True,
-            "restarted": False,
-            "local_commit": new_head,
-            "remote_commit": probe.get("remote_commit"),
-            "message": "Обновление установлено. Перезапустите приложение.",
-        }
+            new_head = _capture_git(["rev-parse", "HEAD"], repo).strip()
+            result: Dict[str, Any] = {
+                "success": True,
+                "updated": True,
+                "restarted": False,
+                "local_commit": new_head,
+                "remote_commit": probe.get("remote_commit"),
+                "message": "Обновление установлено. Перезапустите приложение.",
+            }
 
-        if auto_restart:
-            result["restarted"] = True
-            result["message"] = "Обновление установлено. Перезапуск…"
-            schedule_process_restart()
+            if auto_restart:
+                result["restarted"] = True
+                result["message"] = "Обновление установлено. Перезапуск…"
+                schedule_process_restart()
 
-        return result
+            return result
+        finally:
+            _restore_order_history(repo, history_backup)
     except Exception as exc:
         return {"success": False, "error": str(exc)}
 

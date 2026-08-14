@@ -22,5 +22,25 @@ class ScheduleProcessRestartTests(unittest.TestCase):
             timer_cls.call_args[0][1]  # callback exists; do not invoke (os._exit)
 
 
+class OperatorLocalFilesTests(unittest.TestCase):
+    def test_dirty_order_history_does_not_need_stash(self) -> None:
+        from backend.services.update import local_changes_need_stash
+
+        self.assertFalse(local_changes_need_stash(" M full_orders_history.json\n"))
+        self.assertFalse(local_changes_need_stash("?? runtime/backups/history/full_orders_history-1.json\n"))
+
+    def test_other_dirty_files_still_need_stash(self) -> None:
+        from backend.services.update import local_changes_need_stash
+
+        self.assertTrue(
+            local_changes_need_stash(" M full_orders_history.json\n M backend/app/desktop.py\n")
+        )
+
+    def test_porcelain_rename_path(self) -> None:
+        from backend.services.update import porcelain_path
+
+        self.assertEqual(porcelain_path("R  old.py -> new.py"), "new.py")
+
+
 if __name__ == "__main__":
     unittest.main()
