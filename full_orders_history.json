@@ -36960,8 +36960,8 @@
       "filename": null
     }
   ],
-  "last_update": "2026-08-14T11:14:09.709676",
+  "last_update": "2026-08-14T11:42:32.189217",
   "created_by": "sklad",
-  "updated_by": "User",
-  "storage_path": "C:\\Users\\User\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
+  "updated_by": "user",
+  "storage_path": "C:\\Users\\user\\Desktop\\kontur_api\\runtime\\state\\history_sync_cache\\full_orders_history.json"
 }
