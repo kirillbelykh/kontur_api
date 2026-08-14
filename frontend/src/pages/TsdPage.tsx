@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { PenLine, PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -205,12 +204,11 @@ export function TsdPage() {
   const selectedItem = selectedIds.length === 1 ? items.find((item) => item.document_id === selectedIds[0]) : undefined
   const canSign = Boolean(selectedItem && isFilledOnTsd(selectedItem))
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string, celebrate = false) => {
+  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
     setBusy(key)
     try {
       await action()
       if (successMessage) toast.success(successMessage)
-      if (celebrate) celebrateSuccess()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -260,7 +258,6 @@ export function TsdPage() {
         }
       },
       'Задания на ТСД созданы.',
-      true,
     )
 
   const signIntroduction = () => {
@@ -290,7 +287,6 @@ export function TsdPage() {
         }
       },
       'Документ подписан и отправлен в ГИС МТ.',
-      true,
     )
   }
 

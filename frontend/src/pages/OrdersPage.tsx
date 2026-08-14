@@ -4,7 +4,6 @@ import { Maximize2, RefreshCw, Search, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getAppSetting } from '@/lib/app-settings'
 import { apiCall } from '@/lib/bridge'
-import { celebrateOrderCreated } from '@/lib/celebrate'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage } from '@/lib/utils'
@@ -530,7 +529,6 @@ export function OrdersPage() {
           } else {
             await load(false)
           }
-          celebrateOrderCreated()
         } catch (error) {
           setState((prev) => ({
             ...prev,
@@ -601,8 +599,6 @@ export function OrdersPage() {
           }
           if (result.errors?.length) {
             toast.error(`Часть заказов с ошибками: ${result.errors.length}`)
-          } else {
-            celebrateOrderCreated()
           }
         } catch (error) {
           setState((prev) => ({

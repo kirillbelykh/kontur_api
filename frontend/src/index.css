@@ -101,22 +101,6 @@
   --shimmer-band: 400%;
   --shimmer-ease: linear;
 
-  /* Success check (после создания заказа) */
-  --check-opacity-dur: 220ms;
-  --check-rotate-dur: 220ms;
-  --check-rotate-from: 40deg;
-  --check-bob-dur: 220ms;
-  --check-y-amount: 16px;
-  --check-blur-dur: 220ms;
-  --check-blur-from: 4px;
-  --check-path-dur: 220ms;
-  --check-path-delay: 40ms;
-  --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
-  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
-  --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
-
   /* Error state shake (обязательные поля) */
   --shake-distance: 6px;
   --shake-overshoot: 4px;
@@ -361,47 +345,6 @@ html[data-theme='ocean'] {
 }
 @media (prefers-reduced-motion: reduce) {
   .t-shimmer::before { animation: none !important; }
-}
-
-/* ─── Transitions.dev — Success check ─── */
-.t-success-check {
-  display: inline-block;
-  transform-origin: center;
-  opacity: 0;
-  will-change: transform, opacity, filter;
-}
-.t-success-check svg { display: block; overflow: visible; }
-.t-success-check svg path {
-  stroke-dasharray: 40;
-  stroke-dashoffset: 40;
-}
-.t-success-check[data-state="in"] {
-  animation:
-    t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) forwards,
-    t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  forwards,
-    t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     forwards,
-    t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     forwards;
-}
-.t-success-check[data-state="in"] svg path {
-  animation: t-check-draw var(--check-path-dur) var(--check-ease-path) var(--check-path-delay, 0ms) forwards;
-}
-@keyframes t-check-fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes t-check-rotate {
-  from { transform: rotate(var(--check-rotate-from)); }
-  to   { transform: rotate(0deg); }
-}
-@keyframes t-check-blur {
-  from { filter: blur(var(--check-blur-from)); }
-  to   { filter: blur(0); }
-}
-@keyframes t-check-bob {
-  from { translate: 0 var(--check-y-amount); }
-  to   { translate: 0 0; }
-}
-@keyframes t-check-draw { to { stroke-dashoffset: 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .t-success-check { animation: none !important; opacity: 1; }
-  .t-success-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }
 }
 
 /* ─── Transitions.dev — Error state shake ─── */

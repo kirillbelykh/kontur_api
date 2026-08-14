@@ -11,7 +11,6 @@ import {
 import { Label, ProgressBar } from '@heroui/react'
 import { Download, Printer, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -197,12 +196,11 @@ export function DownloadPage() {
   const printTargetId = selection.focus || selection.ids[0] || ''
   const isBusy = Boolean(busy)
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string, celebrate = false) => {
+  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
     setBusy(key)
     try {
       await action()
       if (successMessage) toast.success(successMessage)
-      if (celebrate) celebrateSuccess()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -329,7 +327,6 @@ export function DownloadPage() {
         }
       },
       'Заказы скачаны.',
-      true,
     )
 
   const printLabels = () =>
@@ -351,7 +348,6 @@ export function DownloadPage() {
         }
       },
       'Печать термоэтикеток запущена.',
-      true,
     )
 
   return (

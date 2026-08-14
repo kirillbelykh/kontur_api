@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Maximize2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -445,13 +444,10 @@ export function LabelsPage() {
     return true
   }
 
-  const runBusy = async (key: string, action: () => Promise<boolean>, successMessage: string, celebrate = false) => {
+  const runBusy = async (key: string, action: () => Promise<boolean>, successMessage: string) => {
     setBusy(key)
     try {
-      if (await action()) {
-        toast.success(successMessage)
-        if (celebrate) celebrateSuccess()
-      }
+      if (await action()) toast.success(successMessage)
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -471,7 +467,6 @@ export function LabelsPage() {
       'print',
       async () => handleResult(await apiCall<LabelActionResult>('print_100x180_label', buildPayload())),
       'Печать поставлена в очередь.',
-      true,
     )
 
   const recordInfoText = () => {

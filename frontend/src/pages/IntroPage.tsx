@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -161,12 +160,11 @@ export function IntroPage() {
     )
   }, [])
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage: string, celebrate = false) => {
+  const runBusy = async (key: string, action: () => Promise<void>, successMessage: string) => {
     setBusy(key)
     try {
       await action()
       toast.success(successMessage)
-      if (celebrate) celebrateSuccess()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -215,7 +213,6 @@ export function IntroPage() {
         }
       },
       'Ввод в оборот завершён.',
-      true,
     )
 
   const isBusy = Boolean(busy) || loading
