@@ -107,7 +107,11 @@ type TableKey = 'orders' | 'aggregation' | 'marking'
 type Row = Record<string, unknown>
 type Column = { label: string; key: string; align?: 'right'; mono?: boolean }
 
-const TEMPLATE_PAGE_SIZE = 3
+const TEMPLATE_PAGE_SIZE = 6
+const FALLBACK_SHEET_FORMATS: SheetFormat[] = [
+  { key: '100x180', label: '100x180' },
+  { key: '100x136', label: '100x136' },
+]
 const EMPTY_MANUAL: ManualFields = { gtin: '', size: '', batch: '', color: '', units_per_pack: '' }
 
 /* Колонки — модульные константы: стабильные props для memo-строк */
@@ -301,7 +305,7 @@ export function LabelsPage() {
   }, [load])
 
   const templates = useMemo(() => state.templates ?? [], [state.templates])
-  const sheetFormats = state.sheet_formats ?? []
+  const sheetFormats = state.sheet_formats?.length ? state.sheet_formats : FALLBACK_SHEET_FORMATS
   const printers = state.printers ?? []
   const orders = useMemo(() => state.orders ?? [], [state.orders])
   const aggregationFiles = useMemo(() => state.aggregation_files ?? [], [state.aggregation_files])
@@ -831,7 +835,7 @@ export function LabelsPage() {
             {templatePageItems.length === 0 ? (
               <EmptyState>Шаблоны для выбранного формата не найдены</EmptyState>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
                 {templatePageItems.map((template) => {
                   const selected = template.path === templatePath
                   return (
@@ -839,7 +843,7 @@ export function LabelsPage() {
                       key={String(template.path)}
                       type="button"
                       className={cn(
-                        'w-full rounded-lg border bg-[var(--field-bg)] px-3.5 py-2.5 text-left transition',
+                        'min-w-0 rounded-lg border bg-[var(--field-bg)] px-2.5 py-2 text-left transition',
                         selected
                           ? 'border-foreground/40 ring-1 ring-foreground/15'
                           : 'border-border hover:border-[var(--field-border-hover)]',
@@ -850,16 +854,15 @@ export function LabelsPage() {
                         setPreview(null)
                       }}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{template.name || '—'}</span>
-                        <span className="shrink-0 rounded-sm bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      <div className="flex items-start justify-between gap-1.5">
+                        <span className="truncate font-medium leading-snug">{template.name || '—'}</span>
+                        <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
                           {template.source_label || template.data_source_kind || '—'}
                         </span>
                       </div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {template.sheet_format_label || template.sheet_format} • {template.category || '—'}
                       </div>
-                      <div className="truncate text-xs text-muted-foreground">{template.relative_path || ''}</div>
                     </button>
                   )
                 })}

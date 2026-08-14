@@ -70,7 +70,6 @@ const IntroRow = memo(function IntroRow({
       </TableCell>
       <TableCell>
         <div className="font-medium">{item.order_name || item.document_id || 'Без названия'}</div>
-        <div className="font-mono text-xs text-muted-foreground">{item.document_id || '—'}</div>
       </TableCell>
       <TableCell className="text-muted-foreground">{item.full_name || item.simpl || '—'}</TableCell>
       <TableCell>

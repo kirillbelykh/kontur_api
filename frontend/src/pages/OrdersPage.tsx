@@ -20,7 +20,6 @@ import { Shimmer } from '@/components/ui/shimmer'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { CoolMode } from '@/components/ui/cool-mode'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 type OrderMode = 'params' | 'gtin'
@@ -789,11 +788,9 @@ export function OrdersPage() {
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
             <CardTitle>Очередь</CardTitle>
             <div className="flex flex-wrap gap-1.5">
-              <CoolMode>
-                <Button size="sm" onClick={() => void submitQueue()} disabled={isBusy || queue.length === 0}>
-                  Отправить очередь
-                </Button>
-              </CoolMode>
+              <Button size="sm" onClick={() => void submitQueue()} disabled={isBusy || queue.length === 0}>
+                Отправить очередь
+              </Button>
               <Button size="sm" variant="outline" onClick={() => void removeQueueItem()} disabled={isBusy || !selectedQueueId}>
                 Удалить
               </Button>

@@ -4,7 +4,7 @@ import { Search, X } from 'lucide-react'
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-/** React Aria ╨╜╨╡ ╨╗╤О╨▒╨╕╤В ╨┐╤Г╤Б╤В╨╛╨╣ id тАФ ╨╝╨░╨┐╨┐╨╕╨╝ "" тЖФ sentinel */
+/** React Aria rejects empty id — map "" to a sentinel. */
 const EMPTY_KEY = '__wms_empty__'
 
 type OptionItem = {
@@ -137,9 +137,9 @@ export type SelectNativeProps = Omit<React.SelectHTMLAttributes<HTMLSelectElemen
 }
 
 /**
- * Drop-in ╨╖╨░╨╝╨╡╨╜╨░ native `<select>` ╨╜╨░ HeroUI Select + ListBox.
- * ╨Ъ╨╗╨╕╨║╨╕ ╤З╨╡╤А╨╡╨╖ React Aria (`isNonModal` тАФ ╤А╨░╨▒╨╛╤В╨░╨╡╤В ╨▓╨╜╤Г╤В╤А╨╕ Dialog).
- * Spring/stagger тАФ ╤В╨╛╨╗╤М╨║╨╛ ╨▓╨╕╨╖╤Г╨░╨╗, ╨▒╨╡╨╖ ╤Б╨▓╨╛╨╡╨│╨╛ portal.
+ * Drop-in replacement for native `<select>` using HeroUI Select + ListBox.
+ * Clicks go through React Aria (`isNonModal` works inside Dialog).
+ * Spring/stagger is visual only — no extra portal.
  */
 export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProps>(
   (
@@ -154,9 +154,9 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
       name,
       id,
       required,
-      placeholder = '╨Т╤Л╨▒╨╡╤А╨╕╤В╨╡',
+      placeholder = 'Выберите',
       searchable = false,
-      searchPlaceholder = '╨Я╨╛╨╕╤Б╨║тАж',
+      searchPlaceholder = 'Поиск…',
       'aria-label': ariaLabel,
       ...rest
     },
@@ -183,7 +183,7 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
     const defaultSelectedKey =
       !controlled && defaultValue !== undefined ? toKey(String(defaultValue)) : undefined
 
-    // isNonModal ╨▓╨╜╤Г╤В╤А╨╕ Dialog ╤Б╨░╨╝ ╨╜╨╡ ╨╖╨░╨║╤А╤Л╨▓╨░╨╡╤В╤Б╤П ╨┐╨╛ ╨║╨╗╨╕╨║╤Г ╤Б╨╜╨░╤А╤Г╨╢╨╕
+    // isNonModal inside Dialog must not close on a click of the trigger.
     React.useEffect(() => {
       if (!isOpen) return
 
@@ -268,8 +268,8 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
             <Select.Indicator />
           </Select.Trigger>
           {/*
-            isNonModal: ╨╕╨╜╨░╤З╨╡ Escape/underlay ╨╖╨░╨║╤А╤Л╨▓╨░╤О╤В Dialog ╨╕ ╤Б╤В╨░╨▓╤П╤В inert ╨╜╨░ #root тАФ
-            ╨║╨╗╨╕╨║╨╕ ╨┐╨╛ portaled-╤Б╨┐╨╕╤Б╨║╤Г ╨╜╨╡ ╨┤╨╛╤Е╨╛╨┤╤П╤В.
+            isNonModal: otherwise Escape/underlay close the Dialog and inert #root;
+            clicks on the portaled popover never arrive.
           */}
           <Select.Popover isNonModal className="pointer-events-auto">
             <motion.div
@@ -281,7 +281,7 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
               {searchable ? (
                 <div
                   className="flex h-10 items-center gap-2 border-b border-border px-2.5"
-                  // ╨╜╨╡ ╨┤╨░╤С╨╝ ListBox/Select ╨┐╨╡╤А╨╡╤Е╨▓╨░╤В╨╕╤В╤М ╨▓╨▓╨╛╨┤
+                  // do not let ListBox/Select steal input
                   onPointerDown={(event) => event.stopPropagation()}
                   onKeyDown={(event) => event.stopPropagation()}
                 >
@@ -298,7 +298,7 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
                   {search ? (
                     <button
                       type="button"
-                      aria-label="╨Ю╤З╨╕╤Б╤В╨╕╤В╤М ╨┐╨╛╨╕╤Б╨║"
+                      aria-label="Очистить поиск"
                       className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                       onClick={() => {
                         setSearch('')
@@ -315,7 +315,7 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
                 renderEmptyState={
                   !hasOptions
                     ? () => (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">╨Э╨╕╤З╨╡╨│╨╛ ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜╨╛</div>
+                        <div className="px-3 py-2 text-sm text-muted-foreground">Ничего не найдено</div>
                       )
                     : undefined
                 }
