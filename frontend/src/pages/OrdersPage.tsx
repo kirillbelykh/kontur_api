@@ -413,9 +413,9 @@ export function OrdersPage() {
     })
   }, [history, debouncedHistorySearch])
 
-  const historyPager = usePagination(filteredHistory, 50)
-  const fullscreenPager = usePagination(filteredHistory, 200)
-  const deletedPager = usePagination(deletedOrders, 50)
+  const historyPager = usePagination(filteredHistory)
+  const fullscreenPager = usePagination(filteredHistory)
+  const deletedPager = usePagination(deletedOrders)
 
   const buildPayload = () => ({
     order_name: form.order_name.trim(),
@@ -1101,7 +1101,6 @@ export function OrdersPage() {
             page={fullscreenPager.page}
             pageCount={fullscreenPager.pageCount}
             total={fullscreenPager.total}
-            pageSize={200}
             onPageChange={fullscreenPager.setPage}
           />
         </DialogContent>

@@ -17,6 +17,7 @@ describe('statusMeta', () => {
       'Отправляется на ТСД',
       'Подписывается',
       'Печатается',
+      'Заказывается',
     ]) {
       const meta = statusMeta(status)
       expect(meta.pending, status).toBe(true)

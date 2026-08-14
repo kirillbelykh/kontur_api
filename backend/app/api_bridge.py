@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import csv
 import importlib
 import json
@@ -397,6 +398,7 @@ class _BridgeRuntime:
         self.aggregation_cache_items: List[Dict[str, Any]] = []
         self.aggregation_cache_at = 0.0
         self.aggregation_cache_ttl_seconds = 90.0
+        self.runtime_stop = Event()
         self.session_refresh_event = Event()
         self.session_refresh_thread: Optional[Thread] = None
         # Single-flight для _ensure_session: пока один поток обновляет сессию,
@@ -455,6 +457,37 @@ def _get_runtime() -> _BridgeRuntime:
             if _RUNTIME is None:
                 _RUNTIME = _BridgeRuntime()
     return _RUNTIME
+
+
+def _pool_shutdown_error(exc: BaseException) -> bool:
+    """ThreadPoolExecutor rejects work once the interpreter is tearing down."""
+    if not isinstance(exc, RuntimeError):
+        return False
+    message = str(exc).lower()
+    return "interpreter shutdown" in message or "after shutdown" in message
+
+
+def _runtime_stopping(runtime: Optional[_BridgeRuntime] = None) -> bool:
+    current = runtime if runtime is not None else _RUNTIME
+    stop = getattr(current, "runtime_stop", None) if current is not None else None
+    return bool(stop is not None and stop.is_set())
+
+
+def stop_background_workers() -> None:
+    """Wake and stop daemon loops so they do not submit to a dying ThreadPool."""
+    runtime = _RUNTIME
+    if runtime is None:
+        return
+    stop = getattr(runtime, "runtime_stop", None)
+    if stop is not None:
+        stop.set()
+    for name in ("live_status_event", "session_refresh_event"):
+        event = getattr(runtime, name, None)
+        if event is not None:
+            event.set()
+
+
+atexit.register(stop_background_workers)
 
 
 _APP_VERSION_INFO: Optional[Dict[str, str]] = None
@@ -679,8 +712,10 @@ class ApiBridge:
 
     def _session_auto_refresh_worker(self) -> None:
         runtime = _get_runtime()
-        while True:
+        while not _runtime_stopping(runtime):
             update_triggered = runtime.session_refresh_event.wait(timeout=runtime.session_ttl_seconds)
+            if _runtime_stopping(runtime):
+                return
             try:
                 cycle_id = runtime.auth_cycle_id
                 runtime.auth_state = "starting"
@@ -1505,19 +1540,26 @@ class ApiBridge:
                 pending.append((index, document_id))
 
         if pending:
+            if _runtime_stopping(runtime):
+                return enriched
             worker_count = min(adaptive_worker_count(cap=KONTUR_ORDER_METADATA_MAX_WORKERS), len(pending))
-            with ThreadPoolExecutor(max_workers=worker_count) as executor:
-                future_map = {
-                    executor.submit(self._fetch_kontur_order_metadata, session, document_id): index
-                    for index, document_id in pending
-                }
-                for future, index in future_map.items():
-                    try:
-                        metadata = future.result(timeout=20)
-                    except Exception:
-                        metadata = {}
-                    if metadata:
-                        enriched[index] = self._merge_kontur_order_metadata(enriched[index], metadata)
+            try:
+                with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                    future_map = {
+                        executor.submit(self._fetch_kontur_order_metadata, session, document_id): index
+                        for index, document_id in pending
+                    }
+                    for future, index in future_map.items():
+                        try:
+                            metadata = future.result(timeout=20)
+                        except Exception:
+                            metadata = {}
+                        if metadata:
+                            enriched[index] = self._merge_kontur_order_metadata(enriched[index], metadata)
+            except RuntimeError as exc:
+                if _pool_shutdown_error(exc):
+                    return enriched
+                raise
         return enriched
 
     def _kontur_order_items_from_cache(self) -> List[Dict[str, Any]]:
@@ -4013,8 +4055,20 @@ class ApiBridge:
         elif mode == "comment" and limit is not None:
             all_codes = all_codes[:limit]
 
-        all_codes.sort(key=lambda item: int(str(item["aggregateCode"])[-10:]) if str(item["aggregateCode"])[-10:].isdigit() else str(item["aggregateCode"]))
+        all_codes.sort(key=lambda item: self._aggregation_code_sort_key(item.get("aggregateCode")))
         return all_codes
+
+    @staticmethod
+    def _aggregation_code_sort_key(code: Any) -> tuple[int, int | str]:
+        text = str(code or "").strip()
+        tail = text[-10:]
+        if tail.isdigit():
+            return (0, int(tail))
+        return (1, text)
+
+    @classmethod
+    def _sort_aggregation_label_rows(cls, rows: List[List[str]]) -> List[List[str]]:
+        return sorted(rows, key=lambda row: cls._aggregation_code_sort_key(row[0] if row else ""))
 
     def _save_simple_aggregation_csv(self, codes: Sequence[Dict[str, Any]], filename: str) -> str:
         desktop = _desktop_data_dir(AGGREGATION_CODES_DIRNAME)
@@ -4029,7 +4083,7 @@ class ApiBridge:
 
         with target_path.open("w", newline="", encoding="utf-8") as csv_file:
             writer = csv.writer(csv_file)
-            for item in codes:
+            for item in sorted(codes, key=lambda row: self._aggregation_code_sort_key(row.get("aggregateCode"))):
                 writer.writerow([item.get("aggregateCode")])
         return str(target_path)
 
@@ -5373,6 +5427,8 @@ class ApiBridge:
 
     def _refresh_live_status_cache_once(self) -> None:
         runtime = _get_runtime()
+        if _runtime_stopping(runtime):
+            return
         with runtime.lock:
             if runtime.live_status_refreshing:
                 return
@@ -5380,6 +5436,8 @@ class ApiBridge:
         try:
             session = self._ensure_session_safely()
             if not session:
+                return
+            if _runtime_stopping(runtime):
                 return
             with ThreadPoolExecutor(max_workers=LIVE_STATUS_MAX_WORKERS) as executor:
                 future_orders = executor.submit(self._fetch_codes_orders_batch, session)
@@ -5408,11 +5466,17 @@ class ApiBridge:
 
     def _background_status_updater(self) -> None:
         runtime = _get_runtime()
-        while True:
+        while not _runtime_stopping(runtime):
             try:
                 self._refresh_live_status_cache_once()
+            except RuntimeError as exc:
+                if _pool_shutdown_error(exc):
+                    return
+                logger.exception("Ошибка в фоновом обновлении статусов")
             except Exception:
                 logger.exception("Ошибка в фоновом обновлении статусов")
+            if _runtime_stopping(runtime):
+                return
             runtime.live_status_event.wait(timeout=LIVE_STATUS_REFRESH_INTERVAL_SECONDS)
             runtime.live_status_event.clear()
 
@@ -6993,6 +7057,9 @@ class ApiBridge:
             raise RuntimeError("Выберите файл с кодами для печати.")
 
         rows, delimiter = self._read_label_csv_rows(Path(normalized_csv_path))
+        data_source_kind = str(template_info.get("data_source_kind") or MARKING_SOURCE_KIND)
+        if data_source_kind == AGGREGATION_SOURCE_KIND:
+            rows = self._sort_aggregation_label_rows(rows)
         total_record_count = len(rows)
         if print_scope != "single":
             if print_scope == "range":
@@ -7030,6 +7097,21 @@ class ApiBridge:
                     "selected_record_end_number": range_end,
                     "range_record_count": len(selected_rows),
                     "record_preview": record_preview,
+                }
+            if data_source_kind == AGGREGATION_SOURCE_KIND:
+                temp_csv_path = Path(tempfile.gettempdir()) / f"kontur_ui_v2_label_{uuid.uuid4().hex}.csv"
+                with temp_csv_path.open("w", encoding="utf-8-sig", newline="") as csv_file:
+                    writer = csv.writer(csv_file, delimiter=delimiter, lineterminator="\n")
+                    writer.writerows(rows)
+                return {
+                    "print_scope": "all",
+                    "csv_path": str(temp_csv_path),
+                    "cleanup_path": str(temp_csv_path),
+                    "total_record_count": total_record_count,
+                    "selected_record_number": None,
+                    "selected_record_end_number": None,
+                    "range_record_count": total_record_count,
+                    "record_preview": None,
                 }
             return {
                 "print_scope": "all",

@@ -328,7 +328,6 @@ export function DownloadPage() {
         }
       },
       'Заказы скачаны.',
-      'Скачивание кодов…',
     )
 
   const printLabels = () =>

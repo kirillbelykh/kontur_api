@@ -20,6 +20,7 @@ import { Shimmer, BusyLabel } from '@/components/ui/shimmer'
 import { Skeleton, TableSkeleton } from '@/components/ui/skeleton'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
+import { DEFAULT_PAGE_SIZE } from '@/components/ui/pagination'
 
 type AggregationItem = {
   document_id?: string
@@ -43,7 +44,7 @@ type AggregationState = {
   total_items?: number
 }
 
-const PAGE_SIZE = 30
+const PAGE_SIZE = DEFAULT_PAGE_SIZE
 
 /** Строка АК — memo: выбор/снятие строки не перерисовывает остальные строки страницы. */
 const AkRow = memo(function AkRow({

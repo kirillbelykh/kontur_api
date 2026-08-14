@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Pagination } from '@heroui/react'
 import { cn } from '@/lib/utils'
 
-export const DEFAULT_PAGE_SIZE = 50
+export const DEFAULT_PAGE_SIZE = 30
 
 /** Пагинация массива строк: возвращает строки текущей страницы и метаданные. */
 export function usePagination<T>(rows: T[], pageSize = DEFAULT_PAGE_SIZE) {

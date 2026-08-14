@@ -20,7 +20,7 @@ import {
 import { toast } from 'sonner'
 import menuLogo from '@/assets/menu_logo_3.png'
 import logo from '@/assets/logo.png'
-import { apiCall, type SessionInfo } from '@/lib/bridge'
+import { apiCall, type AuthState, type SessionInfo } from '@/lib/bridge'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -34,6 +34,8 @@ const DESKTOP_SIDEBAR_OPEN_WIDTH = 256
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = 64
 const SIDEBAR_STORAGE_KEY = 'kontur_desktop_sidebar_open_v1'
 const JOURNAL_STORAGE_KEY = 'kontur_journal_open_v1'
+const SESSION_POLL_FAST_MS = 2_000
+const SESSION_POLL_SLOW_MS = 60_000
 
 const sidebarTransition = {
   duration: 0.16,
@@ -243,7 +245,7 @@ export function AppLayout() {
   const [settingsOpen, setSettingsOpen] = useState(
     () => import.meta.env.DEV && new URLSearchParams(window.location.search).has('qa-settings'),
   )
-  const [session, setSession] = useState<SessionInfo | null>(null)
+  const [session, setSession] = useState<AuthState | null>(null)
   const [sessionLoading, setSessionLoading] = useState(false)
   const { updateAvailable, applying, applyUpdate, remoteShort } = useAppUpdate()
   const { zoom, zoomIn, zoomOut, resetZoom } = usePageZoom()
@@ -257,10 +259,10 @@ export function AppLayout() {
 
   const loadSession = useCallback(async () => {
     try {
-      const info = await apiCall<SessionInfo>('get_session_info')
+      const info = await apiCall<AuthState>('get_auth_state')
       setSession(info)
     } catch {
-      setSession({ has_session: false })
+      setSession({ has_session: false, state: 'error' })
     }
   }, [])
 
@@ -268,7 +270,12 @@ export function AppLayout() {
     setSessionLoading(true)
     try {
       const result = await apiCall<{ success?: boolean; session?: SessionInfo }>('refresh_session')
-      setSession(result.session ?? (await apiCall<SessionInfo>('get_session_info')))
+      const next = result.session
+      setSession({
+        has_session: Boolean(next?.has_session),
+        minutes_until_update: next?.minutes_until_update,
+        state: next?.has_session ? 'ready' : 'error',
+      })
       toast.success('Сессия обновлена')
     } catch (error) {
       toast.error(getErrorMessage(error, 'Не удалось обновить сессию'))
@@ -277,11 +284,15 @@ export function AppLayout() {
     }
   }, [])
 
+  const sessionReady = Boolean(session?.has_session)
   useEffect(() => {
     void loadSession()
-    const id = window.setInterval(() => void loadSession(), 60_000)
+    const id = window.setInterval(
+      () => void loadSession(),
+      sessionReady ? SESSION_POLL_SLOW_MS : SESSION_POLL_FAST_MS,
+    )
     return () => window.clearInterval(id)
-  }, [loadSession])
+  }, [loadSession, sessionReady])
 
   useEffect(() => {
     writeStoredFlag(SIDEBAR_STORAGE_KEY, sidebarOpen)
@@ -303,10 +314,13 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [])
 
-  const sessionTone = session?.has_session ? 'success' : 'warning'
-  const sessionLabel = session?.has_session
-    ? `Сессия · ${Math.round(Number(session.minutes_until_update ?? 0))} мин`
-    : 'Нет сессии'
+  const sessionPending = !sessionReady && session?.state !== 'error'
+  const sessionTone = sessionReady ? 'success' : sessionPending ? 'info' : 'warning'
+  const sessionLabel = sessionReady
+    ? `Сессия · ${Math.round(Number(session?.minutes_until_update ?? 0))} мин`
+    : sessionPending
+      ? 'Подключаемся…'
+      : 'Нет сессии'
 
   const isWelcome = location.pathname === '/' || location.pathname === '/welcome'
 
@@ -480,7 +494,7 @@ export function AppLayout() {
               >
                 <Settings className="h-4 w-4" />
               </Button>
-              <Badge tone={sessionTone}>
+              <Badge tone={sessionTone} shimmer={sessionPending}>
                 <AnimatedTextSwap text={sessionLabel} />
               </Badge>
               <Button

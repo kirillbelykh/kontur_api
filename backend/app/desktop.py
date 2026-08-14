@@ -20,7 +20,7 @@ try:
 except ImportError as exc:
     raise SystemExit("PyWebView not installed. Run: uv sync") from exc
 
-from backend.app.api_bridge import ApiBridge
+from backend.app.api_bridge import ApiBridge, stop_background_workers
 from backend.app.chz_bridge_server import start_chz_bridge_server
 from backend.services.logger import logger
 
@@ -210,6 +210,7 @@ def main() -> None:
     _apply_window_icon()
     debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
     webview.start(debug=debug_mode, **webview_persistence_kwargs())
+    stop_background_workers()
 
 
 if __name__ == "__main__":

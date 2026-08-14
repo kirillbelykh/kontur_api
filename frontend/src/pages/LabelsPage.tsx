@@ -195,7 +195,7 @@ function SelectableTable({
   emptyText: string
 }) {
   // Пагинация внутри таблиц печати — списки файлов/заказов бывают большими
-  const pager = usePagination(rows, 25)
+  const pager = usePagination(rows)
 
   if (rows.length === 0) return <EmptyState>{emptyText}</EmptyState>
 
@@ -239,7 +239,6 @@ function SelectableTable({
       page={pager.page}
       pageCount={pager.pageCount}
       total={pager.total}
-      pageSize={25}
       onPageChange={pager.setPage}
     />
     </div>

@@ -42,7 +42,9 @@ export function statusMeta(status?: string): StatusMeta {
     value.includes('закрыва') ||
     value.includes('наполня') ||
     value.includes('проводится') ||
-    value.includes('проводятся')
+    value.includes('проводятся') ||
+    value.includes('заказыва') ||
+    value.includes('sendforrelease')
   ) {
     return { tone: 'warning', pending: true }
   }

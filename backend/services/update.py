@@ -188,6 +188,12 @@ def schedule_process_restart(delay_sec: float = 0.8) -> None:
     """
 
     def _restart() -> None:
+        try:
+            from backend.app.api_bridge import stop_background_workers
+
+            stop_background_workers()
+        except Exception:
+            logger.debug("Не удалось остановить фоновые потоки перед перезапуском", exc_info=True)
         python = _restart_executable()
         cwd = default_repo_dir()
         kwargs = hidden_console_kwargs()

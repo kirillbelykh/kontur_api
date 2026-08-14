@@ -113,6 +113,48 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         fake_event.set.assert_called_once_with()
         self.assertIs(fake_runtime.session_refresh_thread, fake_thread)
 
+    def test_pool_shutdown_error_detects_interpreter_exit(self):
+        self.assertTrue(
+            api_bridge._pool_shutdown_error(
+                RuntimeError("cannot schedule new futures after interpreter shutdown")
+            )
+        )
+        self.assertFalse(api_bridge._pool_shutdown_error(RuntimeError("queue is full")))
+        self.assertFalse(
+            api_bridge._pool_shutdown_error(
+                ValueError("cannot schedule new futures after interpreter shutdown")
+            )
+        )
+
+    def test_stop_background_workers_wakes_waiters(self):
+        runtime = types.SimpleNamespace(
+            runtime_stop=api_bridge.Event(),
+            live_status_event=api_bridge.Event(),
+            session_refresh_event=api_bridge.Event(),
+        )
+        previous = api_bridge._RUNTIME
+        api_bridge._RUNTIME = runtime
+        try:
+            api_bridge.stop_background_workers()
+            self.assertTrue(runtime.runtime_stop.is_set())
+            self.assertTrue(runtime.live_status_event.is_set())
+            self.assertTrue(runtime.session_refresh_event.is_set())
+        finally:
+            api_bridge._RUNTIME = previous
+
+    def test_background_status_updater_exits_when_runtime_stops(self):
+        runtime = types.SimpleNamespace(
+            runtime_stop=api_bridge.Event(),
+            live_status_event=api_bridge.Event(),
+        )
+        runtime.runtime_stop.set()
+        with (
+            mock.patch.object(api_bridge, "_get_runtime", return_value=runtime),
+            mock.patch.object(self.bridge, "_refresh_live_status_cache_once") as refresh,
+        ):
+            self.bridge._background_status_updater()
+        refresh.assert_not_called()
+
     def test_prolong_kontur_access_calls_cookie_module_manually(self):
         expected_result = {"success": True, "performed": True}
 
@@ -1337,6 +1379,27 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
             self.assertNotIn("010000000000000021AAA", selected_text)
             self.bridge._cleanup_label_selection(selection)
             self.assertFalse(selected_csv.exists())
+
+    def test_resolve_label_print_selection_prints_aggregation_codes_ascending(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            csv_path = Path(temp_dir) / "ak.csv"
+            csv_path.write_text(
+                "00000000000000000300\n"
+                "00000000000000000100\n"
+                "00000000000000000200\n",
+                encoding="utf-8",
+            )
+            selection = self.bridge._resolve_label_print_selection(
+                template_info={"data_source_kind": "aggregation"},
+                csv_path=str(csv_path),
+                payload={"print_scope": "all"},
+            )
+            printed = Path(selection["csv_path"]).read_text(encoding="utf-8-sig").splitlines()
+            self.assertEqual(
+                printed,
+                ["00000000000000000100", "00000000000000000200", "00000000000000000300"],
+            )
+            self.bridge._cleanup_label_selection(selection)
 
     def test_print_100x180_label_logs_range_print(self):
         order_data = {"document_id": "doc-1", "order_name": "Р—Р°РєР°Р· 1"}

@@ -54,6 +54,18 @@ describe('notifyJob', () => {
     })
   })
 
+  it('без pending показывает только success по завершении', async () => {
+    await notifyJob('download:download', async () => 1, {
+      success: 'Заказы скачаны.',
+    })
+    expect(toast).not.toHaveBeenCalled()
+    expect(toast.success).toHaveBeenCalledWith('Заказы скачаны.', {
+      id: 'job:download:download',
+      duration: 8000,
+      closeButton: true,
+    })
+  })
+
   it('не показывает success, если pending-тост закрыли крестиком', async () => {
     vi.mocked(toast).mockImplementation((_message, options) => {
       options?.onDismiss?.({} as never)
