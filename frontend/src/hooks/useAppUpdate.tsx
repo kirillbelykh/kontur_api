@@ -78,7 +78,7 @@ export function AppUpdateProvider({ children }: { children: ReactNode }) {
       if (result.error || result.success === false) {
         throw new Error(result.error || 'Обновление не выполнено')
       }
-      toast.success(result.message || 'Обновление установлено. Перезапустите приложение.')
+      toast.success(result.message || 'Обновление установлено. Перезапуск…')
       setUpdateAvailable(false)
       return result
     } catch (error) {

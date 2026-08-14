@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resizeMapToWidths } from './table-resize'
+import { resizeMapToWidths, tableStorageKey } from './table-resize'
 
 describe('resizeMapToWidths', () => {
   it('берёт только числовые ширины и ключи колонок', () => {
@@ -18,5 +18,11 @@ describe('resizeMapToWidths', () => {
 
   it('пустая карта даёт пустые ширины', () => {
     expect(resizeMapToWidths(new Map())).toEqual({})
+  })
+
+  it('ключ настроек таблицы не зависит от pathname', () => {
+    expect(tableStorageKey('Заказы к загрузке', ['Выбор', 'Заявка'])).toBe(
+      'kontur_table_prefs_v4_Заказы к загрузке_Выбор|Заявка',
+    )
   })
 })

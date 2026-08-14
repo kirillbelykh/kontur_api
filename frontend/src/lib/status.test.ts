@@ -7,9 +7,21 @@ describe('statusMeta', () => {
     expect(statusMeta('Отклонён')).toEqual({ tone: 'danger', pending: false })
   })
 
-  it('перелив только у «На проверке» и «Скачивается»', () => {
-    expect(statusMeta('На проверке')).toEqual({ tone: 'warning', pending: true })
-    expect(statusMeta('Скачивается')).toEqual({ tone: 'warning', pending: true })
+  it('первые статусы после действия получают перелив', () => {
+    for (const status of [
+      'Создаётся',
+      'Ожидает',
+      'На проверке',
+      'Скачивается',
+      'Вводится в оборот',
+      'Отправляется на ТСД',
+      'Подписывается',
+      'Печатается',
+    ]) {
+      const meta = statusMeta(status)
+      expect(meta.pending, status).toBe(true)
+      expect(meta.tone, status).toBe('warning')
+    }
   })
 
   it('отправка и подпись — без перелива', () => {
@@ -18,6 +30,12 @@ describe('statusMeta', () => {
       expect(meta.pending, status).toBe(false)
       expect(meta.tone, status).toBe('warning')
     }
+  })
+
+  it('готовые статусы не переливаются', () => {
+    expect(statusMeta('Создан').pending).toBe(false)
+    expect(statusMeta('Введён в оборот').pending).toBe(false)
+    expect(statusMeta('Наполнен на ТСД').pending).toBe(false)
   })
 
   it('разные статусы получают разные цвета кружка', () => {

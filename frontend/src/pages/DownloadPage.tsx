@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
+import { withPageJob } from '@/lib/jobs'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
@@ -196,17 +197,17 @@ export function DownloadPage() {
   const printTargetId = selection.focus || selection.ids[0] || ''
   const isBusy = Boolean(busy)
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
-    setBusy(key)
-    try {
-      await action()
-      if (successMessage) toast.success(successMessage)
-    } catch (error) {
-      toast.error(getErrorMessage(error))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const runBusy = (
+    key: string,
+    action: () => Promise<void>,
+    successMessage?: string,
+    pendingMessage?: string,
+  ) =>
+    withPageJob(setBusy, key, action, {
+      id: `download:${key}`,
+      success: successMessage,
+      pending: pendingMessage,
+    })
 
   const toggleId = useCallback((documentId: string) => {
     setSelection((prev) => ({
@@ -327,6 +328,7 @@ export function DownloadPage() {
         }
       },
       'Заказы скачаны.',
+      'Скачивание кодов…',
     )
 
   const printLabels = () =>
@@ -348,6 +350,7 @@ export function DownloadPage() {
         }
       },
       'Печать термоэтикеток запущена.',
+      'Печать этикеток…',
     )
 
   return (

@@ -26,8 +26,24 @@ export function statusMeta(status?: string): StatusMeta {
     return { tone: 'danger', pending: false }
   }
 
-  // Перелив только у «На проверке» и «Скачивается»
-  if (value.includes('скачив') || value.includes('проверк')) {
+  // Первые статусы после действия — пока Контур не перевёл заказ дальше
+  if (
+    value.includes('скачив') ||
+    value.includes('проверк') ||
+    value.includes('создаёт') ||
+    value.includes('создает') ||
+    value.includes('ожид') ||
+    value.includes('вводит') ||
+    value.includes('отправляется') ||
+    value.includes('подписывается') ||
+    value.includes('печата') ||
+    value.includes('обработ') ||
+    value.includes('заклад') ||
+    value.includes('закрыва') ||
+    value.includes('наполня') ||
+    value.includes('проводится') ||
+    value.includes('проводятся')
+  ) {
     return { tone: 'warning', pending: true }
   }
 

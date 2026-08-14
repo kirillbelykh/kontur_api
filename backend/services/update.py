@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
@@ -153,6 +154,53 @@ def probe_updates(repo_dir: Optional[str] = None) -> Dict[str, Any]:
         return {"update_available": False, "error": str(exc), "repo_dir": repo}
 
 
+def _restart_executable() -> str:
+    """Prefer pythonw so the restarted app has no console window."""
+    executable = Path(sys.executable)
+    if executable.name.lower() == "python.exe":
+        sibling = executable.with_name("pythonw.exe")
+        if sibling.exists():
+            return str(sibling)
+    return str(executable)
+
+
+def schedule_process_restart(delay_sec: float = 0.8) -> None:
+    """Spawn a fresh process, then exit this one. Safe from the JS-bridge thread.
+
+    os.execl from a pywebview callback would replace the worker thread, not the
+    desktop process. Spawn first so the operator is not left without a window.
+    """
+
+    def _restart() -> None:
+        python = _restart_executable()
+        cwd = default_repo_dir()
+        kwargs = hidden_console_kwargs()
+        if os.name == "nt":
+            kwargs["creationflags"] = int(kwargs.get("creationflags") or 0) | int(
+                getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            )
+        try:
+            subprocess.Popen([python, *sys.argv], cwd=cwd, close_fds=False, **kwargs)
+        except Exception:
+            logger.exception("Не удалось запустить новый процесс после обновления")
+            return
+        try:
+            import webview
+
+            for window in list(getattr(webview, "windows", None) or []):
+                try:
+                    window.destroy()
+                except Exception:
+                    logger.debug("Не удалось закрыть окно webview перед выходом", exc_info=True)
+        except Exception:
+            logger.debug("webview недоступен при перезапуске", exc_info=True)
+        os._exit(0)
+
+    timer = threading.Timer(delay_sec, _restart)
+    timer.daemon = True
+    timer.start()
+
+
 def apply_update(
     repo_dir: Optional[str] = None,
     *,
@@ -243,8 +291,7 @@ def apply_update(
         if auto_restart:
             result["restarted"] = True
             result["message"] = "Обновление установлено. Перезапуск…"
-            python = sys.executable
-            os.execl(python, python, *sys.argv)
+            schedule_process_restart()
 
         return result
     except Exception as exc:

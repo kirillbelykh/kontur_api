@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
+import { withPageJob } from '@/lib/jobs'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -204,17 +205,17 @@ export function TsdPage() {
   const selectedItem = selectedIds.length === 1 ? items.find((item) => item.document_id === selectedIds[0]) : undefined
   const canSign = Boolean(selectedItem && isFilledOnTsd(selectedItem))
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
-    setBusy(key)
-    try {
-      await action()
-      if (successMessage) toast.success(successMessage)
-    } catch (error) {
-      toast.error(getErrorMessage(error))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const runBusy = (
+    key: string,
+    action: () => Promise<void>,
+    successMessage?: string,
+    pendingMessage?: string,
+  ) =>
+    withPageJob(setBusy, key, action, {
+      id: `tsd:${key}`,
+      success: successMessage,
+      pending: pendingMessage,
+    })
 
   const flagIntroNumberError = () => {
     setIntroNumberError(false)
@@ -258,6 +259,7 @@ export function TsdPage() {
         }
       },
       'Задания на ТСД созданы.',
+      'Отправка на ТСД…',
     )
 
   const signIntroduction = () => {
@@ -287,6 +289,7 @@ export function TsdPage() {
         }
       },
       'Документ подписан и отправлен в ГИС МТ.',
+      'Подпись…',
     )
   }
 

@@ -4214,9 +4214,9 @@ class ApiBridge:
             return {"update_available": False, "error": str(exc)}
 
     def apply_update(self) -> Dict[str, Any]:
-        """Fast-forward to origin/main. Restart is left to the user (desktop shell)."""
+        """Fast-forward to origin/main, then fully restart the desktop process."""
         try:
-            return apply_git_update(auto_restart=False, allow_hard_reset=False)
+            return apply_git_update(auto_restart=True, allow_hard_reset=False)
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 

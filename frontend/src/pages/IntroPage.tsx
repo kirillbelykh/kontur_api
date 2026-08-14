@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
+import { withPageJob } from '@/lib/jobs'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -160,17 +161,17 @@ export function IntroPage() {
     )
   }, [])
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage: string) => {
-    setBusy(key)
-    try {
-      await action()
-      toast.success(successMessage)
-    } catch (error) {
-      toast.error(getErrorMessage(error))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const runBusy = (
+    key: string,
+    action: () => Promise<void>,
+    successMessage: string,
+    pendingMessage?: string,
+  ) =>
+    withPageJob(setBusy, key, action, {
+      id: `intro:${key}`,
+      success: successMessage,
+      pending: pendingMessage,
+    })
 
   const refresh = () =>
     runBusy('refresh', async () => {
@@ -213,6 +214,7 @@ export function IntroPage() {
         }
       },
       'Ввод в оборот завершён.',
+      'Ввод в оборот…',
     )
 
   const isBusy = Boolean(busy) || loading

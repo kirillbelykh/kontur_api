@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
+import { withPageJob } from '@/lib/jobs'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -444,16 +445,18 @@ export function LabelsPage() {
     return true
   }
 
-  const runBusy = async (key: string, action: () => Promise<boolean>, successMessage: string) => {
-    setBusy(key)
-    try {
-      if (await action()) toast.success(successMessage)
-    } catch (error) {
-      toast.error(getErrorMessage(error))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const runBusy = (
+    key: string,
+    action: () => Promise<boolean>,
+    successMessage: string,
+    pendingMessage?: string,
+  ) =>
+    withPageJob(setBusy, key, action, {
+      id: `labels:${key}`,
+      success: successMessage,
+      pending: pendingMessage,
+      succeeded: (ok) => ok,
+    })
 
   const showPreview = () =>
     runBusy(
@@ -467,6 +470,7 @@ export function LabelsPage() {
       'print',
       async () => handleResult(await apiCall<LabelActionResult>('print_100x180_label', buildPayload())),
       'Печать поставлена в очередь.',
+      'Печать…',
     )
 
   const recordInfoText = () => {

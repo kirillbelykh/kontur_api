@@ -7,3 +7,8 @@ export function resizeMapToWidths(sizes: Map<unknown, unknown>): Record<string, 
   }
   return widths
 }
+
+/** Стабильный ключ без pathname: HashRouter и file:// иначе сбрасывали настройки. */
+export function tableStorageKey(ariaLabel: string, columnLabels: string[]) {
+  return `kontur_table_prefs_v4_${ariaLabel}_${columnLabels.join('|')}`
+}

@@ -6,6 +6,7 @@ import { getAppSetting } from '@/lib/app-settings'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
+import { withPageJob } from '@/lib/jobs'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -428,17 +429,17 @@ export function OrdersPage() {
     mode,
   })
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
-    setBusy(key)
-    try {
-      await action()
-      if (successMessage) toast.success(successMessage)
-    } catch (error) {
-      toast.error(getErrorMessage(error))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const runBusy = (
+    key: string,
+    action: () => Promise<void>,
+    successMessage?: string,
+    pendingMessage?: string,
+  ) =>
+    withPageJob(setBusy, key, action, {
+      id: `orders:${key}`,
+      success: successMessage,
+      pending: pendingMessage,
+    })
 
   const lookupByParams = () =>
     runBusy('lookup', async () => {
@@ -538,6 +539,7 @@ export function OrdersPage() {
         }
       },
       'Заказ создан',
+      'Создание заказа…',
     )
 
   const submitQueue = () =>
@@ -610,6 +612,7 @@ export function OrdersPage() {
         }
       },
       'Очередь заказов выполнена',
+      'Создание заказов…',
     )
 
   const clearQueue = () =>

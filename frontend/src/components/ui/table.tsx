@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type HTMLAttributes,
   type ReactElement,
@@ -15,7 +16,7 @@ import { Table as HeroTable } from '@heroui/react'
 import { RotateCcw, Settings2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { resizeMapToWidths } from '@/lib/table-resize'
+import { resizeMapToWidths, tableStorageKey } from '@/lib/table-resize'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 
@@ -83,7 +84,6 @@ type TableCellProps = HTMLAttributes<HTMLTableCellElement> & {
   textValue?: string
 }
 
-const TABLE_PREFS_VERSION = 'v3'
 const TABLE_MIN_COLUMN_WIDTH = 72
 const SELECT_COLUMN_WIDTH = 88
 const SELECT_COLUMN_MIN_WIDTH = 56
@@ -97,27 +97,46 @@ function normalizeColumnLabel(value: string, index: number) {
   return label || `Колонка ${index + 1}`
 }
 
-function readPreferences(storageKey: string): TablePreferences {
-  if (!storageKey || typeof window === 'undefined') return { hidden: [], widths: {} }
+function parsePreferences(raw: string | null): TablePreferences {
+  const empty: TablePreferences = { hidden: [], widths: {} }
+  if (!raw) return empty
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || '{}')
+    const parsed = JSON.parse(raw)
     return {
-      hidden: Array.isArray(parsed.hidden) ? parsed.hidden.filter((value: unknown): value is string => typeof value === 'string') : [],
+      hidden: Array.isArray(parsed.hidden)
+        ? parsed.hidden.filter((value: unknown): value is string => typeof value === 'string')
+        : [],
       widths: parsed.widths && typeof parsed.widths === 'object' ? parsed.widths : {},
     }
   } catch {
-    return { hidden: [], widths: {} }
+    return empty
   }
+}
+
+function prefsAreEmpty(preferences: TablePreferences) {
+  return preferences.hidden.length === 0 && Object.keys(preferences.widths).length === 0
+}
+
+function readPreferences(storageKey: string): TablePreferences {
+  if (!storageKey || typeof window === 'undefined') return { hidden: [], widths: {} }
+  const current = parsePreferences(window.localStorage.getItem(storageKey))
+  if (!prefsAreEmpty(current)) return current
+  const marker = storageKey.replace(/^kontur_table_prefs_v4_/, '')
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index)
+    if (!key?.startsWith('kontur_table_preferences_v3_') || !key.endsWith(`_${marker}`)) continue
+    const migrated = parsePreferences(window.localStorage.getItem(key))
+    if (!prefsAreEmpty(migrated)) {
+      writePreferences(storageKey, migrated)
+      return migrated
+    }
+  }
+  return current
 }
 
 function writePreferences(storageKey: string, preferences: TablePreferences) {
   if (!storageKey || typeof window === 'undefined') return
   window.localStorage.setItem(storageKey, JSON.stringify(preferences))
-}
-
-function getPathname() {
-  if (typeof window === 'undefined') return 'server'
-  return window.location.pathname
 }
 
 function flattenHeaderColumns(children: ReactNode): ReactNode[] {
@@ -160,34 +179,37 @@ function collectHeaderColumns(children: ReactNode): TableColumn[] {
 
 export function Table({ className, children, 'aria-label': ariaLabel, variant = 'primary', ...props }: TableProps) {
   const columns = useMemo(() => collectHeaderColumns(children), [children])
-  const [preferences, setPreferences] = useState<TablePreferences>({ hidden: [], widths: {} })
-  const [storageKey, setStorageKey] = useState('')
+  const storageKey = tableStorageKey(
+    ariaLabel || 'table',
+    columns.map((column) => column.label),
+  )
+  const [preferences, setPreferences] = useState<TablePreferences>(() => readPreferences(storageKey))
+  const storageKeyRef = useRef(storageKey)
+  storageKeyRef.current = storageKey
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
-    if (columns.length === 0) return
-    const signature = columns.map((column) => column.label).join('|')
-    // aria-label keeps two same-shaped tables on one page from sharing column preferences
-    const nextStorageKey = `kontur_table_preferences_${TABLE_PREFS_VERSION}_${getPathname()}_${ariaLabel || ''}_${signature}`
-    if (nextStorageKey === storageKey) return
-    setStorageKey(nextStorageKey)
-    setPreferences(readPreferences(nextStorageKey))
-  }, [ariaLabel, columns, storageKey])
+    setPreferences(readPreferences(storageKey))
+  }, [storageKey])
+
+  const persist = (next: TablePreferences) => {
+    writePreferences(storageKeyRef.current, next)
+  }
 
   const updatePreferences = (updater: (current: TablePreferences) => TablePreferences) => {
     setPreferences((current) => {
       const next = updater(current)
-      writePreferences(storageKey, next)
+      persist(next)
       return next
     })
   }
 
-  const applyResize = (sizes: Map<unknown, unknown>, persist: boolean) => {
+  const applyResize = (sizes: Map<unknown, unknown>, persistWrite: boolean) => {
     const widths = resizeMapToWidths(sizes)
     if (Object.keys(widths).length === 0) return
     setPreferences((current) => {
       const next = { ...current, widths }
-      if (persist) writePreferences(storageKey, next)
+      if (persistWrite) persist(next)
       return next
     })
   }
@@ -211,7 +233,7 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
   const resetPreferences = () => {
     const next = { hidden: [], widths: {} }
     setPreferences(next)
-    writePreferences(storageKey, next)
+    persist(next)
   }
 
   return (
