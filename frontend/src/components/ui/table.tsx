@@ -5,9 +5,7 @@ import {
   isValidElement,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
-  useRef,
   useState,
   type HTMLAttributes,
   type ReactElement,
@@ -47,9 +45,15 @@ type TablePreferences = {
 
 type TableLayoutValue = {
   widths: Record<string, number>
+  hidden: string[]
+  columns: TableColumn[]
 }
 
-const TableLayoutContext = createContext<TableLayoutValue>({ widths: {} })
+const TableLayoutContext = createContext<TableLayoutValue>({
+  widths: {},
+  hidden: [],
+  columns: [],
+})
 
 type TableProps = {
   children?: ReactNode
@@ -86,12 +90,6 @@ const SELECT_COLUMN_MIN_WIDTH = 56
 
 function isSelectColumn(children: ReactNode) {
   return typeof children === 'string' && children.trim() === 'Выбор'
-}
-
-function queryTableRows(root: HTMLElement): HTMLElement[] {
-  const slotted = root.querySelectorAll('[data-slot="table-row"]')
-  if (slotted.length) return Array.from(slotted) as HTMLElement[]
-  return Array.from(root.querySelectorAll('tr')) as HTMLElement[]
 }
 
 function normalizeColumnLabel(value: string, index: number) {
@@ -161,7 +159,6 @@ function collectHeaderColumns(children: ReactNode): TableColumn[] {
 }
 
 export function Table({ className, children, 'aria-label': ariaLabel, variant = 'primary', ...props }: TableProps) {
-  const tableRef = useRef<HTMLTableElement>(null)
   const columns = useMemo(() => collectHeaderColumns(children), [children])
   const [preferences, setPreferences] = useState<TablePreferences>({ hidden: [], widths: {} })
   const [storageKey, setStorageKey] = useState('')
@@ -176,21 +173,6 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     setStorageKey(nextStorageKey)
     setPreferences(readPreferences(nextStorageKey))
   }, [ariaLabel, columns, storageKey])
-
-  useLayoutEffect(() => {
-    const table = tableRef.current
-    if (!table || columns.length === 0) return
-
-    const rows = queryTableRows(table)
-    for (const column of columns) {
-      const hidden = preferences.hidden.includes(column.label)
-      for (const row of rows) {
-        const cell = row.children.item(column.index) as HTMLElement | null
-        if (!cell || Number(cell.getAttribute('colspan') || '1') > 1) continue
-        cell.style.display = hidden ? 'none' : ''
-      }
-    }
-  }, [children, columns, preferences.hidden])
 
   const updatePreferences = (updater: (current: TablePreferences) => TablePreferences) => {
     setPreferences((current) => {
@@ -220,6 +202,8 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
       return {
         ...current,
         hidden: isHidden ? current.hidden.filter((item) => item !== label) : [...current.hidden, label],
+        // Сброс ширин: иначе 1fr колонки остаются в пикселях и справа дыра
+        widths: {},
       }
     })
   }
@@ -231,7 +215,7 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
   }
 
   return (
-    <TableLayoutContext.Provider value={{ widths: preferences.widths }}>
+    <TableLayoutContext.Provider value={{ widths: preferences.widths, hidden: preferences.hidden, columns }}>
       <div
         className="relative w-full"
         onPointerDownCapture={(event) => notePressTarget(event.target)}
@@ -294,10 +278,11 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
 
         <HeroTable className={cn(className)} variant={variant}>
           <HeroTable.ResizableContainer
+            className="w-full"
             onResize={(widths) => applyResize(widths as Map<unknown, unknown>, false)}
             onResizeEnd={(widths) => applyResize(widths as Map<unknown, unknown>, true)}
           >
-            <HeroTable.Content ref={tableRef} aria-label={ariaLabel || 'Таблица'}>
+            <HeroTable.Content aria-label={ariaLabel || 'Таблица'}>
               {children}
             </HeroTable.Content>
           </HeroTable.ResizableContainer>
@@ -308,15 +293,28 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
 }
 
 export function TableHeader({ className, children, ...props }: TableSectionProps) {
-  const columns = flattenHeaderColumns(children)
+  const { hidden } = useContext(TableLayoutContext)
+  const heads = flattenHeaderColumns(children)
+    .map((child, index) => ({ child, index }))
+    .filter(({ child, index }) => {
+      if (!isValidElement(child)) return true
+      const label = normalizeColumnLabel(
+        columnLabelFromNode((child.props as { children?: ReactNode }).children),
+        index,
+      )
+      return !hidden.includes(label)
+    })
+  const hasRowHeader = heads.some(
+    ({ child }) => isValidElement(child) && Boolean((child.props as TableHeadProps).isRowHeader),
+  )
 
   return (
     <HeroTable.Header className={className} {...props}>
-      {Children.map(columns, (child, index) => {
+      {heads.map(({ child, index }, visibleIndex) => {
         if (!isValidElement(child)) return child
         const element = child as ReactElement<TableHeadProps>
         return cloneElement(element, {
-          isRowHeader: element.props.isRowHeader ?? index === 0,
+          isRowHeader: element.props.isRowHeader || (!hasRowHeader && visibleIndex === 0),
           id: element.props.id ?? `col-${index}`,
         })
       })}
@@ -333,6 +331,11 @@ export function TableBody({ className, children, ...props }: TableSectionProps) 
 }
 
 export function TableRow({ className, children, onClick, id, ...props }: TableRowProps) {
+  const { hidden, columns } = useContext(TableLayoutContext)
+  const cells = Children.toArray(children).filter((_, index) => {
+    const label = columns[index]?.label
+    return !label || !hidden.includes(label)
+  })
   return (
     <HeroTable.Row
       id={id}
@@ -352,7 +355,7 @@ export function TableRow({ className, children, onClick, id, ...props }: TableRo
       }
       {...props}
     >
-      {children}
+      {cells}
     </HeroTable.Row>
   )
 }
