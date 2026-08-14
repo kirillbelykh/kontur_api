@@ -1,7 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { Toaster } from 'sonner'
-import { AlertTriangle, CheckCircle2, Info, Loader2, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Info, Loader2, X, XCircle } from 'lucide-react'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { AppUpdateProvider } from '@/hooks/useAppUpdate'
@@ -74,6 +74,7 @@ export default function App() {
             warning: <AlertTriangle className="h-4.5 w-4.5 text-amber-600" />,
             info: <Info className="h-4.5 w-4.5 text-sky-600" />,
             loading: <Loader2 className="h-4.5 w-4.5 animate-spin text-muted-foreground" />,
+            close: <X className="h-3.5 w-3.5" />,
           }}
           toastOptions={{
             unstyled: true,

@@ -454,6 +454,7 @@ html[data-theme='ocean'] {
   position: absolute;
   right: 0.6rem;
   top: 50%;
+  z-index: 2;
   transform: translateY(-50%);
   display: grid;
   place-items: center;
@@ -464,6 +465,7 @@ html[data-theme='ocean'] {
   background: transparent;
   color: hsl(var(--wms-muted-foreground));
   cursor: pointer;
+  pointer-events: auto;
   transition: background 0.15s ease, color 0.15s ease;
 }
 .kontur-toast-close:hover {

@@ -1,3 +1,5 @@
+import { createElement } from 'react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getErrorMessage } from '@/lib/utils'
 
@@ -8,9 +10,12 @@ type JobMessages<T> = {
   succeeded?: (result: T) => boolean
 }
 
+const silencedJobs = new Set<string>()
+
 /**
  * Долгая операция с тостом, который живёт вне страницы:
  * уход в другой раздел не отменяет уведомление о завершении.
+ * Sonner прячет крестик у type=loading — поэтому pending это обычный тост с duration: Infinity.
  */
 export async function notifyJob<T>(
   id: string,
@@ -18,15 +23,33 @@ export async function notifyJob<T>(
   messages: JobMessages<T> = {},
 ): Promise<T> {
   const toastId = `job:${id}`
-  if (messages.pending) toast.loading(messages.pending, { id: toastId })
+  silencedJobs.delete(toastId)
+  if (messages.pending) {
+    toast(messages.pending, {
+      id: toastId,
+      duration: Infinity,
+      closeButton: true,
+      icon: createElement(Loader2, {
+        className: 'h-4.5 w-4.5 animate-spin text-muted-foreground',
+      }),
+      onDismiss: () => {
+        silencedJobs.add(toastId)
+      },
+    })
+  }
   try {
     const result = await work()
+    if (silencedJobs.has(toastId)) {
+      silencedJobs.delete(toastId)
+      return result
+    }
     const ok = messages.succeeded?.(result) ?? true
-    if (ok && messages.success) toast.success(messages.success, { id: toastId, duration: 8000 })
+    if (ok && messages.success) toast.success(messages.success, { id: toastId, duration: 8000, closeButton: true })
     else toast.dismiss(toastId)
     return result
   } catch (error) {
-    toast.error(getErrorMessage(error), { id: toastId, duration: 8000 })
+    silencedJobs.delete(toastId)
+    toast.error(getErrorMessage(error), { id: toastId, duration: 8000, closeButton: true })
     throw error
   }
 }
