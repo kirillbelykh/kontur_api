@@ -3,7 +3,7 @@
 
 #define MyAppName "Контур Маркировка"
 #define MyAppNameAscii "KonturMarkirovka"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "2.0.0"
 #define MyAppPublisher "Grundlage"
 #define MyAppURL "https://github.com/kirillbelykh/kontur_api"
 #define MyAppExeName "KonturMarkirovka.bat"
@@ -58,6 +58,7 @@ Type: files; Name: "{userdesktop}\KonturAPI.lnk"
 Type: files; Name: "{userdesktop}\KonturTestAPI.lnk"
 Type: files; Name: "{userdesktop}\KonturMobile.lnk"
 Type: files; Name: "{userdesktop}\CRPT server.lnk"
+
 
 
 
