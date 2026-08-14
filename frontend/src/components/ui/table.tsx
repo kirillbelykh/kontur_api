@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
   type HTMLAttributes,
-  type MouseEvent,
+  type PointerEvent,
   type ReactElement,
   type ReactNode,
 } from 'react'
@@ -71,6 +71,33 @@ type TableCellProps = HTMLAttributes<HTMLTableCellElement> & {
 
 const TABLE_PREFS_VERSION = 'v1'
 const TABLE_MIN_COLUMN_WIDTH = 72
+const HEADER_CELL_SELECTOR = '[data-slot="table-column"], thead th, .table__column'
+
+function queryHeaderCells(root: HTMLElement): HTMLElement[] {
+  const slotted = root.querySelectorAll('[data-slot="table-column"]')
+  if (slotted.length) return Array.from(slotted) as HTMLElement[]
+  const native = root.querySelectorAll('thead tr:first-child th')
+  if (native.length) return Array.from(native) as HTMLElement[]
+  return Array.from(root.querySelectorAll('.table__column')) as HTMLElement[]
+}
+
+function queryTableRows(root: HTMLElement): HTMLElement[] {
+  const slotted = root.querySelectorAll('[data-slot="table-row"]')
+  if (slotted.length) return Array.from(slotted) as HTMLElement[]
+  return Array.from(root.querySelectorAll('tr')) as HTMLElement[]
+}
+
+function applyColumnWidth(root: HTMLElement, columnIndex: number, width: number) {
+  root.style.tableLayout = 'fixed'
+  for (const row of queryTableRows(root)) {
+    const cell = row.children.item(columnIndex) as HTMLElement | null
+    if (!cell || Number(cell.getAttribute('colspan') || '1') > 1) continue
+    cell.style.width = `${width}px`
+    cell.style.minWidth = `${width}px`
+    cell.style.maxWidth = `${width}px`
+    cell.style.overflow = 'hidden'
+  }
+}
 
 function normalizeColumnLabel(value: string, index: number) {
   const label = value.replace(/[↑↓]/g, '').replace(/\s+/g, ' ').trim()
@@ -120,7 +147,7 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     const table = tableRef.current
     if (!table) return
 
-    const headerCells = Array.from(table.querySelectorAll('thead tr:first-child th'))
+    const headerCells = queryHeaderCells(table)
     const nextColumns = headerCells.map((cell, index) => ({
       index,
       label: normalizeColumnLabel(cell.textContent || '', index),
@@ -145,7 +172,7 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     const table = tableRef.current
     if (!table || columns.length === 0) return
 
-    const rows = Array.from(table.querySelectorAll('tr'))
+    const rows = queryTableRows(table)
     for (const column of columns) {
       const hidden = preferences.hidden.includes(column.label)
       const width = preferences.widths[column.label]
@@ -158,9 +185,13 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
         if (!hidden && width) {
           cell.style.width = `${width}px`
           cell.style.minWidth = `${width}px`
+          cell.style.maxWidth = `${width}px`
+          cell.style.overflow = 'hidden'
         } else {
           cell.style.width = ''
           cell.style.minWidth = ''
+          cell.style.maxWidth = ''
+          cell.style.overflow = ''
         }
       }
     }
@@ -205,19 +236,23 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     writePreferences(storageKey, next)
   }
 
-  const handleMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return
     const target = event.target as HTMLElement | null
-    if (!target?.matches('[data-table-resize-handle]')) return
+    const handle = target?.closest('[data-table-resize-handle]') as HTMLElement | null
+    if (!handle) return
 
-    const headerCell = target.closest('th') as HTMLTableCellElement | null
-    if (!headerCell || !headerCell.parentElement) return
+    const headerCell = handle.closest(HEADER_CELL_SELECTOR) as HTMLElement | null
+    const table = tableRef.current
+    if (!headerCell?.parentElement || !table) return
 
     const columnIndex = Array.from(headerCell.parentElement.children).indexOf(headerCell)
-    const column = columns.find((candidate) => candidate.index === columnIndex)
-    if (!column || preferences.hidden.includes(column.label)) return
+    const label = normalizeColumnLabel(headerCell.textContent || '', columnIndex)
+    if (preferences.hidden.includes(label)) return
 
     event.preventDefault()
     event.stopPropagation()
+    handle.setPointerCapture(event.pointerId)
 
     const startX = event.clientX
     const startWidth = headerCell.getBoundingClientRect().width
@@ -225,30 +260,37 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     const previousUserSelect = document.body.style.userSelect
     document.body.style.cursor = 'col-resize'
     document.body.style.userSelect = 'none'
+    handle.dataset.active = 'true'
 
-    const handleMouseMove = (moveEvent: globalThis.MouseEvent) => {
-      const nextWidth = Math.max(TABLE_MIN_COLUMN_WIDTH, Math.round(startWidth + moveEvent.clientX - startX))
+    let nextWidth = Math.round(startWidth)
+
+    const onMove = (moveEvent: globalThis.PointerEvent) => {
+      nextWidth = Math.max(TABLE_MIN_COLUMN_WIDTH, Math.round(startWidth + moveEvent.clientX - startX))
+      applyColumnWidth(table, columnIndex, nextWidth)
+    }
+
+    const onUp = () => {
+      handle.dataset.active = ''
+      document.body.style.cursor = previousCursor
+      document.body.style.userSelect = previousUserSelect
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+      document.removeEventListener('pointercancel', onUp)
       updatePreferences((current) => ({
         ...current,
-        widths: { ...current.widths, [column.label]: nextWidth },
+        widths: { ...current.widths, [label]: nextWidth },
       }))
     }
 
-    const handleMouseUp = () => {
-      document.body.style.cursor = previousCursor
-      document.body.style.userSelect = previousUserSelect
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    document.addEventListener('pointercancel', onUp)
   }
 
   return (
     <div
       className="relative w-full"
-      onMouseDown={handleMouseDown}
+      onPointerDown={handlePointerDown}
       onPointerDownCapture={(event) => notePressTarget(event.target)}
       onKeyDownCapture={() => {
         pressStartedOnControl = false
@@ -375,7 +417,7 @@ export function TableHead({ className, children, isRowHeader, id, ...props }: Ta
       {children}
       <span
         data-table-resize-handle
-        className="absolute right-0 top-0 z-10 h-full w-2 cursor-col-resize select-none touch-none opacity-0 transition hover:bg-ring/30 hover:opacity-100"
+        className="absolute inset-y-0 right-0 z-20 w-3 cursor-col-resize select-none touch-none after:absolute after:inset-y-2 after:right-1 after:w-px after:rounded-full after:bg-border after:content-[''] hover:after:w-0.5 hover:after:bg-foreground/45 data-[active=true]:after:w-0.5 data-[active=true]:after:bg-foreground/55"
         aria-hidden="true"
       />
     </HeroTable.Column>
