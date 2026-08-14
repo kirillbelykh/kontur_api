@@ -18,7 +18,7 @@ type DustParticle = {
   shade: number
 }
 
-const ELEMENT_FADE_MS = 900
+const ELEMENT_FADE_MS = 280
 const PARTICLE_BUDGET = 1400
 
 let activeCanvas: HTMLCanvasElement | null = null
@@ -101,8 +101,8 @@ function spawnParticlesForRect(rect: DOMRect, perElementBudget: number) {
         vx: 30 + Math.random() * 90,
         vy: -20 - Math.random() * 45,
         radius: 1.4 + Math.random() * 2.6,
-        delay: columnProgress * 0.4 + Math.random() * 0.12,
-        life: 0.6 + Math.random() * 0.7,
+        delay: columnProgress * 0.15 + Math.random() * 0.06,
+        life: 0.28 + Math.random() * 0.28,
         age: 0,
         shade: 130 + Math.floor(Math.random() * 60),
       })
@@ -124,7 +124,7 @@ export function dissolveToDust(elements: HTMLElement[]): Promise<void> {
   for (const el of targets) {
     const rect = el.getBoundingClientRect()
     spawnParticlesForRect(rect, perElement)
-    maxDurationMs = Math.max(maxDurationMs, (0.4 + 0.12 + 1.3) * 1000)
+    maxDurationMs = Math.max(maxDurationMs, (0.15 + 0.06 + 0.56) * 1000)
 
     el.style.transition = `opacity ${ELEMENT_FADE_MS}ms ease-out, filter ${ELEMENT_FADE_MS}ms ease-out, transform ${ELEMENT_FADE_MS}ms ease-in`
     el.style.pointerEvents = 'none'

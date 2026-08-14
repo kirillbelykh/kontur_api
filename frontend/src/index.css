@@ -296,6 +296,20 @@ html[data-theme='ocean'] {
   animation: order-arrive 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Коды агрегации: те же контролы, но таблица тяжелее — короткий отклик как у чекбоксов */
+.page-snappy .button,
+.page-snappy [data-slot="button"],
+.page-snappy [data-slot="button"] *,
+.page-snappy .table__row,
+.page-snappy .table__cell,
+.page-snappy .table__column {
+  transition-duration: 80ms !important;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+.page-snappy .order-arrive {
+  animation-duration: 180ms;
+}
+
 /* Строка очереди «улетает» вниз к Истории перед отправкой.
    Keyframes вместо transition: на <tr> в WebView transition срабатывает ненадёжно. */
 @keyframes order-leave-kf {

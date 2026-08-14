@@ -18,7 +18,7 @@ import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
 
 type IntroItem = {
   document_id?: string
@@ -65,13 +65,13 @@ const IntroRow = memo(function IntroRow({
       className={cn(checked && 'row-selected')}
       onClick={() => onToggle(documentId)}
     >
-      <TableCell>
+      <TableSelectCell>
         <Checkbox
           isSelected={checked}
           aria-label={`Выбрать заказ ${item.order_name || documentId}`}
           onChange={() => onToggle(documentId)}
         />
-      </TableCell>
+      </TableSelectCell>
       <TableCell>
         <div className="font-medium">{item.order_name || item.document_id || 'Без названия'}</div>
       </TableCell>

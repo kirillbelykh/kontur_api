@@ -18,7 +18,7 @@ import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
 
 type TsdItem = {
   document_id?: string
@@ -85,13 +85,13 @@ const TsdRow = memo(function TsdRow({
       className={cn(selected && 'row-selected')}
       onClick={() => onToggle(documentId)}
     >
-      <TableCell>
+      <TableSelectCell>
         <Checkbox
           isSelected={selected}
           aria-label={`Выбрать заказ ${item.order_name || documentId}`}
           onChange={() => onToggle(documentId)}
         />
-      </TableCell>
+      </TableSelectCell>
       <TableCell textValue={item.order_name || documentId}>
         <div className="font-medium">{item.order_name || documentId || 'Без названия'}</div>
       </TableCell>

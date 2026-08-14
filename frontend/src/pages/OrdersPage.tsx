@@ -18,7 +18,7 @@ import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { Shimmer, BusyLabel } from '@/components/ui/shimmer'
 import { TableSkeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
@@ -187,13 +187,13 @@ const HistoryRow = memo(function HistoryRow({
       className={cn(checked && 'row-selected', arrived && 'order-arrive')}
       onClick={() => onToggle(documentId)}
     >
-      <TableCell>
+      <TableSelectCell>
         <Checkbox
           isSelected={checked}
           aria-label={`Выбрать заказ ${rowTitle(item)}`}
           onChange={() => onToggle(documentId)}
         />
-      </TableCell>
+      </TableSelectCell>
       <TableCell>
         <div className="font-medium">{rowTitle(item)}</div>
         <div className="truncate text-xs text-muted-foreground">{item.full_name || item.simpl || '—'}</div>
@@ -226,13 +226,13 @@ const QueueRow = memo(function QueueRow({
       className={cn(checked && 'row-selected', leaving && 'order-leave')}
       onClick={() => onSelect(item.uid || '')}
     >
-      <TableCell>
+      <TableSelectCell>
         <Checkbox
           isSelected={checked}
           aria-label={`Выбрать позицию ${item.order_name || rowId}`}
           onChange={() => onSelect(item.uid || '')}
         />
-      </TableCell>
+      </TableSelectCell>
       <TableCell className="font-medium">{item.order_name || '—'}</TableCell>
       <TableCell className="text-muted-foreground">{item.simpl_name || '—'}</TableCell>
       <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
@@ -259,13 +259,13 @@ const DeletedRow = memo(function DeletedRow({
       className={cn(checked && 'row-selected')}
       onClick={() => onSelect(documentId)}
     >
-      <TableCell>
+      <TableSelectCell>
         <Checkbox
           isSelected={checked}
           aria-label={`Выбрать удалённый заказ ${rowTitle(item)}`}
           onChange={() => onSelect(documentId)}
         />
-      </TableCell>
+      </TableSelectCell>
       <TableCell>
         <div className="font-medium">{rowTitle(item)}</div>
         <div className="font-mono text-xs text-muted-foreground">{item.document_id || '—'}</div>

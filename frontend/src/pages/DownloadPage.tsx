@@ -27,7 +27,7 @@ import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
 
 type DownloadItem = {
   document_id?: string
@@ -99,13 +99,13 @@ const DownloadRow = memo(function DownloadRow({
       className={cn('select-none', (checked || focused) && 'row-selected')}
       onClick={() => onActivate(documentId, index)}
     >
-      <TableCell onClick={(event) => event.stopPropagation()}>
+      <TableSelectCell>
         <Checkbox
           isSelected={checked}
           aria-label={`Выбрать заказ ${item.order_name || 'без названия'}`}
           onChange={() => onToggle(documentId)}
         />
-      </TableCell>
+      </TableSelectCell>
       <TableCell textValue={item.order_name || 'Без названия'}>
         <div className="font-medium">{item.order_name || 'Без названия'}</div>
       </TableCell>

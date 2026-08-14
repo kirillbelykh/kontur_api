@@ -19,7 +19,7 @@ import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { Shimmer, BusyLabel } from '@/components/ui/shimmer'
 import { Skeleton, TableSkeleton } from '@/components/ui/skeleton'
 import { SelectNative } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
 
 type AggregationItem = {
   document_id?: string
@@ -43,9 +43,9 @@ type AggregationState = {
   total_items?: number
 }
 
-const PAGE_SIZE = 200
+const PAGE_SIZE = 30
 
-/** Строка АК — memo: выбор/снятие строки не перерисовывает остальные 200 строк страницы. */
+/** Строка АК — memo: выбор/снятие строки не перерисовывает остальные строки страницы. */
 const AkRow = memo(function AkRow({
   row,
   rowId,
@@ -71,9 +71,9 @@ const AkRow = memo(function AkRow({
       className={cn(selected && 'row-selected', arrived && 'order-arrive')}
       onClick={() => onToggle(id, globalIndex)}
     >
-      <TableCell onClick={(event) => event.stopPropagation()}>
+      <TableSelectCell>
         <Checkbox isSelected={selected} onChange={() => onToggle(id, globalIndex)} aria-label="Выбрать АК" />
-      </TableCell>
+      </TableSelectCell>
       <TableCell>
         <div className="font-medium">{row.aggregate_code || '—'}</div>
         <div className="text-xs text-muted-foreground">{row.comment || '—'}</div>
@@ -167,7 +167,7 @@ export function AggregationPage() {
     if (fresh.size === 0) return
     prevIdsRef.current = null
     setArrivedIds(fresh)
-    const timer = window.setTimeout(() => setArrivedIds(new Set()), 1200)
+    const timer = window.setTimeout(() => setArrivedIds(new Set()), 400)
     return () => window.clearTimeout(timer)
   }, [items])
 
@@ -412,7 +412,7 @@ export function AggregationPage() {
   const statusOptions = state.status_options ?? []
 
   return (
-    <div className="page-shell">
+    <div className="page-shell page-snappy">
       <PageHeader
         title="Коды агрегации"
         actions={
@@ -522,7 +522,7 @@ export function AggregationPage() {
                 variant={refillOpen ? 'secondary' : 'ghost'}
                 onClick={() => setRefillOpen((open) => !open)}
               >
-                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', refillOpen && 'rotate-180')} />
+                <ChevronDown className={cn('h-3.5 w-3.5 transition-transform duration-75', refillOpen && 'rotate-180')} />
                 Повторное наполнение
               </Button>
             </div>
@@ -533,7 +533,7 @@ export function AggregationPage() {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+                  transition={{ duration: 0.12, ease: [0.22, 1, 0.36, 1] }}
                   className="overflow-hidden"
                 >
                   <div className="space-y-3 border-t border-border pt-3">

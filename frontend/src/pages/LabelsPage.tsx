@@ -17,7 +17,7 @@ import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 type SheetFormat = { key?: string; label?: string }
@@ -153,13 +153,13 @@ const SelectableRow = memo(function SelectableRow({
       className={cn(selected && 'row-selected')}
       onClick={() => onSelect(selected ? '' : rowId)}
     >
-      <TableCell>
+      <TableSelectCell>
         <Checkbox
           isSelected={selected}
           aria-label={`Выбрать строку ${index + 1}`}
           onChange={(next) => onSelect(next ? rowId : '')}
         />
-      </TableCell>
+      </TableSelectCell>
       {columns.map((column) => (
         <TableCell
           key={column.key}

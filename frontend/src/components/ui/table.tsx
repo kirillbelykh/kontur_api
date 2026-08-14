@@ -3,6 +3,7 @@ import {
   cloneElement,
   createContext,
   isValidElement,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -16,7 +17,7 @@ import { Table as HeroTable } from '@heroui/react'
 import { RotateCcw, Settings2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
-import { resizeMapToWidths, tableStorageKey } from '@/lib/table-resize'
+import { resizeMapToWidths, tableStorageKey, columnLayoutKey, widthsEqual } from '@/lib/table-resize'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 
@@ -177,8 +178,18 @@ function collectHeaderColumns(children: ReactNode): TableColumn[] {
   return result
 }
 
+function useStableColumns(children: ReactNode): TableColumn[] {
+  const collected = collectHeaderColumns(children)
+  const layoutKey = columnLayoutKey(collected)
+  const ref = useRef({ layoutKey, columns: collected })
+  if (ref.current.layoutKey !== layoutKey) {
+    ref.current = { layoutKey, columns: collected }
+  }
+  return ref.current.columns
+}
+
 export function Table({ className, children, 'aria-label': ariaLabel, variant = 'primary', ...props }: TableProps) {
-  const columns = useMemo(() => collectHeaderColumns(children), [children])
+  const columns = useStableColumns(children)
   const storageKey = tableStorageKey(
     ariaLabel || 'table',
     columns.map((column) => column.label),
@@ -204,15 +215,16 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     })
   }
 
-  const applyResize = (sizes: Map<unknown, unknown>, persistWrite: boolean) => {
+  const applyResize = useCallback((sizes: Map<unknown, unknown>, persistWrite: boolean) => {
     const widths = resizeMapToWidths(sizes)
     if (Object.keys(widths).length === 0) return
     setPreferences((current) => {
+      if (widthsEqual(current.widths, widths)) return current
       const next = { ...current, widths }
-      if (persistWrite) persist(next)
+      if (persistWrite) writePreferences(storageKeyRef.current, next)
       return next
     })
-  }
+  }, [])
 
   const visibleColumnsCount = columns.filter((column) => !preferences.hidden.includes(column.label)).length
 
@@ -236,11 +248,27 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     persist(next)
   }
 
+  const layoutValue = useMemo<TableLayoutValue>(
+    () => ({ widths: preferences.widths, hidden: preferences.hidden, columns }),
+    [preferences.widths, preferences.hidden, columns],
+  )
+
   return (
-    <TableLayoutContext.Provider value={{ widths: preferences.widths, hidden: preferences.hidden, columns }}>
+    <TableLayoutContext.Provider value={layoutValue}>
       <div
         className="relative w-full"
-        onPointerDownCapture={(event) => notePressTarget(event.target)}
+        onPointerDownCapture={(event) => {
+          notePressTarget(event.target)
+          // Shift+клик выбирает диапазон строк; без preventDefault браузер ещё и красит текст синим
+          if (
+            event.shiftKey &&
+            event.button === 0 &&
+            !(event.target instanceof Element && event.target.closest('[data-slot="table-column-resizer"]'))
+          ) {
+            event.preventDefault()
+            window.getSelection()?.removeAllRanges()
+          }
+        }}
         onKeyDownCapture={() => {
           pressStartedOnControl = false
         }}
@@ -298,13 +326,13 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
           </div>
         ) : null}
 
-        <HeroTable className={cn(className)} variant={variant}>
+        <HeroTable className={cn(className, 'touch-manipulation')} variant={variant}>
           <HeroTable.ResizableContainer
             className="w-full"
             onResize={(widths) => applyResize(widths as Map<unknown, unknown>, false)}
             onResizeEnd={(widths) => applyResize(widths as Map<unknown, unknown>, true)}
           >
-            <HeroTable.Content aria-label={ariaLabel || 'Таблица'}>
+            <HeroTable.Content aria-label={ariaLabel || 'Таблица'} selectionMode="none">
               {children}
             </HeroTable.Content>
           </HeroTable.ResizableContainer>
@@ -354,28 +382,37 @@ export function TableBody({ className, children, ...props }: TableSectionProps) 
 
 export function TableRow({ className, children, onClick, id, ...props }: TableRowProps) {
   const { hidden, columns } = useContext(TableLayoutContext)
+  const handledByPointer = useRef(false)
   const cells = Children.toArray(children).filter((_, index) => {
     const label = columns[index]?.label
     return !label || !hidden.includes(label)
   })
+  const activate = () => {
+    if (pressStartedOnControl || !onClick) return
+    onClick({
+      target: null,
+      currentTarget: null,
+      preventDefault() {},
+      stopPropagation() {},
+    } as never)
+  }
   return (
     <HeroTable.Row
       id={id}
       className={className}
-      onAction={
-        onClick
-          ? () => {
-              if (pressStartedOnControl) return
-              onClick({
-                target: null,
-                currentTarget: null,
-                preventDefault() {},
-                stopPropagation() {},
-              } as never)
-            }
-          : undefined
-      }
       {...props}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return
+        if (!pressStartedOnControl) handledByPointer.current = true
+        activate()
+      }}
+      onAction={() => {
+        if (handledByPointer.current) {
+          handledByPointer.current = false
+          return
+        }
+        activate()
+      }}
     >
       {cells}
     </HeroTable.Row>
@@ -405,6 +442,28 @@ export function TableHead({ className, children, isRowHeader, id, ...props }: Ta
 export function TableCell({ className, children, colSpan, textValue, ...props }: TableCellProps) {
   return (
     <HeroTable.Cell className={className} colSpan={colSpan} textValue={textValue} {...props}>
+      {children}
+    </HeroTable.Cell>
+  )
+}
+
+/** Ячейка с чекбоксом: не даём RAC-строке перехватить pointerdown (иначе выбор ждёт pointerup). */
+export function TableSelectCell({ className, children, colSpan, textValue, ...props }: TableCellProps) {
+  return (
+    <HeroTable.Cell
+      className={className}
+      colSpan={colSpan}
+      textValue={textValue}
+      {...props}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+        props.onPointerDown?.(event)
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+        props.onClick?.(event)
+      }}
+    >
       {children}
     </HeroTable.Cell>
   )
