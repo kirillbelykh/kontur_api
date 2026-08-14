@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
 import { TablePagination, usePagination } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
-import { Shimmer } from '@/components/ui/shimmer'
+import { Shimmer, BusyLabel } from '@/components/ui/shimmer'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -909,7 +909,9 @@ export function OrdersPage() {
                 onClick={() => void createNow()}
                 disabled={isBusy}
               >
-                Создать сразу
+                <BusyLabel busy={busy === 'create'} pending="Создаётся…">
+                  Создать сразу
+                </BusyLabel>
               </Button>
             </div>
 
@@ -937,7 +939,9 @@ export function OrdersPage() {
             <CardTitle>Очередь</CardTitle>
             <div className="flex flex-wrap gap-1.5">
               <Button size="sm" onClick={() => void submitQueue()} disabled={isBusy || queue.length === 0}>
-                Отправить очередь
+                <BusyLabel busy={busy === 'submit'} pending="Отправляется…">
+                  Отправить очередь
+                </BusyLabel>
               </Button>
               <Button size="sm" variant="outline" onClick={() => void removeQueueItem()} disabled={isBusy || !selectedQueueId}>
                 Удалить

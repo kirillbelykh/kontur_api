@@ -1,12 +1,14 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Maximize2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
+import { BusyLabel } from '@/components/ui/shimmer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePickerField } from '@/components/ui/date-picker'
@@ -443,10 +445,13 @@ export function LabelsPage() {
     return true
   }
 
-  const runBusy = async (key: string, action: () => Promise<boolean>, successMessage: string) => {
+  const runBusy = async (key: string, action: () => Promise<boolean>, successMessage: string, celebrate = false) => {
     setBusy(key)
     try {
-      if (await action()) toast.success(successMessage)
+      if (await action()) {
+        toast.success(successMessage)
+        if (celebrate) celebrateSuccess()
+      }
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -466,6 +471,7 @@ export function LabelsPage() {
       'print',
       async () => handleResult(await apiCall<LabelActionResult>('print_100x180_label', buildPayload())),
       'Печать поставлена в очередь.',
+      true,
     )
 
   const recordInfoText = () => {
@@ -571,10 +577,14 @@ export function LabelsPage() {
               Обновить
             </Button>
             <Button variant="outline" size="sm" onClick={() => void showPreview()} disabled={isBusy}>
-              Показать контекст
+              <BusyLabel busy={busy === 'preview'} pending="Собирается…">
+                Показать контекст
+              </BusyLabel>
             </Button>
             <Button size="sm" onClick={() => void print()} disabled={isBusy}>
-              Печать
+              <BusyLabel busy={busy === 'print'} pending="Печатается…">
+                Печать
+              </BusyLabel>
             </Button>
           </>
         }

@@ -8,7 +8,17 @@ describe('statusMeta', () => {
   })
 
   it('переходные статусы получают shimmer (pending)', () => {
-    for (const status of ['Ожидает', 'Закладывается', 'Закрывается', 'В обработке']) {
+    for (const status of [
+      'Ожидает',
+      'Закладывается',
+      'Закрывается',
+      'В обработке',
+      'Скачивается',
+      'Печатается',
+      'Вводится в оборот',
+      'Отправляется на ТСД',
+      'Подписывается',
+    ]) {
       const meta = statusMeta(status)
       expect(meta.pending, status).toBe(true)
       expect(meta.tone, status).toBe('warning')

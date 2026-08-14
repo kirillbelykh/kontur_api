@@ -34,9 +34,11 @@ function showSuccessCheck() {
   }, 520)
 }
 
-/** После создания заказа: чередуем конфетти и анимированную галочку. */
+/** После успешного действия: чередуем конфетти и анимированную галочку. */
 export function celebrateOrderCreated() {
   if (!getAppSetting('animations')) return
   if (turn++ % 2 === 0) fireConfetti()
   else showSuccessCheck()
 }
+
+export const celebrateSuccess = celebrateOrderCreated

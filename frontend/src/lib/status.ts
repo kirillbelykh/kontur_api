@@ -32,6 +32,14 @@ export function statusMeta(status?: string): StatusMeta {
     value.includes('обработ') ||
     value.includes('создаёт') ||
     value.includes('создает') ||
+    value.includes('скачив') ||
+    value.includes('печат') ||
+    value.includes('вводит') ||
+    value.includes('отправ') ||
+    value.includes('подпис') ||
+    value.includes('наполня') ||
+    value.includes('проводится') ||
+    value.includes('проводятся') ||
     value.includes('закладыва') ||
     value.includes('заклад') ||
     value.includes('закрыва') ||

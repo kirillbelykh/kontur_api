@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { PenLine, PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -8,6 +9,7 @@ import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { BusyLabel } from '@/components/ui/shimmer'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -67,11 +69,13 @@ const TsdRow = memo(function TsdRow({
   item,
   rowId,
   selected,
+  liveTsdStatus,
   onToggle,
 }: {
   item: TsdItem
   rowId: string
   selected: boolean
+  liveTsdStatus?: string
   onToggle: (documentId: string) => void
 }) {
   const documentId = item.document_id || ''
@@ -101,8 +105,8 @@ const TsdRow = memo(function TsdRow({
         ) : null}
       </TableCell>
       <TableCell>
-        <StatusBadge status={item.tsd_status} />
-        {item.tsd_intro_number ? (
+        <StatusBadge status={liveTsdStatus || item.tsd_status} />
+        {item.tsd_intro_number && !liveTsdStatus ? (
           <div className="mt-1 font-mono text-xs text-muted-foreground">{item.tsd_intro_number}</div>
         ) : null}
       </TableCell>
@@ -122,6 +126,7 @@ export function TsdPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [introNumberError, setIntroNumberError] = useState(false)
+  const [liveTsdStatus, setLiveTsdStatus] = useState<Record<string, string>>({})
 
   const setField = <K extends keyof TsdForm>(key: K, value: TsdForm[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -200,11 +205,12 @@ export function TsdPage() {
   const selectedItem = selectedIds.length === 1 ? items.find((item) => item.document_id === selectedIds[0]) : undefined
   const canSign = Boolean(selectedItem && isFilledOnTsd(selectedItem))
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
+  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string, celebrate = false) => {
     setBusy(key)
     try {
       await action()
       if (successMessage) toast.success(successMessage)
+      if (celebrate) celebrateSuccess()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -228,27 +234,33 @@ export function TsdPage() {
           throw new Error('Укажите номер ввода в оборот.')
         }
 
-        const result = await apiCall<TsdRunResult>(
-          'create_tsd_tasks',
-          selectedIds,
-          form.intro_number,
-          form.production_date,
-          form.expiration_date,
-          form.batch_number,
-        )
-
-        const failedIds = new Set((result.errors || []).map((entry) => entry.document_id))
-        setSelectedIds((prev) => prev.filter((id) => failedIds.has(id)))
-        await load(false)
-
-        if (result.errors?.length) {
-          const firstError = result.errors[0]
-          throw new Error(
-            `Создано ${result.results?.length || 0}/${selectedIds.length}. ${firstError?.error || 'Подробности в логе.'}`,
+        setLiveTsdStatus(Object.fromEntries(selectedIds.map((id) => [id, 'Отправляется на ТСД'])))
+        try {
+          const result = await apiCall<TsdRunResult>(
+            'create_tsd_tasks',
+            selectedIds,
+            form.intro_number,
+            form.production_date,
+            form.expiration_date,
+            form.batch_number,
           )
+
+          const failedIds = new Set((result.errors || []).map((entry) => entry.document_id))
+          setSelectedIds((prev) => prev.filter((id) => failedIds.has(id)))
+          await load(false)
+
+          if (result.errors?.length) {
+            const firstError = result.errors[0]
+            throw new Error(
+              `Создано ${result.results?.length || 0}/${selectedIds.length}. ${firstError?.error || 'Подробности в логе.'}`,
+            )
+          }
+        } finally {
+          setLiveTsdStatus({})
         }
       },
       'Задания на ТСД созданы.',
+      true,
     )
 
   const signIntroduction = () => {
@@ -264,15 +276,21 @@ export function TsdPage() {
     return runBusy(
       'sign',
       async () => {
-        const result = await apiCall<SignResult>('sign_tsd_introduction', selectedIds[0])
-        if (result?.state?.items) {
-          setItems(result.state.items)
-          setLive(true)
-        } else {
-          await load(true)
+        setLiveTsdStatus({ [selectedIds[0]]: 'Подписывается' })
+        try {
+          const result = await apiCall<SignResult>('sign_tsd_introduction', selectedIds[0])
+          if (result?.state?.items) {
+            setItems(result.state.items)
+            setLive(true)
+          } else {
+            await load(true)
+          }
+        } finally {
+          setLiveTsdStatus({})
         }
       },
       'Документ подписан и отправлен в ГИС МТ.',
+      true,
     )
   }
 
@@ -315,7 +333,9 @@ export function TsdPage() {
               disabled={isBusy || selectedIds.length === 0 || !form.intro_number.trim()}
             >
               <PlayCircle className="h-3.5 w-3.5" />
-              Создать задания{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
+              <BusyLabel busy={busy === 'create'} pending="Отправляется на ТСД…">
+                Создать задания{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
+              </BusyLabel>
             </Button>
             <Button
               size="sm"
@@ -325,7 +345,9 @@ export function TsdPage() {
               title={!canSign ? 'Доступно только для статуса «Наполнен на ТСД»' : undefined}
             >
               <PenLine className="h-3.5 w-3.5" />
-              Подписать и ввести в оборот
+              <BusyLabel busy={busy === 'sign'} pending="Подписывается…">
+                Подписать и ввести в оборот
+              </BusyLabel>
             </Button>
           </div>
         </CardHeader>
@@ -418,6 +440,7 @@ export function TsdPage() {
                         rowId={rowId}
                         item={item}
                         selected={Boolean(documentId) && selectedIds.includes(documentId)}
+                        liveTsdStatus={liveTsdStatus[documentId]}
                         onToggle={toggleId}
                       />
                     )

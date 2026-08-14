@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { PlayCircle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -8,6 +9,7 @@ import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { BusyLabel } from '@/components/ui/shimmer'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -47,11 +49,13 @@ const IntroRow = memo(function IntroRow({
   item,
   rowId,
   checked,
+  liveStatus,
   onToggle,
 }: {
   item: IntroItem
   rowId: string
   checked: boolean
+  liveStatus?: string
   onToggle: (documentId: string) => void
 }) {
   const documentId = item.document_id || ''
@@ -73,7 +77,7 @@ const IntroRow = memo(function IntroRow({
       </TableCell>
       <TableCell className="text-muted-foreground">{item.full_name || item.simpl || '—'}</TableCell>
       <TableCell>
-        <StatusBadge status={item.status} />
+        <StatusBadge status={liveStatus || item.status} />
       </TableCell>
       <TableCell className="font-mono text-xs text-muted-foreground">{item.gtin || '—'}</TableCell>
     </TableRow>
@@ -92,6 +96,7 @@ export function IntroPage() {
   const [expirationDate, setExpirationDate] = useState('')
   const [batchNumber, setBatchNumber] = useState('')
   const [batchError, setBatchError] = useState(false)
+  const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
 
   const applyItems = useCallback(
     (next: IntroItem[]) => {
@@ -156,11 +161,12 @@ export function IntroPage() {
     )
   }, [])
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage: string) => {
+  const runBusy = async (key: string, action: () => Promise<void>, successMessage: string, celebrate = false) => {
     setBusy(key)
     try {
       await action()
       toast.success(successMessage)
+      if (celebrate) celebrateSuccess()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -189,21 +195,27 @@ export function IntroPage() {
           flagBatchError()
           throw new Error('Укажите номер партии.')
         }
-        const result = await apiCall<IntroResult>(
-          'introduce_orders',
-          selectedIds,
-          productionDate,
-          expirationDate,
-          batchNumber,
-        )
-        if (result.state?.items) applyItems(result.state.items)
-        else await load()
-        const failed = result.errors ?? []
-        if (failed.length) {
-          throw new Error(failed[0]?.error || 'Не удалось ввести заказ в оборот.')
+        setLiveStatus(Object.fromEntries(selectedIds.map((id) => [id, 'Вводится в оборот'])))
+        try {
+          const result = await apiCall<IntroResult>(
+            'introduce_orders',
+            selectedIds,
+            productionDate,
+            expirationDate,
+            batchNumber,
+          )
+          if (result.state?.items) applyItems(result.state.items)
+          else await load()
+          const failed = result.errors ?? []
+          if (failed.length) {
+            throw new Error(failed[0]?.error || 'Не удалось ввести заказ в оборот.')
+          }
+        } finally {
+          setLiveStatus({})
         }
       },
       'Ввод в оборот завершён.',
+      true,
     )
 
   const isBusy = Boolean(busy) || loading
@@ -256,7 +268,9 @@ export function IntroPage() {
             </div>
             <Button size="sm" onClick={() => void runIntroduction()} disabled={isBusy || selectedIds.length === 0}>
               <PlayCircle className="h-3.5 w-3.5" />
-              Ввести в оборот{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
+              <BusyLabel busy={busy === 'run'} pending="Вводится в оборот…">
+                Ввести в оборот{selectedIds.length > 1 ? ` (${selectedIds.length})` : ''}
+              </BusyLabel>
             </Button>
           </CardContent>
         </Card>
@@ -308,6 +322,7 @@ export function IntroPage() {
                           rowId={rowId}
                           item={item}
                           checked={Boolean(documentId) && selectedIds.includes(documentId)}
+                          liveStatus={liveStatus[documentId]}
                           onToggle={toggleId}
                         />
                       )

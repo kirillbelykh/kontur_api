@@ -11,6 +11,7 @@ import {
 import { Label, ProgressBar } from '@heroui/react'
 import { Download, Printer, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -18,6 +19,7 @@ import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { BusyLabel, Shimmer } from '@/components/ui/shimmer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -77,6 +79,7 @@ const DownloadRow = memo(function DownloadRow({
   index,
   checked,
   focused,
+  liveStatus,
   onActivate,
   onToggle,
 }: {
@@ -85,6 +88,7 @@ const DownloadRow = memo(function DownloadRow({
   index: number
   checked: boolean
   focused: boolean
+  liveStatus?: string
   onActivate: (documentId: string, rowIndex: number) => void
   onToggle: (documentId: string) => void
 }) {
@@ -114,8 +118,8 @@ const DownloadRow = memo(function DownloadRow({
         ) : null}
       </TableCell>
       <TableCell>
-        <StatusBadge status={item.status} />
-        {item.status_summary ? (
+        <StatusBadge status={liveStatus || item.status} />
+        {item.status_summary && !liveStatus ? (
           <div className="mt-1 text-xs text-muted-foreground">{item.status_summary}</div>
         ) : null}
       </TableCell>
@@ -138,6 +142,7 @@ export function DownloadPage() {
   const [recordNumber, setRecordNumber] = useState('')
   const [autoDownload, setAutoDownload] = useState(false)
   const [progress, setProgress] = useState<Progress | null>(null)
+  const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
   const lastClickedIndex = useRef(-1)
   // TableRow отдаёт onAction без исходного события — модификаторы снимаем до его срабатывания
   const clickMeta = useRef({ ctrl: false, shift: false, fromControl: false })
@@ -192,11 +197,12 @@ export function DownloadPage() {
   const printTargetId = selection.focus || selection.ids[0] || ''
   const isBusy = Boolean(busy)
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
+  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string, celebrate = false) => {
     setBusy(key)
     try {
       await action()
       if (successMessage) toast.success(successMessage)
+      if (celebrate) celebrateSuccess()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -278,7 +284,8 @@ export function DownloadPage() {
       async () => {
         if (!targetIds.length) throw new Error('Выберите хотя бы один заказ для скачивания.')
 
-        setProgress({ active: true, processed: 0, total: targetIds.length, label: `Прогресс скачивания: 0/${targetIds.length}` })
+        setLiveStatus(Object.fromEntries(targetIds.map((id) => [id, 'Скачивается'])))
+        setProgress({ active: true, processed: 0, total: targetIds.length, label: `Скачивается: 0/${targetIds.length}` })
         let successCount = 0
         const errors: string[] = []
 
@@ -289,14 +296,16 @@ export function DownloadPage() {
             try {
               await apiCall('manual_download_order', documentId)
               successCount += 1
+              setLiveStatus((prev) => ({ ...prev, [documentId]: 'Скачан' }))
             } catch (error) {
               errors.push(`${order?.order_name || documentId}: ${getErrorMessage(error)}`)
+              setLiveStatus((prev) => ({ ...prev, [documentId]: 'Ошибка скачивания' }))
             }
             setProgress({
               active: true,
               processed: index + 1,
               total: targetIds.length,
-              label: `Прогресс скачивания: ${index + 1}/${targetIds.length}`,
+              label: `Скачивается: ${index + 1}/${targetIds.length}`,
             })
           }
         } finally {
@@ -310,12 +319,17 @@ export function DownloadPage() {
           })
         }
 
-        await load()
+        try {
+          await load()
+        } finally {
+          setLiveStatus({})
+        }
         if (errors.length) {
           throw new Error(`Скачано ${successCount}/${targetIds.length}. Первая ошибка: ${errors[0]}`)
         }
       },
-      'Заказ скачан.',
+      'Заказы скачаны.',
+      true,
     )
 
   const printLabels = () =>
@@ -324,19 +338,20 @@ export function DownloadPage() {
       async () => {
         if (!printTargetId) throw new Error('Выберите заказ для печати термоэтикеток.')
         if (!printer) throw new Error('Выберите принтер термоэтикеток.')
-        const result = await apiCall<PrintResult>(
-          'print_download_order',
-          printTargetId,
-          printer,
-          recordNumber.trim() || null,
-        )
-        const selected = result?.selection?.selected_record_number
-        const total = result?.selection?.total_record_count
-        if (selected) {
-          toast.success(`Печать записи №${selected} из ${total || '?'} поставлена в очередь.`)
+        setLiveStatus({ [printTargetId]: 'Печатается' })
+        try {
+          await apiCall<PrintResult>(
+            'print_download_order',
+            printTargetId,
+            printer,
+            recordNumber.trim() || null,
+          )
+        } finally {
+          setLiveStatus({})
         }
       },
       'Печать термоэтикеток запущена.',
+      true,
     )
 
   return (
@@ -350,7 +365,9 @@ export function DownloadPage() {
               Обновить
             </Button>
             <Button size="sm" onClick={() => void syncStatuses()} disabled={isBusy}>
-              Обновить статусы
+              <BusyLabel busy={busy === 'sync'} pending="Обновляются…">
+                Обновить статусы
+              </BusyLabel>
             </Button>
           </>
         }
@@ -398,11 +415,15 @@ export function DownloadPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => void downloadSelected()} disabled={isBusy || targetIds.length === 0}>
               <Download className="h-3.5 w-3.5" />
-              Скачать выбранное
+              <BusyLabel busy={busy === 'download'} pending="Скачивается…">
+                Скачать выбранное
+              </BusyLabel>
             </Button>
             <Button size="sm" onClick={() => void printLabels()} disabled={isBusy || !printTargetId || !printer}>
               <Printer className="h-3.5 w-3.5" />
-              Печать 30×20
+              <BusyLabel busy={busy === 'print'} pending="Печатается…">
+                Печать 30×20
+              </BusyLabel>
             </Button>
             <span title="Скачивать готовые заказы при обновлении статусов">
               <Checkbox isSelected={autoDownload} isDisabled={isBusy} onChange={setAutoDownload}>
@@ -417,7 +438,9 @@ export function DownloadPage() {
               className="w-full"
               value={progress.total ? Math.round((progress.processed / progress.total) * 100) : 0}
             >
-              <Label>{progress.label}</Label>
+              <Label>
+                {progress.active ? <Shimmer className="text-xs">{progress.label}</Shimmer> : progress.label}
+              </Label>
               <ProgressBar.Output />
               <ProgressBar.Track>
                 <ProgressBar.Fill className={cn(progress.active && 'animate-pulse')} />
@@ -476,6 +499,7 @@ export function DownloadPage() {
                         index={index}
                         checked={selection.ids.includes(documentId)}
                         focused={selection.focus === documentId}
+                        liveStatus={liveStatus[documentId]}
                         onActivate={activateRow}
                         onToggle={toggleId}
                       />

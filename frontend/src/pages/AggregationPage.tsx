@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
+import { celebrateSuccess } from '@/lib/celebrate'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
@@ -15,7 +16,7 @@ import { DatePickerField } from '@/components/ui/date-picker'
 import { dissolveToDust, restoreDissolved } from '@/components/ui/dust-effect'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
-import { Shimmer } from '@/components/ui/shimmer'
+import { Shimmer, BusyLabel } from '@/components/ui/shimmer'
 import { Skeleton, TableSkeleton } from '@/components/ui/skeleton'
 import { SelectNative } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -51,6 +52,7 @@ const AkRow = memo(function AkRow({
   globalIndex,
   selected,
   arrived,
+  liveStatus,
   onToggle,
 }: {
   row: AggregationItem
@@ -58,6 +60,7 @@ const AkRow = memo(function AkRow({
   globalIndex: number
   selected: boolean
   arrived: boolean
+  liveStatus?: string
   onToggle: (documentId: string, index: number) => void
 }) {
   const id = String(row.document_id || '')
@@ -76,7 +79,7 @@ const AkRow = memo(function AkRow({
         <div className="text-xs text-muted-foreground">{row.comment || '—'}</div>
       </TableCell>
       <TableCell>
-        <StatusBadge status={row.status_label || row.status} />
+        <StatusBadge status={liveStatus || row.status_label || row.status} />
         {row.status === 'readyForSendAfterApproved' ? (
           <div className="mt-1 text-xs text-muted-foreground">Состав изменён</div>
         ) : null}
@@ -115,6 +118,7 @@ export function AggregationPage() {
   // Создание АК: плейсхолдеры в таблице + подсветка «прилетевших» строк
   const [pendingCreate, setPendingCreate] = useState(0)
   const [arrivedIds, setArrivedIds] = useState<Set<string>>(new Set())
+  const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
   const prevIdsRef = useRef<Set<string> | null>(null)
   // TableRow отдаёт onAction без исходного события — модификатор снимаем в capture-фазе до действия строки
   const shiftPressedRef = useRef(false)
@@ -193,16 +197,21 @@ export function AggregationPage() {
   const isBusy = Boolean(busy)
   const hasSelection = selectedIds.size > 0
 
-  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string) => {
+  const runBusy = async (key: string, action: () => Promise<void>, successMessage?: string, celebrate = false) => {
     setBusy(key)
     try {
       await action()
       if (successMessage) toast.success(successMessage)
+      if (celebrate) celebrateSuccess()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
       setBusy(null)
     }
+  }
+
+  const overlaySelected = (status: string) => {
+    setLiveStatus(Object.fromEntries(selectedIdList().map((id) => [id, status])))
   }
 
   const selectedIdList = () => {
@@ -283,6 +292,7 @@ export function AggregationPage() {
         }
       },
       'Агрегационные коды созданы.',
+      true,
     )
 
   const refreshList = () =>
@@ -298,10 +308,16 @@ export function AggregationPage() {
     runBusy(
       'download-selected',
       async () => {
-        await apiCall('download_selected_aggregations', selectedIdList())
-        await load(true)
+        overlaySelected('Скачивается')
+        try {
+          await apiCall('download_selected_aggregations', selectedIdList())
+          await load(true)
+        } finally {
+          setLiveStatus({})
+        }
       },
       'Выбранные АК скачаны.',
+      true,
     )
 
   const approveSelected = () =>
@@ -314,10 +330,16 @@ export function AggregationPage() {
           window.confirm(
             'Если среди выбранных АК есть коды, уже привязанные к другому АК, разрешить расформирование старого АК?',
           )
-        await apiCall('approve_selected_aggregations', ids, allow)
-        await load(true)
+        overlaySelected('Проводится')
+        try {
+          await apiCall('approve_selected_aggregations', ids, allow)
+          await load(true)
+        } finally {
+          setLiveStatus({})
+        }
       },
       'Проведение выбранных АК завершено.',
+      true,
     )
 
   const archiveSelected = () =>
@@ -352,23 +374,30 @@ export function AggregationPage() {
         targets.forEach(restoreDissolved)
       },
       'Выбранные АК отправлены в архив.',
+      true,
     )
 
   const introduceSelected = () =>
     runBusy(
       'intro-selected',
       async () => {
-        await apiCall(
-          'introduce_selected_aggregations',
-          selectedIdList(),
-          productionDate,
-          expirationDate,
-          batchNumber,
-          documentTitle,
-        )
-        await load(true)
+        overlaySelected('Вводится в оборот')
+        try {
+          await apiCall(
+            'introduce_selected_aggregations',
+            selectedIdList(),
+            productionDate,
+            expirationDate,
+            batchNumber,
+            documentTitle,
+          )
+          await load(true)
+        } finally {
+          setLiveStatus({})
+        }
       },
       'Ввод в оборот по выбранным АК завершён.',
+      true,
     )
 
   const refill = () =>
@@ -379,6 +408,7 @@ export function AggregationPage() {
         await load(true)
       },
       'Повторное наполнение АК завершено.',
+      true,
     )
 
   const cacheAge = Number(state.cache_age_seconds || 0)
@@ -430,7 +460,9 @@ export function AggregationPage() {
               />
             </div>
             <Button size="sm" onClick={() => void createCodes()} disabled={isBusy}>
-              Создать
+              <BusyLabel busy={busy === 'create'} pending="Создаётся…">
+                Создать
+              </BusyLabel>
             </Button>
           </CardContent>
         </Card>
@@ -469,16 +501,24 @@ export function AggregationPage() {
 
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="outline" onClick={() => void downloadSelected()} disabled={isBusy || !hasSelection}>
-                Скачать
+                <BusyLabel busy={busy === 'download-selected'} pending="Скачивается…">
+                  Скачать
+                </BusyLabel>
               </Button>
               <Button size="sm" variant="outline" onClick={() => void approveSelected()} disabled={isBusy || !hasSelection}>
-                Провести
+                <BusyLabel busy={busy === 'approve-selected'} pending="Проводится…">
+                  Провести
+                </BusyLabel>
               </Button>
               <Button size="sm" variant="outline" onClick={() => void archiveSelected()} disabled={isBusy || !hasSelection}>
-                В архив
+                <BusyLabel busy={busy === 'archive-selected'} pending="В архив…">
+                  В архив
+                </BusyLabel>
               </Button>
               <Button size="sm" variant="outline" onClick={() => void introduceSelected()} disabled={isBusy || !hasSelection}>
-                Ввести в оборот
+                <BusyLabel busy={busy === 'intro-selected'} pending="Вводится в оборот…">
+                  Ввести в оборот
+                </BusyLabel>
               </Button>
               <Button
                 size="sm"
@@ -516,7 +556,9 @@ export function AggregationPage() {
                       Только для АК, не зарегистрированных в ГИС МТ.
                     </p>
                     <Button size="sm" onClick={() => void refill()} disabled={isBusy}>
-                      Наполнить
+                      <BusyLabel busy={busy === 'refill'} pending="Наполняется…">
+                        Наполнить
+                      </BusyLabel>
                     </Button>
                   </div>
                 </motion.div>
@@ -645,6 +687,7 @@ export function AggregationPage() {
                           globalIndex={globalIndex}
                           selected={selectedIds.has(id)}
                           arrived={arrivedIds.has(id)}
+                          liveStatus={liveStatus[id]}
                           onToggle={toggleRow}
                         />
                       )
