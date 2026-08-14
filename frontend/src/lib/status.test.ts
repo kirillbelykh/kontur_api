@@ -7,20 +7,15 @@ describe('statusMeta', () => {
     expect(statusMeta('Отклонён')).toEqual({ tone: 'danger', pending: false })
   })
 
-  it('переходные статусы получают shimmer (pending)', () => {
-    for (const status of [
-      'Ожидает',
-      'Закладывается',
-      'Закрывается',
-      'В обработке',
-      'Скачивается',
-      'Печатается',
-      'Вводится в оборот',
-      'Отправляется на ТСД',
-      'Подписывается',
-    ]) {
+  it('перелив только у «На проверке» и «Скачивается»', () => {
+    expect(statusMeta('На проверке')).toEqual({ tone: 'warning', pending: true })
+    expect(statusMeta('Скачивается')).toEqual({ tone: 'warning', pending: true })
+  })
+
+  it('отправка и подпись — без перелива', () => {
+    for (const status of ['Отправлен на подпись', 'Отправлено', 'Не отправлено']) {
       const meta = statusMeta(status)
-      expect(meta.pending, status).toBe(true)
+      expect(meta.pending, status).toBe(false)
       expect(meta.tone, status).toBe('warning')
     }
   })

@@ -26,28 +26,13 @@ export function statusMeta(status?: string): StatusMeta {
     return { tone: 'danger', pending: false }
   }
 
-  // Переходные (крутится shimmer)
-  if (
-    value.includes('ожид') ||
-    value.includes('обработ') ||
-    value.includes('создаёт') ||
-    value.includes('создает') ||
-    value.includes('скачив') ||
-    value.includes('печат') ||
-    value.includes('вводит') ||
-    value.includes('отправ') ||
-    value.includes('подпис') ||
-    value.includes('наполня') ||
-    value.includes('проводится') ||
-    value.includes('проводятся') ||
-    value.includes('закладыва') ||
-    value.includes('заклад') ||
-    value.includes('закрыва') ||
-    value.includes('pending') ||
-    value.includes('process') ||
-    value.includes('creat')
-  ) {
+  // Перелив только у «На проверке» и «Скачивается»
+  if (value.includes('скачив') || value.includes('проверк')) {
     return { tone: 'warning', pending: true }
+  }
+
+  if (value.includes('отправ') || value.includes('подпис')) {
+    return { tone: 'warning', pending: false }
   }
 
   if (value.includes('наполн')) return { tone: 'violet', pending: false }
