@@ -295,7 +295,7 @@ export function OrdersPage() {
         'background:hsl(var(--wms-card));color:hsl(var(--wms-foreground));border:1px solid hsl(var(--wms-border));' +
         'box-shadow:0 8px 24px rgba(15,23,42,0.18);font-size:13px;font-weight:500;' +
         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:1;will-change:transform,opacity;' +
-        `transition:transform 700ms cubic-bezier(0.22,1,0.36,1) ${index * 80}ms,opacity 700ms ease-in ${index * 80}ms;`
+        `transition:transform 240ms cubic-bezier(0.22,1,0.36,1) ${index * 30}ms,opacity 240ms ease-out ${index * 30}ms;`
       document.body.appendChild(chip)
       const dx = targetRect.left + 32 - rect.left
       const dy = targetRect.top + 56 - rect.top
@@ -305,7 +305,7 @@ export function OrdersPage() {
           chip.style.opacity = '0.1'
         }),
       )
-      window.setTimeout(() => chip.remove(), 1000 + index * 80)
+      window.setTimeout(() => chip.remove(), 320 + index * 30)
     })
   }
 
@@ -362,7 +362,7 @@ export function OrdersPage() {
     const fresh = new Set([...currentIds].filter((id) => !previous.has(id)))
     if (fresh.size === 0) return
     setArrivedIds(fresh)
-    const timer = window.setTimeout(() => setArrivedIds(new Set()), 900)
+    const timer = window.setTimeout(() => setArrivedIds(new Set()), 380)
     return () => window.clearTimeout(timer)
   }, [history])
 
@@ -443,11 +443,12 @@ export function OrdersPage() {
     runBusy(
       'create',
       async () => {
-        await apiCall('create_order', buildPayload())
+        const result = await apiCall<{ state?: OrdersViewState }>('create_order', buildPayload())
         setForm((prev) => ({ ...EMPTY_FORM, order_name: prev.order_name }))
         setLookup(null)
         celebrateOrderCreated()
-        await load(true)
+        if (result.state) setState(result.state)
+        else await load(false)
       },
       'Заказ создан',
     )
@@ -462,7 +463,7 @@ export function OrdersPage() {
         const request = apiCall<{ state?: OrdersViewState; errors?: Array<{ order_name?: string; error?: string }> }>(
           'submit_order_queue',
         )
-        const animation = new Promise((resolve) => window.setTimeout(resolve, 700))
+        const animation = new Promise((resolve) => window.setTimeout(resolve, 240))
         try {
           const [result] = await Promise.all([request, animation])
           if (result.state) setState(result.state)

@@ -149,7 +149,7 @@ class ApiTests(unittest.TestCase):
         self.assertIn("/availability-status", session.get.call_args_list[0].args[0])
         self.assertIn("/availability-status", session.get.call_args_list[1].args[0])
         sleep_mock.assert_called_once_with(api.ORDER_AVAILABILITY_POLL_INTERVAL_SECONDS)
-        add_order_mock.assert_called_once()
+        add_order_mock.assert_not_called()
 
     def test_make_task_on_tsd_returns_clear_error_when_base_url_missing(self):
         session = Mock()

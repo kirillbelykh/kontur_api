@@ -28,10 +28,10 @@ function showSuccessCheck() {
   const check = host.firstElementChild as HTMLElement
   requestAnimationFrame(() => check.setAttribute('data-state', 'in'))
   window.setTimeout(() => {
-    check.style.transition = 'opacity 250ms ease-out'
+    check.style.transition = 'opacity 160ms ease-out'
     check.style.opacity = '0'
-    window.setTimeout(() => host.remove(), 300)
-  }, 1200)
+    window.setTimeout(() => host.remove(), 180)
+  }, 520)
 }
 
 /** После создания заказа: чередуем конфетти и анимированную галочку. */

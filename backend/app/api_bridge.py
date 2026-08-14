@@ -90,6 +90,7 @@ from backend.services.options import (
     venchik_required,
 )
 from backend.services.queue_utils import is_order_ready_for_intro, is_order_ready_for_tsd, remove_order_by_document_id
+from backend.services.perf import adaptive_worker_count
 from backend.services.update import apply_update as apply_git_update
 from backend.services.update import probe_updates
 from backend.services.utils import get_tnved_code, make_session_with_cookies, pluralize_ru
@@ -1125,32 +1126,59 @@ class ApiBridge:
             return
         if not force and (time.time() - float(runtime.wms_chz_last_synced_at or 0.0)) < WMS_CHZ_SYNC_INTERVAL_SECONDS:
             return
+
+        def fetch_endpoint(endpoint: str) -> List[Dict[str, Any]]:
+            response = requests.get(
+                f"{base_url}{endpoint}",
+                headers=self._wms_chz_headers(),
+                timeout=3,
+            )
+            if response.status_code == 404:
+                return []
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, list):
+                return []
+            return [item for item in payload if isinstance(item, dict)]
+
         try:
             endpoints = [
                 "/integration/chz/requests/pending",
                 "/integration/production-chz/requests/pending",
                 "/integration/manual-chz/requests/pending",
             ]
-            for endpoint in endpoints:
-                try:
-                    response = requests.get(
-                        f"{base_url}{endpoint}",
-                        headers=self._wms_chz_headers(),
-                        timeout=10,
-                    )
-                    if response.status_code == 404:
-                        continue
-                    response.raise_for_status()
-                    payload = response.json()
-                    if isinstance(payload, list):
-                        for item in payload:
-                            if isinstance(item, dict):
-                                self._upsert_wms_chz_request(item)
-                except Exception as endpoint_exc:
-                    logger.warning("Не удалось синхронизировать CHZ-запросы из WMS (%s): %s", endpoint, endpoint_exc)
+            workers = min(len(endpoints), adaptive_worker_count(cap=3, floor=1))
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                futures = [executor.submit(fetch_endpoint, endpoint) for endpoint in endpoints]
+                for future, endpoint in zip(futures, endpoints):
+                    try:
+                        for item in future.result():
+                            self._upsert_wms_chz_request(item)
+                    except Exception as endpoint_exc:
+                        logger.warning(
+                            "Не удалось синхронизировать CHZ-запросы из WMS (%s): %s",
+                            endpoint,
+                            endpoint_exc,
+                        )
             runtime.wms_chz_last_synced_at = time.time()
         except Exception as exc:
             logger.warning("Не удалось синхронизировать CHZ-запросы из WMS: %s", exc)
+
+    def _schedule_wms_chz_sync(self) -> None:
+        runtime = self._ensure_wms_chz_runtime_defaults()
+        if getattr(runtime, "wms_chz_sync_inflight", False):
+            return
+        if (time.time() - float(runtime.wms_chz_last_synced_at or 0.0)) < WMS_CHZ_SYNC_INTERVAL_SECONDS:
+            return
+        runtime.wms_chz_sync_inflight = True
+
+        def work() -> None:
+            try:
+                self._sync_pending_wms_chz_requests(force=True)
+            finally:
+                runtime.wms_chz_sync_inflight = False
+
+        Thread(target=work, daemon=True, name="WmsChzSync").start()
 
     def _find_wms_chz_request(self, request_ref: Any) -> Optional[Dict[str, Any]]:
         runtime = self._ensure_wms_chz_runtime_defaults()
@@ -1441,7 +1469,6 @@ class ApiBridge:
         try:
             response = session.get(
                 f"{base_url}/api/v1/codes-order/{normalized_id}",
-                headers={"Connection": "close"},
                 timeout=15,
             )
             response.raise_for_status()
@@ -1456,7 +1483,6 @@ class ApiBridge:
             try:
                 response = session.get(
                     f"{base_url}/api/v1/documents/{normalized_id}/positions",
-                    headers={"Connection": "close"},
                     timeout=15,
                 )
                 response.raise_for_status()
@@ -1502,7 +1528,7 @@ class ApiBridge:
                 pending.append((index, document_id))
 
         if pending:
-            worker_count = min(KONTUR_ORDER_METADATA_MAX_WORKERS, len(pending))
+            worker_count = min(adaptive_worker_count(cap=KONTUR_ORDER_METADATA_MAX_WORKERS), len(pending))
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 future_map = {
                     executor.submit(self._fetch_kontur_order_metadata, session, document_id): index
@@ -1530,24 +1556,61 @@ class ApiBridge:
                 return True
         return False
 
-    def _get_kontur_order_items(self, *, force_refresh: bool = False) -> List[Dict[str, Any]]:
+    def _seed_kontur_orders_cache_from_history(self) -> List[Dict[str, Any]]:
         runtime = _get_runtime()
-        now = time.time()
-        cached_at = float(getattr(runtime, "kontur_orders_cache_at", 0.0) or 0.0)
-        cached_items = getattr(runtime, "kontur_orders_cache_items", []) or []
-        if cached_items and not force_refresh and now - cached_at < KONTUR_ORDERS_CACHE_TTL_SECONDS:
-            if self._kontur_orders_need_visible_metadata(cached_items):
-                session = self._ensure_session_safely("orders")
-                if session:
-                    items = self._enrich_kontur_orders_with_metadata(session, self._kontur_order_items_from_cache())
-                    with runtime.lock:
-                        runtime.kontur_orders_cache_items = [dict(item) for item in items]
-                    return items
-            return self._kontur_order_items_from_cache()
+        try:
+            history_orders = runtime.history_db.get_all_orders()
+        except Exception:
+            history_orders = []
+        items = [
+            self._kontur_order_to_local_order(order)
+            for order in history_orders
+            if isinstance(order, dict)
+        ]
+        with runtime.lock:
+            if not getattr(runtime, "kontur_orders_cache_items", None):
+                runtime.kontur_orders_cache_items = [dict(item) for item in items]
+                runtime.kontur_orders_cache_at = 0.0
+        return self._kontur_order_items_from_cache() or items
 
+    def _schedule_kontur_orders_refresh(self) -> None:
+        runtime = _get_runtime()
+        with runtime.lock:
+            if getattr(runtime, "kontur_orders_refreshing", False):
+                return
+            runtime.kontur_orders_refreshing = True
+
+        def work() -> None:
+            try:
+                self._fetch_kontur_orders_into_cache()
+            except Exception:
+                logger.exception("Фоновое обновление списка заказов")
+            finally:
+                with runtime.lock:
+                    runtime.kontur_orders_refreshing = False
+
+        Thread(target=work, daemon=True, name="KonturOrdersRefresh").start()
+
+    def _remember_created_order_in_cache(self, result: Dict[str, Any]) -> None:
+        document_id = str(result.get("document_id") or "").strip()
+        if not document_id:
+            return
+        item = self._kontur_order_to_local_order(result)
+        runtime = _get_runtime()
+        with runtime.lock:
+            items = [
+                dict(existing)
+                for existing in (getattr(runtime, "kontur_orders_cache_items", None) or [])
+                if str(existing.get("document_id") or "").strip() != document_id
+            ]
+            items.insert(0, item)
+            runtime.kontur_orders_cache_items = items
+
+    def _fetch_kontur_orders_into_cache(self) -> List[Dict[str, Any]]:
+        runtime = _get_runtime()
         session = self._ensure_session_safely("orders")
         if not session:
-            return self._kontur_order_items_from_cache()
+            return self._kontur_order_items_from_cache() or self._seed_kontur_orders_cache_from_history()
 
         payload = self._fetch_codes_orders_batch(session)
         raw_items = list((payload.get("by_id") or {}).values())
@@ -1560,6 +1623,23 @@ class ApiBridge:
             runtime.live_order_by_id = dict(payload.get("by_id") or {})
             runtime.live_order_by_number = dict(payload.get("by_number") or {})
         return items
+
+    def _get_kontur_order_items(self, *, force_refresh: bool = False) -> List[Dict[str, Any]]:
+        runtime = _get_runtime()
+        if force_refresh:
+            return self._fetch_kontur_orders_into_cache()
+
+        cached_items = getattr(runtime, "kontur_orders_cache_items", []) or []
+        cached_at = float(getattr(runtime, "kontur_orders_cache_at", 0.0) or 0.0)
+        stale = (time.time() - cached_at) >= KONTUR_ORDERS_CACHE_TTL_SECONDS
+        if cached_items:
+            if stale or self._kontur_orders_need_visible_metadata(cached_items):
+                self._schedule_kontur_orders_refresh()
+            return self._kontur_order_items_from_cache()
+
+        seeded = self._seed_kontur_orders_cache_from_history()
+        self._schedule_kontur_orders_refresh()
+        return seeded
 
     def _get_kontur_order_item(self, document_id: str) -> Optional[Dict[str, Any]]:
         normalized_id = str(document_id or "").strip()
@@ -4257,7 +4337,10 @@ class ApiBridge:
     def get_orders_view_state(self, force_sync: bool = False) -> Dict[str, Any]:
         try:
             self._start_background_status_updater()
-            self._sync_pending_wms_chz_requests(force=bool(force_sync))
+            if force_sync:
+                self._sync_pending_wms_chz_requests(force=True)
+            else:
+                self._schedule_wms_chz_sync()
             runtime = _get_runtime()
             deleted_ids = self._get_deleted_document_ids()
             history_items: List[Dict[str, Any]] = []
@@ -4339,7 +4422,10 @@ class ApiBridge:
     def get_chz_requests_view_state(self, force_sync: bool = False) -> Dict[str, Any]:
         try:
             self._start_background_status_updater()
-            self._sync_pending_wms_chz_requests(force=bool(force_sync))
+            if force_sync:
+                self._sync_pending_wms_chz_requests(force=True)
+            else:
+                self._schedule_wms_chz_sync()
             return self._build_chz_requests_view_state()
         except Exception as exc:
             return {"error": str(exc)}
@@ -4659,13 +4745,18 @@ class ApiBridge:
     def create_order(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             item = self._prepare_order_item(payload)
-            result = self._submit_order_item(item)
-            return {"success": True, **result}
+            result = self._submit_order_item(item, sync_history=True)
+            self._remember_created_order_in_cache(result)
+            return {
+                "success": True,
+                **result,
+                "state": self.get_orders_view_state(force_sync=False),
+            }
         except Exception as exc:
             self._log("orders", f"Ошибка создания заказа: {exc}")
             return {"success": False, "document_id": "", "status": "", "error": str(exc)}
 
-    def _submit_order_item(self, item: Dict[str, Any]) -> Dict[str, Any]:
+    def _submit_order_item(self, item: Dict[str, Any], *, sync_history: bool = True) -> Dict[str, Any]:
         session = self._ensure_session()
         positions = [
             {
@@ -4713,7 +4804,7 @@ class ApiBridge:
         }
         existing_history_entry = _get_runtime().history_db.get_order_by_document_id(document_id)
         if existing_history_entry is None:
-            if not _get_runtime().history_db.add_order(history_entry):
+            if not _get_runtime().history_db.add_order(history_entry, sync=sync_history):
                 self._log(
                     "orders",
                     f"Внимание: заказ {item['order_name']} создан в Контуре, но не сохранён в историю",
@@ -4747,21 +4838,29 @@ class ApiBridge:
             if not runtime.order_queue:
                 raise RuntimeError("Очередь заказов пуста.")
 
+            self._ensure_session()
             results = []
             errors = []
             for item in list(runtime.order_queue):
                 try:
-                    results.append(self._submit_order_item(item))
+                    result = self._submit_order_item(item, sync_history=False)
+                    self._remember_created_order_in_cache(result)
+                    results.append(result)
                 except Exception as exc:
                     errors.append({"order_name": item["order_name"], "error": str(exc)})
                     self._log("orders", f"Ошибка заказа {item['order_name']}: {exc}")
+
+            try:
+                runtime.history_db.flush_github_sync(reason="submit_order_queue")
+            except Exception:
+                logger.exception("Не удалось выгрузить историю после очереди заказов")
 
             runtime.order_queue = []
             return {
                 "success": not errors,
                 "results": results,
                 "errors": errors,
-                "state": self.get_orders_view_state(),
+                "state": self.get_orders_view_state(force_sync=False),
             }
         except Exception as exc:
             self._log("orders", f"Ошибка выполнения очереди: {exc}")
@@ -5191,7 +5290,6 @@ class ApiBridge:
                         "sortField": "updateDate",
                         "sortOrder": "descending",
                     },
-                    headers={"Connection": "close"},
                     timeout=30,
                 )
                 response.raise_for_status()
@@ -5234,7 +5332,6 @@ class ApiBridge:
                         "sortField": "updateDate",
                         "sortOrder": "descending",
                     },
-                    headers={"Connection": "close"},
                     timeout=30,
                 )
                 response.raise_for_status()

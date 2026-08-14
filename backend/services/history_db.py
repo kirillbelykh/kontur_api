@@ -675,11 +675,11 @@ class OrderHistoryDB:
         if changed:
             self._save_data(data)
 
-    def add_order(self, order_data: Dict[str, Any]) -> bool:
+    def add_order(self, order_data: Dict[str, Any], *, sync: bool = True) -> bool:
         """Добавляет новый заказ в историю или обновляет существующий.
 
-        Возвращает False, если запись не удалось сохранить (ошибку не пробрасываем,
-        чтобы не ломать конвейер заказов — вызывающий код должен показать предупреждение).
+        ``sync=False`` пишет только локальный файл — вызывающий код делает
+        один ``flush_github_sync`` на пачку (очередь заказов).
         """
         try:
             with self._io_lock:
@@ -691,12 +691,21 @@ class OrderHistoryDB:
                 else:
                     logger.debug("Заказ %s уже актуален в истории", order_data.get("document_id"))
 
-                # Пытаемся выгрузить историю после каждого заказа кодов,
-                # даже если запись не изменилась (например, при повторе после сетевого сбоя).
-                self._sync_with_github_locked(push=True, reason="add_order")
+                if sync:
+                    self._sync_with_github_locked(push=True, reason="add_order")
             return True
         except Exception:
             logger.exception("Ошибка добавления заказа %s", order_data.get("document_id"))
+            return False
+
+    def flush_github_sync(self, reason: str = "flush") -> bool:
+        if not self.sync_enabled:
+            return False
+        try:
+            with self._io_lock:
+                return bool(self._sync_with_github_locked(push=True, reason=reason))
+        except Exception:
+            logger.exception("Не удалось выгрузить историю (%s)", reason)
             return False
 
     def mark_tsd_created(self, document_id: str, intro_number: str) -> bool:

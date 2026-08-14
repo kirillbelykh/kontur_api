@@ -36,7 +36,7 @@ const SIDEBAR_STORAGE_KEY = 'kontur_desktop_sidebar_open_v1'
 const JOURNAL_STORAGE_KEY = 'kontur_journal_open_v1'
 
 const sidebarTransition = {
-  duration: 0.28,
+  duration: 0.16,
   ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
 }
 
@@ -51,9 +51,9 @@ const textTransition = {
 }
 
 const pageTransition = {
-  initial: { opacity: 0, y: 8 },
+  initial: { opacity: 0, y: 4 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.18 },
+  transition: { duration: 0.1 },
 }
 
 type NavItem = {
@@ -147,7 +147,7 @@ function Navigation({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
               onBlur={() => setTooltip(null)}
               className={({ isActive }) =>
                 cn(
-                  'focus-ring flex h-10 w-full items-center overflow-hidden rounded-lg text-sm font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground',
+                  'focus-ring flex h-10 w-full items-center overflow-hidden rounded-lg text-sm font-medium text-muted-foreground transition-colors duration-100 hover:bg-muted hover:text-foreground',
                   isActive && 'bg-[hsl(var(--wms-border)/0.5)] text-foreground',
                 )
               }

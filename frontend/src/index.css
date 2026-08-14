@@ -85,32 +85,32 @@
   --field-ring: hsl(240 5% 60% / 0.22);
 
   /* Modal morph (transitions.dev Plus→menu motion language) */
-  --modal-open-dur: 350ms;
-  --modal-close-dur: 250ms;
-  --modal-ease: cubic-bezier(0.34, 1.25, 0.64, 1);
+  --modal-open-dur: 180ms;
+  --modal-close-dur: 120ms;
+  --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --modal-close-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --modal-fade-dur: 200ms;
-  --modal-slide: 16px;
-  --modal-scale: 0.97;
-  --modal-blur: 2px;
+  --modal-fade-dur: 120ms;
+  --modal-slide: 8px;
+  --modal-scale: 0.98;
+  --modal-blur: 0px;
 
   /* Shimmer text (загрузка/ожидание) */
-  --shimmer-dur: 2000ms;
+  --shimmer-dur: 1400ms;
   --shimmer-base: hsl(var(--wms-muted-foreground));
   --shimmer-highlight: hsl(var(--wms-foreground));
   --shimmer-band: 400%;
   --shimmer-ease: linear;
 
   /* Success check (после создания заказа) */
-  --check-opacity-dur: 500ms;
-  --check-rotate-dur: 500ms;
-  --check-rotate-from: 80deg;
-  --check-bob-dur: 500ms;
-  --check-y-amount: 40px;
-  --check-blur-dur: 500ms;
-  --check-blur-from: 10px;
-  --check-path-dur: 500ms;
-  --check-path-delay: 80ms;
+  --check-opacity-dur: 220ms;
+  --check-rotate-dur: 220ms;
+  --check-rotate-from: 40deg;
+  --check-bob-dur: 220ms;
+  --check-y-amount: 16px;
+  --check-blur-dur: 220ms;
+  --check-blur-from: 4px;
+  --check-path-dur: 220ms;
+  --check-path-delay: 40ms;
   --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
   --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
@@ -309,7 +309,7 @@ html[data-theme='ocean'] {
 }
 
 .order-arrive {
-  animation: order-arrive 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: order-arrive 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Строка очереди «улетает» вниз к Истории перед отправкой.
@@ -321,10 +321,10 @@ html[data-theme='ocean'] {
   }
 }
 .order-leave {
-  animation: order-leave-kf 0.4s ease-in forwards;
+  animation: order-leave-kf 0.18s ease-out forwards;
 }
 .order-leave td {
-  transition: opacity 0.4s ease-in;
+  transition: opacity 0.18s ease-out;
   opacity: 0.25;
 }
 
@@ -1057,3 +1057,14 @@ button {
     font-family: monospace;
   }
 }
+
+/* Чекбоксы и свитчи — короткий отклик, без «тяжёлой» HeroUI-анимации */
+[data-slot="checkbox"],
+[data-slot="checkbox"] *,
+[data-slot="switch"],
+[data-slot="switch"] * {
+  transition-duration: 80ms !important;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
+  animation-duration: 80ms !important;
+}
+

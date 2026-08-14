@@ -27,8 +27,8 @@ CIS_TYPE: str = os.getenv("CIS_TYPE", "")
 FILLING_METHOD: str = os.getenv("FILLING_METHOD", "")
 
 BASE_URL_CONFIG_ERROR = "BASE_URL не настроен. Укажите BASE_URL в .env"
-ORDER_AVAILABILITY_POLL_ATTEMPTS = 10
-ORDER_AVAILABILITY_POLL_INTERVAL_SECONDS = 2
+ORDER_AVAILABILITY_POLL_ATTEMPTS = 16
+ORDER_AVAILABILITY_POLL_INTERVAL_SECONDS = 0.4
 ORDER_STATUS_POLL_ATTEMPTS = 30
 ORDER_STATUS_POLL_INTERVAL_SECONDS = 10
 PDF_EXPORT_POLL_ATTEMPTS = 24
@@ -598,32 +598,6 @@ def codes_order(session: requests.Session, document_number: str,
         r_fin.raise_for_status()
         doc = r_fin.json()
         logger.info("Финальный статус документа %s: %s", document_number, doc.get("status"))
-        
-        # СОХРАНЕНИЕ В ИСТОРИЮ ПРИ УСПЕШНОМ ВЫПОЛНЕНИИ
-        try:
-            # Извлекаем данные для истории
-            product_name = positions[0].get("name", "Неизвестно") if positions else "Неизвестно"
-            gtin = positions[0].get("gtin", "") if positions else ""
-            
-            # Создаем запись для истории
-            history_entry = {
-                "order_name": document_number,
-                "document_id": document_id,
-                "status": "Выполнен",  # или другой статус, который вы используете
-                "filename": None,  # заполнится при скачивании
-                "simpl": product_group,
-                "full_name": product_name,
-                "gtin": gtin,
-                "positions": positions
-            }
-            
-            # Сохраняем в историю
-            history_db.add_order(history_entry)
-            logger.info("Заказ %s сохранен в историю", document_number)
-            
-        except Exception as history_error:
-            logger.error("Ошибка сохранения в историю: %s", history_error)
-        
         return doc
         
     except Exception as e:

@@ -205,6 +205,24 @@ class OrderHistoryDBTests(unittest.TestCase):
             self.assertTrue(kwargs.get("push"))
             self.assertEqual(kwargs.get("reason"), "add_order")
 
+    def test_add_order_can_defer_github_sync(self):
+        db = OrderHistoryDB(
+            db_file=str(self.base_path / "full_orders_history.json"),
+            legacy_db_files=[],
+            startup_sync="none",
+        )
+        db.sync_enabled = True
+        with patch.object(db, "_sync_with_github_locked", autospec=True, return_value=False) as sync_mock:
+            db.add_order(
+                {"document_id": "DOC-DEFER-1", "order_name": "defer", "status": "Ожидает"},
+                sync=False,
+            )
+            self.assertEqual(sync_mock.call_count, 0)
+            db.flush_github_sync(reason="submit_order_queue")
+
+        self.assertEqual(sync_mock.call_count, 1)
+        self.assertEqual(sync_mock.call_args.kwargs.get("reason"), "submit_order_queue")
+
     def test_load_data_reuses_cache_until_file_changes(self):
         db = OrderHistoryDB(
             db_file=str(self.base_path / "full_orders_history.json"),

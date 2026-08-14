@@ -127,8 +127,7 @@ function synthesizeChangeEvent(
   }
 }
 
-const springPanel = { type: 'spring' as const, stiffness: 520, damping: 36, mass: 0.85 }
-const springItem = { type: 'spring' as const, stiffness: 480, damping: 32, mass: 0.7 }
+const panelTransition = { duration: 0.12, ease: [0.22, 1, 0.36, 1] as const }
 
 export type SelectNativeProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> & {
   placeholder?: string
@@ -139,7 +138,7 @@ export type SelectNativeProps = Omit<React.SelectHTMLAttributes<HTMLSelectElemen
 /**
  * Drop-in replacement for native `<select>` using HeroUI Select + ListBox.
  * Clicks go through React Aria (`isNonModal` works inside Dialog).
- * Spring/stagger is visual only — no extra portal.
+ * Popover fades in at full size — no height:auto spring (that clipped then jumped).
  */
 export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProps>(
   (
@@ -215,25 +214,12 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
       return () => cancelAnimationFrame(frame)
     }, [isOpen, searchable])
 
-    let optionIndex = 0
-
     const renderOption = (option: OptionItem) => {
       const idKey = toKey(option.value)
-      const index = optionIndex++
-      const itemTransition = reduceMotion
-        ? { duration: 0 }
-        : { ...springItem, delay: 0.02 + index * 0.035 }
 
       return (
         <ListBox.Item key={idKey} id={idKey} textValue={option.label || ' '} isDisabled={option.disabled}>
-          <motion.span
-            className="flex w-full min-w-0 items-center truncate"
-            initial={reduceMotion || !isOpen ? false : { opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={itemTransition}
-          >
-            {option.label}
-          </motion.span>
+          <span className="flex w-full min-w-0 items-center truncate">{option.label}</span>
           <ListBox.ItemIndicator />
         </ListBox.Item>
       )
@@ -273,10 +259,9 @@ export const SelectNative = React.forwardRef<HTMLSelectElement, SelectNativeProp
           */}
           <Select.Popover isNonModal className="pointer-events-auto">
             <motion.div
-              initial={reduceMotion ? false : { opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              transition={reduceMotion ? { duration: 0 } : springPanel}
-              className="overflow-hidden"
+              initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={reduceMotion ? { duration: 0 } : panelTransition}
             >
               {searchable ? (
                 <div
