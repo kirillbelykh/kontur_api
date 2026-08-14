@@ -108,6 +108,30 @@ function rowTitle(item: { order_name?: string; name?: string; document_id?: stri
   return item.order_name || item.name || item.document_id || 'Без названия'
 }
 
+function wait(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+}
+
+function queueToHistoryRow(item: QueueItem, index: number): OrderRow {
+  return {
+    document_id: item.uid ? `pending:${item.uid}` : `pending:${index}`,
+    order_name: item.order_name,
+    full_name: item.full_name || item.simpl_name,
+    simpl: item.simpl_name,
+    gtin: item.gtin,
+    codes_count: item.codes_count,
+    status: 'Создаётся',
+  }
+}
+
+function mergeCreatedIntoHistory(state: OrdersViewState, created: OrderRow[]): OrdersViewState {
+  const existing = state.history ?? []
+  const existingIds = new Set(existing.map((item) => item.document_id).filter(Boolean))
+  const missing = created.filter((row) => Boolean(row.document_id) && !existingIds.has(row.document_id))
+  if (missing.length === 0) return state
+  return { ...state, history: [...missing, ...existing] }
+}
+
 function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: OrderMode) => void }) {
   const items = [
     { id: 'params' as const, label: 'По параметрам' },
@@ -142,7 +166,7 @@ function ModeToggle({ mode, onChange }: { mode: OrderMode; onChange: (mode: Orde
   )
 }
 
-/** Строка «Истории» — memo: выбор строки не перерисовывает остальные 100 строк. */
+/** Строка «Заказы» — memo: выбор строки не перерисовывает остальные 100 строк. */
 const HistoryRow = memo(function HistoryRow({
   item,
   rowId,
@@ -269,44 +293,53 @@ export function OrdersPage() {
   const [details, setDetails] = useState<OrderDetailsPayload | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [historyFullscreen, setHistoryFullscreen] = useState(false)
-  // Анимация «Очередь → История»: строки очереди улетают, новые строки истории прилетают
   const [queueLeaving, setQueueLeaving] = useState(false)
   const [arrivedIds, setArrivedIds] = useState<Set<string>>(new Set())
   const prevHistoryIdsRef = useRef<Set<string> | null>(null)
   const queueTableRef = useRef<HTMLDivElement>(null)
   const historyCardRef = useRef<HTMLDivElement>(null)
+  const createButtonRef = useRef<HTMLButtonElement>(null)
 
-  /** Видимый перелёт: чипы с названиями заявок летят из «Очереди» в «Историю». */
-  const flyQueueToHistory = () => {
-    if (!getAppSetting('animations')) return
-    const container = queueTableRef.current
+  const flyToHistory = (sources: Array<{ el: Element; label: string }>) => {
+    if (!getAppSetting('animations') || sources.length === 0) return
     const target = historyCardRef.current
-    if (!container || !target) return
-    const rows = Array.from(container.querySelectorAll('tbody tr')).slice(0, 8)
-    const targetRect = target.getBoundingClientRect()
-    rows.forEach((row, index) => {
-      const rect = row.getBoundingClientRect()
-      const label = (row.querySelector('td:nth-child(2)')?.textContent || 'Заказ').trim().slice(0, 48)
+    if (!target) return
+    const landing = target.querySelector('tbody') || target
+    const targetRect = landing.getBoundingClientRect()
+    sources.slice(0, 8).forEach((source, index) => {
+      const rect = source.el.getBoundingClientRect()
       const chip = document.createElement('div')
-      chip.textContent = label
+      chip.textContent = source.label
       chip.style.cssText =
         `position:fixed;left:${rect.left}px;top:${rect.top}px;max-width:${Math.max(180, Math.min(rect.width, 360))}px;` +
         'z-index:2147483000;pointer-events:none;padding:8px 16px;border-radius:8px;' +
         'background:hsl(var(--wms-card));color:hsl(var(--wms-foreground));border:1px solid hsl(var(--wms-border));' +
         'box-shadow:0 8px 24px rgba(15,23,42,0.18);font-size:13px;font-weight:500;' +
         'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:1;will-change:transform,opacity;' +
-        `transition:transform 240ms cubic-bezier(0.22,1,0.36,1) ${index * 30}ms,opacity 240ms ease-out ${index * 30}ms;`
+        `transition:transform 360ms cubic-bezier(0.22,1,0.36,1) ${index * 45}ms,opacity 360ms ease-out ${index * 45}ms;`
       document.body.appendChild(chip)
-      const dx = targetRect.left + 32 - rect.left
-      const dy = targetRect.top + 56 - rect.top
+      const dx = targetRect.left + 24 - rect.left
+      const dy = targetRect.top + 12 - rect.top
       requestAnimationFrame(() =>
         requestAnimationFrame(() => {
-          chip.style.transform = `translate(${dx}px, ${dy}px) scale(0.5)`
-          chip.style.opacity = '0.1'
+          chip.style.transform = `translate(${dx}px, ${dy}px) scale(0.92)`
+          chip.style.opacity = '0'
         }),
       )
-      window.setTimeout(() => chip.remove(), 320 + index * 30)
+      window.setTimeout(() => chip.remove(), 420 + index * 45)
     })
+  }
+
+  const flyQueueToHistory = () => {
+    const container = queueTableRef.current
+    if (!container) return
+    const rows = Array.from(container.querySelectorAll('tbody tr')).slice(0, 8)
+    flyToHistory(
+      rows.map((row) => ({
+        el: row,
+        label: (row.querySelector('td:nth-child(2)')?.textContent || 'Заказ').trim().slice(0, 48),
+      })),
+    )
   }
 
   const setField = <K extends keyof OrderForm>(key: K, value: OrderForm[K]) => {
@@ -353,7 +386,7 @@ export function OrdersPage() {
   const history = useMemo(() => state.history ?? [], [state.history])
   const deletedOrders = state.deleted_orders ?? []
 
-  // Помечаем свежепоявившиеся документы Истории для анимации «прилёта»
+  // Помечаем свежепоявившиеся документы в «Заказах» для анимации «прилёта»
   useEffect(() => {
     const currentIds = new Set(history.map((item) => item.document_id || '').filter(Boolean))
     const previous = prevHistoryIdsRef.current
@@ -362,7 +395,7 @@ export function OrdersPage() {
     const fresh = new Set([...currentIds].filter((id) => !previous.has(id)))
     if (fresh.size === 0) return
     setArrivedIds(fresh)
-    const timer = window.setTimeout(() => setArrivedIds(new Set()), 380)
+    const timer = window.setTimeout(() => setArrivedIds(new Set()), 480)
     return () => window.clearTimeout(timer)
   }, [history])
 
@@ -379,6 +412,10 @@ export function OrdersPage() {
       return haystack.includes(query)
     })
   }, [history, debouncedHistorySearch])
+
+  const historyPager = usePagination(filteredHistory, 50)
+  const fullscreenPager = usePagination(filteredHistory, 200)
+  const deletedPager = usePagination(deletedOrders, 50)
 
   const buildPayload = () => ({
     order_name: form.order_name.trim(),
@@ -443,12 +480,64 @@ export function OrdersPage() {
     runBusy(
       'create',
       async () => {
-        const result = await apiCall<{ state?: OrdersViewState }>('create_order', buildPayload())
+        const payload = buildPayload()
+        const pendingId = `pending:create:${Date.now()}`
+        const optimistic: OrderRow = {
+          document_id: pendingId,
+          order_name: payload.order_name,
+          gtin: payload.gtin,
+          full_name: lookup?.full_name || form.name,
+          status: 'Создаётся',
+          codes_count: payload.codes_count,
+        }
+        const createButton = createButtonRef.current
+        if (createButton) {
+          flyToHistory([{ el: createButton, label: payload.order_name.trim() || 'Заказ' }])
+        }
+        setState((prev) => ({ ...prev, history: [optimistic, ...(prev.history || [])] }))
+        setArrivedIds(new Set([pendingId]))
+        setHistorySearch('')
+        historyPager.setPage(0)
         setForm((prev) => ({ ...EMPTY_FORM, order_name: prev.order_name }))
         setLookup(null)
-        celebrateOrderCreated()
-        if (result.state) setState(result.state)
-        else await load(false)
+        try {
+          const result = await apiCall<{
+            state?: OrdersViewState
+            document_id?: string
+            order_name?: string
+            gtin?: string
+            full_name?: string
+            status?: string
+            codes_count?: number
+          }>('create_order', payload)
+          const created: OrderRow[] = result.document_id
+            ? [
+                {
+                  document_id: result.document_id,
+                  order_name: result.order_name || payload.order_name,
+                  gtin: result.gtin || payload.gtin,
+                  full_name: result.full_name || optimistic.full_name,
+                  status: result.status || 'Ожидает',
+                  codes_count: result.codes_count ?? payload.codes_count,
+                },
+              ]
+            : []
+          if (result.state) {
+            const next = mergeCreatedIntoHistory(result.state, created)
+            setState(next)
+            const arrived = created.map((row) => row.document_id || '').filter(Boolean)
+            if (arrived.length) setArrivedIds(new Set(arrived))
+          } else {
+            await load(false)
+          }
+          celebrateOrderCreated()
+        } catch (error) {
+          setState((prev) => ({
+            ...prev,
+            history: (prev.history || []).filter((item) => item.document_id !== pendingId),
+          }))
+          throw error
+        }
       },
       'Заказ создан',
     )
@@ -457,25 +546,71 @@ export function OrdersPage() {
     runBusy(
       'submit',
       async () => {
-        // Отклик мгновенно: чипы летят в «Историю», строки очереди гаснут; запрос идёт параллельно
+        const snapshot = queue
+        if (snapshot.length === 0) throw new Error('Очередь заказов пуста')
+        const pendingRows = snapshot.map(queueToHistoryRow)
+        const pendingIds = new Set(pendingRows.map((row) => row.document_id || ''))
+        const request = apiCall<{
+          state?: OrdersViewState
+          results?: Array<{
+            document_id?: string
+            order_name?: string
+            gtin?: string
+            full_name?: string
+            status?: string
+            codes_count?: number
+          }>
+          errors?: Array<{ order_name?: string; error?: string }>
+        }>('submit_order_queue')
         flyQueueToHistory()
         setQueueLeaving(true)
-        const request = apiCall<{ state?: OrdersViewState; errors?: Array<{ order_name?: string; error?: string }> }>(
-          'submit_order_queue',
-        )
-        const animation = new Promise((resolve) => window.setTimeout(resolve, 240))
+        if (getAppSetting('animations')) await wait(200)
+        setState((prev) => ({
+          ...prev,
+          queue: [],
+          history: [...pendingRows, ...(prev.history || [])],
+        }))
+        setArrivedIds(pendingIds)
+        setSelectedQueueId('')
+        setHistorySearch('')
+        historyPager.setPage(0)
+        setQueueLeaving(false)
         try {
-          const [result] = await Promise.all([request, animation])
-          if (result.state) setState(result.state)
-          else await load(true)
-          setSelectedQueueId('')
+          const result = await request
+          const created: OrderRow[] = (result.results || [])
+            .filter((item) => item.document_id)
+            .map((item) => ({
+              document_id: item.document_id,
+              order_name: item.order_name,
+              gtin: item.gtin,
+              full_name: item.full_name,
+              status: item.status || 'Ожидает',
+              codes_count: item.codes_count,
+            }))
+          if (result.state) {
+            const withoutPending = {
+              ...result.state,
+              history: (result.state.history || []).filter((item) => !String(item.document_id || '').startsWith('pending:')),
+            }
+            const next = mergeCreatedIntoHistory(withoutPending, created)
+            setState(next)
+            const arrived = created.map((row) => row.document_id || '').filter(Boolean)
+            if (arrived.length) setArrivedIds(new Set(arrived))
+          } else {
+            await load(true)
+          }
           if (result.errors?.length) {
             toast.error(`Часть заказов с ошибками: ${result.errors.length}`)
           } else {
             celebrateOrderCreated()
           }
-        } finally {
-          setQueueLeaving(false)
+        } catch (error) {
+          setState((prev) => ({
+            ...prev,
+            queue: snapshot,
+            history: (prev.history || []).filter((item) => !String(item.document_id || '').startsWith('pending:')),
+          }))
+          throw error
         }
       },
       'Очередь заказов выполнена',
@@ -508,9 +643,33 @@ export function OrdersPage() {
     runBusy(
       'delete',
       async () => {
-        if (selectedHistoryIds.length !== 1) throw new Error('Выберите один заказ в истории')
-        await apiCall('delete_order', selectedHistoryIds[0])
-        await load(true)
+        if (selectedHistoryIds.length !== 1) throw new Error('Выберите один заказ')
+        const documentId = selectedHistoryIds[0]
+        const removed = history.find((item) => item.document_id === documentId)
+        const previousHistory = history
+        const previousDeleted = deletedOrders
+        setState((prev) => ({
+          ...prev,
+          history: (prev.history || []).filter((item) => item.document_id !== documentId),
+          deleted_orders: removed
+            ? [
+                {
+                  ...removed,
+                  deleted_at: new Date().toISOString(),
+                  deleted_by: '',
+                },
+                ...(prev.deleted_orders || []),
+              ]
+            : prev.deleted_orders,
+        }))
+        setSelectedHistoryIds([])
+        try {
+          await apiCall('delete_order', documentId)
+        } catch (error) {
+          setState((prev) => ({ ...prev, history: previousHistory, deleted_orders: previousDeleted }))
+          setSelectedHistoryIds([documentId])
+          throw error
+        }
       },
       'Заказ перемещён в удалённые',
     )
@@ -530,7 +689,7 @@ export function OrdersPage() {
     runBusy(
       'to-active',
       async () => {
-        if (!selectedHistoryIds.length) throw new Error('Выберите заказы в истории')
+        if (!selectedHistoryIds.length) throw new Error('Выберите заказы')
         await apiCall('add_history_orders_to_active', selectedHistoryIds)
       },
       'Заказы добавлены в загрузку',
@@ -564,12 +723,8 @@ export function OrdersPage() {
     setSelectedDeletedId((prev) => (prev === documentId ? '' : documentId))
   }, [])
 
-  const historyPager = usePagination(filteredHistory, 50)
-  const fullscreenPager = usePagination(filteredHistory, 200)
-  const deletedPager = usePagination(deletedOrders, 50)
-
   const renderHistoryTable = (rows: OrderRow[]) => (
-    <Table aria-label="История заказов">
+    <Table aria-label="Заказы">
       <TableHeader>
         <TableRow>
           <TableHead isRowHeader={false}>Выбор</TableHead>
@@ -614,7 +769,7 @@ export function OrdersPage() {
       <StatRow
         items={[
           { label: 'Очередь', value: queue.length },
-          { label: 'История', value: history.length },
+          { label: 'Заказы', value: history.length },
           { label: 'Удалённые', value: deletedOrders.length },
         ]}
       />
@@ -747,7 +902,13 @@ export function OrdersPage() {
               <Button size="sm" onClick={() => void addToQueue()} disabled={isBusy}>
                 В очередь
               </Button>
-              <Button size="sm" variant="secondary" onClick={() => void createNow()} disabled={isBusy}>
+              <Button
+                ref={createButtonRef}
+                size="sm"
+                variant="secondary"
+                onClick={() => void createNow()}
+                disabled={isBusy}
+              >
                 Создать сразу
               </Button>
             </div>
@@ -826,7 +987,7 @@ export function OrdersPage() {
       <div className="mt-3" ref={historyCardRef}>
         <Card className="cv-auto">
           <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-            <CardTitle>История</CardTitle>
+            <CardTitle>Заказы</CardTitle>
             <div className="flex flex-wrap gap-1.5">
               <Button size="sm" variant="outline" onClick={() => void openDetails()} disabled={isBusy || selectedHistoryIds.length !== 1}>
                 Подробнее
@@ -858,7 +1019,7 @@ export function OrdersPage() {
             {loading && history.length === 0 ? (
               <TableSkeleton rows={6} />
             ) : filteredHistory.length === 0 ? (
-              <EmptyState>История пуста</EmptyState>
+              <EmptyState>Заказов пока нет</EmptyState>
             ) : (
               <>
                 <div className="max-h-[420px] overflow-auto">{renderHistoryTable(historyPager.pageRows)}</div>
@@ -930,7 +1091,7 @@ export function OrdersPage() {
       <Dialog open={historyFullscreen} onOpenChange={setHistoryFullscreen}>
         <DialogContent className="max-w-[96vw]">
           <DialogHeader>
-            <DialogTitle>История заказов</DialogTitle>
+            <DialogTitle>Заказы</DialogTitle>
           </DialogHeader>
           <div className="max-h-[78vh] overflow-auto">{renderHistoryTable(fullscreenPager.pageRows)}</div>
           <TablePagination

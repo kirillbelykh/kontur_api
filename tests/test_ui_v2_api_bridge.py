@@ -224,6 +224,50 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertNotIn("error", result)
         kontur_mock.assert_called_once_with(force_refresh=True)
 
+    def test_merge_locally_created_orders_keeps_new_order_until_kontur_lists_it(self):
+        fake_runtime = types.SimpleNamespace(
+            lock=api_bridge.Lock(),
+            locally_created_orders={
+                "doc-new": {"document_id": "doc-new", "order_name": "Fresh"},
+            },
+        )
+        with mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime):
+            merged = self.bridge._merge_locally_created_orders(
+                [{"document_id": "doc-old", "order_name": "Old"}]
+            )
+        self.assertEqual([item["document_id"] for item in merged], ["doc-new", "doc-old"])
+        self.assertIn("doc-new", fake_runtime.locally_created_orders)
+
+        with mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime):
+            merged = self.bridge._merge_locally_created_orders(
+                [
+                    {"document_id": "doc-new", "order_name": "Fresh from Kontur"},
+                    {"document_id": "doc-old", "order_name": "Old"},
+                ]
+            )
+        self.assertEqual(merged[0]["document_id"], "doc-new")
+        self.assertEqual(fake_runtime.locally_created_orders, {})
+
+    def test_remember_created_order_in_cache_indexes_local_order(self):
+        fake_runtime = types.SimpleNamespace(
+            lock=api_bridge.Lock(),
+            kontur_orders_cache_items=[{"document_id": "doc-old", "order_name": "Old"}],
+            locally_created_orders={},
+        )
+        with mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime):
+            self.bridge._remember_created_order_in_cache(
+                {
+                    "document_id": "doc-new",
+                    "order_name": "Fresh",
+                    "gtin": "04650118041257",
+                    "full_name": "Gloves",
+                    "status": "created",
+                }
+            )
+        self.assertEqual(fake_runtime.kontur_orders_cache_items[0]["document_id"], "doc-new")
+        self.assertEqual(fake_runtime.kontur_orders_cache_items[0]["gtin"], "04650118041257")
+        self.assertEqual(fake_runtime.locally_created_orders["doc-new"]["order_name"], "Fresh")
+
     def test_receive_wms_chz_request_persists_runtime_record(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

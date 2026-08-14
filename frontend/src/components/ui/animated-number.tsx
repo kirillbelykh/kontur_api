@@ -61,15 +61,15 @@ export function AnimatedTextSwap({
   if (reduceMotion || !animations) return <span className={className}>{text}</span>
 
   return (
-    <span className={cn('relative inline-flex overflow-hidden align-bottom', className)}>
-      <AnimatePresence mode="popLayout" initial={false}>
+    <span className={cn('relative inline-grid overflow-hidden align-bottom', className)}>
+      <AnimatePresence initial={false}>
         <motion.span
           key={text}
-          initial={{ y: '0.8em', opacity: 0, filter: 'blur(3px)' }}
-          animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-          exit={{ y: '-0.8em', opacity: 0, filter: 'blur(3px)' }}
-          transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}
-          className="inline-block whitespace-nowrap"
+          initial={{ y: '0.6em', opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: '-0.6em', opacity: 0 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          className="col-start-1 row-start-1 whitespace-nowrap"
         >
           {text}
         </motion.span>

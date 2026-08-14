@@ -98,13 +98,12 @@ const DownloadRow = memo(function DownloadRow({
       <TableCell onClick={(event) => event.stopPropagation()}>
         <Checkbox
           isSelected={checked}
-          aria-label={`Выбрать заказ ${item.order_name || documentId}`}
+          aria-label={`Выбрать заказ ${item.order_name || 'без названия'}`}
           onChange={() => onToggle(documentId)}
         />
       </TableCell>
-      <TableCell textValue={item.order_name || documentId}>
-        <div className="font-medium">{item.order_name || documentId || 'Без названия'}</div>
-        <div className="font-mono text-xs text-muted-foreground">{documentId || '—'}</div>
+      <TableCell textValue={item.order_name || 'Без названия'}>
+        <div className="font-medium">{item.order_name || 'Без названия'}</div>
       </TableCell>
       <TableCell className="text-muted-foreground">
         <div className="max-w-[280px] truncate">{item.full_name || item.simpl || '—'}</div>

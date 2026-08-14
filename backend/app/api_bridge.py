@@ -421,6 +421,7 @@ class _BridgeRuntime:
         self.live_intro_by_number: Dict[str, Dict[str, Any]] = {}
         self.kontur_orders_cache_items: List[Dict[str, Any]] = []
         self.kontur_orders_cache_at = 0.0
+        self.locally_created_orders: Dict[str, Dict[str, Any]] = {}
         self.kontur_order_metadata_cache: Dict[str, Dict[str, Any]] = {}
         self.wms_chz_requests: List[Dict[str, Any]] = []
         self.wms_chz_last_synced_at = 0.0
@@ -1567,13 +1568,50 @@ class ApiBridge:
 
         Thread(target=work, daemon=True, name="KonturOrdersRefresh").start()
 
+    def _merge_locally_created_orders(self, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Keep just-created orders at the top until Kontur's list includes them.
+
+        Caller must hold ``runtime.lock``.
+        """
+        runtime = _get_runtime()
+        local = getattr(runtime, "locally_created_orders", None) or {}
+        if not local:
+            return [dict(item) for item in items]
+        fetched_ids = {
+            str(item.get("document_id") or "").strip()
+            for item in items
+            if str(item.get("document_id") or "").strip()
+        }
+        merged = [dict(item) for item in items]
+        for document_id, local_item in reversed(list(local.items())):
+            if not document_id:
+                continue
+            if document_id in fetched_ids:
+                local.pop(document_id, None)
+                continue
+            merged.insert(0, dict(local_item))
+        return merged
+
     def _remember_created_order_in_cache(self, result: Dict[str, Any]) -> None:
         document_id = str(result.get("document_id") or "").strip()
         if not document_id:
             return
         item = self._kontur_order_to_local_order(result)
+        if result.get("gtin"):
+            item["gtin"] = str(result.get("gtin") or "").strip()
+        if result.get("full_name"):
+            item["full_name"] = str(result.get("full_name") or "").strip()
+        if result.get("name") and not item.get("simpl"):
+            item["simpl"] = str(result.get("name") or "").strip()
+        if result.get("order_name"):
+            item["order_name"] = str(result.get("order_name") or item.get("order_name") or "").strip()
         runtime = _get_runtime()
         with runtime.lock:
+            local = getattr(runtime, "locally_created_orders", None)
+            if local is None:
+                runtime.locally_created_orders = {}
+                local = runtime.locally_created_orders
+            local[document_id] = dict(item)
             items = [
                 dict(existing)
                 for existing in (getattr(runtime, "kontur_orders_cache_items", None) or [])
@@ -1594,6 +1632,7 @@ class ApiBridge:
         items.sort(key=self._fresh_order_sort_key, reverse=True)
         items = self._enrich_kontur_orders_with_metadata(session, items)
         with runtime.lock:
+            items = self._merge_locally_created_orders(items)
             runtime.kontur_orders_cache_items = [dict(item) for item in items]
             runtime.kontur_orders_cache_at = time.time()
             runtime.live_order_by_id = dict(payload.get("by_id") or {})
@@ -2352,12 +2391,22 @@ class ApiBridge:
         return None
 
     def _find_order_data(self, document_id: str) -> Optional[Dict[str, Any]]:
-        active = self._find_download_item(document_id)
+        normalized_id = str(document_id or "").strip()
+        if not normalized_id:
+            return None
+        active = self._find_download_item(normalized_id)
         if active:
             history_data = active.get("history_data")
             if isinstance(history_data, dict):
                 return history_data
-        return _get_runtime().history_db.get_order_by_document_id(document_id)
+        runtime = _get_runtime()
+        history = runtime.history_db.get_order_by_document_id(normalized_id)
+        if history:
+            return history
+        for item in getattr(runtime, "kontur_orders_cache_items", None) or []:
+            if str(item.get("document_id") or "").strip() == normalized_id:
+                return dict(item)
+        return None
 
     def _sync_history_from_download_item(self, item: Dict[str, Any]) -> None:
         order_data = self._find_order_data(str(item.get("document_id") or ""))
@@ -4665,6 +4714,15 @@ class ApiBridge:
             ]
             runtime.document_status_cache.pop(normalized_id, None)
             runtime.code_status_cache.pop(normalized_id, None)
+            with runtime.lock:
+                runtime.kontur_orders_cache_items = [
+                    item
+                    for item in (getattr(runtime, "kontur_orders_cache_items", None) or [])
+                    if str(item.get("document_id") or "").strip() != normalized_id
+                ]
+                local = getattr(runtime, "locally_created_orders", None)
+                if isinstance(local, dict):
+                    local.pop(normalized_id, None)
             self._log("orders", f"Заказ удален в архив: {order_data.get('order_name') or normalized_id}")
             self._log("download", f"Заказ удален из активных списков: {order_data.get('order_name') or normalized_id}")
             self._log("intro", f"Заказ удален из списка ввода в оборот: {order_data.get('order_name') or normalized_id}")
@@ -5335,6 +5393,7 @@ class ApiBridge:
             kontur_items.sort(key=self._fresh_order_sort_key, reverse=True)
             kontur_items = self._enrich_kontur_orders_with_metadata(session, kontur_items)
             with runtime.lock:
+                kontur_items = self._merge_locally_created_orders(kontur_items)
                 runtime.live_order_by_id = dict(orders_payload.get("by_id") or {})
                 runtime.live_order_by_number = dict(orders_payload.get("by_number") or {})
                 runtime.kontur_orders_cache_items = [dict(item) for item in kontur_items]

@@ -291,7 +291,7 @@ html[data-theme='ocean'] {
 
 /* ─── Появление/уход строк таблиц ─── */
 
-/* Заказ «прилетает» в таблицу История после создания */
+/* Заказ «прилетает» в таблицу Заказы после создания */
 @keyframes order-arrive {
   from {
     opacity: 0;
@@ -309,7 +309,7 @@ html[data-theme='ocean'] {
 }
 
 .order-arrive {
-  animation: order-arrive 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: order-arrive 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Строка очереди «улетает» вниз к Истории перед отправкой.
