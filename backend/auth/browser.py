@@ -152,6 +152,9 @@ def build_browser_options(
     options.add_argument("--remote-debugging-port=0")
     options.add_argument("--window-position=-32000,-32000")
     options.add_argument("--window-size=1920,1080")
+    options.add_argument("--hide-crash-restore-bubble")
+    options.add_argument("--disable-session-crashed-bubble")
+    options.add_argument("--noerrdialogs")
     return options
 
 
@@ -324,7 +327,7 @@ def _hide_windows_for_pids(pids: Set[int]) -> int:
 
     def enum_window_callback(hwnd, results):
         _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
-        if window_pid in pids and win32gui.IsWindowVisible(hwnd):
+        if window_pid in pids:
             results.append(hwnd)
 
     win32gui.EnumWindows(enum_window_callback, handles)
@@ -353,7 +356,7 @@ def _start_new_window_hider(before_pids: Set[int]) -> threading.Event:
                         logger.info("Скрыто %s новых окон браузера (всего %s)", hidden, hidden_total)
             except Exception as exc:
                 logger.debug("Сторож окон браузера: %s", exc)
-            stop.wait(0.25)
+            stop.wait(0.05)
 
     threading.Thread(target=loop, daemon=True, name="browser-window-hider").start()
     return stop
@@ -455,7 +458,6 @@ def get_cookies(
             profile_directory,
         )
         driver = None
-        attempt_failed = False
         before_pids: Set[int] = set()
         hider_stop: Optional[threading.Event] = None
         if win32_available:
@@ -483,6 +485,8 @@ def get_cookies(
                 hide_driver_windows(driver)
 
             driver.get(target_url)
+            if win32_available and not use_headless:
+                hide_driver_windows(driver)
             wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             _click_cookie_accept_if_present(driver, By)
 
@@ -532,7 +536,6 @@ def get_cookies(
                 return dict(cookies)
         except Exception as exc:
             logger.exception("get_cookies failed on attempt %s", attempt)
-            attempt_failed = True
             if is_driver_version_mismatch(exc) and not driver_repaired:
                 driver_repaired = True
                 if ensure_yandex_driver_updated(force=True):
@@ -543,24 +546,24 @@ def get_cookies(
                 profile_unlocked = True
                 continue
         finally:
-            if hider_stop is not None:
-                hider_stop.set()
             if driver is not None:
                 try:
                     driver.quit()
                     logger.info("Вкладка/браузер Selenium закрыты")
                 except Exception:
                     pass
-            if attempt_failed and win32_available:
-                # Упавший запуск оставляет пустое окно browser.exe без driver'а —
-                # убираем только процессы, появившиеся за время этой попытки.
+            if win32_available:
+                # Session restore leaves extra browser.exe windows; reap only
+                # processes spawned during this attempt (before_pids stays).
                 try:
                     leftover = _iter_yandex_browser_pids() - before_pids
                     killed = _terminate_pids(leftover)
                     if killed:
-                        logger.info("Закрыто %s осиротевших окон браузера после неудачной попытки", killed)
+                        logger.info("Закрыто %s окон браузера после попытки сбора cookies", killed)
                 except Exception as exc:
-                    logger.debug("Не удалось прибрать осиротевшие окна: %s", exc)
+                    logger.debug("Не удалось прибрать окна браузера: %s", exc)
+            if hider_stop is not None:
+                hider_stop.set()
 
     logger.error("Не удалось получить валидные cookies после %s попыток", max_retries)
     return None

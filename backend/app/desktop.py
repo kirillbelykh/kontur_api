@@ -60,13 +60,22 @@ def _resolve_pythonw() -> str:
 def _ensure_desktop_shortcut() -> None:
     shortcut_path = Path.home() / "Desktop" / "Контур Маркировка.lnk"
     icon_path = REPO_ROOT / "assets" / "icons" / "kontur.ico"
+    vbs = REPO_ROOT / "run_kontur.vbs"
+    windir = Path(os.environ.get("WINDIR") or r"C:\Windows")
+    wscript = windir / "System32" / "wscript.exe"
     try:
         import win32com.client  # type: ignore
 
         shell = win32com.client.Dispatch("WScript.Shell")
         shortcut = shell.CreateShortCut(str(shortcut_path))
-        shortcut.TargetPath = _resolve_pythonw()
-        shortcut.Arguments = f'"{REPO_ROOT / "main.py"}"'
+        # Always VBS + pythonw: a python.exe target keeps a console whose
+        # close kills the app (what operators saw after git pull).
+        if vbs.exists() and wscript.exists():
+            shortcut.TargetPath = str(wscript)
+            shortcut.Arguments = f'"{vbs}"'
+        else:
+            shortcut.TargetPath = _resolve_pythonw()
+            shortcut.Arguments = f'"{REPO_ROOT / "main.py"}"'
         shortcut.WorkingDirectory = str(REPO_ROOT)
         shortcut.Description = "Контур Маркировка"
         if icon_path.exists():
@@ -75,6 +84,21 @@ def _ensure_desktop_shortcut() -> None:
         logger.debug("Ярлык на рабочем столе обновлён: %s", shortcut_path)
     except Exception:
         logger.debug("Не удалось обновить ярлык %s", shortcut_path, exc_info=True)
+
+
+def _detach_console_if_needed() -> None:
+    """Survive closing a parent cmd.exe when launched as python.exe by mistake."""
+    debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
+    if debug_mode:
+        return
+    if Path(sys.executable).name.lower() == "pythonw.exe":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.kernel32.FreeConsole()
+    except Exception:
+        logger.debug("FreeConsole не удался", exc_info=True)
 
 
 def _apply_window_icon() -> None:
@@ -123,6 +147,7 @@ def main() -> None:
         logger.debug("AppUserModelID установлен")
     except Exception:
         logger.debug("Не удалось установить AppUserModelID", exc_info=True)
+    _detach_console_if_needed()
     _ensure_desktop_shortcut()
     api = ApiBridge()
     api.start_session_auto_refresh()

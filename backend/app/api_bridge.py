@@ -708,11 +708,13 @@ class ApiBridge:
                     "Сессия UI v2: запускаем %s обновление cookies",
                     "принудительное" if update_triggered else "плановое",
                 )
-                # Scheduled TTL refresh: re-validate file first.
-                # Event-triggered (startup / manual): may open the browser.
+                # File → Yandex profile → Selenium. Do not force the browser on
+                # startup/schedule: that skipped live cookies and opened extra
+                # Yandex windows (retries + session restore). Manual «Сессия»
+                # still uses refresh_session() → force_browser_refresh=True.
                 self._ensure_session(
                     force_refresh=True,
-                    force_browser_refresh=bool(update_triggered),
+                    force_browser_refresh=False,
                 )
                 runtime.auth_state = "ready"
                 runtime.auth_message = "Авторизация завершена. Сессия активна."

@@ -331,6 +331,7 @@ class BrowserSessionErrorTests(unittest.TestCase):
         self.assertTrue(any(a.startswith("--user-data-dir=") for a in args))
         self.assertIn("--profile-directory=Vinsent O`neal", args)
         self.assertIn("--window-position=-32000,-32000", args)
+        self.assertIn("--hide-crash-restore-bubble", args)
         self.assertFalse(any("headless" in a for a in args))
         self.assertFalse(any("incognito" in a.lower() for a in args))
 
