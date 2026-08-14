@@ -70,7 +70,7 @@ type Selection = {
 const EMPTY_SELECTION: Selection = { ids: [], focus: '' }
 
 /** Клик по этим элементам внутри строки не должен менять выбор */
-const CONTROL_SELECTOR = 'input, button, a, label, [role="checkbox"], [data-table-resize-handle]'
+const CONTROL_SELECTOR = 'input, button, a, label, [role="checkbox"], [data-slot="table-column-resizer"]'
 
 /** Строка заказа — memo: выбор строки не перерисовывает остальные 50 строк страницы. */
 const DownloadRow = memo(function DownloadRow({

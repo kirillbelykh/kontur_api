@@ -1,13 +1,14 @@
 import {
   Children,
   cloneElement,
+  createContext,
   isValidElement,
+  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type HTMLAttributes,
-  type PointerEvent,
   type ReactElement,
   type ReactNode,
 } from 'react'
@@ -15,11 +16,13 @@ import { Table as HeroTable } from '@heroui/react'
 import { RotateCcw, Settings2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { resizeMapToWidths } from '@/lib/table-resize'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 
 type TableColumn = {
   index: number
+  id: string
   label: string
 }
 
@@ -29,7 +32,7 @@ type TableColumn = {
  * One press is in flight at a time, so a module-level flag is enough.
  */
 const ROW_CONTROL_SELECTOR =
-  'input, button, a, label, select, textarea, [role="checkbox"], [role="button"], [data-table-resize-handle]'
+  'input, button, a, label, select, textarea, [role="checkbox"], [role="button"], [data-slot="table-column-resizer"]'
 let pressStartedOnControl = false
 
 function notePressTarget(target: EventTarget | null) {
@@ -40,6 +43,12 @@ type TablePreferences = {
   hidden: string[]
   widths: Record<string, number>
 }
+
+type TableLayoutValue = {
+  widths: Record<string, number>
+}
+
+const TableLayoutContext = createContext<TableLayoutValue>({ widths: {} })
 
 type TableProps = {
   children?: ReactNode
@@ -53,7 +62,7 @@ type TableSectionProps = {
   className?: string
 }
 
-type TableHeadProps = HTMLAttributes<HTMLTableCellElement> & {
+type TableHeadProps = Omit<HTMLAttributes<HTMLTableCellElement>, 'width' | 'id'> & {
   isRowHeader?: boolean
   id?: string
 }
@@ -69,9 +78,14 @@ type TableCellProps = HTMLAttributes<HTMLTableCellElement> & {
   textValue?: string
 }
 
-const TABLE_PREFS_VERSION = 'v1'
+const TABLE_PREFS_VERSION = 'v3'
 const TABLE_MIN_COLUMN_WIDTH = 72
-const HEADER_CELL_SELECTOR = '[data-slot="table-column"], thead th, .table__column'
+const SELECT_COLUMN_WIDTH = 88
+const SELECT_COLUMN_MIN_WIDTH = 56
+
+function isSelectColumn(children: ReactNode) {
+  return typeof children === 'string' && children.trim() === 'Выбор'
+}
 
 function queryHeaderCells(root: HTMLElement): HTMLElement[] {
   const slotted = root.querySelectorAll('[data-slot="table-column"]')
@@ -85,18 +99,6 @@ function queryTableRows(root: HTMLElement): HTMLElement[] {
   const slotted = root.querySelectorAll('[data-slot="table-row"]')
   if (slotted.length) return Array.from(slotted) as HTMLElement[]
   return Array.from(root.querySelectorAll('tr')) as HTMLElement[]
-}
-
-function applyColumnWidth(root: HTMLElement, columnIndex: number, width: number) {
-  root.style.tableLayout = 'fixed'
-  for (const row of queryTableRows(root)) {
-    const cell = row.children.item(columnIndex) as HTMLElement | null
-    if (!cell || Number(cell.getAttribute('colspan') || '1') > 1) continue
-    cell.style.width = `${width}px`
-    cell.style.minWidth = `${width}px`
-    cell.style.maxWidth = `${width}px`
-    cell.style.overflow = 'hidden'
-  }
 }
 
 function normalizeColumnLabel(value: string, index: number) {
@@ -150,6 +152,7 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     const headerCells = queryHeaderCells(table)
     const nextColumns = headerCells.map((cell, index) => ({
       index,
+      id: cell.getAttribute('id') || `col-${index}`,
       label: normalizeColumnLabel(cell.textContent || '', index),
     }))
     if (nextColumns.length === 0) return
@@ -159,8 +162,9 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     const nextStorageKey = `kontur_table_preferences_${TABLE_PREFS_VERSION}_${getPathname()}_${ariaLabel || ''}_${signature}`
 
     setColumns((current) => {
-      const currentSignature = current.map((column) => column.label).join('|')
-      return currentSignature === signature ? current : nextColumns
+      const currentSignature = current.map((column) => `${column.id}:${column.label}`).join('|')
+      const nextSignature = nextColumns.map((column) => `${column.id}:${column.label}`).join('|')
+      return currentSignature === nextSignature ? current : nextColumns
     })
     if (nextStorageKey !== storageKey) {
       setStorageKey(nextStorageKey)
@@ -175,43 +179,28 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     const rows = queryTableRows(table)
     for (const column of columns) {
       const hidden = preferences.hidden.includes(column.label)
-      const width = preferences.widths[column.label]
-
       for (const row of rows) {
         const cell = row.children.item(column.index) as HTMLElement | null
         if (!cell || Number(cell.getAttribute('colspan') || '1') > 1) continue
-
         cell.style.display = hidden ? 'none' : ''
-        if (!hidden && width) {
-          cell.style.width = `${width}px`
-          cell.style.minWidth = `${width}px`
-          cell.style.maxWidth = `${width}px`
-          cell.style.overflow = 'hidden'
-        } else {
-          cell.style.width = ''
-          cell.style.minWidth = ''
-          cell.style.maxWidth = ''
-          cell.style.overflow = ''
-        }
       }
     }
-
-    const hasCustomWidths = Object.keys(preferences.widths).length > 0
-    table.style.tableLayout = hasCustomWidths ? 'fixed' : ''
-    if (hasCustomWidths) {
-      const visibleWidth = columns
-        .filter((column) => !preferences.hidden.includes(column.label))
-        .reduce((total, column) => total + (preferences.widths[column.label] || TABLE_MIN_COLUMN_WIDTH), 0)
-      table.style.minWidth = `${Math.max(visibleWidth, table.parentElement?.clientWidth || 0)}px`
-    } else {
-      table.style.minWidth = ''
-    }
-  }, [children, columns, preferences])
+  }, [children, columns, preferences.hidden])
 
   const updatePreferences = (updater: (current: TablePreferences) => TablePreferences) => {
     setPreferences((current) => {
       const next = updater(current)
       writePreferences(storageKey, next)
+      return next
+    })
+  }
+
+  const applyResize = (sizes: Map<unknown, unknown>, persist: boolean) => {
+    const widths = resizeMapToWidths(sizes)
+    if (Object.keys(widths).length === 0) return
+    setPreferences((current) => {
+      const next = { ...current, widths }
+      if (persist) writePreferences(storageKey, next)
       return next
     })
   }
@@ -236,128 +225,81 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
     writePreferences(storageKey, next)
   }
 
-  const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return
-    const target = event.target as HTMLElement | null
-    const handle = target?.closest('[data-table-resize-handle]') as HTMLElement | null
-    if (!handle) return
-
-    const headerCell = handle.closest(HEADER_CELL_SELECTOR) as HTMLElement | null
-    const table = tableRef.current
-    if (!headerCell?.parentElement || !table) return
-
-    const columnIndex = Array.from(headerCell.parentElement.children).indexOf(headerCell)
-    const label = normalizeColumnLabel(headerCell.textContent || '', columnIndex)
-    if (preferences.hidden.includes(label)) return
-
-    event.preventDefault()
-    event.stopPropagation()
-    handle.setPointerCapture(event.pointerId)
-
-    const startX = event.clientX
-    const startWidth = headerCell.getBoundingClientRect().width
-    const previousCursor = document.body.style.cursor
-    const previousUserSelect = document.body.style.userSelect
-    document.body.style.cursor = 'col-resize'
-    document.body.style.userSelect = 'none'
-    handle.dataset.active = 'true'
-
-    let nextWidth = Math.round(startWidth)
-
-    const onMove = (moveEvent: globalThis.PointerEvent) => {
-      nextWidth = Math.max(TABLE_MIN_COLUMN_WIDTH, Math.round(startWidth + moveEvent.clientX - startX))
-      applyColumnWidth(table, columnIndex, nextWidth)
-    }
-
-    const onUp = () => {
-      handle.dataset.active = ''
-      document.body.style.cursor = previousCursor
-      document.body.style.userSelect = previousUserSelect
-      document.removeEventListener('pointermove', onMove)
-      document.removeEventListener('pointerup', onUp)
-      document.removeEventListener('pointercancel', onUp)
-      updatePreferences((current) => ({
-        ...current,
-        widths: { ...current.widths, [label]: nextWidth },
-      }))
-    }
-
-    document.addEventListener('pointermove', onMove)
-    document.addEventListener('pointerup', onUp)
-    document.addEventListener('pointercancel', onUp)
-  }
-
   return (
-    <div
-      className="relative w-full"
-      onPointerDown={handlePointerDown}
-      onPointerDownCapture={(event) => notePressTarget(event.target)}
-      onKeyDownCapture={() => {
-        pressStartedOnControl = false
-      }}
-      {...props}
-    >
-      {columns.length > 0 ? (
-        /* Шестерёнка не занимает свою строку: накладывается на полосу шапки таблицы */
-        <div className="pointer-events-none relative z-10 -mb-7 flex justify-end pr-1.5 pt-1 print:hidden">
-          <div className="pointer-events-auto relative">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 text-muted-foreground"
-              onClick={() => setSettingsOpen((current) => !current)}
-              title="Настроить колонки"
-              aria-label="Настроить колонки"
-            >
-              <Settings2 className="h-3.5 w-3.5" />
-            </Button>
-            {settingsOpen ? (
-              <div className="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-border bg-card p-3 text-sm shadow-panel">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="font-medium">Колонки таблицы</div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground"
-                    onClick={resetPreferences}
-                    title="Сбросить настройки"
-                    aria-label="Сбросить настройки"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
+    <TableLayoutContext.Provider value={{ widths: preferences.widths }}>
+      <div
+        className="relative w-full"
+        onPointerDownCapture={(event) => notePressTarget(event.target)}
+        onKeyDownCapture={() => {
+          pressStartedOnControl = false
+        }}
+        {...props}
+      >
+        {columns.length > 0 ? (
+          /* Шестерёнка не занимает свою строку: накладывается на полосу шапки таблицы */
+          <div className="pointer-events-none relative z-10 -mb-7 flex justify-end pr-1.5 pt-1 print:hidden">
+            <div className="pointer-events-auto relative">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground"
+                onClick={() => setSettingsOpen((current) => !current)}
+                title="Настроить колонки"
+                aria-label="Настроить колонки"
+              >
+                <Settings2 className="h-3.5 w-3.5" />
+              </Button>
+              {settingsOpen ? (
+                <div className="absolute right-0 z-40 mt-1 w-72 rounded-lg border border-border bg-card p-3 text-sm shadow-panel">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="font-medium">Колонки таблицы</div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground"
+                      onClick={resetPreferences}
+                      title="Сбросить настройки"
+                      aria-label="Сбросить настройки"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
+                    {columns.map((column) => {
+                      const checked = !preferences.hidden.includes(column.label)
+                      return (
+                        <Checkbox
+                          key={`${column.index}-${column.label}`}
+                          isSelected={checked}
+                          isDisabled={checked && visibleColumnsCount <= 1}
+                          onChange={() => toggleColumn(column.label)}
+                          className="w-full rounded-md px-2 py-1.5 hover:bg-muted/70"
+                        >
+                          <span className="min-w-0 flex-1 truncate">{column.label}</span>
+                        </Checkbox>
+                      )
+                    })}
+                  </div>
                 </div>
-                <div className="max-h-72 space-y-1 overflow-y-auto pr-1">
-                  {columns.map((column) => {
-                    const checked = !preferences.hidden.includes(column.label)
-                    return (
-                      <Checkbox
-                        key={`${column.index}-${column.label}`}
-                        isSelected={checked}
-                        isDisabled={checked && visibleColumnsCount <= 1}
-                        onChange={() => toggleColumn(column.label)}
-                        className="w-full rounded-md px-2 py-1.5 hover:bg-muted/70"
-                      >
-                        <span className="min-w-0 flex-1 truncate">{column.label}</span>
-                      </Checkbox>
-                    )
-                  })}
-                </div>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      <HeroTable className={cn(className)} variant={variant}>
-        <HeroTable.ScrollContainer>
-          <HeroTable.Content ref={tableRef} aria-label={ariaLabel || 'Таблица'}>
-            {children}
-          </HeroTable.Content>
-        </HeroTable.ScrollContainer>
-      </HeroTable>
-    </div>
+        <HeroTable className={cn(className)} variant={variant}>
+          <HeroTable.ResizableContainer
+            onResize={(widths) => applyResize(widths as Map<unknown, unknown>, false)}
+            onResizeEnd={(widths) => applyResize(widths as Map<unknown, unknown>, true)}
+          >
+            <HeroTable.Content ref={tableRef} aria-label={ariaLabel || 'Таблица'}>
+              {children}
+            </HeroTable.Content>
+          </HeroTable.ResizableContainer>
+        </HeroTable>
+      </div>
+    </TableLayoutContext.Provider>
   )
 }
 
@@ -412,14 +354,21 @@ export function TableRow({ className, children, onClick, id, ...props }: TableRo
 }
 
 export function TableHead({ className, children, isRowHeader, id, ...props }: TableHeadProps) {
+  const { widths } = useContext(TableLayoutContext)
+  const width = id ? widths[id] : undefined
+  const selectColumn = isSelectColumn(children)
   return (
-    <HeroTable.Column id={id} isRowHeader={isRowHeader} className={cn('relative', className)} {...props}>
+    <HeroTable.Column
+      {...props}
+      id={id}
+      isRowHeader={isRowHeader}
+      className={cn('relative', className)}
+      minWidth={selectColumn ? SELECT_COLUMN_MIN_WIDTH : TABLE_MIN_COLUMN_WIDTH}
+      defaultWidth={selectColumn ? SELECT_COLUMN_WIDTH : '1fr'}
+      {...(typeof width === 'number' ? { width } : {})}
+    >
       {children}
-      <span
-        data-table-resize-handle
-        className="absolute inset-y-0 right-0 z-20 w-3 cursor-col-resize select-none touch-none after:absolute after:inset-y-2 after:right-1 after:w-px after:rounded-full after:bg-border after:content-[''] hover:after:w-0.5 hover:after:bg-foreground/45 data-[active=true]:after:w-0.5 data-[active=true]:after:bg-foreground/55"
-        aria-hidden="true"
-      />
+      <HeroTable.ColumnResizer />
     </HeroTable.Column>
   )
 }
