@@ -25,6 +25,17 @@ from backend.app.chz_bridge_server import start_chz_bridge_server
 from backend.services.logger import logger
 
 
+def webview_persistence_kwargs() -> dict[str, object]:
+    """Keep localStorage (table columns, theme, zoom) across process restarts.
+
+    pywebview defaults to private_mode=True, which discards the WebView2 profile
+    when the window closes — so column settings looked saved until the next launch.
+    """
+    storage = REPO_ROOT / "runtime" / "webview"
+    storage.mkdir(parents=True, exist_ok=True)
+    return {"private_mode": False, "storage_path": str(storage)}
+
+
 def _resolve_frontend_url() -> str:
     """Prefer Vite dev server when set; otherwise load production build."""
     dev_url = str(os.getenv("VITE_DEV_URL") or "").strip()
@@ -198,7 +209,7 @@ def main() -> None:
     window.events.loaded += lambda *_: api.start_session_auto_refresh(trigger_now=False)
     _apply_window_icon()
     debug_mode = os.getenv("KONTUR_UI_DEBUG", "").strip().lower() in {"1", "true", "yes", "on"}
-    webview.start(debug=debug_mode)
+    webview.start(debug=debug_mode, **webview_persistence_kwargs())
 
 
 if __name__ == "__main__":

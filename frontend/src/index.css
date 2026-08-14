@@ -431,6 +431,7 @@ html[data-theme='ocean'] {
 /* Карточка уведомления: иконка в цветной плашке + крестик справа по центру */
 .kontur-toast-icon {
   display: flex;
+  position: relative;
   height: 2.25rem;
   width: 2.25rem;
   flex: none;
