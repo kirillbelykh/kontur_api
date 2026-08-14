@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type HTMLAttributes,
@@ -87,14 +88,6 @@ function isSelectColumn(children: ReactNode) {
   return typeof children === 'string' && children.trim() === 'Выбор'
 }
 
-function queryHeaderCells(root: HTMLElement): HTMLElement[] {
-  const slotted = root.querySelectorAll('[data-slot="table-column"]')
-  if (slotted.length) return Array.from(slotted) as HTMLElement[]
-  const native = root.querySelectorAll('thead tr:first-child th')
-  if (native.length) return Array.from(native) as HTMLElement[]
-  return Array.from(root.querySelectorAll('.table__column')) as HTMLElement[]
-}
-
 function queryTableRows(root: HTMLElement): HTMLElement[] {
   const slotted = root.querySelectorAll('[data-slot="table-row"]')
   if (slotted.length) return Array.from(slotted) as HTMLElement[]
@@ -138,39 +131,51 @@ function flattenHeaderColumns(children: ReactNode): ReactNode[] {
   })
 }
 
+function columnLabelFromNode(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  return Children.toArray(node)
+    .map((child) => {
+      if (typeof child === 'string' || typeof child === 'number') return String(child)
+      if (isValidElement(child)) return columnLabelFromNode((child.props as { children?: ReactNode }).children)
+      return ''
+    })
+    .join('')
+}
+
+function collectHeaderColumns(children: ReactNode): TableColumn[] {
+  const result: TableColumn[] = []
+  for (const child of Children.toArray(children)) {
+    if (!isValidElement(child) || child.type !== TableHeader) continue
+    const heads = flattenHeaderColumns((child.props as TableSectionProps).children)
+    heads.forEach((head, index) => {
+      if (!isValidElement(head)) return
+      const props = head.props as TableHeadProps & { children?: ReactNode }
+      result.push({
+        index,
+        id: String(props.id || `col-${index}`),
+        label: normalizeColumnLabel(columnLabelFromNode(props.children), index),
+      })
+    })
+  }
+  return result
+}
+
 export function Table({ className, children, 'aria-label': ariaLabel, variant = 'primary', ...props }: TableProps) {
   const tableRef = useRef<HTMLTableElement>(null)
-  const [columns, setColumns] = useState<TableColumn[]>([])
+  const columns = useMemo(() => collectHeaderColumns(children), [children])
   const [preferences, setPreferences] = useState<TablePreferences>({ hidden: [], widths: {} })
   const [storageKey, setStorageKey] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
-    const table = tableRef.current
-    if (!table) return
-
-    const headerCells = queryHeaderCells(table)
-    const nextColumns = headerCells.map((cell, index) => ({
-      index,
-      id: cell.getAttribute('id') || `col-${index}`,
-      label: normalizeColumnLabel(cell.textContent || '', index),
-    }))
-    if (nextColumns.length === 0) return
-
-    const signature = nextColumns.map((column) => column.label).join('|')
+    if (columns.length === 0) return
+    const signature = columns.map((column) => column.label).join('|')
     // aria-label keeps two same-shaped tables on one page from sharing column preferences
     const nextStorageKey = `kontur_table_preferences_${TABLE_PREFS_VERSION}_${getPathname()}_${ariaLabel || ''}_${signature}`
-
-    setColumns((current) => {
-      const currentSignature = current.map((column) => `${column.id}:${column.label}`).join('|')
-      const nextSignature = nextColumns.map((column) => `${column.id}:${column.label}`).join('|')
-      return currentSignature === nextSignature ? current : nextColumns
-    })
-    if (nextStorageKey !== storageKey) {
-      setStorageKey(nextStorageKey)
-      setPreferences(readPreferences(nextStorageKey))
-    }
-  }, [ariaLabel, children, storageKey])
+    if (nextStorageKey === storageKey) return
+    setStorageKey(nextStorageKey)
+    setPreferences(readPreferences(nextStorageKey))
+  }, [ariaLabel, columns, storageKey])
 
   useLayoutEffect(() => {
     const table = tableRef.current
@@ -236,14 +241,13 @@ export function Table({ className, children, 'aria-label': ariaLabel, variant = 
         {...props}
       >
         {columns.length > 0 ? (
-          /* Шестерёнка не занимает свою строку: накладывается на полосу шапки таблицы */
-          <div className="pointer-events-none relative z-10 -mb-7 flex justify-end pr-1.5 pt-1 print:hidden">
+          <div className="pointer-events-none absolute right-1.5 top-1.5 z-30 print:hidden">
             <div className="pointer-events-auto relative">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 text-muted-foreground"
+                className="h-7 w-7 bg-muted/80 text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground"
                 onClick={() => setSettingsOpen((current) => !current)}
                 title="Настроить колонки"
                 aria-label="Настроить колонки"
