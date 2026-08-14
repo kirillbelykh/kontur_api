@@ -47,43 +47,71 @@ def _resolve_frontend_url() -> str:
     raise SystemExit(message)
 
 
-def _resolve_pythonw() -> str:
+def _resolve_pythonw() -> str | None:
+    """Path to pythonw.exe only — never python.exe (that keeps a killable console)."""
+    venv_pythonw = REPO_ROOT / ".venv" / "Scripts" / "pythonw.exe"
+    if venv_pythonw.exists():
+        return str(venv_pythonw)
     executable = Path(sys.executable)
     if executable.name.lower() == "pythonw.exe":
         return str(executable)
-    pythonw = executable.with_name("pythonw.exe")
-    if pythonw.exists():
-        return str(pythonw)
-    return str(executable)
+    sibling = executable.with_name("pythonw.exe")
+    if sibling.exists():
+        return str(sibling)
+    return None
 
 
-def _ensure_desktop_shortcut() -> None:
-    shortcut_path = Path.home() / "Desktop" / "Контур Маркировка.lnk"
-    icon_path = REPO_ROOT / "assets" / "icons" / "kontur.ico"
-    vbs = REPO_ROOT / "run_kontur.vbs"
-    windir = Path(os.environ.get("WINDIR") or r"C:\Windows")
-    wscript = windir / "System32" / "wscript.exe"
+def _desktop_dirs() -> list[Path]:
+    dirs: list[Path] = []
     try:
         import win32com.client  # type: ignore
 
-        shell = win32com.client.Dispatch("WScript.Shell")
-        shortcut = shell.CreateShortCut(str(shortcut_path))
-        # Always VBS + pythonw: a python.exe target keeps a console whose
-        # close kills the app (what operators saw after git pull).
-        if vbs.exists() and wscript.exists():
-            shortcut.TargetPath = str(wscript)
-            shortcut.Arguments = f'"{vbs}"'
-        else:
-            shortcut.TargetPath = _resolve_pythonw()
-            shortcut.Arguments = f'"{REPO_ROOT / "main.py"}"'
-        shortcut.WorkingDirectory = str(REPO_ROOT)
-        shortcut.Description = "Контур Маркировка"
-        if icon_path.exists():
-            shortcut.IconLocation = str(icon_path)
-        shortcut.Save()
-        logger.debug("Ярлык на рабочем столе обновлён: %s", shortcut_path)
+        special = str(win32com.client.Dispatch("WScript.Shell").SpecialFolders("Desktop") or "")
+        if special:
+            dirs.append(Path(special))
     except Exception:
-        logger.debug("Не удалось обновить ярлык %s", shortcut_path, exc_info=True)
+        pass
+    dirs.append(Path.home() / "Desktop")
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for path in dirs:
+        key = str(path)
+        if key not in seen:
+            seen.add(key)
+            unique.append(path)
+    return unique
+
+
+def _write_desktop_shortcut(shortcut_path: Path) -> None:
+    icon_path = REPO_ROOT / "assets" / "icons" / "kontur.ico"
+    pythonw = _resolve_pythonw()
+    bat = REPO_ROOT / "KonturMarkirovka.bat"
+    import win32com.client  # type: ignore
+
+    shell = win32com.client.Dispatch("WScript.Shell")
+    shortcut = shell.CreateShortCut(str(shortcut_path))
+    if pythonw:
+        shortcut.TargetPath = pythonw
+        shortcut.Arguments = f'"{REPO_ROOT / "main.py"}"'
+    elif bat.exists():
+        shortcut.TargetPath = str(bat)
+        shortcut.Arguments = ""
+    else:
+        return
+    shortcut.WorkingDirectory = str(REPO_ROOT)
+    shortcut.Description = "Контур Маркировка"
+    if icon_path.exists():
+        shortcut.IconLocation = str(icon_path)
+    shortcut.Save()
+    logger.debug("Ярлык на рабочем столе обновлён: %s", shortcut_path)
+
+
+def _ensure_desktop_shortcut() -> None:
+    try:
+        for desktop in _desktop_dirs():
+            _write_desktop_shortcut(desktop / "Контур Маркировка.lnk")
+    except Exception:
+        logger.debug("Не удалось обновить ярлык на рабочем столе", exc_info=True)
 
 
 def _detach_console_if_needed() -> None:

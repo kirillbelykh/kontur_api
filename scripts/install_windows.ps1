@@ -587,7 +587,19 @@ function Create-DesktopShortcut {
     $launcherExtension = [System.IO.Path]::GetExtension($launcher).ToLowerInvariant()
     $targetPath = $launcher
     $arguments = ""
-    if ($launcherExtension -eq ".vbs") {
+    $pythonw = Join-Path $ProjectDir ".venv\Scripts\pythonw.exe"
+    $mainPy = Join-Path $ProjectDir "main.py"
+    if ($LauncherFile -eq "run_kontur.vbs" -or $LauncherFile -eq "main.py" -or $LauncherFile -eq "KonturMarkirovka.bat") {
+        # Desktop app: pythonw directly. VBS is blocked on some PCs; python.exe keeps a console.
+        if ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy)) {
+            $targetPath = $pythonw
+            $arguments = "`"$mainPy`""
+        } else {
+            $bat = Join-Path $ProjectDir "KonturMarkirovka.bat"
+            $targetPath = $bat
+            $arguments = ""
+        }
+    } elseif ($launcherExtension -eq ".vbs") {
         $wscript = Join-Path $env:WINDIR "System32\\wscript.exe"
         if (-not (Test-Path $wscript)) {
             $wscript = "wscript.exe"

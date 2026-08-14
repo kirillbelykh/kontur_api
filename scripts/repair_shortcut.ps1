@@ -37,7 +37,17 @@ function New-KonturShortcut {
     $launcherExtension = [System.IO.Path]::GetExtension($launcher).ToLowerInvariant()
     $targetPath = $launcher
     $arguments = ""
-    if ($launcherExtension -eq ".vbs") {
+    $pythonw = Join-Path $projectDir ".venv\Scripts\pythonw.exe"
+    $mainPy = Join-Path $projectDir "main.py"
+    if ($LauncherFile -eq "run_kontur.vbs" -or $LauncherFile -eq "main.py" -or $LauncherFile -eq "KonturMarkirovka.bat") {
+        if ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy)) {
+            $targetPath = $pythonw
+            $arguments = "`"$mainPy`""
+        } else {
+            $targetPath = Join-Path $projectDir "KonturMarkirovka.bat"
+            $arguments = ""
+        }
+    } elseif ($launcherExtension -eq ".vbs") {
         $targetPath = $wscript
         $arguments = "`"$launcher`""
     } elseif ($launcherExtension -in @(".cmd", ".bat")) {

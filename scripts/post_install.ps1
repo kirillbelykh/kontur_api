@@ -58,15 +58,16 @@ if (-not (Test-Path -LiteralPath $launchBat)) {
 }
 $icon = Join-Path $ProjectDir "assets\icons\kontur.ico"
 $shortcutPath = Join-Path $desktop "Контур Маркировка.lnk"
-$wscript = Join-Path $env:WINDIR "System32\wscript.exe"
-$vbs = Join-Path $ProjectDir "run_kontur.vbs"
+$pythonw = Join-Path $ProjectDir ".venv\Scripts\pythonw.exe"
+$mainPy = Join-Path $ProjectDir "main.py"
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
-if (Test-Path -LiteralPath $vbs) {
-    $shortcut.TargetPath = $wscript
-    $shortcut.Arguments = "`"$vbs`""
+if ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy)) {
+    $shortcut.TargetPath = $pythonw
+    $shortcut.Arguments = "`"$mainPy`""
 } else {
     $shortcut.TargetPath = $launchBat
+    $shortcut.Arguments = ""
 }
 $shortcut.WorkingDirectory = $ProjectDir
 $shortcut.Description = "Контур Маркировка"
