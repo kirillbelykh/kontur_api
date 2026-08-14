@@ -83,6 +83,16 @@ def validate_cookies(cookies: Dict[str, str]) -> tuple[bool, List[str]]:
     return True, []
 
 
+def read_fresh_cookie_bundle() -> Optional[Dict[str, object]]:
+    """Local cookies + timestamp if they are still within TTL. No Kontur call."""
+    cookies = load_cookies_from_file(allow_stale=False)
+    if not cookies:
+        return None
+    with _COOKIE_LOCK:
+        timestamp = float(_MEMOIZED_TIMESTAMP or 0.0)
+    return {"timestamp": timestamp, "cookies": cookies}
+
+
 def load_cookies_from_file(allow_stale: bool = False) -> Optional[Dict[str, str]]:
     with _COOKIE_LOCK:
         if _MEMOIZED_COOKIES and cookies_are_fresh(_MEMOIZED_TIMESTAMP):

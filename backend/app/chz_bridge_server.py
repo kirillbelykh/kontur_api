@@ -9,7 +9,7 @@ from threading import Thread
 from typing import Any
 
 from backend.services.logger import logger
-from backend.app.api_bridge import ApiBridge
+from backend.auth.store import read_fresh_cookie_bundle
 
 
 # WMS в проде шлёт колбэки на этот порт с ДРУГОГО хоста, поэтому дефолт —
@@ -87,7 +87,8 @@ class ChzBridgeRequestHandler(BaseHTTPRequestHandler):
             raise PermissionError("Invalid CHZ bridge token.")
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path.rstrip("/") == "/api/chz/health":
+        path = self.path.rstrip("/")
+        if path == "/api/chz/health":
             state = self.bridge.get_orders_view_state(force_sync=False)
             self._write_json(
                 {
@@ -96,6 +97,18 @@ class ChzBridgeRequestHandler(BaseHTTPRequestHandler):
                     "active_requests": len(state.get("wms_chz_active") or []),
                 }
             )
+            return
+        if path == "/api/auth/cookies":
+            try:
+                self._authorize()
+            except PermissionError as exc:
+                self._write_json({"ok": False, "error": str(exc)}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            bundle = read_fresh_cookie_bundle()
+            if not bundle:
+                self._write_json({"ok": False, "error": "no fresh cookies"}, status=HTTPStatus.NOT_FOUND)
+                return
+            self._write_json({"ok": True, **bundle})
             return
         self._write_json({"error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 

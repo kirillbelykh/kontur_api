@@ -25,8 +25,11 @@ class AuthServiceTests(unittest.TestCase):
         store.clear_memoized_cookies()
         store.set_cookie_refresh_in_progress(False)
         store.cookie_refresh_event().set()
+        self.lan_patcher = mock.patch("backend.auth.service.fetch_cookies_from_lan", return_value=None)
+        self.lan_patcher.start()
 
     def tearDown(self):
+        self.lan_patcher.stop()
         store.clear_memoized_cookies()
         store.set_cookie_refresh_in_progress(False)
         store.cookie_refresh_event().set()
@@ -96,6 +99,25 @@ class AuthServiceTests(unittest.TestCase):
             result = service.get_valid_cookies(force_refresh=True)
 
         self.assertEqual(result, profile_cookies)
+        selenium_mock.assert_not_called()
+
+    def test_force_refresh_prefers_lan_before_profile(self):
+        lan_cookies = _valid_cookie_dict()
+        lan_cookies["token"] = "from-lan"
+
+        with (
+            mock.patch.object(store, "COOKIES_FILE", self.cookies_file),
+            mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
+            mock.patch("backend.auth.service.validate_kontur_session", return_value=True),
+            mock.patch("backend.auth.service.fetch_cookies_from_lan", return_value=lan_cookies),
+            mock.patch("backend.auth.service.load_cookies_from_yandex_profile") as profile_mock,
+            mock.patch("backend.auth.service.get_cookies") as selenium_mock,
+            mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
+        ):
+            result = service.get_valid_cookies(force_refresh=True)
+
+        self.assertEqual(result, lan_cookies)
+        profile_mock.assert_not_called()
         selenium_mock.assert_not_called()
 
 

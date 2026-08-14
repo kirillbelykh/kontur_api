@@ -17,6 +17,7 @@ from backend.auth.store import (
     save_cookies_to_file,
     set_cookie_refresh_in_progress,
 )
+from backend.auth.lan_cookies import fetch_cookies_from_lan
 from backend.auth.yandex_cookies import load_cookies_from_yandex_profile
 
 # Skip a second Selenium launch when cookies were just collected successfully.
@@ -92,6 +93,11 @@ def get_valid_cookies(
         logger.info("Получаем новые cookies")
 
         if not force_browser:
+            lan_cookies = fetch_cookies_from_lan()
+            accepted = _accept_live_cookies(lan_cookies, source="lan")
+            if accepted:
+                return accepted
+
             profile_cookies = load_cookies_from_yandex_profile()
             accepted = _accept_live_cookies(profile_cookies, source="yandex-profile")
             if accepted:
