@@ -181,7 +181,7 @@ try {
     }
 
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        throw "Git is not installed. Run setup.bat first."
+        throw "Git is not installed. Run Install.bat first."
     }
 
     Write-Step "Starting full update and rebuild"
@@ -209,8 +209,13 @@ try {
         if ($stashableStatusLines.Count -gt 0) {
             $stashName = "autostash-before-full-update-" + (Get-Date -Format "yyyyMMdd-HHmmss")
             Write-Step "Saving local changes to temporary git stash"
-            Invoke-Git -Arguments @("stash", "push", "-u", "-m", $stashName, "--", ":(exclude)full_orders_history.json", ":(exclude)runtime/backups")
-            $stashCreated = $true
+            try {
+                Invoke-Git -Arguments @("stash", "push", "-u", "-m", $stashName, "--", ":(exclude)full_orders_history.json", ":(exclude)runtime/backups")
+                $stashCreated = $true
+            } catch {
+                Write-WarnMsg "Could not stash local changes: $($_.Exception.Message)"
+                Write-WarnMsg "Continuing update without stash."
+            }
         }
 
         Write-Step "Fetching latest code from origin/$Branch"
@@ -238,7 +243,7 @@ try {
     }
 
     Write-Step "Running installer to rebuild local environment"
-    & powershell -NoProfile -ExecutionPolicy Bypass -File $installScript -RepoUrl $RepoUrl
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $installScript -RepoUrl $RepoUrl -Reinstall
     if ($LASTEXITCODE -ne 0) {
         throw "Installer rebuild failed with exit code $LASTEXITCODE."
     }
@@ -262,7 +267,7 @@ try {
     Restore-OrderHistoryBackup -ProjectDir $projectDir -BackupPath $historyBackupPath
 
     if ($stashRestoreFailed) {
-        throw "Update completed, but local changes need manual restore from git stash."
+        Write-WarnMsg "Update finished, but some local files stayed in git stash. Run: git stash list"
     }
 
     Write-Ok "Full update and rebuild completed"

@@ -51,24 +51,17 @@ if (Test-Path -LiteralPath $fullInstall) {
     }
 }
 
-# Ensure the single desktop shortcut exists with the new icon.
-$launchBat = Join-Path $ProjectDir "KonturMarkirovka.bat"
-if (-not (Test-Path -LiteralPath $launchBat)) {
-    throw "Launcher not found: $launchBat"
-}
 $icon = Join-Path $ProjectDir "assets\icons\kontur.ico"
 $shortcutPath = Join-Path $desktop "Контур Маркировка.lnk"
 $pythonw = Join-Path $ProjectDir ".venv\Scripts\pythonw.exe"
 $mainPy = Join-Path $ProjectDir "main.py"
+if (-not ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy))) {
+    throw "pythonw.exe not found after install: $pythonw"
+}
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
-if ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy)) {
-    $shortcut.TargetPath = $pythonw
-    $shortcut.Arguments = "`"$mainPy`""
-} else {
-    $shortcut.TargetPath = $launchBat
-    $shortcut.Arguments = ""
-}
+$shortcut.TargetPath = $pythonw
+$shortcut.Arguments = "`"$mainPy`""
 $shortcut.WorkingDirectory = $ProjectDir
 $shortcut.Description = "Контур Маркировка"
 if (Test-Path -LiteralPath $icon) {

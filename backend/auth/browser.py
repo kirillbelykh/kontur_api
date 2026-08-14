@@ -1,9 +1,7 @@
-"""Selenium / YandexDriver cookie collection.
+﻿"""Selenium / YandexDriver cookie collection.
 
-Click flow mirrors Desktop ``cookies.py`` (clear sequential clicks):
-1. Name / cert button (user XPath)
-2. Warehouse «Лахта» card (user XPath)
-3. Collect cookies and quit the browser
+One Chrome window: auto-detected Yandex profile, click name → Лахта, then quit.
+LAN sharing lives in ``backend.auth.service``.
 """
 
 from __future__ import annotations
@@ -20,8 +18,9 @@ from backend.services.logger import logger
 
 from backend.auth.constants import (
     HEADLESS,
-    PROFILE_DIRECTORY,
-    PROFILE_USER_DATA_DIR,
+    SELENIUM_PROFILE_DIRECTORY,
+    SELENIUM_USER_DATA_DIR,
+    SLEEP,
     TARGET_URL,
     WAIT_TIMEOUT,
     YANDEX_BROWSER_PATH,
@@ -29,12 +28,12 @@ from backend.auth.constants import (
 )
 from backend.auth.store import save_cookies_to_file, validate_cookies
 
-# Exact XPaths from the live DOM (provided by operator).
+# XPaths from 60bd74f (working background collection).
 STEP1_NAME_XPATH = (
-    "/html/body/div[3]/div/div/div[1]/div[2]/div/div/div/div/div[2]"
-    "/div/div/div/div/div/div/div[1]/div/div[1]/div/div[1]/div/div/span/span"
+    '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]'
+    "/div/div/div/div/div/div/div[1]/div/div/div/div[1]/div/div"
 )
-STEP2_WAREHOUSE_XPATH = '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[3]'
+STEP2_WAREHOUSE_XPATH = '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]'
 
 # Aliases kept for tests / callers.
 PROFILE_CARD_XPATH = STEP1_NAME_XPATH
@@ -67,7 +66,7 @@ def _click_cookie_accept_if_present(driver, by) -> None:
         )
         if cookie_btn:
             cookie_btn[0].click()
-            time.sleep(0.3)
+            time.sleep(SLEEP)
     except Exception as exc:
         logger.debug("Cookie accept button not available: %s", exc)
 
@@ -136,7 +135,7 @@ def build_browser_options(
     options.add_experimental_option("useAutomationExtension", False)
 
     if profile_user_data_dir:
-        options.add_argument(f"--user-data-dir={Path(profile_user_data_dir)}")
+        options.add_argument(f"--user-data-dir={Path(profile_user_data_dir).resolve()}")
     profile = str(profile_directory or "").strip()
     if profile:
         options.add_argument(f"--profile-directory={profile}")
@@ -152,9 +151,6 @@ def build_browser_options(
     options.add_argument("--remote-debugging-port=0")
     options.add_argument("--window-position=-32000,-32000")
     options.add_argument("--window-size=1920,1080")
-    options.add_argument("--hide-crash-restore-bubble")
-    options.add_argument("--disable-session-crashed-bubble")
-    options.add_argument("--noerrdialogs")
     return options
 
 
@@ -273,6 +269,14 @@ def _iter_yandex_browser_pids(browser_path: Optional[Path] = None) -> Set[int]:
     return found
 
 
+def yandex_browser_is_running() -> bool:
+    """True when the operator already has Yandex Browser open."""
+    try:
+        return bool(_iter_yandex_browser_pids())
+    except Exception:
+        return False
+
+
 def _iter_descendant_pids(root_pid: int) -> Set[int]:
     children: Dict[int, Set[int]] = {}
     for pid, parent, _exe in _iter_process_entries():
@@ -363,24 +367,32 @@ def _start_new_window_hider(before_pids: Set[int]) -> threading.Event:
 
 
 def hide_driver_windows(driver) -> None:
-    """SW_HIDE окон браузера, запущенного драйвером.
-
-    Старая версия сравнивала PID окна с PID самого драйвера, но окно
-    принадлежит дочернему browser.exe — ни одно окно не совпадало и всё
-    оставалось видимым. Ищем окна по потомкам процесса драйвера.
-    """
+    """Hide by driver PID, same as 60bd74f."""
     try:
-        pid = int(driver.service.process.pid)
-    except Exception as exc:
-        logger.debug("Не удалось получить PID драйвера: %s", exc)
+        import win32con
+        import win32gui
+        import win32process
+    except ImportError as exc:
+        logger.debug("pywin32 недоступен для скрытия окна браузера: %s", exc)
         return
 
     try:
-        time.sleep(0.4)
-        pids = _iter_descendant_pids(pid) | {pid}
-        hidden = _hide_windows_for_pids(pids)
-        if hidden:
-            logger.info("Скрыто %s окон браузера по дереву PID %s", hidden, pid)
+        pid = driver.service.process.pid
+        time.sleep(1.0)
+
+        def enum_window_callback(hwnd, results):
+            _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
+            if window_pid == pid:
+                results.append(hwnd)
+
+        results: list[int] = []
+        win32gui.EnumWindows(enum_window_callback, results)
+        if results:
+            for hwnd in results:
+                win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+            logger.info("Скрыто %s окон браузера по PID %s", len(results), pid)
+        else:
+            logger.warning("Не удалось найти окна браузера по PID для скрытия")
     except Exception as exc:
         logger.debug("Не удалось скрыть окно браузера: %s", exc)
 
@@ -412,13 +424,13 @@ def ensure_yandex_driver_updated(*, force: bool = True) -> bool:
 def get_cookies(
     driver_path: Path = YANDEX_DRIVER_PATH,
     browser_path: Optional[Path] = YANDEX_BROWSER_PATH,
-    profile_user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
-    profile_directory: str = PROFILE_DIRECTORY,
-    headless: Optional[bool] = None,
+    profile_user_data_dir: Optional[Path] = SELENIUM_USER_DATA_DIR,
+    profile_directory: str = SELENIUM_PROFILE_DIRECTORY,
+    headless: bool = HEADLESS,
     target_url: str = TARGET_URL,
-    max_retries: int = 3,
+    max_retries: int = 1,
 ) -> Optional[Dict[str, str]]:
-    """Desktop-style flow: open → click name → click Лахта → cookies → quit."""
+    """One Chrome on the app's persistent profile, then quit."""
     try:
         from selenium import webdriver
         from selenium.webdriver.chrome.service import Service
@@ -426,19 +438,22 @@ def get_cookies(
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
     except Exception as exc:
+        logger.exception("Selenium import failed")
         logger.error("Selenium не установлен или недоступен: %s", exc)
         return None
 
+    win32gui = None
+    win32con = None
+    win32process = None
     try:
-        import win32con  # noqa: F401
-        import win32gui  # noqa: F401
-        import win32process  # noqa: F401
-
-        win32_available = True
+        import win32con  # type: ignore
+        import win32gui  # type: ignore
+        import win32process  # type: ignore
     except ImportError as exc:
-        win32_available = False
-        logger.warning("pywin32 не установлен. Окно не будет скрыто.")
-        logger.debug("%s", exc)
+        logger.warning(
+            "pywin32 не установлен. Окно браузера не будет скрыто. Установите: pip install pywin32"
+        )
+        logger.warning("Ошибка импорта pywin32: %s", exc)
 
     if not driver_path or not Path(driver_path).exists():
         logger.error("Driver not found: %s", driver_path)
@@ -447,126 +462,106 @@ def get_cookies(
         logger.error("Browser binary not found: %s", browser_path)
         return None
 
-    use_headless = _effective_headless(headless)
-    driver_repaired = False
-    profile_unlocked = False
+    profile_dir = Path(profile_user_data_dir).resolve() if profile_user_data_dir else None
+    if profile_dir:
+        profile_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(
+        "Профиль программы: user-data=%s profile=%s",
+        profile_dir,
+        profile_directory,
+    )
 
-    for attempt in range(1, max_retries + 1):
-        logger.info(
-            "Попытка получения cookies #%s (profile=%s)",
-            attempt,
-            profile_directory,
-        )
-        driver = None
-        before_pids: Set[int] = set()
-        hider_stop: Optional[threading.Event] = None
-        if win32_available:
-            try:
-                before_pids = _iter_yandex_browser_pids()
-            except Exception:
-                before_pids = set()
-            if not use_headless:
-                # Окно появляется, пока webdriver.Chrome() ещё блокирует,
-                # поэтому прятать надо параллельно с запуском.
-                hider_stop = _start_new_window_hider(before_pids)
+    opts = build_browser_options(
+        browser_path=Path(browser_path),
+        profile_user_data_dir=profile_dir,
+        profile_directory=profile_directory,
+        headless=bool(headless),
+    )
+
+    driver = None
+    try:
+        service = Service(str(driver_path))
+        driver = webdriver.Chrome(service=service, options=opts)
+        wait = WebDriverWait(driver, WAIT_TIMEOUT)
+
+        if win32gui and win32con and win32process:
+            pid = driver.service.process.pid
+            time.sleep(1.0)
+
+            def enum_window_callback(hwnd, results):
+                _, window_pid = win32process.GetWindowThreadProcessId(hwnd)
+                if window_pid == pid:
+                    results.append(hwnd)
+
+            results: list[int] = []
+            win32gui.EnumWindows(enum_window_callback, results)
+            if results:
+                for hwnd in results:
+                    win32gui.ShowWindow(hwnd, win32con.SW_HIDE)
+                logger.info("Скрыто %s окон браузера по PID %s", len(results), pid)
+            else:
+                logger.warning("Не удалось найти окна браузера по PID для скрытия")
+
+        driver.get(target_url)
+        time.sleep(2.0)
+
         try:
-            options = build_browser_options(
-                browser_path=Path(browser_path),
-                profile_user_data_dir=profile_user_data_dir,
-                profile_directory=profile_directory,
-                headless=use_headless,
+            cookie_btn = driver.find_elements(
+                By.XPATH,
+                '//*[@id="root"]/div/div/div[1]/div[1]/span/button/div[2]/span',
             )
-            service = Service(str(driver_path))
-            driver = webdriver.Chrome(service=service, options=options)
-            remove_webdriver_marker(driver)
-            wait = WebDriverWait(driver, WAIT_TIMEOUT)
-
-            if win32_available and not use_headless:
-                hide_driver_windows(driver)
-
-            driver.get(target_url)
-            if win32_available and not use_headless:
-                hide_driver_windows(driver)
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            _click_cookie_accept_if_present(driver, By)
-
-            # Exact Desktop-style sequence with operator XPaths.
-            _click_xpath(
-                driver,
-                wait,
-                By,
-                EC,
-                STEP1_NAME_XPATH,
-                "Шаг 1 — кнопка с именем",
-            )
-            _click_xpath(
-                driver,
-                wait,
-                By,
-                EC,
-                STEP2_WAREHOUSE_XPATH,
-                "Шаг 2 — карточка «Лахта»",
-            )
-
-            # Warehouse navigation / cookie flush is async in the SPA;
-            # wait_for_valid_cookies below polls until the cookies land.
-            wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            logger.info("Страница загружена (body найден), читаем cookies")
-
-            cookies = wait_for_valid_cookies(driver, timeout_seconds=WAIT_TIMEOUT)
-            if cookies and save_cookies_to_file(cookies):
-                logger.info("Successfully refreshed Kontur cookies")
-                return dict(cookies)
-
-            raw_cookies = driver.get_cookies()
-            if not raw_cookies:
-                logger.warning("После кликов cookies не найдены")
-                continue
-
-            cookies = {item["name"]: item["value"] for item in raw_cookies}
-            is_valid, missing_fields = validate_cookies(cookies)
-            if not is_valid:
-                logger.warning("Cookies невалидны, нет полей: %s", missing_fields)
-                if attempt < max_retries:
-                    time.sleep(2.0)
-                continue
-
-            if save_cookies_to_file(cookies):
-                logger.info("Успешно получили и сохранили валидные cookies")
-                return dict(cookies)
+            if cookie_btn:
+                cookie_btn[0].click()
+                logger.info("Clicked cookie accept")
+                time.sleep(SLEEP)
+            else:
+                logger.info("Cookie accept button not found on page - skipping")
         except Exception as exc:
-            logger.exception("get_cookies failed on attempt %s", attempt)
-            if is_driver_version_mismatch(exc) and not driver_repaired:
-                driver_repaired = True
-                if ensure_yandex_driver_updated(force=True):
-                    continue
-            if is_profile_in_use(exc) and not profile_unlocked:
-                logger.warning("Профиль занят — закрываем Яндекс и повторяем")
-                terminate_yandex_browser_processes(Path(browser_path))
-                profile_unlocked = True
-                continue
-        finally:
-            if driver is not None:
-                try:
-                    driver.quit()
-                    logger.info("Вкладка/браузер Selenium закрыты")
-                except Exception:
-                    pass
-            if win32_available:
-                # Session restore leaves extra browser.exe windows; reap only
-                # processes spawned during this attempt (before_pids stays).
-                try:
-                    leftover = _iter_yandex_browser_pids() - before_pids
-                    killed = _terminate_pids(leftover)
-                    if killed:
-                        logger.info("Закрыто %s окон браузера после попытки сбора cookies", killed)
-                except Exception as exc:
-                    logger.debug("Не удалось прибрать окна браузера: %s", exc)
-            if hider_stop is not None:
-                hider_stop.set()
+            logger.info("Error with cookie accept button: %s - skipping", exc)
 
-    logger.error("Не удалось получить валидные cookies после %s попыток", max_retries)
-    return None
+        try:
+            profile_xpath = STEP1_NAME_XPATH
+            profile_el = wait.until(EC.element_to_be_clickable((By.XPATH, profile_xpath)))
+            profile_el.click()
+            logger.info("Clicked profile (best-effort)")
+            time.sleep(SLEEP)
+        except Exception as exc:
+            logger.info("Profile select error: %s - ignored", exc)
+
+        try:
+            warehouse_el = wait.until(
+                EC.element_to_be_clickable((By.XPATH, STEP2_WAREHOUSE_XPATH))
+            )
+            warehouse_el.click()
+            logger.info("Clicked warehouse (fallback selector)")
+            time.sleep(SLEEP)
+        except Exception as exc:
+            logger.info("Warehouse select error: %s - ignored", exc)
+
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        logger.info("Страница загружена (body найден)")
+
+        raw = driver.get_cookies()
+        if not raw:
+            logger.warning(
+                "Нет cookies после загрузки - возможно, требуется авторизация или ошибка"
+            )
+            return None
+
+        cookies = {item["name"]: item["value"] for item in raw}
+        save_cookies_to_file(cookies)
+        logger.info("Collected cookies keys: %s", list(cookies.keys()))
+        return cookies
+    except Exception as exc:
+        logger.exception("get_cookies failed")
+        logger.error("get_cookies failed: %s", exc)
+        return None
+    finally:
+        if driver is not None:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
 
 _build_browser_options = build_browser_options

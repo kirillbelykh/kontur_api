@@ -22,13 +22,20 @@ PROFILE_DIRECTORY = str(
 # True Chrome --headless=new is unsupported for this auth stack by default.
 HEADLESS = False
 
-RUNTIME_DIR = Path(os.getenv("KONTUR_RUNTIME_DIR", "runtime"))
+RUNTIME_DIR = Path(os.getenv("KONTUR_RUNTIME_DIR", "runtime")).resolve()
 RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
 AUTH_RUNTIME_DIR = RUNTIME_DIR / "auth"
 AUTH_RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
 
 COOKIES_FILE = AUTH_RUNTIME_DIR / "kontur_cookies.json"
 LEGACY_COOKIES_FILE = Path("kontur_cookies.json")
+
+# Dedicated Yandex profile for this app. Reused across launches so CryptoPro
+# / Kontur extensions stay installed. Independent from the operator's daily
+# Yandex window (that profile stays locked while they work).
+SELENIUM_USER_DATA_DIR = (AUTH_RUNTIME_DIR / "yandex_profile").resolve()
+SELENIUM_USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+SELENIUM_PROFILE_DIRECTORY = "Default"
 
 ORGANIZATION_ID = os.getenv(
     "ORGANIZATION_ID",

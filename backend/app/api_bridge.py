@@ -708,10 +708,9 @@ class ApiBridge:
                     "Сессия UI v2: запускаем %s обновление cookies",
                     "принудительное" if update_triggered else "плановое",
                 )
-                # File → Yandex profile → Selenium. Do not force the browser on
-                # startup/schedule: that skipped live cookies and opened extra
-                # Yandex windows (retries + session restore). Manual «Сессия»
-                # still uses refresh_session() → force_browser_refresh=True.
+                # File → LAN → Yandex profile → one Selenium window.
+                # Do not force the browser: that skipped live cookies and
+                # opened extra Yandex windows. Manual «Сессия» uses the same cascade.
                 self._ensure_session(
                     force_refresh=True,
                     force_browser_refresh=False,
@@ -1975,7 +1974,7 @@ class ApiBridge:
                         f"{retry_message} ({attempt}/{total_attempts - 1}): {exc}",
                     )
                 try:
-                    self._ensure_session(force_refresh=True, force_browser_refresh=True)
+                    self._ensure_session(force_refresh=True, force_browser_refresh=False)
                 except Exception as refresh_exc:
                     if log_channel:
                         self._log(log_channel, f"Не удалось обновить сессию перед повтором: {refresh_exc}")
@@ -4087,7 +4086,7 @@ class ApiBridge:
 
     def refresh_session(self) -> Dict[str, Any]:
         try:
-            self._ensure_session(force_refresh=True, force_browser_refresh=True)
+            self._ensure_session(force_refresh=True, force_browser_refresh=False)
             return {"success": True, "session": self.get_session_info()}
         except Exception as exc:
             return {"success": False, "error": str(exc)}

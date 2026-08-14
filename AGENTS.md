@@ -11,12 +11,7 @@ kontur_api/
   .github/workflows/ci.yml  # CI: backend unittest (Windows) + frontend typecheck/build (Ubuntu)
   main.py                   # thin desktop launcher → backend.app.desktop
   cookies.py                # thin shim → backend.auth (legacy imports)
-  KonturMarkirovka.bat      # primary Windows launcher
-  run_kontur.vbs            # silent launcher (desktop shortcut target)
-  run_crpt_server.vbs       # thin stub → scripts/launchers/ (CHZ bridge without a window)
-  setup.bat / update.bat / Обновление.bat / repair_shortcut.bat  # thin entrypoints → scripts/
-  Build-Installer.bat       # → scripts/build_installer.ps1
-  KonturMarkirovka-Setup.exe # installer deliverable, committed on purpose
+  Update.bat / Install.bat / Install.exe  # operator entrypoints (in-place on the git clone)
   full_orders_history.json  # order history DB; auto-synced via git branch `orders-history`
   backend/                  # Python business logic (see below)
   frontend/                 # React 19 + Vite + TS + Tailwind 4 + HeroUI 3; dist/ is COMMITTED deliberately
@@ -60,11 +55,12 @@ npm run dev
 
 - In-app updates: `check_for_updates` (git fetch, compare HEAD vs `origin/main`, polled every 5 min) → `apply_update` (`git merge --ff-only origin/main`), restart is manual.
 - `frontend/dist` is committed **deliberately** — operator PCs get UI updates via the same git pull, no Node required. After frontend changes run `npm run build` and commit `dist` together with the sources.
-- `Обновление.bat` / `update.bat` → `scripts/update_windows.ps1`: full update + environment rebuild (stash local changes, pull/reset `main`, re-run installer).
+- Other PCs: `git pull`, then `Install.bat` / `Install.exe` — stops the app, rebuilds `.venv`, driver, desktop shortcut (`pythonw` + `main.py`).
+- `Update.bat` → `scripts/update_windows.ps1`: stash local changes, pull/reset `main`, then the same full reinstall.
 
 ## Windows installer
 
-`Build-Installer.bat` → `KonturMarkirovka-Setup.exe` + `KonturMarkirovka-<ver>-payload.zip` appear in the **project root** (build cache: `dist\installer\`, payload staging: `installer\payload\`). Inno Setup 6 is auto-downloaded if missing. The installer unpacks to `%LOCALAPPDATA%\Programs\KonturMarkirovka`; the payload has no `.git`, so in-app updates and history sync do not work in that copy — git-clone installs are the primary deployment.
+Operator surface in the repo root is only `Update.bat`, `Install.bat`, `Install.exe`. All three work **in the git clone folder** (they do not copy the app to `%LOCALAPPDATA%`). `Install.exe` is a tiny wrapper around `scripts/install_windows.ps1 -Reinstall`. Rebuild it with `scripts/build_install_exe.ps1`. Optional Inno payload stays under `dist/installer/` and is not published to the root.
 
 ## Architecture
 

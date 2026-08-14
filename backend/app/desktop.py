@@ -85,7 +85,7 @@ def _desktop_dirs() -> list[Path]:
 def _write_desktop_shortcut(shortcut_path: Path) -> None:
     icon_path = REPO_ROOT / "assets" / "icons" / "kontur.ico"
     pythonw = _resolve_pythonw()
-    bat = REPO_ROOT / "KonturMarkirovka.bat"
+    bat = REPO_ROOT / "scripts" / "launchers" / "KonturMarkirovka.bat"
     import win32com.client  # type: ignore
 
     shell = win32com.client.Dispatch("WScript.Shell")

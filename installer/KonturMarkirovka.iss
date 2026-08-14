@@ -6,7 +6,7 @@
 #define MyAppVersion "2.0.0"
 #define MyAppPublisher "Grundlage"
 #define MyAppURL "https://github.com/kirillbelykh/kontur_api"
-#define MyAppExeName "KonturMarkirovka.bat"
+#define MyAppExeName "scripts\\launchers\\KonturMarkirovka.bat"
 
 [Setup]
 AppId={{8F2A1C9E-4B67-4D91-9E2A-3C8F5B1D0A77}}

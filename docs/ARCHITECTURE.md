@@ -42,7 +42,7 @@ flowchart LR
 сравнение HEAD с `origin/main`); кнопка «Обновить» → `apply_update` →
 `git merge --ff-only origin/main`, перезапуск вручную. `frontend/dist`
 закоммичен сознательно: UI приезжает тем же pull, Node.js на рабочих ПК не
-нужен. Жёсткий путь — `Обновление.bat` → `scripts/update_windows.ps1`
+нужен. Жёсткий путь — `Update.bat` → `scripts/update_windows.ps1`
 (stash → pull/reset → пересборка окружения).
 
 **История между ПК.** `history_db.py` синхронизирует

@@ -30,20 +30,7 @@ function Publish-Deliverables {
         [string]$Dist,
         [string]$Version
     )
-    $names = @(
-        "KonturMarkirovka-Setup.exe",
-        "Setup-KonturMarkirovka.bat",
-        "KonturMarkirovka-$Version-payload.zip",
-        "Install-KonturMarkirovka.ps1"
-    )
-    foreach ($name in $names) {
-        $src = Join-Path $Dist $name
-        if (Test-Path -LiteralPath $src) {
-            $dst = Join-Path $Root $name
-            Copy-Item -LiteralPath $src -Destination $dst -Force
-            Write-Ok "Published to root: $dst"
-        }
-    }
+    Write-Ok "Deliverables stay in $Dist (not copied to repo root)"
 }
 if (Test-Path -LiteralPath $payloadDir) {
     Remove-Item -LiteralPath $payloadDir -Recurse -Force
@@ -88,6 +75,7 @@ Get-ChildItem -LiteralPath $ProjectDir -Force | ForEach-Object {
         if ($_.Name -eq 'full_orders_history.json') { return }
         # Do not nest previous installer deliverables into the next payload
         if ($_.Name -eq 'KonturMarkirovka-Setup.exe') { return }
+        if ($_.Name -eq 'Install.exe') { return }
         if ($_.Name -like 'KonturMarkirovka-*-payload.zip') { return }
         if ($_.Name -eq 'Setup-KonturMarkirovka.bat') { return }
         if ($_.Name -eq 'Install-KonturMarkirovka.ps1') { return }
@@ -98,8 +86,8 @@ Get-ChildItem -LiteralPath $ProjectDir -Force | ForEach-Object {
 # Ensure launcher + icon present
 foreach ($required in @(
     "main.py",
-    "KonturMarkirovka.bat",
-    "run_kontur.vbs",
+    "scripts\launchers\KonturMarkirovka.bat",
+    "scripts\launchers\run_kontur.vbs",
     "assets\icons\kontur.ico",
     "scripts\post_install.ps1",
     "scripts\ensure_yandex_driver.ps1",

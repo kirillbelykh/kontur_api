@@ -16,8 +16,8 @@ from backend.auth.constants import (
     DEFAULT_PROLONGATION_INTERVAL_HOURS,
     HEADLESS,
     LEGACY_PROLONGATION_STATE_FILE,
-    PROFILE_DIRECTORY,
-    PROFILE_USER_DATA_DIR,
+    SELENIUM_PROFILE_DIRECTORY,
+    SELENIUM_USER_DATA_DIR,
     PROLONGATION_BUTTON_XPATH,
     PROLONGATION_ENABLED_ENV,
     PROLONGATION_IDLE_CHECK_SECONDS,
@@ -155,8 +155,8 @@ def _click_first_matching_xpath(driver, wait, by, expected_conditions, xpaths: L
 def _run_kontur_access_prolongation_browser_flow(
     driver_path: Path = YANDEX_DRIVER_PATH,
     browser_path: Optional[Path] = YANDEX_BROWSER_PATH,
-    profile_user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
-    profile_directory: str = PROFILE_DIRECTORY,
+    profile_user_data_dir: Optional[Path] = SELENIUM_USER_DATA_DIR,
+    profile_directory: str = SELENIUM_PROFILE_DIRECTORY,
     headless: bool = HEADLESS,
     target_url: str = PROLONGATION_URL,
 ) -> None:

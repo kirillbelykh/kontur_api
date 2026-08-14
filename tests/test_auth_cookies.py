@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import tempfile
-import threading
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -25,6 +24,8 @@ class AuthServiceTests(unittest.TestCase):
         store.clear_memoized_cookies()
         store.set_cookie_refresh_in_progress(False)
         store.cookie_refresh_event().set()
+        service._LAST_SELENIUM_OK_AT = 0.0
+        service._LAST_SELENIUM_TRY_AT = 0.0
         self.lan_patcher = mock.patch("backend.auth.service.fetch_cookies_from_lan", return_value=None)
         self.lan_patcher.start()
 
@@ -119,6 +120,40 @@ class AuthServiceTests(unittest.TestCase):
         self.assertEqual(result, lan_cookies)
         profile_mock.assert_not_called()
         selenium_mock.assert_not_called()
+
+    def test_failed_selenium_is_not_retried_within_debounce(self):
+        self._write_cookie_file(age_seconds=30.0)
+        with (
+            mock.patch.object(store, "COOKIES_FILE", self.cookies_file),
+            mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
+            mock.patch("backend.auth.service.validate_kontur_session", return_value=False),
+            mock.patch("backend.auth.service.load_cookies_from_yandex_profile", return_value=None),
+            mock.patch("backend.auth.service.get_cookies", return_value=None) as selenium_mock,
+            mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
+        ):
+            first = service.get_valid_cookies(force_refresh=True)
+            second = service.get_valid_cookies(force_refresh=True)
+
+        self.assertIsNone(first)
+        self.assertIsNone(second)
+        selenium_mock.assert_called_once_with()
+
+    def test_missing_cookie_file_still_launches_selenium_after_debounce(self):
+        """No saved cookies → debounce must not skip the browser."""
+        with (
+            mock.patch.object(store, "COOKIES_FILE", self.cookies_file),
+            mock.patch.object(store, "LEGACY_COOKIES_FILE", self.cookies_file),
+            mock.patch("backend.auth.service.validate_kontur_session", return_value=False),
+            mock.patch("backend.auth.service.load_cookies_from_yandex_profile", return_value=None),
+            mock.patch("backend.auth.service.get_cookies", return_value=None) as selenium_mock,
+            mock.patch("backend.auth.service.save_cookies_to_file", return_value=True),
+        ):
+            first = service.get_valid_cookies(force_refresh=True)
+            second = service.get_valid_cookies(force_refresh=True)
+
+        self.assertIsNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(selenium_mock.call_count, 2)
 
 
 class KonturCheckTests(unittest.TestCase):
@@ -218,8 +253,33 @@ class BrowserSessionErrorTests(unittest.TestCase):
         )
         self.assertFalse(is_driver_version_mismatch(exc))
 
-    def test_get_cookies_frees_locked_profile_without_temp_profile(self):
-        """Locked real profile → close Yandex and retry; never open temp/incognito."""
+    def test_get_cookies_uses_persistent_program_profile(self):
+        from backend.auth import browser as browser_mod
+        from backend.auth.constants import SELENIUM_PROFILE_DIRECTORY, SELENIUM_USER_DATA_DIR
+
+        captured: dict[str, list[str]] = {}
+
+        def fake_chrome(*, service, options):
+            captured["args"] = list(options.arguments)
+            raise RuntimeError("stop")
+
+        with (
+            mock.patch("selenium.webdriver.Chrome", side_effect=fake_chrome),
+            mock.patch.object(Path, "exists", return_value=True),
+        ):
+            browser_mod.get_cookies(
+                driver_path=Path("driver/yandexdriver.exe"),
+                browser_path=Path("browser.exe"),
+            )
+
+        args = captured["args"]
+        self.assertIn(f"--user-data-dir={SELENIUM_USER_DATA_DIR.resolve()}", args)
+        self.assertIn(f"--profile-directory={SELENIUM_PROFILE_DIRECTORY}", args)
+        self.assertIn("--remote-debugging-port=0", args)
+        self.assertFalse(any("incognito" in a.lower() for a in args))
+
+    def test_get_cookies_launches_chrome_only_once(self):
+        """Even max_retries>1 must not open a second Yandex window."""
         from backend.auth import browser as browser_mod
 
         lock_error = RuntimeError(
@@ -238,30 +298,25 @@ class BrowserSessionErrorTests(unittest.TestCase):
                 browser_path=Path("browser.exe"),
                 profile_user_data_dir=Path("User Data"),
                 profile_directory="Vinsent O`neal",
-                max_retries=2,
+                max_retries=3,
             )
 
         self.assertIsNone(result)
-        term_mock.assert_called_once()
+        term_mock.assert_not_called()
         mkdtemp_mock.assert_not_called()
-        self.assertGreaterEqual(chrome_mock.call_count, 2)
+        self.assertEqual(chrome_mock.call_count, 1)
 
-    def test_failed_launch_sweeps_orphan_browser_windows(self):
-        """Упавший запуск не должен оставлять пустые окна browser.exe."""
+    def test_failed_launch_does_not_kill_browser_processes(self):
+        """Failed launch must not TerminateProcess leftover browser.exe."""
         from backend.auth import browser as browser_mod
 
         generic_error = RuntimeError("some random selenium failure")
 
         with (
-            mock.patch.object(browser_mod, "_start_new_window_hider", return_value=threading.Event()),
-            mock.patch.object(
-                browser_mod,
-                "_iter_yandex_browser_pids",
-                side_effect=[{100}, {100, 999}, {100}, {100, 999}],
-            ),
             mock.patch.object(browser_mod, "_terminate_pids", return_value=1) as term_mock,
             mock.patch("selenium.webdriver.Chrome", side_effect=generic_error),
             mock.patch.object(Path, "exists", return_value=True),
+            mock.patch("tempfile.mkdtemp") as mkdtemp_mock,
         ):
             result = browser_mod.get_cookies(
                 driver_path=Path("driver/yandexdriver.exe"),
@@ -272,10 +327,10 @@ class BrowserSessionErrorTests(unittest.TestCase):
             )
 
         self.assertIsNone(result)
-        self.assertEqual(term_mock.call_count, 2)
-        term_mock.assert_called_with({999})
+        term_mock.assert_not_called()
+        mkdtemp_mock.assert_not_called()
 
-    def test_get_cookies_version_mismatch_repairs_once_then_retries(self):
+    def test_get_cookies_does_not_repair_driver_with_second_launch(self):
         from backend.auth import browser as browser_mod
 
         version_error = RuntimeError(
@@ -286,6 +341,7 @@ class BrowserSessionErrorTests(unittest.TestCase):
             mock.patch.object(browser_mod, "ensure_yandex_driver_updated", return_value=True) as ensure_mock,
             mock.patch("selenium.webdriver.Chrome", side_effect=version_error) as chrome_mock,
             mock.patch.object(Path, "exists", return_value=True),
+            mock.patch("tempfile.mkdtemp") as mkdtemp_mock,
         ):
             result = browser_mod.get_cookies(
                 driver_path=Path("driver/yandexdriver.exe"),
@@ -296,16 +352,17 @@ class BrowserSessionErrorTests(unittest.TestCase):
             )
 
         self.assertIsNone(result)
-        ensure_mock.assert_called_once()
-        self.assertGreaterEqual(chrome_mock.call_count, 2)
+        ensure_mock.assert_not_called()
+        mkdtemp_mock.assert_not_called()
+        self.assertEqual(chrome_mock.call_count, 1)
 
     def test_profile_xpath_is_first_step(self):
         from backend.auth import browser as browser_mod
 
         self.assertEqual(
             browser_mod.STEP1_NAME_XPATH,
-            "/html/body/div[3]/div/div/div[1]/div[2]/div/div/div/div/div[2]"
-            "/div/div/div/div/div/div/div[1]/div/div[1]/div/div[1]/div/div/span/span",
+            '//*[@id="root"]/div/div/div[1]/div[2]/div/div/div/div/div[2]'
+            "/div/div/div/div/div/div/div[1]/div/div/div/div[1]/div/div",
         )
 
     def test_warehouse_xpaths_prefer_lakhta_card(self):
@@ -313,7 +370,7 @@ class BrowserSessionErrorTests(unittest.TestCase):
 
         self.assertEqual(
             browser_mod.STEP2_WAREHOUSE_XPATH,
-            '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[3]',
+            '//*[@id="root"]/div/div/div[2]/div/div/div[1]/div[3]/ul/li/div[2]',
         )
 
     def test_click_warehouse_card_uses_warehouse_xpaths(self):
@@ -353,7 +410,6 @@ class BrowserSessionErrorTests(unittest.TestCase):
         self.assertTrue(any(a.startswith("--user-data-dir=") for a in args))
         self.assertIn("--profile-directory=Vinsent O`neal", args)
         self.assertIn("--window-position=-32000,-32000", args)
-        self.assertIn("--hide-crash-restore-bubble", args)
         self.assertFalse(any("headless" in a for a in args))
         self.assertFalse(any("incognito" in a.lower() for a in args))
 

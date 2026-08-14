@@ -39,14 +39,19 @@ function New-KonturShortcut {
     $arguments = ""
     $pythonw = Join-Path $projectDir ".venv\Scripts\pythonw.exe"
     $mainPy = Join-Path $projectDir "main.py"
-    if ($LauncherFile -eq "run_kontur.vbs" -or $LauncherFile -eq "main.py" -or $LauncherFile -eq "KonturMarkirovka.bat") {
-        if ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy)) {
-            $targetPath = $pythonw
-            $arguments = "`"$mainPy`""
-        } else {
-            $targetPath = Join-Path $projectDir "KonturMarkirovka.bat"
-            $arguments = ""
+    $isAppShortcut = $LauncherFile -in @(
+        "run_kontur.vbs",
+        "main.py",
+        "KonturMarkirovka.bat",
+        "scripts\launchers\run_kontur.vbs",
+        "scripts\launchers\KonturMarkirovka.bat"
+    )
+    if ($isAppShortcut) {
+        if (-not ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy))) {
+            throw "pythonw.exe not found: $pythonw. Run Install.bat first."
         }
+        $targetPath = $pythonw
+        $arguments = "`"$mainPy`""
     } elseif ($launcherExtension -eq ".vbs") {
         $targetPath = $wscript
         $arguments = "`"$launcher`""
@@ -124,4 +129,4 @@ foreach ($legacy in @(
     Remove-KonturShortcut -ShortcutName $legacy
 }
 $appName = ConvertFrom-Utf8Base64 "0JrQvtC90YLRg9GAINCc0LDRgNC60LjRgNC+0LLQutCw"
-New-KonturShortcut -ShortcutName $appName -LauncherFile "run_kontur.vbs" -Description $appName
+New-KonturShortcut -ShortcutName $appName -LauncherFile "scripts\launchers\run_kontur.vbs" -Description $appName

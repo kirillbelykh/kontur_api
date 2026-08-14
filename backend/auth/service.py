@@ -23,6 +23,7 @@ from backend.auth.yandex_cookies import load_cookies_from_yandex_profile
 # Skip a second Selenium launch when cookies were just collected successfully.
 _SELENIUM_DEBOUNCE_SECONDS = 90.0
 _LAST_SELENIUM_OK_AT = 0.0
+_LAST_SELENIUM_TRY_AT = 0.0
 
 
 def _accept_live_cookies(cookies: Optional[Dict[str, str]], *, source: str) -> Optional[Dict[str, str]]:
@@ -49,7 +50,7 @@ def get_valid_cookies(
     ``force_browser`` is set. Even then a short debounce avoids opening the
     browser twice when two refresh triggers fire back-to-back.
     """
-    global _LAST_SELENIUM_OK_AT
+    global _LAST_SELENIUM_OK_AT, _LAST_SELENIUM_TRY_AT
 
     if not force_refresh and not force_browser:
         cached = load_cookies_from_file()
@@ -103,17 +104,32 @@ def get_valid_cookies(
             if accepted:
                 return accepted
 
-        age = time.time() - _LAST_SELENIUM_OK_AT
-        if age < _SELENIUM_DEBOUNCE_SECONDS:
-            cached = load_cookies_from_file(allow_stale=True)
+        now = time.time()
+        cached = load_cookies_from_file(allow_stale=True)
+        recently_tried = (
+            not force_browser
+            and _LAST_SELENIUM_TRY_AT
+            and (now - _LAST_SELENIUM_TRY_AT) < _SELENIUM_DEBOUNCE_SECONDS
+        )
+        if recently_tried and cached:
             accepted = _accept_live_cookies(cached, source="selenium-debounce")
             if accepted:
                 logger.info(
                     "Пропускаем повторный Selenium — cookies свежие (%.0f сек назад)",
-                    age,
+                    now - _LAST_SELENIUM_OK_AT,
                 )
                 return accepted
+            logger.info(
+                "Пропускаем повторный Selenium — уже пробовали %.0f сек назад",
+                now - _LAST_SELENIUM_TRY_AT,
+            )
+            return _accept_live_cookies(cached, source="file-stale-after-refresh")
+        if recently_tried and not cached:
+            logger.info(
+                "Debounce Selenium сброшен: файла cookies нет, запускаем браузер"
+            )
 
+        _LAST_SELENIUM_TRY_AT = now
         selenium_cookies = get_cookies()
         if selenium_cookies:
             accepted = _accept_live_cookies(selenium_cookies, source="selenium")

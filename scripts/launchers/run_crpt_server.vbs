@@ -17,5 +17,5 @@ ElseIf fso.FileExists(python) Then
     cmd = """" & python & """ """ & mainScript & """"
     shell.Run cmd, 0, False
 Else
-    MsgBox "Python venv not found for Kontur API (.venv). Run setup.bat first.", vbExclamation, "CRPT server"
+    MsgBox "Python venv not found for Kontur API (.venv). Run Install.bat first.", vbExclamation, "CRPT server"
 End If

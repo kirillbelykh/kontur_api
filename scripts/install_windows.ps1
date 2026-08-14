@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$RepoUrl = "https://github.com/kirillbelykh/kontur_api.git"
+    [string]$RepoUrl = "https://github.com/kirillbelykh/kontur_api.git",
+    [switch]$Reinstall
 )
 
 Set-StrictMode -Version 3
@@ -55,7 +56,7 @@ function Add-UserPathDirectory {
 
 function Ensure-Winget {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        throw "winget is not available. Install App Installer from Microsoft Store and re-run setup.bat."
+        throw "winget is not available. Install App Installer from Microsoft Store and re-run Install.bat."
     }
 }
 
@@ -480,6 +481,55 @@ function Install-YandexDriver {
     }
 }
 
+function Stop-KonturRuntimeProcesses {
+    param([Parameter(Mandatory = $true)][string]$ProjectDir)
+
+    $targets = @()
+    $projectDirLower = $ProjectDir.ToLowerInvariant()
+    try {
+        $pythonProcesses = Get-CimInstance Win32_Process -Filter "Name='python.exe' OR Name='pythonw.exe'" -ErrorAction Stop
+    } catch {
+        Write-WarnMsg "Could not enumerate running Python processes: $($_.Exception.Message)"
+        return
+    }
+
+    foreach ($process in $pythonProcesses) {
+        $commandLine = [string]$process.CommandLine
+        if ([string]::IsNullOrWhiteSpace($commandLine)) {
+            continue
+        }
+        if ($commandLine.ToLowerInvariant().Contains($projectDirLower)) {
+            $targets += $process
+        }
+    }
+
+    foreach ($process in $targets) {
+        try {
+            Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
+            Write-Ok "Stopped process $($process.Name) (PID $($process.ProcessId))"
+        } catch {
+            Write-WarnMsg "Could not stop process $($process.Name) (PID $($process.ProcessId)): $($_.Exception.Message)"
+        }
+    }
+
+    if ($targets.Count -gt 0) {
+        Start-Sleep -Seconds 2
+    }
+}
+
+function Remove-ProjectVenv {
+    param([Parameter(Mandatory = $true)][string]$ProjectDir)
+
+    $venv = Join-Path $ProjectDir ".venv"
+    if (-not (Test-Path -LiteralPath $venv)) {
+        return
+    }
+
+    Write-Step "Removing .venv for a clean reinstall"
+    Remove-Item -LiteralPath $venv -Recurse -Force
+    Write-Ok "Removed $venv"
+}
+
 function Sync-ProjectDependencies {
     param([Parameter(Mandatory = $true)][string]$ProjectDir)
 
@@ -549,8 +599,12 @@ function Test-PythonEnvironment {
     param([Parameter(Mandatory = $true)][string]$ProjectDir)
 
     $python = Join-Path $ProjectDir ".venv\Scripts\python.exe"
+    $pythonw = Join-Path $ProjectDir ".venv\Scripts\pythonw.exe"
     if (-not (Test-Path $python)) {
         throw "Python executable was not found after dependency sync: $python"
+    }
+    if (-not (Test-Path $pythonw)) {
+        throw "pythonw.exe was not found after dependency sync: $pythonw"
     }
 
     Write-Step "Checking Python runtime imports"
@@ -581,25 +635,28 @@ function Create-DesktopShortcut {
     )
 
     $launcher = Join-Path $ProjectDir $LauncherFile
-    if (-not (Test-Path $launcher)) {
-        throw "$LauncherFile was not found in project directory."
-    }
-    $launcherExtension = [System.IO.Path]::GetExtension($launcher).ToLowerInvariant()
+    $launcherExtension = [System.IO.Path]::GetExtension($LauncherFile).ToLowerInvariant()
     $targetPath = $launcher
     $arguments = ""
     $pythonw = Join-Path $ProjectDir ".venv\Scripts\pythonw.exe"
     $mainPy = Join-Path $ProjectDir "main.py"
-    if ($LauncherFile -eq "run_kontur.vbs" -or $LauncherFile -eq "main.py" -or $LauncherFile -eq "KonturMarkirovka.bat") {
-        # Desktop app: pythonw directly. VBS is blocked on some PCs; python.exe keeps a console.
-        if ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy)) {
-            $targetPath = $pythonw
-            $arguments = "`"$mainPy`""
-        } else {
-            $bat = Join-Path $ProjectDir "KonturMarkirovka.bat"
-            $targetPath = $bat
-            $arguments = ""
+    $isAppShortcut = $LauncherFile -in @(
+        "run_kontur.vbs",
+        "main.py",
+        "KonturMarkirovka.bat",
+        "scripts\launchers\run_kontur.vbs",
+        "scripts\launchers\KonturMarkirovka.bat"
+    )
+    if ($isAppShortcut) {
+        if (-not ((Test-Path -LiteralPath $pythonw) -and (Test-Path -LiteralPath $mainPy))) {
+            throw "pythonw.exe not found after install: $pythonw. Re-run Install.bat."
         }
+        $targetPath = $pythonw
+        $arguments = "`"$mainPy`""
     } elseif ($launcherExtension -eq ".vbs") {
+        if (-not (Test-Path $launcher)) {
+            throw "$LauncherFile was not found in project directory."
+        }
         $wscript = Join-Path $env:WINDIR "System32\\wscript.exe"
         if (-not (Test-Path $wscript)) {
             $wscript = "wscript.exe"
@@ -685,6 +742,12 @@ Ensure-Uv
 $projectDir = Resolve-ProjectDir -ScriptRoot $PSScriptRoot
 Write-Ok "Project directory: $projectDir"
 
+if ($Reinstall) {
+    Write-Step "Full reinstall: stop running app and rebuild .venv"
+    Stop-KonturRuntimeProcesses -ProjectDir $projectDir
+    Remove-ProjectVenv -ProjectDir $projectDir
+}
+
 Ensure-EnvFile -ProjectDir $projectDir
 Ensure-DesktopDataDirectories
 Sync-ProjectDependencies -ProjectDir $projectDir
@@ -706,7 +769,7 @@ foreach ($legacy in @("KonturAPI", "KonturTestAPI", "KonturMobile", "CRPT server
 Create-DesktopShortcut `
     -ProjectDir $projectDir `
     -ShortcutName (ConvertFrom-Utf8Base64 "0JrQvtC90YLRg9GAINCc0LDRgNC60LjRgNC+0LLQutCw") `
-    -LauncherFile "run_kontur.vbs" `
+    -LauncherFile "scripts\launchers\run_kontur.vbs" `
     -Description "Kontur Markirovka"
 
 if (-not $singleShortcut) {

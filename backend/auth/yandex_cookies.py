@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import base64
+import ctypes
 import json
-import shutil
+import os
 import sqlite3
 import tempfile
-import time
+from ctypes import wintypes
 from pathlib import Path
 from typing import Dict, Optional
 
 from backend.services.logger import logger
 
-from backend.auth.constants import PROFILE_DIRECTORY, PROFILE_USER_DATA_DIR
+from backend.auth.constants import SELENIUM_PROFILE_DIRECTORY, SELENIUM_USER_DATA_DIR
 from backend.auth.store import validate_cookies
 
 
@@ -48,50 +49,108 @@ def _decrypt_yandex_cookie(value: bytes, key: Optional[bytes]) -> Optional[str]:
         return None
 
 
+def _read_file_shared(path: Path) -> bytes:
+    """Read a file while Yandex still has it open (FILE_SHARE_READ|WRITE|DELETE)."""
+    if os.name != "nt":
+        return path.read_bytes()
+
+    GENERIC_READ = 0x80000000
+    FILE_SHARE_READ = 0x00000001
+    FILE_SHARE_WRITE = 0x00000002
+    FILE_SHARE_DELETE = 0x00000004
+    OPEN_EXISTING = 3
+    FILE_ATTRIBUTE_NORMAL = 0x80
+    INVALID_HANDLE_VALUE = ctypes.c_void_p(-1).value
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    CreateFileW = kernel32.CreateFileW
+    CreateFileW.argtypes = [
+        wintypes.LPCWSTR,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.HANDLE,
+    ]
+    CreateFileW.restype = wintypes.HANDLE
+
+    handle = CreateFileW(
+        str(path),
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        None,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        None,
+    )
+    if handle == INVALID_HANDLE_VALUE or not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    try:
+        size = ctypes.c_longlong(0)
+        if not kernel32.GetFileSizeEx(handle, ctypes.byref(size)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if size.value <= 0:
+            return b""
+        buf = ctypes.create_string_buffer(size.value)
+        read = wintypes.DWORD(0)
+        if not kernel32.ReadFile(handle, buf, size.value, ctypes.byref(read), None):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return buf.raw[: read.value]
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _copy_sqlite_tree(src: Path, dest: Path) -> None:
+    dest.write_bytes(_read_file_shared(src))
+    for extra in (src.parent / f"{src.name}-wal", src.parent / f"{src.name}-journal"):
+        if not extra.exists():
+            continue
+        try:
+            dest.with_name(dest.name + extra.name[len(src.name) :]).write_bytes(
+                _read_file_shared(extra)
+            )
+        except OSError:
+            pass
+
+
+def _cookie_db_candidates(user_data_dir: Path, profile_directory: str) -> list[Path]:
+    profile_root = user_data_dir / profile_directory
+    return [
+        profile_root / "Network" / "Cookies",
+        profile_root / "Cookies",
+    ]
+
+
 def load_cookies_from_yandex_profile(
-    user_data_dir: Optional[Path] = PROFILE_USER_DATA_DIR,
-    profile_directory: str = PROFILE_DIRECTORY,
+    user_data_dir: Optional[Path] = SELENIUM_USER_DATA_DIR,
+    profile_directory: str = SELENIUM_PROFILE_DIRECTORY,
 ) -> Optional[Dict[str, str]]:
-    """Read Kontur cookies from the user's normal Yandex Browser profile."""
+    """Read Kontur cookies from the app's persistent Yandex profile."""
     if not user_data_dir:
         return None
     user_data_dir = Path(user_data_dir)
-    cookies_db = user_data_dir / profile_directory / "Network" / "Cookies"
-    if not cookies_db.exists():
+    cookies_db = next((path for path in _cookie_db_candidates(user_data_dir, profile_directory) if path.exists()), None)
+    if cookies_db is None:
         return None
 
-    temporary_db = Path(tempfile.mkstemp(prefix="kontur_cookies_", suffix=".sqlite")[1])
+    fd, temp_name = tempfile.mkstemp(prefix="kontur_cookies_", suffix=".sqlite")
+    os.close(fd)
+    temporary_db = Path(temp_name)
     try:
-        last_error: Optional[Exception] = None
         copied = False
-        # Browser often locks Cookies exclusively; retry briefly in case the
-        # lock is transient (startup / flush). Shared-read open is preferred.
-        for attempt in range(1, 4):
-            try:
-                try:
-                    raw = cookies_db.read_bytes()
-                    temporary_db.write_bytes(raw)
-                except OSError:
-                    shutil.copy2(cookies_db, temporary_db)
-                copied = True
-                break
-            except OSError as exc:
-                last_error = exc
-                logger.debug(
-                    "Yandex Cookies DB locked (attempt %s/3): %s",
-                    attempt,
-                    exc,
-                )
-                time.sleep(0.35 * attempt)
-        if not copied:
-            # Last resort: open sqlite in immutable URI mode (may still fail).
-            try:
-                uri = cookies_db.resolve().as_uri() + "?mode=ro&immutable=1"
-                connection = sqlite3.connect(uri, uri=True)
-            except Exception as exc:
-                raise last_error or exc
-        else:
+        try:
+            _copy_sqlite_tree(cookies_db, temporary_db)
+            copied = True
+        except OSError as exc:
+            logger.debug("Shared copy of Yandex Cookies failed: %s", exc)
+
+        if copied:
             connection = sqlite3.connect(temporary_db)
+        else:
+            uri = cookies_db.resolve().as_uri() + "?mode=ro&immutable=1&nolock=1"
+            connection = sqlite3.connect(uri, uri=True)
         try:
             key = _load_yandex_cookie_key(user_data_dir)
             rows = connection.execute(
@@ -105,21 +164,22 @@ def load_cookies_from_yandex_profile(
             value = str(plain_value or "") or _decrypt_yandex_cookie(encrypted_value or b"", key)
             if name and value is not None:
                 cookies[str(name)] = value
-        is_valid, _ = validate_cookies(cookies)
-        return cookies if is_valid else None
+        is_valid, missing = validate_cookies(cookies)
+        if not is_valid:
+            logger.info("Cookies в профиле Яндекса неполные: %s", missing)
+            return None
+        logger.info("Прочитали cookies из профиля Яндекса (%s ключей)", len(cookies))
+        return cookies
     except Exception as exc:
-        winerr = getattr(exc, "winerror", None)
-        if winerr == 32 or isinstance(exc, PermissionError):
-            logger.warning(
-                "Could not read cookies from Yandex Browser: profile DB is locked "
-                "(close the browser or rely on saved file cookies). %s",
-                exc,
-            )
-        else:
-            logger.warning("Could not read cookies from Yandex Browser: %s", exc)
+        logger.warning("Не удалось прочитать cookies из профиля Яндекса: %s", exc)
         return None
     finally:
-        try:
-            temporary_db.unlink(missing_ok=True)
-        except PermissionError:
-            logger.debug("Temporary browser cookie copy is still locked: %s", temporary_db)
+        for leftover in (
+            temporary_db,
+            Path(str(temporary_db) + "-wal"),
+            Path(str(temporary_db) + "-journal"),
+        ):
+            try:
+                leftover.unlink(missing_ok=True)
+            except PermissionError:
+                logger.debug("Temporary browser cookie copy is still locked: %s", leftover)
