@@ -310,7 +310,6 @@ export function TsdPage() {
     <div className="page-shell">
       <PageHeader
         title="Задание на ТСД"
-        refreshing={loading && items.length > 0}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load(false)} disabled={loading || isBusy}>

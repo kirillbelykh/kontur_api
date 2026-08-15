@@ -355,7 +355,6 @@ export function DownloadPage() {
     <div className="page-shell">
       <PageHeader
         title="Загрузка кодов"
-        refreshing={loading && items.length > 0}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || isBusy}>

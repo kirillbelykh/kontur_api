@@ -705,7 +705,6 @@ export function LabelsPage() {
     <div className="page-shell">
       <PageHeader
         title="Печать этикеток"
-        refreshing={loading && Boolean(state.templates?.length || state.orders?.length)}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || isBusy}>

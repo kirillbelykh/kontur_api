@@ -232,7 +232,6 @@ export function IntroPage() {
     <div className="page-shell">
       <PageHeader
         title="Ввод в оборот"
-        refreshing={loading && items.length > 0}
         actions={
           <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={isBusy}>
             <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />

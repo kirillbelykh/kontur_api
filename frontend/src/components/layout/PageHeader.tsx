@@ -6,21 +6,17 @@ export function PageHeader({
   title,
   actions,
   className,
-  refreshing = false,
 }: {
   title: string
   actions?: ReactNode
   className?: string
-  /** Тонкая полоска, пока список уже на экране и идёт фоновый refresh. */
-  refreshing?: boolean
 }) {
   return (
-    <div className={cn('relative mb-3', className)}>
+    <div className={cn('mb-3', className)}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight text-foreground">{title}</h1>
         {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
-      {refreshing ? <span className="page-refresh-bar" aria-hidden /> : null}
     </div>
   )
 }

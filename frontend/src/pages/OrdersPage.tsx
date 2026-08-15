@@ -758,7 +758,6 @@ export function OrdersPage() {
     <div className="page-shell">
       <PageHeader
         title="Заказ кодов"
-        refreshing={loading && ((state.history?.length || 0) > 0 || (state.queue?.length || 0) > 0)}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load(true)} disabled={loading || isBusy}>

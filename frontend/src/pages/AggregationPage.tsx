@@ -455,7 +455,6 @@ export function AggregationPage() {
     <div className="page-shell page-snappy">
       <PageHeader
         title="Коды агрегации"
-        refreshing={loading && items.length > 0}
         actions={
           <Button variant="outline" size="sm" onClick={() => void refreshList()} disabled={loading || isBusy}>
             <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
