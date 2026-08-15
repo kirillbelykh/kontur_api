@@ -962,6 +962,43 @@ button {
     background-color: hsl(var(--wms-border));
   }
 
+  .page-refresh-bar {
+    pointer-events: none;
+    position: absolute;
+    right: 0;
+    bottom: -4px;
+    left: 0;
+    height: 2px;
+    overflow: hidden;
+    background: hsl(var(--wms-border));
+  }
+
+  .page-refresh-bar::after {
+    content: "";
+    display: block;
+    height: 100%;
+    width: 32%;
+    background: var(--accent);
+    animation: page-refresh-slide 1.1s ease-in-out infinite;
+  }
+
+  @keyframes page-refresh-slide {
+    0% {
+      transform: translateX(-120%);
+    }
+    100% {
+      transform: translateX(400%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .page-refresh-bar::after {
+      width: 100%;
+      animation: none;
+      opacity: 0.45;
+    }
+  }
+
   .page-shell {
     margin-inline: auto;
     width: 100%;

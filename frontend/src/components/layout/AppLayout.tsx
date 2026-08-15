@@ -29,6 +29,7 @@ import { JOURNAL_WIDTH, JournalPanel } from '@/components/layout/JournalPanel'
 import { SettingsDialog } from '@/components/layout/SettingsDialog'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import { usePageZoom } from '@/hooks/usePageZoom'
+import { focusTableSearch, isTypingTarget, PAGE_REFRESH_EVENT, SECTION_ROUTES } from '@/lib/hotkeys'
 
 const DESKTOP_SIDEBAR_OPEN_WIDTH = 256
 const DESKTOP_SIDEBAR_COLLAPSED_WIDTH = 64
@@ -136,14 +137,15 @@ function Navigation({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
   return (
     <>
       <div className="flex flex-col gap-1">
-        {navItems.map((item) => {
+        {navItems.map((item, index) => {
           const Icon = item.icon
           return (
             <NavLink
               key={item.to}
               to={item.to}
+              title={`${item.label} (Ctrl+${index + 1})`}
               onClick={onNavigate}
-              onMouseEnter={(event) => showTooltip(item.label, event.currentTarget)}
+              onMouseEnter={(event) => showTooltip(`${item.label} · Ctrl+${index + 1}`, event.currentTarget)}
               onMouseLeave={() => setTooltip(null)}
               onFocus={(event) => showTooltip(item.label, event.currentTarget)}
               onBlur={() => setTooltip(null)}
@@ -302,17 +304,55 @@ export function AppLayout() {
     writeStoredFlag(JOURNAL_STORAGE_KEY, journalOpen)
   }, [journalOpen])
 
-  // Ctrl+, — настройки (как в VS Code)
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === ',') {
+      const ctrl = event.ctrlKey || event.metaKey
+      if (ctrl && event.key === ',') {
         event.preventDefault()
         setSettingsOpen((value) => !value)
+        return
+      }
+      if (ctrl && (event.key === 'j' || event.key === 'J')) {
+        event.preventDefault()
+        setJournalOpen((value) => !value)
+        return
+      }
+      if (ctrl && (event.key === 'f' || event.key === 'F')) {
+        event.preventDefault()
+        focusTableSearch()
+        return
+      }
+      if (event.key === 'F5' || (ctrl && (event.key === 'r' || event.key === 'R'))) {
+        event.preventDefault()
+        window.dispatchEvent(new Event(PAGE_REFRESH_EVENT))
+        return
+      }
+      if (ctrl && !event.shiftKey && !event.altKey && !isTypingTarget(event.target)) {
+        const digit = /^Digit([1-6])$/.exec(event.code)
+        if (digit) {
+          event.preventDefault()
+          navigate(SECTION_ROUTES[Number(digit[1]) - 1])
+        }
+      }
+      if (event.key !== 'Escape') return
+      if (settingsOpen) {
+        event.preventDefault()
+        setSettingsOpen(false)
+        return
+      }
+      if (journalOpen) {
+        event.preventDefault()
+        setJournalOpen(false)
+        return
+      }
+      if (isTypingTarget(event.target)) {
+        event.preventDefault()
+        ;(event.target as HTMLElement).blur()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [journalOpen, navigate, settingsOpen])
 
   const sessionPending = !sessionReady && session?.state !== 'error'
   const sessionTone = sessionReady ? 'success' : sessionPending ? 'info' : 'warning'
@@ -519,7 +559,7 @@ export function AppLayout() {
                 className={cn('hidden h-8 w-8 md:inline-flex', journalOpen && 'bg-muted text-foreground')}
                 onClick={() => setJournalOpen((value) => !value)}
                 aria-label={journalOpen ? 'Скрыть журнал' : 'Показать журнал'}
-                title={journalOpen ? 'Скрыть журнал' : 'Журнал операций'}
+                title={journalOpen ? 'Скрыть журнал (Ctrl+J)' : 'Журнал операций (Ctrl+J)'}
               >
                 <PanelRight className="h-4 w-4" />
               </Button>

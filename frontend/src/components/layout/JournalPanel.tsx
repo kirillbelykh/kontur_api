@@ -54,6 +54,16 @@ function parseLine(channel: string, line: string): JournalEntry {
     : { channel, time: '', message: line }
 }
 
+async function fetchAllLogs(): Promise<JournalEntry[]> {
+  const payload = await apiCall<Record<string, string[]>>('get_logs', 'all')
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
+  const next = CHANNELS.flatMap((item) =>
+    (Array.isArray(payload[item.id]) ? payload[item.id] : []).map((line) => parseLine(item.id, String(line))),
+  )
+  next.sort((a, b) => a.time.localeCompare(b.time))
+  return next
+}
+
 async function fetchChannel(channel: string): Promise<JournalEntry[]> {
   const lines = await apiCall<string[]>('get_logs', channel)
   return (Array.isArray(lines) ? lines : []).map((line) => parseLine(channel, String(line)))
@@ -77,11 +87,9 @@ export function JournalPanel({ open, onClose }: { open: boolean; onClose: () => 
     try {
       let next: JournalEntry[]
       if (selected === ALL) {
-        const perChannel = await Promise.all(CHANNELS.map((item) => fetchChannel(item.id)))
-        next = perChannel.flat()
+        next = await fetchAllLogs()
         // ponytail: сортировка по HH:MM:SS ломается на записях через полночь;
         // логи живут в памяти одной сессии (≤500 строк на канал), для смены суток нужен полный timestamp в бридже
-        next.sort((a, b) => a.time.localeCompare(b.time))
       } else {
         next = await fetchChannel(selected)
       }

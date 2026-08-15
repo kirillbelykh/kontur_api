@@ -15,7 +15,7 @@ import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
 import { subscribeDownloadProgress } from '@/lib/progress'
-import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
+import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,10 +24,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
 import { FieldLabel, TableSearch, TextInput } from '@/components/ui/field'
-import { TablePagination, usePagination } from '@/components/ui/pagination'
+import { TablePagination, DEFAULT_PAGE_SIZE } from '@/components/ui/pagination'
 import { SelectNative } from '@/components/ui/select'
 import { TableSkeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableSelectCell } from '@/components/ui/table'
+import { usePageRefreshHotkey } from '@/lib/hotkeys'
+import { OPS_AUTO_DOWNLOAD_KEY, useOpsPrinter, usePersistedState } from '@/lib/persist'
 
 type DownloadItem = {
   document_id?: string
@@ -44,6 +46,9 @@ type DownloadItem = {
 
 type DownloadState = {
   items?: DownloadItem[]
+  total?: number
+  page?: number
+  page_size?: number
   printers?: string[]
   default_printer?: string
 }
@@ -132,10 +137,11 @@ export function DownloadPage() {
   const [state, setState] = useCachedState<DownloadState>('download.state', {})
   const guard = useRequestGuard()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(0)
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION)
-  const [printer, setPrinter] = useState('')
+  const [printer, setPrinter] = useOpsPrinter()
   const [recordNumber, setRecordNumber] = useState('')
-  const [autoDownload, setAutoDownload] = useState(false)
+  const [autoDownload, setAutoDownload] = usePersistedState(OPS_AUTO_DOWNLOAD_KEY, false)
   const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
   const [liveProgress, setLiveProgress] = useState<Record<string, number>>({})
   const lastClickedIndex = useRef(-1)
@@ -143,6 +149,7 @@ export function DownloadPage() {
   const clickMeta = useRef({ ctrl: false, shift: false, fromControl: false })
   // Строки текущей страницы для стабильного activateRow (иначе memo строк бесполезен)
   const pageRowsRef = useRef<DownloadItem[]>([])
+  const debouncedSearch = useDebouncedValue(search)
 
   useEffect(
     () =>
@@ -150,6 +157,11 @@ export function DownloadPage() {
         setLiveProgress((prev) => {
           const next = { ...prev }
           for (const id of ids) next[id] = progress
+          return next
+        })
+        setLiveStatus((prev) => {
+          const next = { ...prev }
+          for (const id of ids) next[id] = progress >= 1 ? 'Скачан' : 'Скачивается'
           return next
         })
       }),
@@ -160,9 +172,10 @@ export function DownloadPage() {
     const fresh = guard()
     setLoading(true)
     try {
-      const result = await apiCall<DownloadState>('get_download_state')
+      const result = await apiCall<DownloadState>('get_download_state', debouncedSearch, page, DEFAULT_PAGE_SIZE)
       if (!fresh()) return
       setState(result)
+      if (typeof result.page === 'number' && result.page !== page) setPage(result.page)
 
       const printers = result.printers ?? []
       setPrinter((prev) => {
@@ -174,11 +187,9 @@ export function DownloadPage() {
 
       const items = result.items ?? []
       setSelection((prev) => {
-        const ids = prev.ids.filter((id) => items.some((item) => item.document_id === id))
-        let focus = items.some((item) => item.document_id === prev.focus) ? prev.focus : ''
-        if (!focus) focus = ids[0] || items[0]?.document_id || ''
-        if (!ids.length && focus) ids.push(focus)
-        return { ids, focus }
+        if (prev.ids.length || prev.focus) return prev
+        const first = items[0]?.document_id || ''
+        return first ? { ids: [first], focus: first } : prev
       })
     } catch (error) {
       if (!fresh()) return
@@ -186,7 +197,9 @@ export function DownloadPage() {
     } finally {
       if (fresh()) setLoading(false)
     }
-  }, [guard, setState])
+  }, [debouncedSearch, guard, page, setPrinter, setState])
+
+  usePageRefreshHotkey(load)
 
   useEffect(() => {
     void load()
@@ -194,11 +207,9 @@ export function DownloadPage() {
 
   const items = useMemo(() => state.items ?? [], [state.items])
   const printers = state.printers ?? []
-
-  const debouncedSearch = useDebouncedValue(search)
-  const rows = useMemo(() => items.filter((item) => rowMatchesQuery(item, debouncedSearch)), [items, debouncedSearch])
-  const pager = usePagination(rows)
-  pageRowsRef.current = pager.pageRows
+  const total = state.total ?? items.length
+  const pageCount = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE))
+  pageRowsRef.current = items
 
   const targetIds = selection.ids.length ? selection.ids : [selection.focus].filter(Boolean)
   const printTargetId = selection.focus || selection.ids[0] || ''
@@ -223,7 +234,7 @@ export function DownloadPage() {
     }))
   }, [])
 
-  const visibleIds = useMemo(() => rows.map((row) => row.document_id || '').filter(Boolean), [rows])
+  const visibleIds = useMemo(() => items.map((row) => row.document_id || '').filter(Boolean), [items])
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selection.ids.includes(id))
 
   const toggleAllVisible = (nextSelected: boolean) => {
@@ -292,6 +303,9 @@ export function DownloadPage() {
 
         setLiveStatus(Object.fromEntries(targetIds.map((id) => [id, 'Скачивается'])))
         setLiveProgress(Object.fromEntries(targetIds.map((id) => [id, 0])))
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => window.setTimeout(resolve, 0))
+        })
         try {
           const result = await apiCall<{
             downloaded?: number
@@ -341,6 +355,7 @@ export function DownloadPage() {
     <div className="page-shell">
       <PageHeader
         title="Загрузка кодов"
+        refreshing={loading && items.length > 0}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || isBusy}>
@@ -358,7 +373,7 @@ export function DownloadPage() {
 
       <StatRow
         items={[
-          { label: 'Всего заказов', value: items.length },
+          { label: 'Всего заказов', value: total },
           { label: 'Выбрано', value: selection.ids.length },
           { label: 'Принтеры', value: printers.length },
           { label: 'По умолчанию', value: state.default_printer || '—' },
@@ -424,19 +439,25 @@ export function DownloadPage() {
             <CardDescription>Ctrl / Shift — множественный выбор</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Checkbox isSelected={allVisibleSelected} isDisabled={rows.length === 0} onChange={toggleAllVisible}>
-              <span className="text-sm">Выбрать все</span>
+            <Checkbox isSelected={allVisibleSelected} isDisabled={items.length === 0} onChange={toggleAllVisible}>
+              <span className="text-sm">Выбрать страницу</span>
             </Checkbox>
             <div className="w-56">
-              <TableSearch value={search} onChange={setSearch} />
+              <TableSearch
+                value={search}
+                onChange={(value) => {
+                  setSearch(value)
+                  setPage(0)
+                }}
+              />
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {loading && items.length === 0 ? (
             <TableSkeleton rows={8} />
-          ) : rows.length === 0 ? (
-            <EmptyState>Данных пока нет.</EmptyState>
+          ) : items.length === 0 ? (
+            <EmptyState>{debouncedSearch ? 'Ничего не найдено.' : 'Данных пока нет.'}</EmptyState>
           ) : (
             <div
               className="max-h-[520px] overflow-auto"
@@ -455,7 +476,7 @@ export function DownloadPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pager.pageRows.map((item, index) => {
+                  {items.map((item, index) => {
                     const documentId = item.document_id || ''
                     const rowId = documentId || `${item.order_name}-${index}`
                     return (
@@ -478,10 +499,10 @@ export function DownloadPage() {
             </div>
           )}
           <TablePagination
-            page={pager.page}
-            pageCount={pager.pageCount}
-            total={pager.total}
-            onPageChange={pager.setPage}
+            page={page}
+            pageCount={pageCount}
+            total={total}
+            onPageChange={setPage}
           />
         </CardContent>
       </Card>

@@ -6,6 +6,8 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
+import { usePageRefreshHotkey } from '@/lib/hotkeys'
+import { useOpsDates } from '@/lib/persist'
 import { subscribeDownloadProgress } from '@/lib/progress'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
@@ -108,9 +110,10 @@ export function AggregationPage() {
 
   const [commentFilter, setCommentFilter] = useState('')
   const [refillToken, setRefillToken] = useState('')
-  const [productionDate, setProductionDate] = useState('')
-  const [expirationDate, setExpirationDate] = useState('')
-  const [batchNumber, setBatchNumber] = useState('')
+  const [dates, setDates] = useOpsDates()
+  const productionDate = dates.production
+  const expirationDate = dates.expiration
+  const batchNumber = dates.batch
   const [documentTitle, setDocumentTitle] = useState('')
   const [allowDisaggregate, setAllowDisaggregate] = useState(false)
   const [refillOpen, setRefillOpen] = useState(false)
@@ -160,15 +163,23 @@ export function AggregationPage() {
     }
   }, [guard, setState])
 
+  const refreshPage = useCallback(() => {
+    void load(false)
+  }, [load])
+  usePageRefreshHotkey(refreshPage)
+
   useEffect(() => {
     void load(false)
     void apiCall<{ production_date?: string; expiration_date?: string }>('get_default_date_window')
       .then((window) => {
-        setProductionDate((prev) => prev || String(window.production_date || ''))
-        setExpirationDate((prev) => prev || String(window.expiration_date || ''))
+        setDates((prev) => ({
+          ...prev,
+          production: prev.production || String(window.production_date || ''),
+          expiration: prev.expiration || String(window.expiration_date || ''),
+        }))
       })
       .catch(() => null)
-  }, [load])
+  }, [load, setDates])
 
   const items = useMemo(() => state.items ?? [], [state.items])
 
@@ -444,6 +455,7 @@ export function AggregationPage() {
     <div className="page-shell page-snappy">
       <PageHeader
         title="Коды агрегации"
+        refreshing={loading && items.length > 0}
         actions={
           <Button variant="outline" size="sm" onClick={() => void refreshList()} disabled={loading || isBusy}>
             <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
@@ -501,15 +513,15 @@ export function AggregationPage() {
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <FieldLabel>Дата производства</FieldLabel>
-                <DatePickerField value={productionDate} onChange={setProductionDate} />
+                <DatePickerField value={productionDate} onChange={(value) => setDates((prev) => ({ ...prev, production: value }))} />
               </div>
               <div>
                 <FieldLabel>Срок годности</FieldLabel>
-                <DatePickerField value={expirationDate} onChange={setExpirationDate} />
+                <DatePickerField value={expirationDate} onChange={(value) => setDates((prev) => ({ ...prev, expiration: value }))} />
               </div>
               <div>
                 <FieldLabel>Номер партии</FieldLabel>
-                <TextInput value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} />
+                <TextInput value={batchNumber} onChange={(e) => setDates((prev) => ({ ...prev, batch: e.target.value }))} />
               </div>
               <div>
                 <FieldLabel>Название документа</FieldLabel>

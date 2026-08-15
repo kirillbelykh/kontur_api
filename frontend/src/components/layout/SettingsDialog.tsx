@@ -221,6 +221,23 @@ export function SettingsDialog({
             <div className="space-y-2">
               <SettingSwitch settingKey="animations" label="Показывать анимации" />
               <SettingSwitch settingKey="journalAutoRefresh" label="Автообновление журнала" />
+              <div className="rounded-md border border-border px-3 py-2">
+                <div className="mb-1.5 text-xs font-medium text-muted-foreground">Клавиши</div>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-foreground">
+                  <dt className="font-mono text-muted-foreground">Ctrl+1…6</dt>
+                  <dd>Разделы</dd>
+                  <dt className="font-mono text-muted-foreground">Ctrl+F</dt>
+                  <dd>Поиск в таблице</dd>
+                  <dt className="font-mono text-muted-foreground">Ctrl+J</dt>
+                  <dd>Журнал</dd>
+                  <dt className="font-mono text-muted-foreground">Ctrl+,</dt>
+                  <dd>Настройки</dd>
+                  <dt className="font-mono text-muted-foreground">F5</dt>
+                  <dd>Обновить экран</dd>
+                  <dt className="font-mono text-muted-foreground">Esc</dt>
+                  <dd>Закрыть / пропустить заставку</dd>
+                </dl>
+              </div>
             </div>
           ) : null}
 

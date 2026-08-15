@@ -36,7 +36,7 @@ export function TableSearch({
     >
       <SearchField.Group>
         <SearchField.SearchIcon />
-        <SearchField.Input placeholder={placeholder} />
+        <SearchField.Input placeholder={placeholder} data-kontur-search="" />
         <SearchField.ClearButton />
       </SearchField.Group>
     </SearchField>

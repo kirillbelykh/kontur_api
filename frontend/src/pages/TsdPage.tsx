@@ -5,6 +5,8 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
+import { usePageRefreshHotkey } from '@/lib/hotkeys'
+import { useOpsDates } from '@/lib/persist'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -55,13 +57,6 @@ type TsdForm = {
   production_date: string
   expiration_date: string
   batch_number: string
-}
-
-const EMPTY_FORM: TsdForm = {
-  intro_number: '',
-  production_date: '',
-  expiration_date: '',
-  batch_number: '',
 }
 
 /** Строка заказа ТСД — memo: выбор строки не перерисовывает остальные строки. */
@@ -121,7 +116,14 @@ export function TsdPage() {
   const [items, setItems] = useCachedState<TsdItem[]>('tsd.items', [])
   const guard = useRequestGuard()
   const [live, setLive] = useState(false)
-  const [form, setForm] = useState<TsdForm>(EMPTY_FORM)
+  const [dates, setDates] = useOpsDates()
+  const [introNumber, setIntroNumber] = useState('')
+  const form: TsdForm = {
+    intro_number: introNumber,
+    production_date: dates.production,
+    expiration_date: dates.expiration,
+    batch_number: dates.batch,
+  }
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -129,7 +131,14 @@ export function TsdPage() {
   const [liveTsdStatus, setLiveTsdStatus] = useState<Record<string, string>>({})
 
   const setField = <K extends keyof TsdForm>(key: K, value: TsdForm[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
+    const text = String(value)
+    if (key === 'intro_number') {
+      setIntroNumber(text)
+      return
+    }
+    if (key === 'production_date') setDates((prev) => ({ ...prev, production: text }))
+    else if (key === 'expiration_date') setDates((prev) => ({ ...prev, expiration: text }))
+    else setDates((prev) => ({ ...prev, batch: text }))
   }
 
   const applyItems = useCallback((next: TsdItem[]) => {
@@ -160,22 +169,26 @@ export function TsdPage() {
     }
   }, [applyItems, guard])
 
+  const refreshPage = useCallback(() => {
+    void load(false)
+  }, [load])
+  usePageRefreshHotkey(refreshPage)
+
   useEffect(() => {
     void load(false)
   }, [load])
 
-  // Автозаполнение дат (01-03-2026 / 01-03-2031 из бэкенда)
   useEffect(() => {
     void apiCall<{ production_date?: string; expiration_date?: string }>('get_default_date_window')
       .then((window) => {
-        setForm((prev) => ({
+        setDates((prev) => ({
           ...prev,
-          production_date: prev.production_date || String(window.production_date || ''),
-          expiration_date: prev.expiration_date || String(window.expiration_date || ''),
+          production: prev.production || String(window.production_date || ''),
+          expiration: prev.expiration || String(window.expiration_date || ''),
         }))
       })
       .catch(() => null)
-  }, [])
+  }, [setDates])
 
   const statusOptions = useMemo(
     () => Array.from(new Set(items.map((item) => String(item.tsd_status || '').trim()).filter(Boolean))),
@@ -297,6 +310,7 @@ export function TsdPage() {
     <div className="page-shell">
       <PageHeader
         title="Задание на ТСД"
+        refreshing={loading && items.length > 0}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load(false)} disabled={loading || isBusy}>

@@ -6,6 +6,8 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
+import { usePageRefreshHotkey } from '@/lib/hotkeys'
+import { useOpsDates, useOpsPrinter } from '@/lib/persist'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -375,9 +377,10 @@ export function LabelsPage() {
   const guard = useRequestGuard()
 
   const [sheetFormat, setSheetFormat] = useState('')
-  const [printer, setPrinter] = useState('')
-  const [manufactureDate, setManufactureDate] = useState('')
-  const [expirationDate, setExpirationDate] = useState('')
+  const [printer, setPrinter] = useOpsPrinter()
+  const [dates, setDates] = useOpsDates()
+  const manufactureDate = dates.production
+  const expirationDate = dates.expiration
   const [quantityValue, setQuantityValue] = useState('')
 
   const [templatePath, setTemplatePath] = useState('')
@@ -409,24 +412,35 @@ export function LabelsPage() {
       if (!fresh()) return
       setState(result)
       setSheetFormat((prev) => prev || String(result.default_sheet_format || '100x180'))
-      setPrinter((prev) => prev || String(result.default_printer || ''))
+      setPrinter((prev) => {
+        const printers = result.printers ?? []
+        if (prev && printers.includes(prev)) return prev
+        const fallback = String(result.default_printer || '')
+        if (fallback && printers.includes(fallback)) return fallback
+        return printers[0] || prev || ''
+      })
     } catch (error) {
       if (!fresh()) return
       toast.error(getErrorMessage(error, 'Не удалось загрузить состояние этикеток'))
     } finally {
       if (fresh()) setLoading(false)
     }
-  }, [guard, setState])
+  }, [guard, setPrinter, setState])
+
+  usePageRefreshHotkey(load)
 
   useEffect(() => {
     void load()
     void apiCall<{ production_date?: string; expiration_date?: string }>('get_default_date_window')
       .then((window) => {
-        setManufactureDate((prev) => prev || String(window.production_date || ''))
-        setExpirationDate((prev) => prev || String(window.expiration_date || ''))
+        setDates((prev) => ({
+          ...prev,
+          production: prev.production || String(window.production_date || ''),
+          expiration: prev.expiration || String(window.expiration_date || ''),
+        }))
       })
       .catch(() => null)
-  }, [load])
+  }, [load, setDates])
 
   const templates = useMemo(() => state.templates ?? [], [state.templates])
   const sheetFormats = state.sheet_formats?.length ? state.sheet_formats : FALLBACK_SHEET_FORMATS
@@ -691,6 +705,7 @@ export function LabelsPage() {
     <div className="page-shell">
       <PageHeader
         title="Печать этикеток"
+        refreshing={loading && Boolean(state.templates?.length || state.orders?.length)}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading || isBusy}>
@@ -758,11 +773,11 @@ export function LabelsPage() {
               </div>
               <div>
                 <FieldLabel>Дата изготовления</FieldLabel>
-                <DatePickerField value={manufactureDate} onChange={setManufactureDate} />
+                <DatePickerField value={manufactureDate} onChange={(value) => setDates((prev) => ({ ...prev, production: value }))} />
               </div>
               <div>
                 <FieldLabel>Срок годности</FieldLabel>
-                <DatePickerField value={expirationDate} onChange={setExpirationDate} />
+                <DatePickerField value={expirationDate} onChange={(value) => setDates((prev) => ({ ...prev, expiration: value }))} />
               </div>
               <div>
                 <FieldLabel>Количество</FieldLabel>

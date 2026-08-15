@@ -775,6 +775,40 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertEqual(result["failed"][0]["document_id"], "b")
         self.assertEqual({item["document_id"] for item in result["items"]}, {"a", "c"})
 
+    def test_get_download_state_serializes_only_the_requested_page(self):
+        source = [{"document_id": f"d{index:03d}", "order_name": f"Order {index}"} for index in range(50)]
+        serialized_ids: list[str] = []
+
+        def fake_serialize(item, **_kwargs):
+            serialized_ids.append(str(item["document_id"]))
+            return {"document_id": item["document_id"], "order_name": item["order_name"]}
+
+        with (
+            mock.patch.object(self.bridge, "_start_background_status_updater"),
+            mock.patch.object(self.bridge, "_get_deleted_document_ids", return_value=set()),
+            mock.patch.object(self.bridge, "_collect_known_orders", return_value=source),
+            mock.patch.object(self.bridge, "_is_archived_order", return_value=False),
+            mock.patch.object(self.bridge, "_is_hidden_service_order", return_value=False),
+            mock.patch.object(self.bridge, "_serialize_download_item", side_effect=fake_serialize),
+            mock.patch.object(api_bridge, "list_installed_printers", return_value=(["P1"], "P1")),
+        ):
+            result = self.bridge.get_download_state("", 1, 10)
+
+        self.assertEqual(result["total"], 50)
+        self.assertEqual(result["page"], 1)
+        self.assertEqual(result["page_size"], 10)
+        self.assertEqual(len(result["items"]), 10)
+        self.assertEqual(len(serialized_ids), 10)
+
+    def test_get_logs_all_returns_every_channel(self):
+        for argument in ("all", ""):
+            payload = self.bridge.get_logs(argument)
+            self.assertIsInstance(payload, dict, argument)
+            self.assertNotIn("error", payload, argument)
+            for channel in api_bridge.LOG_CHANNELS:
+                self.assertIn(channel, payload)
+                self.assertIsInstance(payload[channel], list)
+
     def test_intro_exact_filtered_sends_only_emitted_saved_codes(self):
         emitted_code = "010465011804125721ABC1234567890\x1d91EE11\x1d92TAIL"
         introduced_code = "010465011804125721XYZ1234567890\x1d91EE11\x1d92TAIL"

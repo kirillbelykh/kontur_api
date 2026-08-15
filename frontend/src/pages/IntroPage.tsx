@@ -5,6 +5,8 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
+import { usePageRefreshHotkey } from '@/lib/hotkeys'
+import { useOpsDates } from '@/lib/persist'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -92,9 +94,10 @@ export function IntroPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
-  const [productionDate, setProductionDate] = useState('')
-  const [expirationDate, setExpirationDate] = useState('')
-  const [batchNumber, setBatchNumber] = useState('')
+  const [dates, setDates] = useOpsDates()
+  const productionDate = dates.production
+  const expirationDate = dates.expiration
+  const batchNumber = dates.batch
   const [batchError, setBatchError] = useState(false)
   const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
 
@@ -121,19 +124,24 @@ export function IntroPage() {
     }
   }, [applyItems, guard])
 
+  usePageRefreshHotkey(load)
+
   useEffect(() => {
     void load()
   }, [load])
 
-  // Автозаполнение дат (01-03-2026 / 01-03-2031 из бэкенда)
+  // Автозаполнение дат (01-03-2026 / 01-03-2031 из бэкенда), не затирает сохранённые
   useEffect(() => {
     void apiCall<{ production_date?: string; expiration_date?: string }>('get_default_date_window')
       .then((window) => {
-        setProductionDate((prev) => prev || String(window.production_date || ''))
-        setExpirationDate((prev) => prev || String(window.expiration_date || ''))
+        setDates((prev) => ({
+          ...prev,
+          production: prev.production || String(window.production_date || ''),
+          expiration: prev.expiration || String(window.expiration_date || ''),
+        }))
       })
       .catch(() => null)
-  }, [])
+  }, [setDates])
 
   const statusOptions = useMemo(
     () => [...new Set(items.map((item) => String(item.status || '').trim()).filter(Boolean))],
@@ -224,6 +232,7 @@ export function IntroPage() {
     <div className="page-shell">
       <PageHeader
         title="Ввод в оборот"
+        refreshing={loading && items.length > 0}
         actions={
           <Button variant="outline" size="sm" onClick={() => void refresh()} disabled={isBusy}>
             <RefreshCw className={loading ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
@@ -248,11 +257,11 @@ export function IntroPage() {
           <CardContent className="space-y-3">
             <div>
               <FieldLabel>Дата производства</FieldLabel>
-              <DatePickerField value={productionDate} onChange={setProductionDate} />
+              <DatePickerField value={productionDate} onChange={(value) => setDates((prev) => ({ ...prev, production: value }))} />
             </div>
             <div>
               <FieldLabel>Срок годности</FieldLabel>
-              <DatePickerField value={expirationDate} onChange={setExpirationDate} />
+              <DatePickerField value={expirationDate} onChange={(value) => setDates((prev) => ({ ...prev, expiration: value }))} />
             </div>
             <div>
               <FieldLabel>Номер партии</FieldLabel>
@@ -260,7 +269,7 @@ export function IntroPage() {
                 value={batchNumber}
                 className={cn('t-input', batchError && 'is-error is-shaking')}
                 onChange={(event) => {
-                  setBatchNumber(event.target.value)
+                  setDates((prev) => ({ ...prev, batch: event.target.value }))
                   setBatchError(false)
                 }}
               />

@@ -29,11 +29,25 @@ export function WelcomePage() {
     navigate('/orders', { replace: true })
   }, [navigate])
 
+  const skipGreeting = useCallback(() => setVisible(false), [])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' || event.key === 'Enter') {
+        event.preventDefault()
+        skipGreeting()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [skipGreeting])
+
   return (
     <main className="fixed inset-0 z-[10000] bg-background">
       <AnimatePresence onExitComplete={finishGreeting}>
         {visible ? (
           <motion.div
+            onClick={skipGreeting}
             className="absolute inset-0 overflow-hidden bg-background"
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}

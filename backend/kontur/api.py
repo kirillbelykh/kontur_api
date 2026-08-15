@@ -695,7 +695,8 @@ def download_codes(
             attempt += 1
         except Exception as e:
             logger.error("Ошибка проверки статуса заказа %s: %s", document_id, e)
-            return None
+            time.sleep(ORDER_STATUS_POLL_INTERVAL_SECONDS)
+            attempt += 1
 
     if status not in ("released", "received"):
         logger.error(

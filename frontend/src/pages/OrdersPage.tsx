@@ -7,6 +7,7 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
+import { usePageRefreshHotkey } from '@/lib/hotkeys'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -367,6 +368,8 @@ export function OrdersPage() {
       if (fresh()) setLoading(false)
     }
   }, [guard, setState])
+
+  usePageRefreshHotkey(load)
 
   const loadOptions = useCallback(async () => {
     try {
@@ -755,6 +758,7 @@ export function OrdersPage() {
     <div className="page-shell">
       <PageHeader
         title="Заказ кодов"
+        refreshing={loading && ((state.history?.length || 0) > 0 || (state.queue?.length || 0) > 0)}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => void load(true)} disabled={loading || isBusy}>

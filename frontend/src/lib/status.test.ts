@@ -61,6 +61,12 @@ describe('statusMeta', () => {
     expect(statusShowsSpinner('Печатается')).toBe(false)
     expect(statusShowsSpinner('Заказывается')).toBe(false)
     expect(statusShowsSpinner('Скачан')).toBe(false)
+    expect(statusShowsSpinner('Не скачаны')).toBe(false)
     expect(statusShowsSpinner('Ошибка скачивания')).toBe(false)
+  })
+
+  it('не скачанные коды не красятся как скачанные', () => {
+    expect(statusMeta('Не скачаны')).toEqual({ tone: 'info', pending: false })
+    expect(statusMeta('Скачаны').tone).toBe('teal')
   })
 })

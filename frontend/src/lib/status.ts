@@ -29,6 +29,9 @@ export function statusMeta(status?: string): StatusMeta {
   if (value.includes('скачив')) {
     return { tone: 'success', pending: true }
   }
+  if (value.includes('не скач')) {
+    return { tone: 'info', pending: false }
+  }
 
   // Первые статусы после действия — пока Контур не перевёл заказ дальше
   if (

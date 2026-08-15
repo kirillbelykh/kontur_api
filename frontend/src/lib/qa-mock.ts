@@ -183,8 +183,30 @@ export function installQaMock(theme: string) {
         ],
       }),
 
-    get_download_state: () =>
-      reply({ items: DOWNLOAD_ITEMS, printers: ['Zebra ZT230', 'Godex G500'], default_printer: 'Zebra ZT230' }),
+    get_download_state: (query?: unknown, page?: unknown, pageSize?: unknown) => {
+      const needle = String(query ?? '').trim().toLowerCase()
+      const size = Math.max(1, Math.min(Number(pageSize) || 30, 100))
+      let pageIndex = Math.max(0, Number(page) || 0)
+      const filtered = needle
+        ? DOWNLOAD_ITEMS.filter((item) =>
+            [item.order_name, item.full_name, item.simpl, item.gtin, item.document_id]
+              .join(' ')
+              .toLowerCase()
+              .includes(needle),
+          )
+        : DOWNLOAD_ITEMS
+      const total = filtered.length
+      if (total && pageIndex * size >= total) pageIndex = Math.floor((total - 1) / size)
+      const start = pageIndex * size
+      return reply({
+        items: filtered.slice(start, start + size),
+        total,
+        page: pageIndex,
+        page_size: size,
+        printers: ['Zebra ZT230', 'Godex G500'],
+        default_printer: 'Zebra ZT230',
+      })
+    },
     sync_download_statuses: () => reply({ success: true }),
     manual_download_order: () => reply({ success: true }),
     manual_download_orders: () => reply({ success: true, downloaded: 1, failed: [], items: [] }),
@@ -232,7 +254,11 @@ export function installQaMock(theme: string) {
       reply({ preview: { order_name: 'Заявка 1199', sheet_format: '100x180', label_count: 24 } }),
     print_100x180_label: () => reply({ preview: { order_name: 'Заявка 1199', label_count: 24 } }),
 
-    get_logs: (channel: unknown) => reply(LOG_LINES[String(channel)] ?? []),
+    get_logs: (channel: unknown) => {
+      const name = String(channel ?? '').trim().toLowerCase()
+      if (!name || name === 'all') return reply(LOG_LINES)
+      return reply(LOG_LINES[name] ?? [])
+    },
     clear_logs: () => reply({ success: true }),
   }
 

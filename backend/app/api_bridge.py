@@ -810,20 +810,6 @@ class ApiBridge:
         if len(runtime.logs[channel]) > MAX_LOG_LINES:
             runtime.logs[channel] = runtime.logs[channel][-MAX_LOG_LINES:]
 
-    def _clone_http_session(self, session: requests.Session) -> requests.Session:
-        if not isinstance(session, requests.Session):
-            return session
-        cloned = requests.Session()
-        cloned.headers.update(dict(session.headers))
-        cloned.cookies.update(session.cookies)
-        cloned.auth = session.auth
-        cloned.verify = session.verify
-        cloned.cert = session.cert
-        cloned.proxies = dict(session.proxies)
-        cloned.trust_env = session.trust_env
-        cloned.max_redirects = session.max_redirects
-        return cloned
-
     def _emit_download_progress(self, document_ids: Sequence[str], value: float) -> None:
         ids = [str(item).strip() for item in document_ids if str(item or "").strip()]
         if not ids:
@@ -2473,6 +2459,24 @@ class ApiBridge:
         }
         runtime.download_items.insert(0, download_item)
         return download_item
+
+    def _order_matches_search(self, item: Dict[str, Any], search_text: str) -> bool:
+        normalized = str(search_text or "").strip().lower()
+        if not normalized:
+            return True
+        haystack = " ".join(
+            str(value or "")
+            for value in (
+                item.get("order_name"),
+                item.get("full_name"),
+                item.get("simpl"),
+                item.get("simpl_name"),
+                item.get("gtin"),
+                item.get("document_id"),
+                item.get("filename"),
+            )
+        ).lower()
+        return normalized in haystack
 
     def _find_download_item(self, document_id: str) -> Optional[Dict[str, Any]]:
         for item in _get_runtime().download_items:
@@ -4466,12 +4470,18 @@ class ApiBridge:
         except Exception as exc:
             return {"success": False, "error": str(exc)}
 
-    def get_logs(self, channel: str) -> List[str] | Dict[str, Any]:
+    def get_logs(self, channel: str = "") -> List[str] | Dict[str, Any]:
         try:
-            normalized = str(channel or "").strip()
+            normalized = str(channel or "").strip().lower()
+            runtime = _get_runtime()
+            if not normalized or normalized == "all":
+                return {
+                    name: [_normalize_ui_text(line) for line in runtime.logs.get(name, [])]
+                    for name in LOG_CHANNELS
+                }
             if normalized not in LOG_CHANNELS:
                 raise RuntimeError(f"Неизвестный канал логов: {normalized}")
-            return [_normalize_ui_text(line) for line in _get_runtime().logs[normalized]]
+            return [_normalize_ui_text(line) for line in runtime.logs[normalized]]
         except Exception as exc:
             return {"error": str(exc)}
 
@@ -5008,12 +5018,21 @@ class ApiBridge:
             self._log("orders", f"Ошибка выполнения очереди: {exc}")
             return {"success": False, "error": str(exc)}
 
-    def get_download_state(self) -> Dict[str, Any]:
+    def get_download_state(self, query: str = "", page: int = 0, page_size: int = 30) -> Dict[str, Any]:
         try:
             self._start_background_status_updater()
             printers, default_printer = list_installed_printers()
             deleted_ids = self._get_deleted_document_ids()
-            items = []
+            try:
+                size = max(1, min(int(page_size or 30), 100))
+            except (TypeError, ValueError):
+                size = 30
+            try:
+                page_index = max(0, int(page or 0))
+            except (TypeError, ValueError):
+                page_index = 0
+
+            candidates: List[Dict[str, Any]] = []
             for item in self._collect_known_orders():
                 if str(item.get("document_id") or "").strip() in deleted_ids:
                     continue
@@ -5021,10 +5040,24 @@ class ApiBridge:
                     continue
                 if self._is_hidden_service_order(item):
                     continue
-                serialized = self._serialize_download_item(item, session=None, tab_type="download")
-                items.append(serialized)
+                if not self._order_matches_search(item, query):
+                    continue
+                candidates.append(item)
+
+            total = len(candidates)
+            if total and page_index * size >= total:
+                page_index = (total - 1) // size
+            start = page_index * size
+            page_items = candidates[start : start + size]
+            items = [
+                self._serialize_download_item(item, session=None, tab_type="download")
+                for item in page_items
+            ]
             return {
                 "items": items,
+                "total": total,
+                "page": page_index,
+                "page_size": size,
                 "printers": printers,
                 "default_printer": default_printer,
             }
@@ -5283,12 +5316,17 @@ class ApiBridge:
             items_out: List[Dict[str, Any]] = []
             if resolved:
                 session = self._ensure_session()
+                try:
+                    cookie_snapshot = dict(session.cookies.get_dict())
+                except Exception:
+                    cookie_snapshot = {}
                 workers = min(len(resolved), adaptive_worker_count(cap=DOWNLOAD_MAX_WORKERS, floor=1))
 
                 def _work(pair: tuple[str, Dict[str, Any]]) -> tuple[str, Optional[Dict[str, Any]], Optional[str]]:
                     document_id, item = pair
                     try:
-                        serialized = self._download_order_internal(self._clone_http_session(session), item)
+                        worker_session = make_session_with_cookies(cookie_snapshot)
+                        serialized = self._download_order_internal(worker_session, item)
                         return document_id, serialized, None
                     except Exception as exc:
                         self._log("download", f"Ошибка ручного скачивания {document_id}: {exc}")
