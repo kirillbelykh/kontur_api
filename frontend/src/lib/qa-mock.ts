@@ -145,6 +145,7 @@ export function installQaMock(theme: string) {
       reply({ has_session: true, ready: true, state: 'ready', minutes_until_update: 42 }),
     refresh_session: () => reply({ success: true, session: { has_session: true, minutes_until_update: 60 } }),
     get_app_version: () => reply({ version: '0.1.0', commit: 'a1b2c3d4e5' }),
+    set_window_chrome: () => reply({ ok: true }),
     check_for_updates: () => reply({ update_available: false }),
     apply_update: () => reply({ success: true }),
     get_default_date_window: () => reply({ production_date: '01-03-2026', expiration_date: '01-03-2031' }),

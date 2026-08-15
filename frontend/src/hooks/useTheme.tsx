@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { apiCall } from '@/lib/bridge'
 
 const STORAGE_KEY = 'kontur_theme'
 
@@ -72,6 +73,17 @@ function applyTheme(resolved: ResolvedTheme) {
   const root = document.documentElement
   root.dataset.theme = resolved
   root.classList.toggle('dark', DARK_IDS.has(resolved))
+  syncWindowChrome(resolved)
+}
+
+function syncWindowChrome(resolved: ResolvedTheme) {
+  const option = THEME_OPTIONS.find((item) => item.id === resolved)
+  if (!option) return
+  void apiCall('set_window_chrome', {
+    dark: option.dark,
+    caption: option.preview.bg,
+    text: option.preview.text,
+  }).catch(() => {})
 }
 
 type ThemeContextValue = {

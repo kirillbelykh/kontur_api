@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { statusMeta } from './status'
+import { statusMeta, statusShowsSpinner } from './status'
 
 describe('statusMeta', () => {
   it('ошибочные статусы — danger, без shimmer', () => {
@@ -51,5 +51,13 @@ describe('statusMeta', () => {
   it('пустой статус — нейтральный', () => {
     expect(statusMeta('')).toEqual({ tone: 'neutral', pending: false })
     expect(statusMeta(undefined)).toEqual({ tone: 'neutral', pending: false })
+  })
+
+  it('кольцо-спиннер только у скачивания', () => {
+    expect(statusShowsSpinner('Скачивается')).toBe(true)
+    expect(statusShowsSpinner('Печатается')).toBe(false)
+    expect(statusShowsSpinner('Заказывается')).toBe(false)
+    expect(statusShowsSpinner('Скачан')).toBe(false)
+    expect(statusShowsSpinner('Ошибка скачивания')).toBe(false)
   })
 })

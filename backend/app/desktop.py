@@ -24,6 +24,15 @@ from backend.app.api_bridge import ApiBridge, stop_background_workers
 from backend.app.chz_bridge_server import start_chz_bridge_server
 from backend.services.logger import logger
 
+WINDOW_TITLE = "Контур Маркировка"
+
+DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19
+DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+DWMWA_BORDER_COLOR = 34
+DWMWA_CAPTION_COLOR = 35
+DWMWA_TEXT_COLOR = 36
+DWMWA_COLOR_DEFAULT = 0xFFFFFFFF
+
 
 def webview_persistence_kwargs() -> dict[str, object]:
     """Keep localStorage (table columns, theme, zoom) across process restarts.
@@ -140,6 +149,59 @@ def _detach_console_if_needed() -> None:
         logger.debug("FreeConsole не удался", exc_info=True)
 
 
+def colorref_from_hex(value: str | None) -> int | None:
+    """CSS #RRGGBB → COLORREF 0x00BBGGRR. None, если строка не цвет."""
+    raw = str(value or "").strip().lstrip("#")
+    if len(raw) == 3 and all(char in "0123456789abcdefABCDEF" for char in raw):
+        raw = "".join(char * 2 for char in raw)
+    if len(raw) != 6 or any(char not in "0123456789abcdefABCDEF" for char in raw):
+        return None
+    red = int(raw[0:2], 16)
+    green = int(raw[2:4], 16)
+    blue = int(raw[4:6], 16)
+    return red | (green << 8) | (blue << 16)
+
+
+def _find_app_hwnd() -> int:
+    try:
+        import ctypes
+
+        return int(ctypes.windll.user32.FindWindowW(None, WINDOW_TITLE) or 0)
+    except Exception:
+        return 0
+
+
+def _set_dwm_attribute(hwnd: int, attribute: int, value: int) -> None:
+    import ctypes
+
+    data = ctypes.c_uint32(value)
+    ctypes.windll.dwmapi.DwmSetWindowAttribute(
+        ctypes.c_void_p(hwnd),
+        ctypes.c_uint(attribute),
+        ctypes.byref(data),
+        ctypes.sizeof(data),
+    )
+
+
+def apply_window_chrome(*, dark: bool, caption: str | None = None, text: str | None = None) -> bool:
+    """Окрасить заголовок и рамку окна в цвет темы (Windows 11 DWM)."""
+    hwnd = _find_app_hwnd()
+    if not hwnd:
+        return False
+    try:
+        _set_dwm_attribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, 1 if dark else 0)
+        _set_dwm_attribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, 1 if dark else 0)
+        caption_color = colorref_from_hex(caption) if dark else None
+        text_color = colorref_from_hex(text) if dark else None
+        _set_dwm_attribute(hwnd, DWMWA_CAPTION_COLOR, caption_color if caption_color is not None else DWMWA_COLOR_DEFAULT)
+        _set_dwm_attribute(hwnd, DWMWA_BORDER_COLOR, caption_color if caption_color is not None else DWMWA_COLOR_DEFAULT)
+        _set_dwm_attribute(hwnd, DWMWA_TEXT_COLOR, text_color if text_color is not None else DWMWA_COLOR_DEFAULT)
+        return True
+    except Exception:
+        logger.debug("Не удалось окрасить рамку окна", exc_info=True)
+        return False
+
+
 def _apply_window_icon() -> None:
     """The window is owned by pythonw.exe, so Windows shows the Python icon.
     Load kontur.ico and set it via WM_SETICON once the window exists."""
@@ -156,7 +218,7 @@ def _apply_window_icon() -> None:
             user32 = ctypes.windll.user32
             hwnd = 0
             for _ in range(100):
-                hwnd = user32.FindWindowW(None, "Контур Маркировка")
+                hwnd = _find_app_hwnd()
                 if hwnd:
                     break
                 time.sleep(0.1)
@@ -197,7 +259,7 @@ def main() -> None:
         logger.exception("CHZ bridge не смог занять порт — колбэки WMS приниматься не будут")
 
     window = webview.create_window(
-        title="Контур Маркировка",
+        title=WINDOW_TITLE,
         url=_resolve_frontend_url(),
         js_api=api,
         width=1440,

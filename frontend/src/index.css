@@ -361,6 +361,32 @@ html[data-theme='ocean'] {
   .t-shimmer::before { animation: none !important; }
 }
 
+/* Статус «в процессе»: сплошной кружок становится кольцом-спиннером */
+.status-dot {
+  display: inline-block;
+  height: 0.5rem;
+  width: 0.5rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  box-sizing: border-box;
+  transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.status-dot--spin {
+  height: 0.75rem;
+  width: 0.75rem;
+  background-color: transparent !important;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 28%, transparent);
+  border: 1.5px solid transparent;
+  border-top-color: currentColor;
+  animation: status-dot-spin 0.7s linear infinite;
+}
+@keyframes status-dot-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .status-dot--spin { animation: none; }
+}
+
 /* ─── Transitions.dev — Error state shake ─── */
 .t-input {
   transition: border-color 150ms ease-out;
@@ -463,27 +489,47 @@ html[data-theme='ocean'] {
 .dark .kontur-toast[data-type="warning"] .kontur-toast-icon { background: hsl(40 60% 20%); }
 .dark .kontur-toast[data-type="info"]    .kontur-toast-icon { background: hsl(205 60% 22%); }
 
-/* Круглый крестик — иконко-кнопка, пилюля разрешена */
-.kontur-toast-close {
+/* Круглый крестик — без transform: Sonner по умолчанию делает translate(-35%, -35%),
+   из‑за этого hover-круг уезжает влево-вверх относительно иконки. */
+[data-sonner-toaster] {
+  --toast-close-button-transform: none;
+}
+[data-sonner-toast] [data-close-button].kontur-toast-close {
+  appearance: none;
   position: absolute;
+  left: auto;
   right: 0.6rem;
-  top: 50%;
+  top: 0;
+  bottom: 0;
   z-index: 2;
-  transform: translateY(-50%);
-  display: grid;
-  place-items: center;
+  margin-block: auto;
+  transform: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   height: 1.6rem;
   width: 1.6rem;
+  padding: 0;
+  line-height: 0;
   border: 0;
   border-radius: 9999px;
   background: transparent;
   color: hsl(var(--wms-muted-foreground));
   cursor: pointer;
   pointer-events: auto;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
-.kontur-toast-close:hover {
+[data-sonner-toast] [data-close-button].kontur-toast-close svg {
+  display: block;
+  margin: 0;
+  flex: none;
+}
+[data-sonner-toast] [data-close-button].kontur-toast-close:hover,
+[data-sonner-toast][data-styled="true"]:hover [data-close-button].kontur-toast-close:hover {
+  transform: none;
   background: hsl(var(--wms-muted));
+  border-color: transparent;
   color: hsl(var(--wms-foreground));
 }
 

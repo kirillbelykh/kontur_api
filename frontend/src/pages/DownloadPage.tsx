@@ -8,7 +8,6 @@ import {
   type KeyboardEvent,
   type PointerEvent,
 } from 'react'
-import { Label, ProgressBar } from '@heroui/react'
 import { Download, Printer, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
@@ -19,7 +18,7 @@ import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { BusyLabel, Shimmer } from '@/components/ui/shimmer'
+import { BusyLabel } from '@/components/ui/shimmer'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -53,13 +52,6 @@ type PrintResult = {
     total_record_count?: number
     selected_record_number?: number | null
   }
-}
-
-type Progress = {
-  active: boolean
-  label: string
-  processed: number
-  total: number
 }
 
 type Selection = {
@@ -141,7 +133,6 @@ export function DownloadPage() {
   const [printer, setPrinter] = useState('')
   const [recordNumber, setRecordNumber] = useState('')
   const [autoDownload, setAutoDownload] = useState(false)
-  const [progress, setProgress] = useState<Progress | null>(null)
   const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
   const lastClickedIndex = useRef(-1)
   // TableRow отдаёт onAction без исходного события — модификаторы снимаем до его срабатывания
@@ -284,13 +275,11 @@ export function DownloadPage() {
         if (!targetIds.length) throw new Error('Выберите хотя бы один заказ для скачивания.')
 
         setLiveStatus(Object.fromEntries(targetIds.map((id) => [id, 'Скачивается'])))
-        setProgress({ active: true, processed: 0, total: targetIds.length, label: `Скачивается: 0/${targetIds.length}` })
         let successCount = 0
         const errors: string[] = []
 
         try {
-          for (let index = 0; index < targetIds.length; index += 1) {
-            const documentId = targetIds[index]
+          for (const documentId of targetIds) {
             const order = items.find((item) => item.document_id === documentId)
             try {
               await apiCall('manual_download_order', documentId)
@@ -300,25 +289,7 @@ export function DownloadPage() {
               errors.push(`${order?.order_name || documentId}: ${getErrorMessage(error)}`)
               setLiveStatus((prev) => ({ ...prev, [documentId]: 'Ошибка скачивания' }))
             }
-            setProgress({
-              active: true,
-              processed: index + 1,
-              total: targetIds.length,
-              label: `Скачивается: ${index + 1}/${targetIds.length}`,
-            })
           }
-        } finally {
-          setProgress({
-            active: false,
-            processed: successCount,
-            total: targetIds.length,
-            label: errors.length
-              ? `Скачано ${successCount}/${targetIds.length}, ошибок: ${errors.length}`
-              : `Скачано ${successCount}/${targetIds.length}`,
-          })
-        }
-
-        try {
           await load()
         } finally {
           setLiveStatus({})
@@ -429,22 +400,6 @@ export function DownloadPage() {
               </Checkbox>
             </span>
           </div>
-
-          {progress ? (
-            <ProgressBar
-              aria-label="Прогресс скачивания"
-              className="w-full"
-              value={progress.total ? Math.round((progress.processed / progress.total) * 100) : 0}
-            >
-              <Label>
-                {progress.active ? <Shimmer className="text-xs">{progress.label}</Shimmer> : progress.label}
-              </Label>
-              <ProgressBar.Output />
-              <ProgressBar.Track>
-                <ProgressBar.Fill className={cn(progress.active && 'animate-pulse')} />
-              </ProgressBar.Track>
-            </ProgressBar>
-          ) : null}
         </CardContent>
       </Card>
 

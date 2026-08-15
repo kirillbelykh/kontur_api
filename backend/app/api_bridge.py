@@ -4260,6 +4260,22 @@ class ApiBridge:
             }
         return dict(_APP_VERSION_INFO)
 
+    def set_window_chrome(self, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Окрасить заголовок Windows-окна в цвет текущей темы."""
+        data = payload if isinstance(payload, dict) else {}
+        try:
+            from backend.app.desktop import apply_window_chrome
+
+            applied = apply_window_chrome(
+                dark=bool(data.get("dark")),
+                caption=str(data.get("caption") or "").strip() or None,
+                text=str(data.get("text") or "").strip() or None,
+            )
+            return {"ok": applied}
+        except Exception as exc:
+            logger.debug("set_window_chrome: %s", exc, exc_info=True)
+            return {"ok": False}
+
     def check_for_updates(self) -> Dict[str, Any]:
         """Fetch origin and report whether origin/main is ahead of HEAD."""
         try:

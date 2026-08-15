@@ -73,3 +73,9 @@ export function statusMeta(status?: string): StatusMeta {
   }
   return { tone: 'neutral', pending: false }
 }
+
+/** Кольцо-спиннер только у активного скачивания, не у остальных pending-статусов. */
+export function statusShowsSpinner(status?: string): boolean {
+  const value = (status || '').toLowerCase()
+  return statusMeta(status).pending && value.includes('скачив')
+}
