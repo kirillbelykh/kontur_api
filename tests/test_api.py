@@ -170,6 +170,38 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(result["errors"], [api.BASE_URL_CONFIG_ERROR])
         session.post.assert_not_called()
 
+    def test_wait_for_downloadable_codes_order_accepts_archived_without_sleep(self):
+        session = Mock()
+        session.get.return_value = FakeResponse(json_data={"status": "archived"})
+
+        with patch.object(api.time, "sleep") as sleep_mock:
+            status = api.wait_for_downloadable_codes_order(session, "doc-archived")
+
+        self.assertEqual(status, "archived")
+        sleep_mock.assert_not_called()
+        session.get.assert_called_once()
+
+    def test_wait_for_downloadable_codes_order_fails_fast_on_auth_error(self):
+        session = Mock()
+        session.get.return_value = FakeResponse(status_code=401, text="unauthorized")
+
+        with patch.object(api.time, "sleep") as sleep_mock:
+            with self.assertRaisesRegex(RuntimeError, "отклонил сессию"):
+                api.wait_for_downloadable_codes_order(session, "doc-auth")
+
+        sleep_mock.assert_not_called()
+        session.get.assert_called_once()
+
+    def test_wait_for_downloadable_codes_order_fails_fast_on_terminal_error(self):
+        session = Mock()
+        session.get.return_value = FakeResponse(json_data={"status": "error"})
+
+        with patch.object(api.time, "sleep") as sleep_mock:
+            with self.assertRaisesRegex(RuntimeError, "нельзя скачать"):
+                api.wait_for_downloadable_codes_order(session, "doc-error")
+
+        sleep_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

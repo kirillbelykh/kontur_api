@@ -31,6 +31,11 @@ ORDER_AVAILABILITY_POLL_ATTEMPTS = 16
 ORDER_AVAILABILITY_POLL_INTERVAL_SECONDS = 0.4
 ORDER_STATUS_POLL_ATTEMPTS = 30
 ORDER_STATUS_POLL_INTERVAL_SECONDS = 10
+# Коды уже есть в Контуре — export PDF/CSV/XLS должен работать без ожидания released.
+DOWNLOADABLE_CODES_ORDER_STATUSES = frozenset({"released", "received", "downloaded", "archived"})
+PENDING_CODES_ORDER_STATUSES = frozenset(
+    {"created", "processing", "inprogress", "sendforrelease", "waitchecking"}
+)
 PDF_EXPORT_POLL_ATTEMPTS = 24
 EXPORT_POLL_ATTEMPTS = 60
 EXPORT_POLL_INTERVAL_SECONDS = 5
@@ -612,12 +617,73 @@ def check_order_status(session: requests.Session, document_id: str) -> str:
     try:
         base_url = _require_base_url()
         resp_status = session.get(f"{base_url}/api/v1/codes-order/{document_id}", timeout=15)
+        _raise_if_kontur_auth_failed(resp_status, document_id)
         resp_status.raise_for_status()
         doc = resp_status.json()
         return doc.get("status", "unknown")
+    except RuntimeError:
+        raise
     except Exception as e:
         logger.error("Ошибка проверки статуса заказа %s: %s", document_id, e)
         return "error"
+
+
+def _raise_if_kontur_auth_failed(response: requests.Response, document_id: str) -> None:
+    if int(getattr(response, "status_code", 0) or 0) not in (401, 403):
+        return
+    raise RuntimeError(
+        f"Контур отклонил сессию (HTTP {response.status_code}) для заказа {document_id}. "
+        "Обновите сессию и повторите скачивание."
+    )
+
+
+def wait_for_downloadable_codes_order(
+    session: requests.Session,
+    document_id: str,
+    *,
+    progress: Optional[Callable[[float], None]] = None,
+) -> str:
+    """Ждёт, пока заказ можно выгрузить, либо сразу падает на терминальном статусе / 401."""
+    base_url = _require_base_url()
+    max_attempts = ORDER_STATUS_POLL_ATTEMPTS
+    attempt = 0
+    status: Optional[str] = None
+    previous_status = None
+    while attempt < max_attempts:
+        try:
+            resp_status = session.get(f"{base_url}/api/v1/codes-order/{document_id}", timeout=15)
+            _raise_if_kontur_auth_failed(resp_status, document_id)
+            resp_status.raise_for_status()
+            doc = resp_status.json()
+            status = str(doc.get("status") or "").strip()
+            previous_status = _log_status_change("Статус заказа", document_id, previous_status, status)
+            _notify_download_progress(progress, 0.08 * (attempt + 1) / max_attempts)
+            normalized = status.lower()
+            if normalized in DOWNLOADABLE_CODES_ORDER_STATUSES:
+                return status
+            if status and normalized not in PENDING_CODES_ORDER_STATUSES:
+                raise RuntimeError(
+                    f"Заказ {document_id} в статусе {status!r} — коды нельзя скачать."
+                )
+            time.sleep(ORDER_STATUS_POLL_INTERVAL_SECONDS)
+            attempt += 1
+        except RuntimeError:
+            raise
+        except requests.HTTPError as exc:
+            response = getattr(exc, "response", None)
+            if response is not None:
+                _raise_if_kontur_auth_failed(response, document_id)
+            logger.error("Ошибка проверки статуса заказа %s: %s", document_id, exc)
+            time.sleep(ORDER_STATUS_POLL_INTERVAL_SECONDS)
+            attempt += 1
+        except Exception as e:
+            logger.error("Ошибка проверки статуса заказа %s: %s", document_id, e)
+            time.sleep(ORDER_STATUS_POLL_INTERVAL_SECONDS)
+            attempt += 1
+
+    raise RuntimeError(
+        f"Заказ {document_id} не готов к скачиванию (статус {status or 'unknown'})."
+    )
 
 
 def _notify_download_progress(progress: Optional[Callable[[float], None]], value: float) -> None:
@@ -661,12 +727,7 @@ def download_codes(
     После скачивания CSV файла автоматически обрабатывает его.
     Возвращает кортеж (pdf_path, csv_path, xls_path). Если файл не скачан — соответствующий элемент = None.
     """
-    try:
-        base_url = _require_base_url()
-    except RuntimeError as e:
-        logger.error(str(e))
-        return None
-
+    base_url = _require_base_url()
     logger.info("Начало скачивания PDF/CSV/XLS для заказа %s (%r)", document_id, order_name)
 
     def make_full_url(url: str) -> str:
@@ -676,35 +737,7 @@ def download_codes(
             return url
         return urljoin(base_url, url)
 
-    # 1) дождаться статуса released (polling)
-    max_attempts = ORDER_STATUS_POLL_ATTEMPTS
-    attempt = 0
-    status = None
-    previous_status = None
-    while attempt < max_attempts:
-        try:
-            resp_status = session.get(f"{base_url}/api/v1/codes-order/{document_id}", timeout=15)
-            resp_status.raise_for_status()
-            doc = resp_status.json()
-            status = doc.get("status")
-            previous_status = _log_status_change("Статус заказа", document_id, previous_status, status)
-            _notify_download_progress(progress, 0.08 * (attempt + 1) / max_attempts)
-            if status in ("released", "received"):
-                break
-            time.sleep(ORDER_STATUS_POLL_INTERVAL_SECONDS)
-            attempt += 1
-        except Exception as e:
-            logger.error("Ошибка проверки статуса заказа %s: %s", document_id, e)
-            time.sleep(ORDER_STATUS_POLL_INTERVAL_SECONDS)
-            attempt += 1
-
-    if status not in ("released", "received"):
-        logger.error(
-            "Заказ %s не перешёл в 'released' за %s сек",
-            document_id,
-            max_attempts * ORDER_STATUS_POLL_INTERVAL_SECONDS,
-        )
-        return None
+    wait_for_downloadable_codes_order(session, document_id, progress=progress)
 
     # Подготовка каталога для сохранения: Desktop / "pdf-коды км" / <safe_order_name>
     try:

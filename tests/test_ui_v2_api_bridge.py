@@ -762,6 +762,7 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         with (
             mock.patch.object(api_bridge, "adaptive_worker_count", return_value=4),
             mock.patch.object(self.bridge, "_ensure_session", return_value=object()),
+            mock.patch.object(api_bridge, "clone_session", side_effect=lambda session: session),
             mock.patch.object(self.bridge, "_find_download_item", side_effect=lambda document_id: items[document_id]),
             mock.patch.object(self.bridge, "_download_order_internal", side_effect=fake_download),
             mock.patch.object(self.bridge, "get_download_state", return_value={"items": []}),
@@ -774,6 +775,19 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertEqual(len(result["failed"]), 1)
         self.assertEqual(result["failed"][0]["document_id"], "b")
         self.assertEqual({item["document_id"] for item in result["items"]}, {"a", "c"})
+
+    def test_download_order_internal_restores_status_on_failure(self):
+        item = {"document_id": "d1", "order_name": "Order", "status": "Не скачаны"}
+        with (
+            mock.patch.object(api_bridge, "download_codes", side_effect=RuntimeError("boom")),
+            mock.patch.object(self.bridge, "_emit_download_progress"),
+            mock.patch.object(self.bridge, "_log"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "boom"):
+                self.bridge._download_order_internal(object(), item)
+
+        self.assertEqual(item["status"], "Не скачаны")
+        self.assertFalse(item["downloading"])
 
     def test_get_download_state_serializes_only_the_requested_page(self):
         source = [{"document_id": f"d{index:03d}", "order_name": f"Order {index}"} for index in range(50)]

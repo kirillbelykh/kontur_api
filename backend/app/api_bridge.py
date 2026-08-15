@@ -38,6 +38,7 @@ from backend.services.aggregation_bulk import (
     extract_sntin,
 )
 from backend.kontur.api import (
+    DOWNLOADABLE_CODES_ORDER_STATUSES,
     check_order_status,
     codes_order,
     download_codes,
@@ -94,7 +95,7 @@ from backend.services.queue_utils import is_order_ready_for_intro, is_order_read
 from backend.services.perf import adaptive_worker_count
 from backend.services.update import apply_update as apply_git_update
 from backend.services.update import probe_updates
-from backend.services.utils import get_tnved_code, make_session_with_cookies, pluralize_ru
+from backend.services.utils import clone_session, get_tnved_code, make_session_with_cookies, pluralize_ru
 from backend.services.win_subprocess import hidden_console_kwargs
 
 LABEL_PRINT_SELECTION_CLEANUP_DELAY_SECONDS = 300
@@ -2732,12 +2733,12 @@ class ApiBridge:
             raise RuntimeError("У заказа не найден document_id.")
 
         raw_status = str(item.get("status_raw") or item.get("status") or "").strip()
-        if raw_status not in {"released", "received", "downloaded"}:
+        if raw_status.lower() not in DOWNLOADABLE_CODES_ORDER_STATUSES:
             raw_status = check_order_status(session, document_id)
             item["status"] = raw_status
             self._sync_history_from_download_item(item)
 
-        if raw_status not in {"released", "received", "downloaded"}:
+        if raw_status.lower() not in DOWNLOADABLE_CODES_ORDER_STATUSES:
             raise RuntimeError("Заказ ещё не готов для ввода в оборот.")
 
         self._log("intro", f"Заказ {item.get('order_name') or document_id} ещё не скачан. Скачиваем перед вводом в оборот.")
@@ -2750,6 +2751,7 @@ class ApiBridge:
 
     def _download_order_internal(self, session: requests.Session, item: Dict[str, Any], log_prefix: str = "") -> Dict[str, Any]:
         runtime = _get_runtime()
+        previous_status = str(item.get("status") or "").strip()
         with runtime.lock:
             if item.get("downloading"):
                 raise RuntimeError(f"{log_prefix}Заказ уже скачивается.")
@@ -2766,7 +2768,7 @@ class ApiBridge:
                 progress=lambda value, _id=document_id: self._emit_download_progress([_id], value),
             )
             if not paths:
-                raise RuntimeError("download_codes не вернул файлов для скачивания.")
+                raise RuntimeError("Контур не отдал файлы кодов.")
             item["pdf_path"], item["csv_path"], item["xls_path"] = paths
             filename = ", ".join([path for path in paths if path])
             if not filename:
@@ -2777,6 +2779,9 @@ class ApiBridge:
             self._emit_download_progress([str(item.get("document_id") or "")], 1)
             self._log("download", f"{log_prefix}Успешно скачан: {filename}")
             return self._serialize_download_item(item)
+        except Exception:
+            item["status"] = previous_status or "Не скачаны"
+            raise
         finally:
             item["downloading"] = False
 
@@ -5266,7 +5271,7 @@ class ApiBridge:
 
                 raw_status = check_order_status(session, document_id)
                 item["status"] = raw_status
-                if raw_status in {"released", "received"} and auto_download:
+                if str(raw_status or "").strip().lower() in DOWNLOADABLE_CODES_ORDER_STATUSES and auto_download:
                     self._download_order_internal(session, item, log_prefix="Автоскачивание: ")
                 updated.append(self._serialize_download_item(item, session=session))
 
@@ -5316,16 +5321,12 @@ class ApiBridge:
             items_out: List[Dict[str, Any]] = []
             if resolved:
                 session = self._ensure_session()
-                try:
-                    cookie_snapshot = dict(session.cookies.get_dict())
-                except Exception:
-                    cookie_snapshot = {}
                 workers = min(len(resolved), adaptive_worker_count(cap=DOWNLOAD_MAX_WORKERS, floor=1))
 
                 def _work(pair: tuple[str, Dict[str, Any]]) -> tuple[str, Optional[Dict[str, Any]], Optional[str]]:
                     document_id, item = pair
                     try:
-                        worker_session = make_session_with_cookies(cookie_snapshot)
+                        worker_session = clone_session(session)
                         serialized = self._download_order_internal(worker_session, item)
                         return document_id, serialized, None
                     except Exception as exc:

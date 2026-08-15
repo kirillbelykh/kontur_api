@@ -21,6 +21,14 @@ def make_session_with_cookies(cookies: Optional[Dict[str, str]]) -> requests.Ses
     return session
 
 
+def clone_session(session: requests.Session) -> requests.Session:
+    """Копия сессии для потока: CookieJar с доменами, без get_dict()."""
+    clone = requests.Session()
+    clone.headers.update(session.headers)
+    clone.cookies.update(session.cookies)
+    return clone
+
+
 def pluralize_ru(value: int, singular: str, few: str, many: str) -> str:
     """Подбирает русскую форму слова по числу: 1 пара, 2 пары, 5 пар."""
     remainder10 = value % 10
