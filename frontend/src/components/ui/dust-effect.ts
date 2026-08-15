@@ -134,6 +134,15 @@ export function dissolveToDust(elements: HTMLElement[]): Promise<void> {
       el.style.filter = 'blur(5px)'
       el.style.transform = 'translateX(48px)'
     })
+    // После фейда строка не должна занимать место — иначе в таблице остаётся серая дыра
+    window.setTimeout(() => {
+      el.style.display = 'none'
+      el.style.height = '0'
+      el.style.minHeight = '0'
+      el.style.overflow = 'hidden'
+      el.style.padding = '0'
+      el.style.borderWidth = '0'
+    }, ELEMENT_FADE_MS)
   }
 
   if (!rafHandle) {
@@ -148,7 +157,19 @@ export function dissolveToDust(elements: HTMLElement[]): Promise<void> {
 
 /** Возвращает элементу исходный вид, если операция сорвалась. */
 export function restoreDissolved(element: HTMLElement) {
-  for (const prop of ['transition', 'opacity', 'filter', 'transform', 'pointer-events']) {
+  for (const prop of [
+    'transition',
+    'opacity',
+    'filter',
+    'transform',
+    'pointer-events',
+    'display',
+    'height',
+    'min-height',
+    'overflow',
+    'padding',
+    'border-width',
+  ]) {
     element.style.removeProperty(prop)
   }
 }

@@ -12,7 +12,6 @@ describe('statusMeta', () => {
       'Создаётся',
       'Ожидает',
       'На проверке',
-      'Скачивается',
       'Вводится в оборот',
       'Отправляется на ТСД',
       'Подписывается',
@@ -51,6 +50,10 @@ describe('statusMeta', () => {
   it('пустой статус — нейтральный', () => {
     expect(statusMeta('')).toEqual({ tone: 'neutral', pending: false })
     expect(statusMeta(undefined)).toEqual({ tone: 'neutral', pending: false })
+  })
+
+  it('скачивание — зелёное кольцо с переливом', () => {
+    expect(statusMeta('Скачивается')).toEqual({ tone: 'success', pending: true })
   })
 
   it('кольцо-спиннер только у скачивания', () => {

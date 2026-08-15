@@ -371,20 +371,94 @@ html[data-theme='ocean'] {
   box-sizing: border-box;
   transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.status-dot--spin {
-  height: 0.75rem;
-  width: 0.75rem;
-  background-color: transparent !important;
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, currentColor 28%, transparent);
-  border: 1.5px solid transparent;
-  border-top-color: currentColor;
-  animation: status-dot-spin 0.7s linear infinite;
+.status-download-ring {
+  height: 0.5rem;
+  width: 0.5rem;
+  flex-shrink: 0;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  animation: status-download-grow 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
-@keyframes status-dot-spin {
-  to { transform: rotate(360deg); }
+.status-download-core {
+  fill: currentColor;
+  transform-origin: 6px 6px;
+  animation: status-download-open 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.status-download-track {
+  opacity: 0;
+  animation: status-download-track-in 280ms ease-out 90ms forwards;
+}
+.status-download-arc {
+  opacity: 0;
+  animation: status-download-arc-in 200ms ease-out 160ms forwards;
+  transition: stroke-dashoffset 200ms ease-out;
+}
+@keyframes status-download-grow {
+  to { height: 0.75rem; width: 0.75rem; }
+}
+@keyframes status-download-open {
+  0%   { fill: currentColor; transform: scale(1); opacity: 1; }
+  55%  { fill: currentColor; transform: scale(1.15); opacity: 0.55; }
+  100% { fill: transparent; transform: scale(1.35); opacity: 0; }
+}
+@keyframes status-download-track-in {
+  to { opacity: 0.28; }
+}
+@keyframes status-download-arc-in {
+  to { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .status-dot--spin { animation: none; }
+  .status-download-ring { animation: none; height: 0.75rem; width: 0.75rem; }
+  .status-download-core { animation: none; opacity: 0; fill: transparent; }
+  .status-download-track { animation: none; opacity: 0.28; }
+  .status-download-arc { animation: none; opacity: 1; }
+}
+
+.meteor-origin {
+  position: absolute;
+}
+.meteor-fly {
+  display: block;
+  animation-name: meteor-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: backwards;
+}
+.meteor-streak {
+  position: relative;
+  display: block;
+  /* Хвост назад и вверх-вправо, голова смотрит вниз-влево — как падение с неба */
+  transform: rotate(112deg);
+}
+.meteor-head {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 9999px;
+  background: #71717a;
+}
+.meteor-tail {
+  position: absolute;
+  top: 50%;
+  left: -72px;
+  height: 1px;
+  width: 72px;
+  transform: translateY(-50%);
+  background: linear-gradient(to right, transparent, #71717a);
+}
+.dark .meteor-head {
+  background: #a1a1aa;
+}
+.dark .meteor-tail {
+  background: linear-gradient(to right, transparent, #a1a1aa);
+}
+@keyframes meteor-fall {
+  0% { transform: translate3d(0, 0, 0); opacity: 1; }
+  88% { opacity: 1; }
+  100% { transform: translate3d(-24vw, 120vh, 0); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .meteor-fly { animation: none; opacity: 0; }
 }
 
 /* ─── Transitions.dev — Error state shake ─── */

@@ -189,7 +189,7 @@ function SidebarBrand({
   onLogoClick?: () => void
 }) {
   return (
-    <div className="mb-4 flex h-12 shrink-0 items-center justify-between">
+    <div className="mb-4 flex h-14 shrink-0 items-center justify-between">
       <div className="flex min-w-0 items-center">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center">
           <motion.img
@@ -324,6 +324,14 @@ export function AppLayout() {
 
   const isWelcome = location.pathname === '/' || location.pathname === '/welcome'
 
+  if (isWelcome) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Outlet />
+      </div>
+    )
+  }
+
   return (
     <div
       className="min-h-screen bg-background"
@@ -417,7 +425,7 @@ export function AppLayout() {
         }}
       >
         <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-          <div className="relative flex h-12 items-center justify-between gap-2 px-4 sm:px-5 lg:px-6">
+          <div className="relative flex h-14 items-center justify-between gap-2 px-4 sm:px-5 lg:px-6">
             <div className="flex min-w-0 items-center gap-2">
               <Button
                 variant="ghost"
@@ -431,13 +439,12 @@ export function AppLayout() {
               <h1 className="truncate text-base font-semibold">{title || 'Контур Маркировка'}</h1>
             </div>
 
-            {/* С открытым журналом центру не хватает места — логотип уступает контролам */}
-            {!isWelcome && !journalOpen ? (
-              <div className="pointer-events-none absolute left-1/2 top-1/2 block -translate-x-1/2 -translate-y-1/2">
+            {!journalOpen ? (
+              <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 md:block">
                 <img
                   src={logo}
                   alt="Grundlage"
-                  className="h-9 w-auto object-contain opacity-90 transition-opacity hover:opacity-100 dark:invert dark:brightness-110"
+                  className="h-[clamp(2.25rem,5.5vw,3rem)] w-auto object-contain opacity-90 dark:invert dark:brightness-110"
                 />
               </div>
             ) : null}

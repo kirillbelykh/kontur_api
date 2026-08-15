@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Switch } from '@heroui/react'
 import { Check, Monitor, ScrollText } from 'lucide-react'
-import { getAppSetting, setAppSetting, type AppSettingKey } from '@/lib/app-settings'
+import { motion } from 'framer-motion'
+import { setAppSetting, useAppSetting, type AppSettingKey } from '@/lib/app-settings'
 import { apiCall } from '@/lib/bridge'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import { usePageZoom, ZOOM_STEPS } from '@/hooks/usePageZoom'
 import { THEME_OPTIONS, useTheme, type ThemeOption } from '@/hooks/useTheme'
@@ -82,21 +81,30 @@ function SystemThemeCard({ active, onSelect }: { active: boolean; onSelect: () =
 }
 
 function SettingSwitch({ settingKey, label }: { settingKey: AppSettingKey; label: string }) {
-  const [value, setValue] = useState(() => getAppSetting(settingKey))
+  const value = useAppSetting(settingKey)
   return (
-    <Switch
-      isSelected={value}
-      onChange={(next) => {
-        setValue(next)
-        setAppSetting(settingKey, next)
-      }}
-      className="flex w-full flex-row items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
+    <button
+      type="button"
+      role="switch"
+      aria-checked={value}
+      onClick={() => setAppSetting(settingKey, !value)}
+      className="flex w-full cursor-pointer flex-row items-center justify-between gap-3 rounded-md border border-border px-3 py-2 text-left"
     >
       <span className="text-sm text-foreground">{label}</span>
-      <Switch.Control>
-        <Switch.Thumb />
-      </Switch.Control>
-    </Switch>
+      <span
+        className={cn(
+          'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+          value ? 'bg-foreground' : 'bg-muted',
+        )}
+      >
+        <span
+          className={cn(
+            'absolute top-0.5 h-4 w-4 rounded-full bg-card shadow-sm transition-transform',
+            value ? 'translate-x-4' : 'translate-x-0.5',
+          )}
+        />
+      </span>
+    </button>
   )
 }
 
@@ -136,6 +144,12 @@ export function SettingsDialog({
       ? `Доступно обновление${remoteShort ? ` · ${remoteShort}` : ''}`
       : 'Актуальная версия'
 
+  const SETTINGS_TABS = [
+    { id: 'appearance' as const, label: 'Оформление' },
+    { id: 'behavior' as const, label: 'Поведение' },
+    { id: 'about' as const, label: 'О приложении' },
+  ]
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -143,69 +157,95 @@ export function SettingsDialog({
           <DialogTitle>Настройки</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="appearance">Оформление</TabsTrigger>
-            <TabsTrigger value="behavior">Поведение</TabsTrigger>
-            <TabsTrigger value="about">О приложении</TabsTrigger>
-          </TabsList>
+        <div className="grid w-full grid-cols-3 rounded-md border border-border bg-muted/50 p-0.5">
+          {SETTINGS_TABS.map((item) => {
+            const active = tab === item.id
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={cn(
+                  'relative w-full rounded-sm border-0 bg-transparent px-2 py-1.5 text-sm font-medium transition-colors',
+                  active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {active ? (
+                  <motion.span
+                    layoutId="settings-tab-toggle"
+                    transition={{ type: 'spring', stiffness: 520, damping: 38, mass: 0.8 }}
+                    className="absolute inset-0 rounded-sm bg-card shadow-sm"
+                  />
+                ) : null}
+                <span className="relative z-10">{item.label}</span>
+              </button>
+            )
+          })}
+        </div>
 
-          <TabsContent value="appearance" className="space-y-4">
-            <div className="grid grid-cols-3 gap-2">
-              {THEME_OPTIONS.map((option) => (
-                <ThemeCard
-                  key={option.id}
-                  option={option}
-                  active={themeId === option.id}
-                  onSelect={() => setTheme(option.id)}
-                />
-              ))}
-              <SystemThemeCard active={themeId === 'system'} onSelect={() => setTheme('system')} />
-            </div>
-
-            <div>
-              <div className="mb-1.5 text-xs font-medium text-muted-foreground">Масштаб</div>
-              <div className="flex flex-wrap gap-1">
-                {ZOOM_STEPS.map((step) => (
-                  <Button
-                    key={step}
-                    size="sm"
-                    variant={zoom === step ? 'secondary' : 'ghost'}
-                    className="px-2.5 tabular-nums"
-                    onClick={() => setZoom(step)}
-                  >
-                    {Math.round(step * 100)}%
-                  </Button>
+        <div className="h-[22.5rem] overflow-y-auto pt-1">
+          {tab === 'appearance' ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                {THEME_OPTIONS.map((option) => (
+                  <ThemeCard
+                    key={option.id}
+                    option={option}
+                    active={themeId === option.id}
+                    onSelect={() => setTheme(option.id)}
+                  />
                 ))}
+                <SystemThemeCard active={themeId === 'system'} onSelect={() => setTheme('system')} />
+              </div>
+
+              <div>
+                <div className="mb-1.5 text-xs font-medium text-muted-foreground">Масштаб</div>
+                <div className="flex flex-wrap gap-1">
+                  {ZOOM_STEPS.map((step) => (
+                    <Button
+                      key={step}
+                      size="sm"
+                      variant={zoom === step ? 'secondary' : 'ghost'}
+                      className="px-2.5 tabular-nums"
+                      onClick={() => setZoom(step)}
+                    >
+                      {Math.round(step * 100)}%
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
-          </TabsContent>
+          ) : null}
 
-          <TabsContent value="behavior" className="space-y-2">
-            <SettingSwitch settingKey="animations" label="Показывать анимации" />
-            <SettingSwitch settingKey="journalAutoRefresh" label="Автообновление журнала" />
-          </TabsContent>
-
-          <TabsContent value="about" className="space-y-2">
-            <div className="rounded-md border border-border px-3 py-2">
-              <div className="text-sm font-medium text-foreground">Контур Маркировка</div>
-              <div className="mt-0.5 font-mono text-xs text-muted-foreground">
-                v{versionLabel}
-                {commitLabel ? ` · ${commitLabel}` : ''}
-              </div>
+          {tab === 'behavior' ? (
+            <div className="space-y-2">
+              <SettingSwitch settingKey="animations" label="Показывать анимации" />
+              <SettingSwitch settingKey="journalAutoRefresh" label="Автообновление журнала" />
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
-              <span className="text-xs text-muted-foreground">{updateStatus}</span>
-              <Button size="sm" variant="outline" disabled={checking} onClick={() => void checkForUpdates()}>
-                Проверить обновления
+          ) : null}
+
+          {tab === 'about' ? (
+            <div className="space-y-2">
+              <div className="rounded-md border border-border px-3 py-2">
+                <div className="text-sm font-medium text-foreground">Контур Маркировка</div>
+                <div className="mt-0.5 font-mono text-xs text-muted-foreground">
+                  v{versionLabel}
+                  {commitLabel ? ` · ${commitLabel}` : ''}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                <span className="text-xs text-muted-foreground">{updateStatus}</span>
+                <Button size="sm" variant="outline" disabled={checking} onClick={() => void checkForUpdates()}>
+                  Проверить обновления
+                </Button>
+              </div>
+              <Button size="sm" variant="ghost" onClick={onOpenJournal}>
+                <ScrollText className="h-3.5 w-3.5" />
+                Открыть журнал
               </Button>
             </div>
-            <Button size="sm" variant="ghost" onClick={onOpenJournal}>
-              <ScrollText className="h-3.5 w-3.5" />
-              Открыть журнал
-            </Button>
-          </TabsContent>
-        </Tabs>
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   )

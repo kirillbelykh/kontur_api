@@ -620,7 +620,40 @@ def check_order_status(session: requests.Session, document_id: str) -> str:
         return "error"
 
 
-def download_codes(session: requests.Session, document_id: str, order_name: str) -> Optional[Tuple[Optional[str], Optional[str], Optional[str]]]:
+def _notify_download_progress(progress: Optional[Callable[[float], None]], value: float) -> None:
+    if progress is None:
+        return
+    try:
+        progress(min(1.0, max(0.0, value)))
+    except Exception:
+        return
+
+
+def _write_stream(
+    response: requests.Response,
+    path: str,
+    on_fraction: Optional[Callable[[float], None]] = None,
+) -> None:
+    total = int(response.headers.get("Content-Length") or 0)
+    written = 0
+    with open(path, "wb") as handle:
+        for chunk in response.iter_content(chunk_size=64 * 1024):
+            if not chunk:
+                continue
+            handle.write(chunk)
+            written += len(chunk)
+            if total > 0 and on_fraction is not None:
+                on_fraction(min(1.0, written / total))
+    if on_fraction is not None:
+        on_fraction(1.0)
+
+
+def download_codes(
+    session: requests.Session,
+    document_id: str,
+    order_name: str,
+    progress: Optional[Callable[[float], None]] = None,
+) -> Optional[Tuple[Optional[str], Optional[str], Optional[str]]]:
     """
     Скачивает PDF, CSV и XLS (если доступны) для заказа document_id и сохраняет их в папку:
       Desktop / "pdf-коды км" / <safe_order_name>/
@@ -655,6 +688,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
             doc = resp_status.json()
             status = doc.get("status")
             previous_status = _log_status_change("Статус заказа", document_id, previous_status, status)
+            _notify_download_progress(progress, 0.08 * (attempt + 1) / max_attempts)
             if status in ("released", "received"):
                 break
             time.sleep(ORDER_STATUS_POLL_INTERVAL_SECONDS)
@@ -731,6 +765,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                 result_data = resp_result.json()
                 status_pdf = result_data.get("status")
                 previous_pdf_status = _log_status_change("PDF export", document_id, previous_pdf_status, status_pdf)
+                _notify_download_progress(progress, 0.10 + 0.08 * (attempts_pdf + 1) / PDF_EXPORT_POLL_ATTEMPTS)
                 if status_pdf == "success":
                     file_infos = result_data.get("fileInfos", [])
                     if file_infos:
@@ -747,18 +782,21 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                     logger.debug(f"Downloading PDF from {full_file_url}")
                     r = session.get(full_file_url, timeout=60, headers=headers, stream=True, allow_redirects=True)
                     r.raise_for_status()
-                    with open(pdf_path, "wb") as fh:
-                        for chunk in r.iter_content(chunk_size=8192):
-                            if chunk:
-                                fh.write(chunk)
+                    _write_stream(
+                        r,
+                        pdf_path,
+                        lambda fraction: _notify_download_progress(progress, 0.18 + 0.22 * fraction),
+                    )
                     logger.info(f"PDF сохранён: {pdf_path}")
                 except Exception as e:
                     logger.error("Ошибка скачивания PDF %s: %s", full_file_url, e)
                     pdf_path = None
             else:
                 logger.warning("PDF export для %s завершился без fileUrl", document_id)
+                _notify_download_progress(progress, 0.40)
         else:
             logger.warning("Шаблон '30x20' для PDF не найден — пропускаем PDF экспорт")
+            _notify_download_progress(progress, 0.40)
     except Exception:
         logger.exception("Ошибка в PDF-части для %s", document_id)
         pdf_path = None
@@ -782,6 +820,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
             csv_status_data = resp_csv_status.json()
             status_csv = csv_status_data.get("status")
             previous_csv_status = _log_status_change("CSV export", document_id, previous_csv_status, status_csv)
+            _notify_download_progress(progress, 0.40 + 0.12 * (attempts_csv + 1) / EXPORT_POLL_ATTEMPTS)
             if status_csv == "success":
                 file_infos = csv_status_data.get("fileInfos", [])
                 break
@@ -801,11 +840,13 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                 logger.debug(f"Downloading CSV from {download_csv_url}")
                 r = session.get(download_csv_url, timeout=60, headers=headers, stream=True, allow_redirects=True)
                 r.raise_for_status()
-                with open(csv_path, "wb") as fh:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        if chunk:
-                            fh.write(chunk)
+                _write_stream(
+                    r,
+                    csv_path,
+                    lambda fraction: _notify_download_progress(progress, 0.52 + 0.26 * fraction),
+                )
                 logger.info(f"CSV сохранён: {csv_path}")
+                _notify_download_progress(progress, 0.80)
                 if process_csv_file(csv_path):
                     logger.info("CSV обработан: %s", csv_path)
                 else:
@@ -839,6 +880,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
             xls_status_data = resp_xls_status.json()
             status_xls = xls_status_data.get("status")
             previous_xls_status = _log_status_change("XLS export", document_id, previous_xls_status, status_xls)
+            _notify_download_progress(progress, 0.82 + 0.08 * (attempts_xls + 1) / EXPORT_POLL_ATTEMPTS)
             if status_xls == "success":
                 file_infos = xls_status_data.get("fileInfos", [])
                 break
@@ -857,10 +899,11 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
                 logger.debug(f"Downloading XLS from {download_xls_url}")
                 r = session.get(download_xls_url, timeout=60, headers=headers, stream=True, allow_redirects=True)
                 r.raise_for_status()
-                with open(xls_path, "wb") as fh:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        if chunk:
-                            fh.write(chunk)
+                _write_stream(
+                    r,
+                    xls_path,
+                    lambda fraction: _notify_download_progress(progress, 0.90 + 0.10 * fraction),
+                )
                 logger.info(f"XLS сохранён: {xls_path}")
             except Exception as e:
                 logger.error("Ошибка скачивания XLS %s: %s", download_xls_url, e)
@@ -871,7 +914,7 @@ def download_codes(session: requests.Session, document_id: str, order_name: str)
         logger.exception("Ошибка в XLS-части для %s", document_id)
         xls_path = None
 
-    # Вернуть кортеж путей (возможно некоторые элементы None)
+    _notify_download_progress(progress, 1.0)
     return pdf_path, csv_path, xls_path
 
 

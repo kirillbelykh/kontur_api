@@ -14,6 +14,7 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
+import { subscribeDownloadProgress } from '@/lib/progress'
 import { cn, getErrorMessage, rowMatchesQuery } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { Badge, StatusBadge } from '@/components/ui/badge'
@@ -72,6 +73,7 @@ const DownloadRow = memo(function DownloadRow({
   checked,
   focused,
   liveStatus,
+  liveProgress,
   onActivate,
   onToggle,
 }: {
@@ -81,6 +83,7 @@ const DownloadRow = memo(function DownloadRow({
   checked: boolean
   focused: boolean
   liveStatus?: string
+  liveProgress?: number
   onActivate: (documentId: string, rowIndex: number) => void
   onToggle: (documentId: string) => void
 }) {
@@ -110,7 +113,7 @@ const DownloadRow = memo(function DownloadRow({
         ) : null}
       </TableCell>
       <TableCell>
-        <StatusBadge status={liveStatus || item.status} />
+        <StatusBadge status={liveStatus || item.status} progress={liveProgress} />
         {item.status_summary && !liveStatus ? (
           <div className="mt-1 text-xs text-muted-foreground">{item.status_summary}</div>
         ) : null}
@@ -134,11 +137,24 @@ export function DownloadPage() {
   const [recordNumber, setRecordNumber] = useState('')
   const [autoDownload, setAutoDownload] = useState(false)
   const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
+  const [liveProgress, setLiveProgress] = useState<Record<string, number>>({})
   const lastClickedIndex = useRef(-1)
   // TableRow отдаёт onAction без исходного события — модификаторы снимаем до его срабатывания
   const clickMeta = useRef({ ctrl: false, shift: false, fromControl: false })
   // Строки текущей страницы для стабильного activateRow (иначе memo строк бесполезен)
   const pageRowsRef = useRef<DownloadItem[]>([])
+
+  useEffect(
+    () =>
+      subscribeDownloadProgress((ids, progress) => {
+        setLiveProgress((prev) => {
+          const next = { ...prev }
+          for (const id of ids) next[id] = progress
+          return next
+        })
+      }),
+    [],
+  )
 
   const load = useCallback(async () => {
     const fresh = guard()
@@ -274,16 +290,20 @@ export function DownloadPage() {
       async () => {
         if (!targetIds.length) throw new Error('Выберите хотя бы один заказ для скачивания.')
 
-        setLiveStatus(Object.fromEntries(targetIds.map((id) => [id, 'Скачивается'])))
+        setLiveStatus({})
+        setLiveProgress({})
         let successCount = 0
         const errors: string[] = []
 
         try {
           for (const documentId of targetIds) {
             const order = items.find((item) => item.document_id === documentId)
+            setLiveStatus((prev) => ({ ...prev, [documentId]: 'Скачивается' }))
+            setLiveProgress((prev) => ({ ...prev, [documentId]: 0 }))
             try {
               await apiCall('manual_download_order', documentId)
               successCount += 1
+              setLiveProgress((prev) => ({ ...prev, [documentId]: 1 }))
               setLiveStatus((prev) => ({ ...prev, [documentId]: 'Скачан' }))
             } catch (error) {
               errors.push(`${order?.order_name || documentId}: ${getErrorMessage(error)}`)
@@ -293,6 +313,7 @@ export function DownloadPage() {
           await load()
         } finally {
           setLiveStatus({})
+          setLiveProgress({})
         }
         if (errors.length) {
           throw new Error(`Скачано ${successCount}/${targetIds.length}. Первая ошибка: ${errors[0]}`)
@@ -453,6 +474,7 @@ export function DownloadPage() {
                         checked={selection.ids.includes(documentId)}
                         focused={selection.focus === documentId}
                         liveStatus={liveStatus[documentId]}
+                        liveProgress={liveProgress[documentId]}
                         onActivate={activateRow}
                         onToggle={toggleId}
                       />

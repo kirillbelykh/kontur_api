@@ -1,5 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Maximize2, RefreshCw } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
@@ -109,12 +110,134 @@ type TableKey = 'orders' | 'aggregation' | 'marking'
 type Row = Record<string, unknown>
 type Column = { label: string; key: string; align?: 'right'; mono?: boolean }
 
-const TEMPLATE_PAGE_SIZE = 6
+const TEMPLATE_PAGE_SIZE = 9
 const FALLBACK_SHEET_FORMATS: SheetFormat[] = [
   { key: '100x180', label: '100x180' },
   { key: '100x136', label: '100x136' },
 ]
 const EMPTY_MANUAL: ManualFields = { gtin: '', size: '', batch: '', color: '', units_per_pack: '' }
+
+type HighlightBox = { x: number; y: number; w: number; h: number }
+
+const frameSpring = { type: 'spring' as const, stiffness: 380, damping: 34, mass: 0.85 }
+
+function TemplateCardGrid({
+  items,
+  selectedPath,
+  pageKey,
+  onSelect,
+}: {
+  items: TemplateItem[]
+  selectedPath: string
+  pageKey: number
+  onSelect: (path: string) => void
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const prevIndexRef = useRef(-1)
+  const pageKeyRef = useRef(pageKey)
+  const [box, setBox] = useState<HighlightBox | null>(null)
+  const [moving, setMoving] = useState(false)
+  const selectedIndex = items.findIndex((item) => item.path === selectedPath)
+
+  const measure = (index: number): HighlightBox | null => {
+    const wrap = wrapRef.current
+    const cell = gridRef.current?.children[index] as HTMLElement | undefined
+    if (!wrap || !cell) return null
+    const origin = wrap.getBoundingClientRect()
+    const rect = cell.getBoundingClientRect()
+    return {
+      x: rect.left - origin.left,
+      y: rect.top - origin.top,
+      w: rect.width,
+      h: rect.height,
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (selectedIndex < 0) return
+    const dest = measure(selectedIndex)
+    if (!dest) return
+    const prev = prevIndexRef.current
+    prevIndexRef.current = selectedIndex
+    const pageChanged = pageKey !== pageKeyRef.current
+    pageKeyRef.current = pageKey
+
+    if (pageChanged || prev < 0 || prev === selectedIndex || prev >= items.length) {
+      setMoving(false)
+      setBox(dest)
+      return
+    }
+
+    setMoving(true)
+    setBox(dest)
+    const id = window.setTimeout(() => setMoving(false), 420)
+    return () => window.clearTimeout(id)
+  }, [items, pageKey, selectedIndex])
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <div ref={gridRef} className="grid grid-cols-3 gap-2">
+        {items.map((template) => {
+          const selected = template.path === selectedPath
+          return (
+            <motion.button
+              key={String(template.path)}
+              type="button"
+              aria-pressed={selected}
+              animate={{ scale: selected ? 1.035 : 1 }}
+              transition={frameSpring}
+              className={cn(
+                'relative min-h-[5.75rem] min-w-0 rounded-lg border bg-[var(--field-bg)] px-2.5 py-3 text-left',
+                selected
+                  ? 'z-[1] border-transparent'
+                  : 'border-border hover:border-[var(--field-border-hover)]',
+              )}
+              onClick={() => onSelect(String(template.path || ''))}
+            >
+              <div className="flex h-full min-h-[4.25rem] flex-col justify-between gap-2">
+                <span className="line-clamp-2 font-medium leading-snug">{template.name || '—'}</span>
+                <div className="flex items-end justify-between gap-1.5">
+                  <span className="min-w-0 truncate text-xs text-muted-foreground">
+                    {template.sheet_format_label || template.sheet_format} • {template.category || '—'}
+                  </span>
+                  <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    {template.source_label || template.data_source_kind || '—'}
+                  </span>
+                </div>
+              </div>
+            </motion.button>
+          )
+        })}
+      </div>
+      {box ? (
+        <motion.div
+          aria-hidden
+          initial={false}
+          animate={{
+            left: box.x,
+            top: box.y,
+            width: box.w,
+            height: box.h,
+            borderRadius: moving ? 22 : 8,
+          }}
+          transition={frameSpring}
+          className="pointer-events-none absolute z-10 overflow-hidden border-2 border-foreground/50 bg-foreground/[0.04]"
+        >
+          {!moving ? (
+            <motion.span
+              key={selectedPath}
+              className="absolute top-0 h-full w-14 bg-gradient-to-r from-transparent via-foreground/15 to-transparent"
+              initial={{ left: '-40%' }}
+              animate={{ left: '110%' }}
+              transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            />
+          ) : null}
+        </motion.div>
+      ) : null}
+    </div>
+  )
+}
 
 /* Колонки — модульные константы: стабильные props для memo-строк */
 const ORDER_COLUMNS: Column[] = [
@@ -843,38 +966,16 @@ export function LabelsPage() {
             {templatePageItems.length === 0 ? (
               <EmptyState>Шаблоны для выбранного формата не найдены</EmptyState>
             ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {templatePageItems.map((template) => {
-                  const selected = template.path === templatePath
-                  return (
-                    <button
-                      key={String(template.path)}
-                      type="button"
-                      className={cn(
-                        'min-w-0 rounded-lg border bg-[var(--field-bg)] px-2.5 py-2 text-left transition',
-                        selected
-                          ? 'border-foreground/40 ring-1 ring-foreground/15'
-                          : 'border-border hover:border-[var(--field-border-hover)]',
-                      )}
-                      onClick={() => {
-                        setTemplatePath(String(template.path || ''))
-                        resetManual()
-                        setPreview(null)
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-1.5">
-                        <span className="truncate font-medium leading-snug">{template.name || '—'}</span>
-                        <span className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                          {template.source_label || template.data_source_kind || '—'}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {template.sheet_format_label || template.sheet_format} • {template.category || '—'}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
+              <TemplateCardGrid
+                items={templatePageItems}
+                selectedPath={templatePath}
+                pageKey={templateStart}
+                onSelect={(path) => {
+                  setTemplatePath(path)
+                  resetManual()
+                  setPreview(null)
+                }}
+              />
             )}
           </CardContent>
         </Card>

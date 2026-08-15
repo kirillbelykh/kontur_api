@@ -6,6 +6,7 @@ import { apiCall } from '@/lib/bridge'
 import { useCachedState } from '@/lib/view-cache'
 import { useRequestGuard } from '@/hooks/useRequestGuard'
 import { withPageJob } from '@/lib/jobs'
+import { subscribeDownloadProgress } from '@/lib/progress'
 import { cn, getErrorMessage } from '@/lib/utils'
 import { EmptyState, PageHeader, StatRow } from '@/components/layout/PageHeader'
 import { StatusBadge } from '@/components/ui/badge'
@@ -54,6 +55,7 @@ const AkRow = memo(function AkRow({
   selected,
   arrived,
   liveStatus,
+  liveProgress,
   onToggle,
 }: {
   row: AggregationItem
@@ -62,6 +64,7 @@ const AkRow = memo(function AkRow({
   selected: boolean
   arrived: boolean
   liveStatus?: string
+  liveProgress?: number
   onToggle: (documentId: string, index: number) => void
 }) {
   const id = String(row.document_id || '')
@@ -80,7 +83,7 @@ const AkRow = memo(function AkRow({
         <div className="text-xs text-muted-foreground">{row.comment || '—'}</div>
       </TableCell>
       <TableCell>
-        <StatusBadge status={liveStatus || row.status_label || row.status} />
+        <StatusBadge status={liveStatus || row.status_label || row.status} progress={liveProgress} />
         {row.status === 'readyForSendAfterApproved' ? (
           <div className="mt-1 text-xs text-muted-foreground">Состав изменён</div>
         ) : null}
@@ -120,6 +123,7 @@ export function AggregationPage() {
   const [pendingCreate, setPendingCreate] = useState(0)
   const [arrivedIds, setArrivedIds] = useState<Set<string>>(new Set())
   const [liveStatus, setLiveStatus] = useState<Record<string, string>>({})
+  const [liveProgress, setLiveProgress] = useState<Record<string, number>>({})
   const prevIdsRef = useRef<Set<string> | null>(null)
   // TableRow отдаёт onAction без исходного события — модификатор снимаем в capture-фазе до действия строки
   const shiftPressedRef = useRef(false)
@@ -127,6 +131,18 @@ export function AggregationPage() {
   const lastClickedIndexRef = useRef(-1)
   const filteredItemsRef = useRef<AggregationItem[]>([])
   const tableScrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(
+    () =>
+      subscribeDownloadProgress((ids, progress) => {
+        setLiveProgress((prev) => {
+          const next = { ...prev }
+          for (const id of ids) next[id] = progress
+          return next
+        })
+      }),
+    [],
+  )
   const load = useCallback(async (force = false) => {
     const fresh = guard()
     setLoading(true)
@@ -309,11 +325,15 @@ export function AggregationPage() {
       'download-selected',
       async () => {
         overlaySelected('Скачивается')
+        const ids = selectedIdList()
+        setLiveProgress(Object.fromEntries(ids.map((id) => [id, 0])))
         try {
-          await apiCall('download_selected_aggregations', selectedIdList())
+          await apiCall('download_selected_aggregations', ids)
+          setLiveProgress(Object.fromEntries(ids.map((id) => [id, 1])))
           await load(true)
         } finally {
           setLiveStatus({})
+          setLiveProgress({})
         }
       },
       'Выбранные АК скачаны.',
@@ -368,10 +388,18 @@ export function AggregationPage() {
           throw error
         }
         await dust
+        const archived = new Set(ids)
         setSelectedIds(new Set())
+        setState((prev) => {
+          const nextItems = (prev.items || []).filter((item) => !archived.has(String(item.document_id || '')))
+          const removed = (prev.items || []).length - nextItems.length
+          return {
+            ...prev,
+            items: nextItems,
+            total_items: Math.max(0, (prev.total_items ?? (prev.items || []).length) - removed),
+          }
+        })
         await load(true)
-        // Если какая-то строка не ушла в архив и осталась в данных — вернуть ей вид
-        targets.forEach(restoreDissolved)
       },
       'Выбранные АК отправлены в архив.',
     )
@@ -686,6 +714,7 @@ export function AggregationPage() {
                           selected={selectedIds.has(id)}
                           arrived={arrivedIds.has(id)}
                           liveStatus={liveStatus[id]}
+                          liveProgress={liveProgress[id]}
                           onToggle={toggleRow}
                         />
                       )

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Trash2, X } from 'lucide-react'
 import { useAppSetting } from '@/lib/app-settings'
 import { apiCall } from '@/lib/bridge'
-import { getErrorMessage } from '@/lib/utils'
+import { journalMessageTone } from '@/lib/journal'
+import { cn, getErrorMessage } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { SelectNative } from '@/components/ui/select'
 
@@ -20,6 +21,24 @@ const CHANNELS: Array<{ id: string; label: string }> = [
   { id: 'aggregation', label: 'Агрегация' },
   { id: 'labels', label: 'Этикетки' },
 ]
+
+const CHANNEL_CHIP: Record<string, string> = {
+  orders: 'bg-muted text-muted-foreground',
+  chz: 'bg-[color-mix(in_srgb,var(--status-teal)_14%,transparent)] text-[var(--status-teal)]',
+  download: 'bg-[color-mix(in_srgb,var(--status-info)_14%,transparent)] text-[var(--status-info)]',
+  intro: 'bg-[color-mix(in_srgb,var(--status-primary)_14%,transparent)] text-[var(--status-primary)]',
+  tsd: 'bg-[color-mix(in_srgb,var(--status-warning)_14%,transparent)] text-[var(--status-warning)]',
+  aggregation: 'bg-[color-mix(in_srgb,var(--status-violet)_14%,transparent)] text-[var(--status-violet)]',
+  labels: 'bg-[color-mix(in_srgb,var(--status-success)_14%,transparent)] text-[var(--status-success)]',
+}
+
+const MESSAGE_TONE: Record<string, string> = {
+  danger: 'text-rose-600 dark:text-rose-400',
+  success: 'text-emerald-700 dark:text-emerald-400',
+  warning: 'text-amber-700 dark:text-amber-400',
+  info: 'text-sky-700 dark:text-sky-400',
+  neutral: 'text-foreground',
+}
 
 type JournalEntry = {
   channel: string
@@ -156,13 +175,31 @@ export function JournalPanel({ open, onClose }: { open: boolean; onClose: () => 
             {entries.map((entry, index) => (
               <li
                 key={`${entry.channel}-${entry.time}-${index}`}
-                className="rounded-sm px-1.5 py-1 font-mono text-xs leading-snug hover:bg-muted/60"
+                className="rounded-sm px-1.5 py-1.5 leading-snug hover:bg-muted/50"
               >
-                <span className="text-muted-foreground">{entry.time || '—:—:—'}</span>
-                {channel === ALL ? (
-                  <span className="ml-1.5 text-muted-foreground">[{channelLabel(entry.channel)}]</span>
-                ) : null}
-                <span className="ml-1.5 break-words text-foreground">{entry.message}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[11px] tabular-nums text-muted-foreground/80">
+                    {entry.time || '—:—:—'}
+                  </span>
+                  {channel === ALL ? (
+                    <span
+                      className={cn(
+                        'rounded-sm px-1 py-px text-[10px] font-medium',
+                        CHANNEL_CHIP[entry.channel] || 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {channelLabel(entry.channel)}
+                    </span>
+                  ) : null}
+                </div>
+                <p
+                  className={cn(
+                    'mt-0.5 break-words text-[13px]',
+                    MESSAGE_TONE[journalMessageTone(entry.message)],
+                  )}
+                >
+                  {entry.message}
+                </p>
               </li>
             ))}
           </ol>

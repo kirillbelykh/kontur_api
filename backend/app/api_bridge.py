@@ -809,6 +809,34 @@ class ApiBridge:
         if len(runtime.logs[channel]) > MAX_LOG_LINES:
             runtime.logs[channel] = runtime.logs[channel][-MAX_LOG_LINES:]
 
+    def _emit_download_progress(self, document_ids: Sequence[str], value: float) -> None:
+        ids = [str(item).strip() for item in document_ids if str(item or "").strip()]
+        if not ids:
+            return
+        now = time.monotonic()
+        last = getattr(self, "_download_progress_emitted_at", 0.0)
+        if value < 0.99 and now - last < 0.05:
+            return
+        self._download_progress_emitted_at = now
+        payload = json.dumps(
+            {"documentIds": ids, "progress": round(float(value), 4)},
+            ensure_ascii=True,
+        )
+        script = f"window.__konturDownloadProgress&&window.__konturDownloadProgress({payload})"
+
+        def _push() -> None:
+            try:
+                import webview
+            except Exception:
+                return
+            for window in getattr(webview, "windows", None) or []:
+                try:
+                    window.evaluate_js(script)
+                except Exception:
+                    continue
+
+        Thread(target=_push, daemon=True).start()
+
     def _run_background_job(
         self,
         *,
@@ -2704,7 +2732,14 @@ class ApiBridge:
         item["status"] = "Скачивается"
         self._log("download", f"{log_prefix}Начинаем скачивание: {item.get('order_name')}")
         try:
-            paths = download_codes(session, item["document_id"], item["order_name"])
+            document_id = str(item.get("document_id") or "")
+            self._emit_download_progress([document_id], 0)
+            paths = download_codes(
+                session,
+                item["document_id"],
+                item["order_name"],
+                progress=lambda value, _id=document_id: self._emit_download_progress([_id], value),
+            )
             if not paths:
                 raise RuntimeError("download_codes не вернул файлов для скачивания.")
             item["pdf_path"], item["csv_path"], item["xls_path"] = paths
@@ -2714,6 +2749,7 @@ class ApiBridge:
             item["filename"] = filename
             item["status"] = "Скачан"
             self._sync_history_from_download_item(item)
+            self._emit_download_progress([str(item.get("document_id") or "")], 1)
             self._log("download", f"{log_prefix}Успешно скачан: {filename}")
             return self._serialize_download_item(item)
         finally:
@@ -6394,7 +6430,9 @@ class ApiBridge:
 
                 saved_groups: List[Dict[str, Any]] = []
                 saved_paths: List[str] = []
-                for comment, group_rows in sorted(grouped_items.items(), key=lambda pair: pair[0]):
+                group_items = sorted(grouped_items.items(), key=lambda pair: pair[0])
+                self._emit_download_progress(normalized_ids, 0.2 if group_items else 1)
+                for index, (comment, group_rows) in enumerate(group_items):
                     safe_comment = "".join(char for char in comment if char.isalnum() or char in " -_").strip()[:80]
                     filename = f"{safe_comment or 'selected_aggregations'}_{len(group_rows)}.csv"
                     saved_path = self._save_simple_aggregation_csv(group_rows, filename)
@@ -6410,6 +6448,7 @@ class ApiBridge:
                         "aggregation",
                         f"Скачано АК '{comment}': {len(group_rows)}, сохранено в {saved_path}",
                     )
+                    self._emit_download_progress(normalized_ids, 0.2 + 0.8 * ((index + 1) / max(1, len(group_items))))
                 return {
                     "count": len(items),
                     "items": items,
