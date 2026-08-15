@@ -1,5 +1,6 @@
 import json
 import tempfile
+import threading
 import types
 import unittest
 from pathlib import Path
@@ -743,6 +744,36 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
         self.assertTrue(result["success"])
         download_mock.assert_called_once()
         intro_mock.assert_called_once()
+
+    def test_manual_download_orders_runs_in_parallel(self):
+        items = {
+            "a": {"document_id": "a", "order_name": "A"},
+            "b": {"document_id": "b", "order_name": "B"},
+            "c": {"document_id": "c", "order_name": "C"},
+        }
+        barrier = threading.Barrier(3, timeout=2)
+
+        def fake_download(_session, item, log_prefix=""):
+            barrier.wait()
+            if item["document_id"] == "b":
+                raise RuntimeError("boom")
+            return {"document_id": item["document_id"]}
+
+        with (
+            mock.patch.object(api_bridge, "adaptive_worker_count", return_value=4),
+            mock.patch.object(self.bridge, "_ensure_session", return_value=object()),
+            mock.patch.object(self.bridge, "_find_download_item", side_effect=lambda document_id: items[document_id]),
+            mock.patch.object(self.bridge, "_download_order_internal", side_effect=fake_download),
+            mock.patch.object(self.bridge, "get_download_state", return_value={"items": []}),
+            mock.patch.object(self.bridge, "_log"),
+        ):
+            result = self.bridge.manual_download_orders(["a", "b", "c"])
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["downloaded"], 2)
+        self.assertEqual(len(result["failed"]), 1)
+        self.assertEqual(result["failed"][0]["document_id"], "b")
+        self.assertEqual({item["document_id"] for item in result["items"]}, {"a", "c"})
 
     def test_intro_exact_filtered_sends_only_emitted_saved_codes(self):
         emitted_code = "010465011804125721ABC1234567890\x1d91EE11\x1d92TAIL"

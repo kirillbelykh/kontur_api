@@ -187,6 +187,7 @@ export function installQaMock(theme: string) {
       reply({ items: DOWNLOAD_ITEMS, printers: ['Zebra ZT230', 'Godex G500'], default_printer: 'Zebra ZT230' }),
     sync_download_statuses: () => reply({ success: true }),
     manual_download_order: () => reply({ success: true }),
+    manual_download_orders: () => reply({ success: true, downloaded: 1, failed: [], items: [] }),
     print_download_order: () => reply({ selection: { total_record_count: 250, selected_record_number: 1 } }),
 
     get_intro_state: () => reply({ items: INTRO_ITEMS }),

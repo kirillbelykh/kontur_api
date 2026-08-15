@@ -290,33 +290,26 @@ export function DownloadPage() {
       async () => {
         if (!targetIds.length) throw new Error('Выберите хотя бы один заказ для скачивания.')
 
-        setLiveStatus({})
-        setLiveProgress({})
-        let successCount = 0
-        const errors: string[] = []
-
+        setLiveStatus(Object.fromEntries(targetIds.map((id) => [id, 'Скачивается'])))
+        setLiveProgress(Object.fromEntries(targetIds.map((id) => [id, 0])))
         try {
-          for (const documentId of targetIds) {
-            const order = items.find((item) => item.document_id === documentId)
-            setLiveStatus((prev) => ({ ...prev, [documentId]: 'Скачивается' }))
-            setLiveProgress((prev) => ({ ...prev, [documentId]: 0 }))
-            try {
-              await apiCall('manual_download_order', documentId)
-              successCount += 1
-              setLiveProgress((prev) => ({ ...prev, [documentId]: 1 }))
-              setLiveStatus((prev) => ({ ...prev, [documentId]: 'Скачан' }))
-            } catch (error) {
-              errors.push(`${order?.order_name || documentId}: ${getErrorMessage(error)}`)
-              setLiveStatus((prev) => ({ ...prev, [documentId]: 'Ошибка скачивания' }))
-            }
-          }
+          const result = await apiCall<{
+            downloaded?: number
+            failed?: { document_id?: string; error?: string }[]
+          }>('manual_download_orders', targetIds)
           await load()
+          const failed = result.failed ?? []
+          if (failed.length) {
+            const names = new Map(items.map((item) => [item.document_id, item.order_name]))
+            const first = failed[0]
+            const label = names.get(first.document_id) || first.document_id
+            throw new Error(
+              `Скачано ${result.downloaded ?? targetIds.length - failed.length}/${targetIds.length}. Первая ошибка: ${label}: ${first.error}`,
+            )
+          }
         } finally {
           setLiveStatus({})
           setLiveProgress({})
-        }
-        if (errors.length) {
-          throw new Error(`Скачано ${successCount}/${targetIds.length}. Первая ошибка: ${errors[0]}`)
         }
       },
       'Заказы скачаны.',

@@ -109,6 +109,7 @@ TRUE_STATUS_WORKER_TIMEOUT_SECONDS = 25
 LIVE_STATUS_REFRESH_INTERVAL_SECONDS = 30
 LIVE_STATUS_PAGE_LIMIT = 1000
 LIVE_STATUS_MAX_WORKERS = 2
+DOWNLOAD_MAX_WORKERS = 4
 KONTUR_ORDERS_CACHE_TTL_SECONDS = 60
 KONTUR_ORDER_METADATA_PREFETCH_LIMIT = 20
 KONTUR_ORDER_METADATA_MAX_WORKERS = 8
@@ -809,15 +810,34 @@ class ApiBridge:
         if len(runtime.logs[channel]) > MAX_LOG_LINES:
             runtime.logs[channel] = runtime.logs[channel][-MAX_LOG_LINES:]
 
+    def _clone_http_session(self, session: requests.Session) -> requests.Session:
+        if not isinstance(session, requests.Session):
+            return session
+        cloned = requests.Session()
+        cloned.headers.update(dict(session.headers))
+        cloned.cookies.update(session.cookies)
+        cloned.auth = session.auth
+        cloned.verify = session.verify
+        cloned.cert = session.cert
+        cloned.proxies = dict(session.proxies)
+        cloned.trust_env = session.trust_env
+        cloned.max_redirects = session.max_redirects
+        return cloned
+
     def _emit_download_progress(self, document_ids: Sequence[str], value: float) -> None:
         ids = [str(item).strip() for item in document_ids if str(item or "").strip()]
         if not ids:
             return
         now = time.monotonic()
-        last = getattr(self, "_download_progress_emitted_at", 0.0)
+        last_map = getattr(self, "_download_progress_emitted_at", None)
+        if not isinstance(last_map, dict):
+            last_map = {}
+            self._download_progress_emitted_at = last_map
+        key = ids[0] if len(ids) == 1 else ",".join(ids)
+        last = last_map.get(key, 0.0)
         if value < 0.99 and now - last < 0.05:
             return
-        self._download_progress_emitted_at = now
+        last_map[key] = now
         payload = json.dumps(
             {"documentIds": ids, "progress": round(float(value), 4)},
             ensure_ascii=True,
@@ -2725,11 +2745,12 @@ class ApiBridge:
         return item
 
     def _download_order_internal(self, session: requests.Session, item: Dict[str, Any], log_prefix: str = "") -> Dict[str, Any]:
-        if item.get("downloading"):
-            raise RuntimeError(f"{log_prefix}Заказ уже скачивается.")
-
-        item["downloading"] = True
-        item["status"] = "Скачивается"
+        runtime = _get_runtime()
+        with runtime.lock:
+            if item.get("downloading"):
+                raise RuntimeError(f"{log_prefix}Заказ уже скачивается.")
+            item["downloading"] = True
+            item["status"] = "Скачивается"
         self._log("download", f"{log_prefix}Начинаем скачивание: {item.get('order_name')}")
         try:
             document_id = str(item.get("document_id") or "")
@@ -5223,15 +5244,74 @@ class ApiBridge:
             return {"success": False, "error": str(exc)}
 
     def manual_download_order(self, document_id: str) -> Dict[str, Any]:
+        result = self.manual_download_orders([document_id])
+        if not result.get("success"):
+            return {"success": False, "error": result.get("error") or "Ошибка скачивания."}
+        failed = result.get("failed") or []
+        if failed:
+            return {"success": False, "error": failed[0].get("error") or "Ошибка скачивания."}
+        items = result.get("items") or []
+        return {"success": True, "item": items[0] if items else None, "state": result.get("state")}
+
+    def manual_download_orders(self, document_ids: Sequence[str]) -> Dict[str, Any]:
         try:
-            item = self._find_download_item(str(document_id or "").strip())
-            if not item:
-                item = self._get_order_for_document_id(str(document_id or "").strip())
-            if not item:
-                raise RuntimeError("Заказ не найден в активном списке загрузок.")
-            session = self._ensure_session()
-            result = self._download_order_internal(session, item)
-            return {"success": True, "item": result, "state": self.get_download_state()}
+            ids: List[str] = []
+            seen: set[str] = set()
+            for raw in document_ids or []:
+                document_id = str(raw or "").strip()
+                if not document_id or document_id in seen:
+                    continue
+                seen.add(document_id)
+                ids.append(document_id)
+            if not ids:
+                raise RuntimeError("Выберите хотя бы один заказ для скачивания.")
+
+            resolved: List[tuple[str, Dict[str, Any]]] = []
+            failed: List[Dict[str, str]] = []
+            for document_id in ids:
+                item = self._find_download_item(document_id) or self._get_order_for_document_id(document_id)
+                if not item:
+                    failed.append(
+                        {
+                            "document_id": document_id,
+                            "error": "Заказ не найден в активном списке загрузок.",
+                        }
+                    )
+                    continue
+                resolved.append((document_id, item))
+
+            items_out: List[Dict[str, Any]] = []
+            if resolved:
+                session = self._ensure_session()
+                workers = min(len(resolved), adaptive_worker_count(cap=DOWNLOAD_MAX_WORKERS, floor=1))
+
+                def _work(pair: tuple[str, Dict[str, Any]]) -> tuple[str, Optional[Dict[str, Any]], Optional[str]]:
+                    document_id, item = pair
+                    try:
+                        serialized = self._download_order_internal(self._clone_http_session(session), item)
+                        return document_id, serialized, None
+                    except Exception as exc:
+                        self._log("download", f"Ошибка ручного скачивания {document_id}: {exc}")
+                        return document_id, None, str(exc)
+
+                if workers <= 1:
+                    outcomes = [_work(pair) for pair in resolved]
+                else:
+                    with ThreadPoolExecutor(max_workers=workers) as executor:
+                        outcomes = list(executor.map(_work, resolved))
+                for document_id, serialized, error in outcomes:
+                    if error:
+                        failed.append({"document_id": document_id, "error": error})
+                    elif serialized:
+                        items_out.append(serialized)
+
+            return {
+                "success": True,
+                "downloaded": len(items_out),
+                "failed": failed,
+                "items": items_out,
+                "state": self.get_download_state(),
+            }
         except Exception as exc:
             self._log("download", f"Ошибка ручного скачивания: {exc}")
             return {"success": False, "error": str(exc)}
