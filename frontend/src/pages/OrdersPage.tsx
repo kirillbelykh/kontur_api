@@ -473,8 +473,6 @@ export function OrdersPage() {
         const result = await apiCall<{ queue?: QueueItem[]; item?: QueueItem }>('add_order_item', buildPayload())
         if (result.queue) setState((prev) => ({ ...prev, queue: result.queue }))
         if (result.item?.uid) setSelectedQueueId(result.item.uid)
-        setForm((prev) => ({ ...EMPTY_FORM, order_name: prev.order_name }))
-        setLookup(null)
       },
       'Позиция добавлена в очередь',
     )
@@ -501,8 +499,6 @@ export function OrdersPage() {
         setArrivedIds(new Set([pendingId]))
         setHistorySearch('')
         historyPager.setPage(0)
-        setForm((prev) => ({ ...EMPTY_FORM, order_name: prev.order_name }))
-        setLookup(null)
         try {
           const result = await apiCall<{
             state?: OrdersViewState
