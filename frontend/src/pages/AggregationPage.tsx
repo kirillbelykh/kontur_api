@@ -105,22 +105,22 @@ export function AggregationPage() {
   const [state, setState] = useCachedState<AggregationState>('aggregation.state', {})
   const guard = useRequestGuard()
 
-  const [createComment, setCreateComment] = useState('')
-  const [createCount, setCreateCount] = useState('1')
+  const [createComment, setCreateComment] = useCachedState('aggregation.createComment', '')
+  const [createCount, setCreateCount] = useCachedState('aggregation.createCount', '1')
 
-  const [commentFilter, setCommentFilter] = useState('')
-  const [refillToken, setRefillToken] = useState('')
+  const [commentFilter, setCommentFilter] = useCachedState('aggregation.commentFilter', '')
+  const [refillToken, setRefillToken] = useCachedState('aggregation.refillToken', '')
   const [dates, setDates] = useOpsDates()
   const productionDate = dates.production
   const expirationDate = dates.expiration
   const batchNumber = dates.batch
-  const [documentTitle, setDocumentTitle] = useState('')
-  const [allowDisaggregate, setAllowDisaggregate] = useState(false)
-  const [refillOpen, setRefillOpen] = useState(false)
+  const [documentTitle, setDocumentTitle] = useCachedState('aggregation.documentTitle', '')
+  const [allowDisaggregate, setAllowDisaggregate] = useCachedState('aggregation.allowDisaggregate', false)
+  const [refillOpen, setRefillOpen] = useCachedState('aggregation.refillOpen', false)
 
-  const [statusFilter, setStatusFilter] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [currentPage, setCurrentPage] = useState(0)
+  const [statusFilter, setStatusFilter] = useCachedState('aggregation.statusFilter', '')
+  const [searchQuery, setSearchQuery] = useCachedState('aggregation.searchQuery', '')
+  const [currentPage, setCurrentPage] = useCachedState('aggregation.currentPage', 0)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   // Создание АК: плейсхолдеры в таблице + подсветка «прилетевших» строк
   const [pendingCreate, setPendingCreate] = useState(0)
