@@ -2761,11 +2761,15 @@ class ApiBridge:
         try:
             document_id = str(item.get("document_id") or "")
             self._emit_download_progress([document_id], 0)
+
+            def emit_progress(value: float) -> None:
+                self._emit_download_progress([document_id], value)
+
             paths = download_codes(
                 session,
                 item["document_id"],
                 item["order_name"],
-                progress=lambda value, _id=document_id: self._emit_download_progress([_id], value),
+                progress=emit_progress,
             )
             if not paths:
                 raise RuntimeError("Контур не отдал файлы кодов.")

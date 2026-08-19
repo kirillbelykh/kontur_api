@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading as threading  # noqa: F401  # historical test surface
 
-from backend.auth import *  # noqa: F403
+from backend.auth import *  # noqa: F401,F403
 from backend.auth.browser import (  # noqa: F401
     _build_browser_options,
     _click_cookie_accept_if_present,

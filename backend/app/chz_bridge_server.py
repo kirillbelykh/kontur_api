@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from typing import Any
 
+from backend.app.api_bridge import ApiBridge
 from backend.services.logger import logger
 from backend.auth.store import read_fresh_cookie_bundle
 
