@@ -43,6 +43,7 @@ from backend.kontur.api import (
     codes_order,
     download_codes,
     make_task_on_tsd,
+    resume_codes_order,
 )
 try:
     from backend.app.bartender_label_formats import (
@@ -4912,9 +4913,10 @@ class ApiBridge:
         try:
             item = self._prepare_order_item(payload)
             result = self._submit_order_item(item, sync_history=True)
-            self._remember_created_order_in_cache(result)
+            if not result.get("submission_pending"):
+                self._remember_created_order_in_cache(result)
             return {
-                "success": True,
+                "success": not bool(result.get("submission_pending")),
                 **result,
                 "state": self.get_orders_view_state(force_sync=False),
             }
@@ -4935,20 +4937,37 @@ class ApiBridge:
         ]
 
         self._log("orders", f"Создаём заказ: {item['order_name']}")
-        response = codes_order(
-            session,
-            item["order_name"],
-            str(getattr(api_module, "PRODUCT_GROUP", "")),
-            str(getattr(api_module, "RELEASE_METHOD_TYPE", "")),
-            positions,
-            filling_method=str(getattr(api_module, "FILLING_METHOD", "")),
-            thumbprint=None,
-        )
+        existing_document_id = str(item.get("document_id") or "").strip()
+        if existing_document_id:
+            self._log(
+                "orders",
+                f"Продолжаем отправку черновика: {item['order_name']} ({existing_document_id})",
+            )
+            response = resume_codes_order(
+                session,
+                existing_document_id,
+                item["order_name"],
+                thumbprint=None,
+            )
+        else:
+            response = codes_order(
+                session,
+                item["order_name"],
+                str(getattr(api_module, "PRODUCT_GROUP", "")),
+                str(getattr(api_module, "RELEASE_METHOD_TYPE", "")),
+                positions,
+                filling_method=str(getattr(api_module, "FILLING_METHOD", "")),
+                thumbprint=None,
+            )
         if not response:
             raise RuntimeError("API не вернуло результат по созданию заказа.")
 
         document_id = str(response.get("documentId") or response.get("id") or "")
         status = str(response.get("status") or "unknown")
+        submission_pending = bool(response.get("submission_pending"))
+        submission_error = str(response.get("submission_error") or "").strip()
+        if document_id:
+            item["document_id"] = document_id
         created_at = datetime.now().isoformat()
         history_entry = {
             "order_name": item["order_name"],
@@ -4968,13 +4987,11 @@ class ApiBridge:
             "requested_codes_count": item["codes_count"],
             "received_codes_count": 0,
         }
-        existing_history_entry = _get_runtime().history_db.get_order_by_document_id(document_id)
-        if existing_history_entry is None:
-            if not _get_runtime().history_db.add_order(history_entry, sync=sync_history):
-                self._log(
-                    "orders",
-                    f"Внимание: заказ {item['order_name']} создан в Контуре, но не сохранён в историю",
-                )
+        if document_id and not _get_runtime().history_db.add_order(history_entry, sync=sync_history):
+            self._log(
+                "orders",
+                f"Внимание: заказ {item['order_name']} создан в Контуре, но не сохранён в историю",
+            )
         download_item = self._add_download_item(item, document_id)
 
         result = {
@@ -4992,10 +5009,19 @@ class ApiBridge:
             "created_at": created_at,
             "updated_at": created_at,
             "download_item": self._serialize_download_item(download_item),
+            "submission_pending": submission_pending,
+            "submission_error": submission_error,
         }
         _get_runtime().session_orders.insert(0, result)
-        self._log("orders", f"Заказ создан: {item['order_name']} ({document_id})")
-        self._log("download", f"Добавлен в очередь загрузки: {item['order_name']}")
+        if submission_pending:
+            self._log(
+                "orders",
+                f"Заказ {item['order_name']} пока остаётся черновиком. Он сохранён в очереди для повторной отправки: "
+                f"{submission_error or 'Контур не подтвердил выпуск'}",
+            )
+        else:
+            self._log("orders", f"Заказ создан: {item['order_name']} ({document_id})")
+            self._log("download", f"Добавлен в очередь загрузки: {item['order_name']}")
         return result
 
     def submit_order_queue(self) -> Dict[str, Any]:
@@ -5007,16 +5033,28 @@ class ApiBridge:
             self._ensure_session()
             results = []
             errors = []
+            remaining_queue = []
             for item in list(runtime.order_queue):
                 try:
                     result = self._submit_order_item(item, sync_history=False)
-                    self._remember_created_order_in_cache(result)
-                    results.append(result)
+                    if result.get("submission_pending"):
+                        remaining_queue.append(item)
+                        errors.append(
+                            {
+                                "order_name": item["order_name"],
+                                "error": result.get("submission_error") or "Заказ остался в черновике.",
+                                "document_id": result.get("document_id") or "",
+                            }
+                        )
+                    else:
+                        self._remember_created_order_in_cache(result)
+                        results.append(result)
                 except Exception as exc:
+                    remaining_queue.append(item)
                     errors.append({"order_name": item["order_name"], "error": str(exc)})
                     self._log("orders", f"Ошибка заказа {item['order_name']}: {exc}")
 
-            runtime.order_queue = []
+            runtime.order_queue = remaining_queue
             return {
                 "success": not errors,
                 "results": results,

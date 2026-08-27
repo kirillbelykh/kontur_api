@@ -150,6 +150,43 @@ class ApiTests(unittest.TestCase):
         sleep_mock.assert_called_once_with(api.ORDER_AVAILABILITY_POLL_INTERVAL_SECONDS)
         add_order_mock.assert_not_called()
 
+    def test_codes_order_retries_sending_the_same_draft_after_temporary_failure(self):
+        session = Mock()
+        session.post.side_effect = [
+            FakeResponse(json_data={"id": "DOC-RETRY"}),
+            requests.ConnectionError("temporary connection loss"),
+            FakeResponse(json_data={"ok": True}),
+        ]
+        session.get.side_effect = [
+            FakeResponse(json_data=[{"id": "ORDER-1", "base64Content": "AAAA"}]),
+            FakeResponse(json_data={"status": "draft"}),
+            FakeResponse(json_data=[{"id": "ORDER-1", "base64Content": "AAAA"}]),
+            FakeResponse(json_data={"status": "sentForRelease"}),
+        ]
+
+        with (
+            patch.object(api, "_wait_for_order_availability", return_value=True) as availability_mock,
+            patch.object(api, "find_certificate_by_thumbprint", return_value=object()),
+            patch.object(api, "sign_data", return_value="signed-content"),
+            patch.object(api.time, "sleep", return_value=None) as sleep_mock,
+        ):
+            result = api.codes_order(
+                session=session,
+                document_number="ORDER-RETRY",
+                product_group="wheelchairs",
+                release_method_type="SELF_MADE",
+                positions=[{"gtin": "04600000000000", "name": "Test product", "quantity": 1}],
+                thumbprint=None,
+            )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["status"], "sentForRelease")
+        self.assertEqual(session.post.call_count, 3)
+        self.assertIn("/api/v1/codes-order?warehouseId=", session.post.call_args_list[0].args[0])
+        self.assertTrue(all("/DOC-RETRY/send" in call.args[0] for call in session.post.call_args_list[1:]))
+        self.assertEqual(availability_mock.call_count, 2)
+        sleep_mock.assert_called_once_with(api.CODES_ORDER_SEND_RETRY_INTERVAL_SECONDS)
+
     def test_make_task_on_tsd_returns_clear_error_when_base_url_missing(self):
         session = Mock()
 

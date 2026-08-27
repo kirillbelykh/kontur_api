@@ -52,6 +52,30 @@ class ApiBridgeUiV2Tests(unittest.TestCase):
                 },
             )
 
+    def test_submit_order_queue_keeps_draft_that_needs_another_send_attempt(self):
+        queued_item = {"uid": "queue-1", "order_name": "Заказ с повтором"}
+        fake_runtime = types.SimpleNamespace(order_queue=[queued_item])
+
+        with (
+            mock.patch.object(api_bridge, "_get_runtime", return_value=fake_runtime),
+            mock.patch.object(self.bridge, "_ensure_session"),
+            mock.patch.object(
+                self.bridge,
+                "_submit_order_item",
+                return_value={
+                    "document_id": "draft-1",
+                    "submission_pending": True,
+                    "submission_error": "Контур пока не подтвердил выпуск",
+                },
+            ),
+            mock.patch.object(self.bridge, "get_orders_view_state", return_value={"queue": []}),
+        ):
+            result = self.bridge.submit_order_queue()
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["errors"][0]["document_id"], "draft-1")
+        self.assertEqual(fake_runtime.order_queue, [queued_item])
+
     def test_bridge_runtime_loads_local_history_without_github_sync(self):
         fake_history_order = {"document_id": "doc-1", "order_name": "Order 1"}
 

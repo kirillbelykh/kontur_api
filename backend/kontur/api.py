@@ -29,6 +29,8 @@ FILLING_METHOD: str = os.getenv("FILLING_METHOD", "")
 BASE_URL_CONFIG_ERROR = "BASE_URL не настроен. Укажите BASE_URL в .env"
 ORDER_AVAILABILITY_POLL_ATTEMPTS = 16
 ORDER_AVAILABILITY_POLL_INTERVAL_SECONDS = 0.4
+CODES_ORDER_SEND_RETRY_ATTEMPTS = 4
+CODES_ORDER_SEND_RETRY_INTERVAL_SECONDS = 2
 ORDER_STATUS_POLL_ATTEMPTS = 30
 ORDER_STATUS_POLL_INTERVAL_SECONDS = 10
 # Коды уже есть в Контуре — export PDF/CSV/XLS должен работать без ожидания released.
@@ -487,6 +489,165 @@ def _wait_for_order_availability(
     return False
 
 
+def _validate_codes_order_certificate(
+    session: requests.Session,
+    base_url: str,
+    thumbprint: str | None,
+) -> Any | None:
+    if thumbprint:
+        try:
+            resp = session.get(
+                f"{base_url}/api/v1/organizations/{ORGANIZATION_ID}/employees/has-certificate?thumbprint={thumbprint}",
+                timeout=15,
+            )
+            resp.raise_for_status()
+            if not resp.json():
+                logger.error("Сертификат не зарегистрирован в организации")
+                return None
+        except Exception as exc:
+            logger.error("Проверка сертификата: %s", exc)
+            return None
+    else:
+        logger.info("Thumbprint не задан: будет использован первый доступный сертификат с ПК")
+
+    cert = find_certificate_by_thumbprint(thumbprint)
+    if not cert:
+        logger.error("Сертификат для подписи не найден (thumbprint=%s)", thumbprint)
+    return cert
+
+
+def _is_codes_order_sent_status(status: Any) -> bool:
+    normalized = str(status or "").strip().lower()
+    return normalized in {
+        "released",
+        "sentforrelease",
+        "waitchecking",
+        "received",
+        "downloaded",
+        "archived",
+        "success",
+    }
+
+
+def _get_codes_order_document(
+    session: requests.Session,
+    base_url: str,
+    document_id: str,
+) -> dict | None:
+    try:
+        response = session.get(f"{base_url}/api/v1/codes-order/{document_id}", timeout=15)
+        response.raise_for_status()
+        document = response.json()
+        return document if isinstance(document, dict) else None
+    except Exception as exc:
+        logger.warning("Не удалось прочитать статус заказа %s: %s", document_id, exc)
+        return None
+
+
+def resume_codes_order(
+    session: requests.Session,
+    document_id: str,
+    document_number: str,
+    thumbprint: str | None = None,
+    *,
+    retry_attempts: int = CODES_ORDER_SEND_RETRY_ATTEMPTS,
+) -> dict:
+    """Signs and sends an existing draft without creating a second order document."""
+    try:
+        base_url = _require_base_url()
+    except RuntimeError as exc:
+        return {
+            "documentId": document_id,
+            "status": "draft",
+            "submission_pending": True,
+            "submission_error": str(exc),
+        }
+
+    cert = _validate_codes_order_certificate(session, base_url, thumbprint)
+    if not cert:
+        return {
+            "documentId": document_id,
+            "status": "draft",
+            "submission_pending": True,
+            "submission_error": "Не найден или не подтвержден сертификат для подписи.",
+        }
+
+    last_error = ""
+    attempts = max(1, int(retry_attempts))
+    for attempt in range(1, attempts + 1):
+        try:
+            logger.info(
+                "Документ %s: попытка отправки %s/%s",
+                document_number,
+                attempt,
+                attempts,
+            )
+            if not _wait_for_order_availability(session, base_url, document_id, document_number):
+                raise RuntimeError("документ пока недоступен для подписи")
+
+            response = session.get(f"{base_url}/api/v1/codes-order/{document_id}/orders-for-sign", timeout=15)
+            response.raise_for_status()
+            orders_to_sign = response.json()
+            if not isinstance(orders_to_sign, list) or not orders_to_sign:
+                raise RuntimeError("Контур не вернул части заказа для подписи")
+
+            signed_orders_payload: list[dict] = []
+            for order in orders_to_sign:
+                order_id = order["id"]
+                signature_b64 = sign_data(cert, order["base64Content"], b_detached=True)
+                signed_orders_payload.append({"id": order_id, "base64Content": signature_b64})
+
+            send_url = f"{base_url}/api/v1/codes-order/{document_id}/send"
+            send_response = session.post(send_url, json={"signedOrders": signed_orders_payload}, timeout=30)
+            send_response.raise_for_status()
+            logger.info("Документ %s отправлен на выпуск", document_number)
+
+            final_document = _get_codes_order_document(session, base_url, document_id)
+            if final_document and _is_codes_order_sent_status(final_document.get("status")):
+                logger.info("Финальный статус документа %s: %s", document_number, final_document.get("status"))
+                return final_document
+            raise RuntimeError(
+                "Контур сохранил документ в черновике после отправки"
+                if final_document
+                else "не удалось подтвердить статус после отправки"
+            )
+        except Exception as exc:
+            last_error = str(exc)
+            logger.warning(
+                "Документ %s: попытка %s/%s не завершилась: %s",
+                document_number,
+                attempt,
+                attempts,
+                exc,
+            )
+
+            existing_document = _get_codes_order_document(session, base_url, document_id)
+            if existing_document and _is_codes_order_sent_status(existing_document.get("status")):
+                logger.info(
+                    "Документ %s был принят Контуром после ошибки ответа, статус: %s",
+                    document_number,
+                    existing_document.get("status"),
+                )
+                return existing_document
+
+            if attempt < attempts:
+                time.sleep(CODES_ORDER_SEND_RETRY_INTERVAL_SECONDS)
+
+    logger.error(
+        "Документ %s (%s) остался в черновике после %s попыток: %s",
+        document_number,
+        document_id,
+        attempts,
+        last_error,
+    )
+    return {
+        "documentId": document_id,
+        "status": "draft",
+        "submission_pending": True,
+        "submission_error": last_error or "Не удалось отправить документ на выпуск.",
+    }
+
+
 def codes_order(session: requests.Session, document_number: str,
                 product_group: str, release_method_type: str,
                 positions: list[dict],
@@ -496,8 +657,6 @@ def codes_order(session: requests.Session, document_number: str,
     except RuntimeError as e:
         logger.error(str(e))
         return None
-
-    signed_orders_payload: list[dict] = []
 
     logger.info("Создание документа кодов: %s", document_number)
     url_create = f"{base_url}/api/v1/codes-order?warehouseId={WAREHOUSE_ID}"
@@ -533,81 +692,7 @@ def codes_order(session: requests.Session, document_number: str,
         return None
 
     logger.info("Документ создан: %s", document_id)
-
-    if not _wait_for_order_availability(session, base_url, document_id, document_number):
-        return None
-
-    # проверка сертификата
-    if thumbprint:
-        try:
-            resp = session.get(
-                f"{base_url}/api/v1/organizations/{ORGANIZATION_ID}/employees/has-certificate?thumbprint={thumbprint}",
-                timeout=15,
-            )
-            resp.raise_for_status()
-            if not resp.json():
-                logger.error("Сертификат не зарегистрирован в организации")
-                return None
-        except Exception as e:
-            logger.error("Проверка сертификата: %s", e)
-            return None
-    else:
-        logger.info("Thumbprint не задан: будет использован первый доступный сертификат с ПК")
-
-    # обновление токена OMS
-    cert = find_certificate_by_thumbprint(thumbprint)
-    if not cert:
-        logger.error(f"Сертификат для подписи не найден (thumbprint={thumbprint})")
-        return None
-
-    # получение orders-for-sign
-    try:
-        resp = session.get(f"{base_url}/api/v1/codes-order/{document_id}/orders-for-sign", timeout=15)
-        resp.raise_for_status()
-        orders_to_sign = resp.json()
-        if not isinstance(orders_to_sign, list):
-            logger.error("Некорректный формат orders_for_sign: %s", _preview_text(orders_to_sign))
-            return None
-    except Exception as e:
-        logger.error("Получение данных для подписи: %s", e)
-        return None
-
-    logger.info("Документ %s: получено %s частей для подписи", document_number, len(orders_to_sign))
-
-    # подпись каждого order
-    for o in orders_to_sign:
-        oid = o["id"]
-        b64content = o["base64Content"]
-        logger.debug("Подписываем order id=%s (base64 length=%s)", oid, len(b64content))
-        try:
-            signature_b64 = sign_data(cert, b64content, b_detached=True)
-            signed_orders_payload.append({"id": oid, "base64Content": signature_b64})
-        except Exception as e:
-            logger.error("Ошибка подписи order %s: %s", oid, e)
-            return None
-
-    # отправка документа
-    try:
-        send_url = f"{base_url}/api/v1/codes-order/{document_id}/send"
-        payload = {"signedOrders": signed_orders_payload}
-        r_send = session.post(send_url, json=payload, timeout=30)
-        r_send.raise_for_status()
-        logger.info("Документ %s отправлен на выпуск", document_number)
-    except Exception as e:
-        logger.error("Отправка документа %s: %s", document_number, e)
-        return None
-
-    # финальный статус
-    try:
-        r_fin = session.get(f"{base_url}/api/v1/codes-order/{document_id}", timeout=15)
-        r_fin.raise_for_status()
-        doc = r_fin.json()
-        logger.info("Финальный статус документа %s: %s", document_number, doc.get("status"))
-        return doc
-        
-    except Exception as e:
-        logger.error("Получение финального статуса: %s", e)
-        return None
+    return resume_codes_order(session, document_id, document_number, thumbprint)
 
 
 def check_order_status(session: requests.Session, document_id: str) -> str:
