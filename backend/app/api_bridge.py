@@ -85,10 +85,12 @@ from backend.services.history_db import OrderHistoryDB
 from backend.services.logger import logger
 from backend.services.options import (
     color_options,
+    color_required,
+    product_requires_color,
+    product_requires_venchik,
     simplified_options,
     size_options,
     units_options,
-    color_required,
     venchik_options,
     venchik_required,
 )
@@ -2350,6 +2352,10 @@ class ApiBridge:
         color: str = "",
         venchik: str = "",
     ) -> Dict[str, str]:
+        if product_requires_color(name) and not str(color or "").strip():
+            raise RuntimeError("Укажите цвет — для этого товара цвет обязателен.")
+        if product_requires_venchik(name) and not str(venchik or "").strip():
+            raise RuntimeError("Укажите тип манжеты (венчик) — для этого товара он обязателен.")
         gtin, full_name = lookup_gtin(
             self._load_nomenclature_df(),
             name,

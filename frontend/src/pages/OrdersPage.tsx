@@ -347,8 +347,15 @@ export function OrdersPage() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
-  const colorNeeded = Boolean(form.name && (options.color_required || []).includes(form.name))
-  const venchikNeeded = Boolean(form.name && (options.venchik_required || []).includes(form.name))
+  // Сравнение без учёта регистра: в справочнике «латекс HR», в UI мог остаться «латекс hr».
+  const colorNeeded = Boolean(
+    form.name &&
+      (options.color_required || []).some((item) => item.toLowerCase() === form.name.toLowerCase()),
+  )
+  const venchikNeeded = Boolean(
+    form.name &&
+      (options.venchik_required || []).some((item) => item.toLowerCase() === form.name.toLowerCase()),
+  )
   const paramsMode = mode === 'params'
 
   const load = useCallback(async (force = false) => {
