@@ -16,8 +16,9 @@
 2. Убедитесь, что в обычном Яндекс Браузере выполнен вход в Контур —
    Selenium использует этот профиль (`KONTUR_YANDEX_PROFILE` в `.env`,
    по умолчанию профиль подбирается автоматически).
-3. Несовместимый `driver\yandexdriver.exe` приложение чинит само
-   (`scripts\ensure_yandex_driver.ps1`); вручную:
+3. Несовместимый `driver\yandexdriver.exe` приложение чинит само при
+   сборе cookies и после кнопки «Обновить»
+   (`scripts\ensure_yandex_driver.ps1`). Вручную:
    `powershell -File scripts\ensure_yandex_driver.ps1 -Force`.
 4. Сбор cookies идёт в отдельном профиле программы
    (`runtime\auth\yandex_profile`), обычный Яндекс Браузер закрывать не нужно.

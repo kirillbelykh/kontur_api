@@ -49,34 +49,71 @@ function Find-YandexBrowserPath {
     return $null
 }
 
+function Test-YandexMarketingMajor {
+    param([int]$Major)
+    return ($Major -ge 20 -and $Major -le 40)
+}
+
+function Test-ChromiumMajor {
+    param([int]$Major)
+    return ($Major -ge 80)
+}
+
+function Get-YandexBrowserVersionTexts {
+    param([Parameter(Mandatory = $true)][string]$BrowserPath)
+
+    $texts = New-Object System.Collections.Generic.List[string]
+    $appDir = Split-Path -Parent $BrowserPath
+    $versionInfo = $null
+    try { $versionInfo = (Get-Item -LiteralPath $BrowserPath).VersionInfo } catch {}
+    foreach ($value in @(
+        $(if ($versionInfo) { $versionInfo.FileVersion } else { $null }),
+        $(if ($versionInfo) { $versionInfo.ProductVersion } else { $null })
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace($value)) { $texts.Add($value) }
+    }
+
+    $folders = @(Get-ChildItem -LiteralPath $appDir -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\d+\.\d+' } |
+        Sort-Object {
+            $p = Extract-VersionParts $_.Name
+            "{0:D4}{1:D4}{2:D4}{3:D4}" -f $p[0], $p[1], $p[2], $p[3]
+        } -Descending)
+    foreach ($folder in $folders) { $texts.Add($folder.Name) }
+    return @($texts)
+}
+
 function Get-YandexBrowserVersion {
     param([Parameter(Mandatory = $true)][string]$BrowserPath)
 
-    $appDir = Split-Path -Parent $BrowserPath
-    $folderVersion = Get-ChildItem -LiteralPath $appDir -Directory -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -match '^\d+\.\d+' } |
-        Sort-Object { 
-            $p = Extract-VersionParts $_.Name
-            "{0:D4}{1:D4}{2:D4}{3:D4}" -f $p[0], $p[1], $p[2], $p[3]
-        } -Descending |
-        Select-Object -First 1 -ExpandProperty Name
-
-    $productVersion = $null
-    try { $productVersion = (Get-Item -LiteralPath $BrowserPath).VersionInfo.ProductVersion } catch {}
-
-    foreach ($candidate in @($folderVersion, $productVersion)) {
+    $texts = Get-YandexBrowserVersionTexts -BrowserPath $BrowserPath
+    foreach ($candidate in $texts) {
         $parts = Extract-VersionParts -Text $candidate
-        if ($parts.Count -gt 0 -and $parts[0] -ge 20 -and $parts[0] -le 40) {
-            # Yandex marketing versions are like 25.x / 26.x (not Chromium 148.x).
+        if ($parts.Count -gt 0 -and (Test-YandexMarketingMajor -Major $parts[0])) {
+            # GitHub YandexDriver tags are 25.x / 26.x, not Chromium 148/150.
             return ($parts -join '.')
         }
     }
 
-    $parts = Extract-VersionParts -Text ($productVersion)
-    if ($parts.Count -eq 0) {
-        throw "Unable to detect Yandex Browser version from $BrowserPath"
+    foreach ($candidate in $texts) {
+        $parts = Extract-VersionParts -Text $candidate
+        if ($parts.Count -gt 0) {
+            return ($parts -join '.')
+        }
     }
-    return ($parts -join '.')
+    throw "Unable to detect Yandex Browser version from $BrowserPath"
+}
+
+function Get-YandexBrowserChromiumMajor {
+    param([Parameter(Mandatory = $true)][string]$BrowserPath)
+
+    foreach ($candidate in (Get-YandexBrowserVersionTexts -BrowserPath $BrowserPath)) {
+        $parts = Extract-VersionParts -Text $candidate
+        if ($parts.Count -gt 0 -and (Test-ChromiumMajor -Major $parts[0])) {
+            return [int]$parts[0]
+        }
+    }
+    return $null
 }
 
 function Get-InstalledDriverInfo {
@@ -155,7 +192,9 @@ function Get-YandexDriverSelection {
         Select-Object -First 1
 
     if ($best.Score -lt 100) {
-        throw ("No YandexDriver release matches browser $BrowserVersion (best was $($best.ReleaseTag)). Update the installer list or install a supported browser.")
+        # ProductVersion is often Chromium 150.x while releases are tagged 26.x.
+        # Newest Windows asset is the driver that matches the current browser.
+        Write-WarnMsg "No YandexDriver tag matches browser $BrowserVersion; using newest Windows release $($best.ReleaseTag)."
     }
 
     return $best
@@ -187,7 +226,11 @@ function Ensure-YandexDriver {
     }
 
     $browserVersion = Get-YandexBrowserVersion -BrowserPath $BrowserPath
+    $chromiumMajor = Get-YandexBrowserChromiumMajor -BrowserPath $BrowserPath
     Write-Ok "Yandex Browser version: $browserVersion"
+    if ($chromiumMajor) {
+        Write-Ok "Yandex Browser Chromium major: $chromiumMajor"
+    }
 
     $selection = Get-YandexDriverSelection -BrowserVersion $browserVersion
     Write-Step "Matching YandexDriver release: $($selection.ReleaseTag) ($($selection.AssetName))"
@@ -199,9 +242,13 @@ function Ensure-YandexDriver {
     $installed = Get-InstalledDriverInfo -DriverExe $targetExe
 
     $needsInstall = $Force -or (-not $installed.Exists) -or ($installed.ReleaseTag -ne $selection.ReleaseTag)
+    if (-not $needsInstall -and $installed.ChromeMajor -and $chromiumMajor -and ($installed.ChromeMajor -ne $chromiumMajor)) {
+        $needsInstall = $true
+        Write-WarnMsg "YandexDriver Chrome $($installed.ChromeMajor) != browser Chromium $chromiumMajor. Reinstalling."
+    }
     if (-not $needsInstall -and $installed.Exists -and [string]::IsNullOrWhiteSpace($installed.ReleaseTag)) {
-        # Legacy install without marker: keep only if driver reports a modern Chrome major.
-        if (-not $installed.ChromeMajor -or $installed.ChromeMajor -lt 140) {
+        # Legacy install without marker: keep only if driver reports a matching Chrome major.
+        if (-not $installed.ChromeMajor -or $installed.ChromeMajor -lt 140 -or ($chromiumMajor -and $installed.ChromeMajor -ne $chromiumMajor)) {
             $needsInstall = $true
             Write-WarnMsg "Installed YandexDriver looks outdated ($($installed.VersionLine)). Reinstalling."
         } else {

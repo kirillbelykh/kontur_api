@@ -355,6 +355,18 @@ def apply_update(
                     logger.warning("Локальные изменения остались в stash — выполните `git stash pop` вручную", exc_info=True)
 
             new_head = _capture_git(["rev-parse", "HEAD"], repo).strip()
+            try:
+                from backend.auth.browser import ensure_yandex_driver_updated
+
+                if ensure_yandex_driver_updated(force=False):
+                    logger.info("YandexDriver синхронизирован с Яндекс Браузером")
+                else:
+                    logger.warning(
+                        "Не удалось синхронизировать YandexDriver после git-обновления; "
+                        "сессия повторит попытку при запуске"
+                    )
+            except Exception:
+                logger.warning("Сбой синхронизации YandexDriver после обновления", exc_info=True)
             result: Dict[str, Any] = {
                 "success": True,
                 "updated": True,

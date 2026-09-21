@@ -42,5 +42,61 @@ class OperatorLocalFilesTests(unittest.TestCase):
         self.assertEqual(porcelain_path("R  old.py -> new.py"), "new.py")
 
 
-if __name__ == "__main__":
-    unittest.main()
+class ApplyUpdateDriverSyncTests(unittest.TestCase):
+    def test_apply_update_syncs_yandex_driver_before_restart(self) -> None:
+        probe = {
+            "update_available": True,
+            "local_commit": "aaa",
+            "remote_commit": "bbb",
+        }
+        with (
+            patch("backend.services.update.probe_updates", return_value=probe),
+            patch("backend.services.update._ensure_index_lock_removed"),
+            patch("backend.services.update._capture_git", side_effect=["", "ccc"]),
+            patch("backend.services.update._run_git"),
+            patch("backend.services.update.local_changes_need_stash", return_value=False),
+            patch("backend.services.update._backup_order_history", return_value=None),
+            patch("backend.services.update._restore_order_history"),
+            patch("backend.services.update.schedule_process_restart") as restart_mock,
+            patch("backend.auth.browser.ensure_yandex_driver_updated", return_value=True) as ensure_mock,
+        ):
+            from backend.services.update import apply_update
+
+            result = apply_update(
+                repo_dir="/tmp/repo",
+                auto_restart=True,
+                pre_update_cleanup=lambda: None,
+            )
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["updated"])
+        ensure_mock.assert_called_once_with(force=False)
+        restart_mock.assert_called_once()
+
+    def test_apply_update_still_restarts_if_driver_sync_fails(self) -> None:
+        probe = {
+            "update_available": True,
+            "local_commit": "aaa",
+            "remote_commit": "bbb",
+        }
+        with (
+            patch("backend.services.update.probe_updates", return_value=probe),
+            patch("backend.services.update._ensure_index_lock_removed"),
+            patch("backend.services.update._capture_git", side_effect=["", "ccc"]),
+            patch("backend.services.update._run_git"),
+            patch("backend.services.update.local_changes_need_stash", return_value=False),
+            patch("backend.services.update._backup_order_history", return_value=None),
+            patch("backend.services.update._restore_order_history"),
+            patch("backend.services.update.schedule_process_restart") as restart_mock,
+            patch("backend.auth.browser.ensure_yandex_driver_updated", return_value=False),
+        ):
+            from backend.services.update import apply_update
+
+            result = apply_update(
+                repo_dir="/tmp/repo",
+                auto_restart=True,
+                pre_update_cleanup=lambda: None,
+            )
+
+        self.assertTrue(result["success"])
+        restart_mock.assert_called_once()

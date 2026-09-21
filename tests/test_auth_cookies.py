@@ -246,6 +246,16 @@ class BrowserSessionErrorTests(unittest.TestCase):
         )
         self.assertTrue(is_driver_version_mismatch(exc))
 
+    def test_detects_current_yandex_148_vs_150_mismatch(self):
+        from backend.auth.browser import is_driver_version_mismatch
+
+        exc = RuntimeError(
+            "session not created: This version of ChromeDriver only supports Chrome version 148\n"
+            "Current browser version is 150.0.7871.1774 with binary path "
+            "C:\\Program Files\\Yandex\\YandexBrowser\\Application\\browser.exe"
+        )
+        self.assertTrue(is_driver_version_mismatch(exc))
+
     def test_profile_lock_is_not_a_version_mismatch(self):
         from backend.auth.browser import is_driver_version_mismatch
 
@@ -331,16 +341,65 @@ class BrowserSessionErrorTests(unittest.TestCase):
         term_mock.assert_not_called()
         mkdtemp_mock.assert_not_called()
 
-    def test_get_cookies_does_not_repair_driver_with_second_launch(self):
+    def test_get_cookies_repairs_driver_mismatch_and_retries_once(self):
         from backend.auth import browser as browser_mod
 
         version_error = RuntimeError(
-            "session not created: This version of ChromeDriver only supports Chrome version 146"
+            "session not created: This version of ChromeDriver only supports Chrome version 148\n"
+            "Current browser version is 150.0.7871.1774 with binary path C:\\Program Files\\"
+            "Yandex\\YandexBrowser\\Application\\browser.exe"
         )
 
         with (
             mock.patch.object(browser_mod, "ensure_yandex_driver_updated", return_value=True) as ensure_mock,
+            mock.patch("selenium.webdriver.Chrome", side_effect=[version_error, RuntimeError("stop")]) as chrome_mock,
+            mock.patch.object(Path, "exists", return_value=True),
+            mock.patch("tempfile.mkdtemp") as mkdtemp_mock,
+        ):
+            result = browser_mod.get_cookies(
+                driver_path=Path("driver/yandexdriver.exe"),
+                browser_path=Path("browser.exe"),
+                profile_user_data_dir=Path("User Data"),
+                profile_directory="Default",
+                max_retries=2,
+            )
+
+        self.assertIsNone(result)
+        ensure_mock.assert_called_once_with(force=True)
+        mkdtemp_mock.assert_not_called()
+        self.assertEqual(chrome_mock.call_count, 2)
+
+    def test_get_cookies_does_not_retry_when_driver_update_fails(self):
+        from backend.auth import browser as browser_mod
+
+        version_error = RuntimeError(
+            "session not created: This version of ChromeDriver only supports Chrome version 148"
+        )
+
+        with (
+            mock.patch.object(browser_mod, "ensure_yandex_driver_updated", return_value=False) as ensure_mock,
             mock.patch("selenium.webdriver.Chrome", side_effect=version_error) as chrome_mock,
+            mock.patch.object(Path, "exists", return_value=True),
+        ):
+            result = browser_mod.get_cookies(
+                driver_path=Path("driver/yandexdriver.exe"),
+                browser_path=Path("browser.exe"),
+            )
+
+        self.assertIsNone(result)
+        ensure_mock.assert_called_once_with(force=True)
+        self.assertEqual(chrome_mock.call_count, 1)
+
+    def test_get_cookies_does_not_repair_unrelated_launch_errors(self):
+        from backend.auth import browser as browser_mod
+
+        lock_error = RuntimeError(
+            "session not created: DevToolsActivePort file doesn't exist; Chrome instance exited"
+        )
+
+        with (
+            mock.patch.object(browser_mod, "ensure_yandex_driver_updated", return_value=True) as ensure_mock,
+            mock.patch("selenium.webdriver.Chrome", side_effect=lock_error) as chrome_mock,
             mock.patch.object(Path, "exists", return_value=True),
             mock.patch("tempfile.mkdtemp") as mkdtemp_mock,
         ):

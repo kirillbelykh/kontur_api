@@ -429,11 +429,39 @@ def ensure_yandex_driver_updated(*, force: bool = True) -> bool:
         logger.info("Обновляем YandexDriver через ensure_yandex_driver.ps1...")
         from backend.services.win_subprocess import hidden_console_kwargs
 
-        completed = subprocess.run(cmd, check=False, timeout=180, **hidden_console_kwargs())
-        return completed.returncode == 0
+        completed = subprocess.run(
+            cmd,
+            check=False,
+            timeout=240,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            **hidden_console_kwargs(),
+        )
+        stdout = (completed.stdout or "").strip()
+        stderr = (completed.stderr or "").strip()
+        if stdout:
+            logger.info("YandexDriver: %s", stdout[-4000:])
+        if completed.returncode != 0:
+            logger.error(
+                "Автообновление YandexDriver завершилось с кодом %s: %s",
+                completed.returncode,
+                stderr[-4000:] or stdout[-4000:] or "нет вывода",
+            )
+            return False
+        logger.info("YandexDriver синхронизирован с браузером")
+        return True
     except Exception as exc:
         logger.warning("Автообновление YandexDriver не удалось: %s", exc)
         return False
+
+
+def _start_chrome(driver_path: Path, opts: Any):
+    from selenium import webdriver
+
+    service = build_chrome_service(Path(driver_path))
+    return webdriver.Chrome(service=service, options=opts)
 
 
 def get_cookies(
@@ -447,7 +475,6 @@ def get_cookies(
 ) -> Optional[Dict[str, str]]:
     """One Chrome on the app's persistent profile, then quit."""
     try:
-        from selenium import webdriver
         from selenium.webdriver.common.by import By
         from selenium.webdriver.support import expected_conditions as EC
         from selenium.webdriver.support.ui import WebDriverWait
@@ -494,8 +521,20 @@ def get_cookies(
 
     driver = None
     try:
-        service = build_chrome_service(Path(driver_path))
-        driver = webdriver.Chrome(service=service, options=opts)
+        try:
+            driver = _start_chrome(Path(driver_path), opts)
+        except Exception as exc:
+            if not is_driver_version_mismatch(exc):
+                raise
+            logger.warning(
+                "YandexDriver не подходит к установленному Яндекс Браузеру (%s). "
+                "Скачиваем совместимый драйвер и повторяем запуск.",
+                exc,
+            )
+            if not ensure_yandex_driver_updated(force=True):
+                raise
+            logger.info("YandexDriver обновлён, повторяем запуск браузера")
+            driver = _start_chrome(Path(driver_path), opts)
         wait = WebDriverWait(driver, WAIT_TIMEOUT)
 
         if win32gui and win32con and win32process:
