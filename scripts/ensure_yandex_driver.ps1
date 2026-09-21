@@ -15,6 +15,10 @@ param(
 
 Set-StrictMode -Version 3
 $ErrorActionPreference = "Stop"
+$ProgressPreference = "SilentlyContinue"
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+} catch {}
 
 function Write-Step([string]$Message) { Write-Host "[*] $Message" -ForegroundColor Cyan }
 function Write-Ok([string]$Message) { Write-Host "[+] $Message" -ForegroundColor Green }
@@ -269,7 +273,7 @@ function Ensure-YandexDriver {
     New-Item -ItemType Directory -Path $tmpRoot -Force | Out-Null
     try {
         $zipPath = Join-Path $tmpRoot $selection.AssetName
-        Invoke-WebRequest -Uri $selection.DownloadUrl -OutFile $zipPath -Headers @{ "User-Agent" = "KonturAPI-Installer" }
+        Invoke-WebRequest -Uri $selection.DownloadUrl -OutFile $zipPath -UseBasicParsing -Headers @{ "User-Agent" = "KonturAPI-Installer" }
         Expand-Archive -Path $zipPath -DestinationPath $tmpRoot -Force
         $driverExe = Get-ChildItem -Path $tmpRoot -Recurse -Filter "yandexdriver.exe" | Select-Object -First 1
         if (-not $driverExe) { throw "yandexdriver.exe was not found in the downloaded archive." }

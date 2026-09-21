@@ -21,6 +21,7 @@ from backend.auth.lan_cookies import fetch_cookies_from_lan
 from backend.auth.yandex_cookies import load_cookies_from_yandex_profile
 
 # Skip a second Selenium launch when cookies were just collected successfully.
+# Driver auto-heal may download ~40MB from GitHub; keep debounce below that wait.
 _SELENIUM_DEBOUNCE_SECONDS = 90.0
 _LAST_SELENIUM_OK_AT = 0.0
 _LAST_SELENIUM_TRY_AT = 0.0
@@ -75,7 +76,7 @@ def get_valid_cookies(
             became_refresher = True
 
     if not became_refresher:
-        cookie_refresh_event().wait(timeout=120)
+        cookie_refresh_event().wait(timeout=300)
         cached = load_cookies_from_file(allow_stale=True)
         accepted = _accept_live_cookies(cached, source="file-after-wait")
         if accepted:
